@@ -58,6 +58,33 @@ Feature: Tracing headers
       | $session_id | explicit-session |
 
   @server
+  Scenario: Server capture without explicit or context distinct id is personless
+    Given the SDK is initialized with token "test-token"
+    And server request context middleware is installed
+    When a server request is handled with headers:
+      | header                | value       |
+      | X-POSTHOG-SESSION-ID  | session-123 |
+    And capture is called with event "Backend Work" inside that request context
+    Then one event named "Backend Work" should be enqueued
+    And the enqueued event should include a generated distinct id
+    And the enqueued event properties should include:
+      | property                | value       |
+      | $session_id             | session-123 |
+      | $process_person_profile | false       |
+
+  @server
+  Scenario: Server feature flag evaluation without explicit or context distinct id is empty
+    Given the SDK is initialized with token "test-token"
+    And server request context middleware is installed
+    When a server request is handled with headers:
+      | header                | value       |
+      | X-POSTHOG-SESSION-ID  | session-123 |
+    And evaluate feature flags is called without a distinct id inside that request context
+    Then the returned feature flag evaluation should be empty
+    And no feature flag request should be sent
+    And no event named "$feature_flag_called" should be enqueued
+
+  @server
   Scenario: Server sanitizes tracing header values before storing context
     Given the SDK is initialized with token "test-token"
     And server request context middleware is installed

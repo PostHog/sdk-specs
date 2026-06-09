@@ -97,14 +97,20 @@ clear public tracing-header host allow-list rather than a broad boolean "all hos
    distinct id, the SDK MAY use request context distinct id. If no explicit or context distinct id
    exists, SDKs that support personless server capture SHOULD generate a random id for the event and
    set `$process_person_profile = false` unless the caller explicitly supplied that property.
-8. **Never trust headers for security.** Tracing header identity must not be used for authentication,
+8. **Require identity for feature-flag evaluation.** If server-side feature-flag evaluation
+   (`evaluateFeatureFlags`, `getAllFlags`, or equivalent) is called with no explicit distinct id and
+   request context also has no distinct id, the SDK MUST return an empty/no-op evaluation result and
+   MUST NOT make a feature-flag request or emit `$feature_flag_called` events. Unlike capture, flag
+   evaluation must not invent a random distinct id because doing so would evaluate flags for an
+   unrelated synthetic user.
+9. **Never trust headers for security.** Tracing header identity must not be used for authentication,
    authorization, account lookup, tenant isolation, or security decisions. Authenticated framework
    user context, when deliberately configured by the application, may override or supersede tracing
    header identity.
-9. **Exception autocapture preserves semantics.** Middleware that autocaptures exceptions includes
+10. **Exception autocapture preserves semantics.** Middleware that autocaptures exceptions includes
    request context and tracing-derived properties, but it must rethrow or pass the exception to the
    framework's normal error handling and must not swallow it.
-10. **Request isolation.** Concurrent requests must not leak tracing context into each other or into
+11. **Request isolation.** Concurrent requests must not leak tracing context into each other or into
     later background work unless the application explicitly carries that context forward.
 
 ## State & lifecycle
@@ -156,6 +162,8 @@ clear public tracing-header host allow-list rather than a broad boolean "all hos
 - **`capture`** — server captures may use context distinct id and context `$session_id` when
   explicit values are absent.
 - **`capture-exception`** — server middleware may attach tracing/request context to exception events.
+- **Feature-flag evaluation** — server evaluators may use request context distinct id when no
+  explicit distinct id is supplied, but return an empty/no-op result when neither source is present.
 - **`get-distinct-id` / `get-session-id`** — client header injection reads the same ambient values
   exposed by these public getters.
 - **`session-manager`** — supplies session ids where available.
@@ -209,6 +217,23 @@ headers into analytics context for captures made while handling the request.
 - **WHEN** capture is called with distinct id "explicit-user" and property `$session_id: explicit-session`
 - **THEN** the enqueued event distinct id is "explicit-user"
 - **AND** the event properties keep `$session_id: explicit-session`
+
+#### Scenario: capture without explicit or context distinct id is personless
+- **GIVEN** server request context middleware is installed
+- **AND** an incoming request has `X-POSTHOG-SESSION-ID: session-123`
+- **AND** the request has no `X-POSTHOG-DISTINCT-ID`
+- **WHEN** `capture("Backend Work")` is called inside that request with no explicit distinct id
+- **THEN** the SDK enqueues a personless event with a generated distinct id
+- **AND** the event properties include `$session_id: session-123`
+- **AND** the event properties include `$process_person_profile: false` unless explicitly overridden
+
+#### Scenario: feature-flag evaluation without explicit or context distinct id is empty
+- **GIVEN** server request context middleware is installed
+- **AND** an incoming request has no `X-POSTHOG-DISTINCT-ID`
+- **WHEN** server-side feature-flag evaluation is called with no explicit distinct id
+- **THEN** the SDK returns an empty/no-op evaluation result
+- **AND** no feature-flag request is sent
+- **AND** no `$feature_flag_called` event is enqueued
 
 #### Scenario: malformed server headers are sanitized or omitted
 - **GIVEN** server request context middleware is installed

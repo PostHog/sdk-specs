@@ -16,11 +16,18 @@ their own repos (`posthog-android`, `posthog-ios`, `posthog-js`, `posthog-flutte
 
 ## Capabilities
 
-- `logs` — structured log records emitted through the SDK, enriched with context, batched, and
-  shipped to PostHog as OpenTelemetry Logs (OTLP/HTTP JSON) at `POST {host}/i/v1/logs`.
+Specs now cover three groups of canonical SDK behavior:
 
-<!-- Add a new sibling under specs/<capability>/ for each genuinely distinct capability
-     (e.g. feature flags, session replay, surveys). One capability per folder. -->
+- **Public SDK APIs** such as capture, identify, groups, feature-flag getters, opt-in/out,
+  session-replay controls, setup, flush, shutdown, and property registration.
+- **Internal SDK components** such as lifecycle handling, autocapture, batching, retry queues,
+  persistent storage, remote config, feature-flag caches/evaluators, session management, surveys,
+  consent gating, and replay privacy.
+- **Product pipelines** such as logs, whose records are enriched, batched, and shipped as
+  OpenTelemetry Logs (OTLP/HTTP JSON) at `POST {host}/i/v1/logs`.
+
+Add a new sibling under `specs/<capability>/` for each genuinely distinct capability. One
+capability per folder.
 
 ## Conventions
 

@@ -21,6 +21,7 @@ Tags on each feature indicate whether scenarios apply to client SDKs, server SDK
 | Capability | Spec | Scope | Status |
 |------------|------|-------|--------|
 | Logs | [`openspec/specs/logs/spec.md`](openspec/specs/logs/spec.md) | product | Canonical |
+| Tracing Headers | [`openspec/specs/tracing-headers/spec.md`](openspec/specs/tracing-headers/spec.md) | cross-SDK correlation | Canonical |
 | Alias | [`openspec/specs/alias/spec.md`](openspec/specs/alias/spec.md) | public API | Canonical |
 | Capture | [`openspec/specs/capture/spec.md`](openspec/specs/capture/spec.md) | public API | Canonical |
 | Capture Exception | [`openspec/specs/capture-exception/spec.md`](openspec/specs/capture-exception/spec.md) | public API | Canonical |

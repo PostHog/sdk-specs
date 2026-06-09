@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+
+# Editor / IDE
+.idea/
+*.swp
+*.swo
+*~
+.vscode/
+
+# Node (OpenSpec CLI tooling)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Logs / temp
+*.log
+.tmp/

@@ -1,0 +1,40 @@
+name: OpenSpec
+
+on:
+  pull_request:
+    paths:
+      - 'openspec/**'
+      - '.github/workflows/openspec.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'openspec/**'
+      - '.github/workflows/openspec.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate specs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        # actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Set up Node.js
+        # actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+
+      - name: Install OpenSpec CLI
+        run: npm install -g @fission-ai/openspec@1.4.1
+
+      - name: Validate OpenSpec specs
+        env:
+          OPENSPEC_TELEMETRY: '0'
+        run: openspec validate --specs --strict --no-interactive

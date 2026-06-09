@@ -9,6 +9,13 @@ repos (`posthog-android`, `posthog-ios`, `posthog-js`, `posthog-flutter`, …). 
 the canonical behavior derived from the shipped implementations plus the relevant backend
 service, stating the **winner** wherever SDKs currently diverge.
 
+## Acceptance specs
+
+The `acceptance/` directory contains Gherkin feature files for cross-SDK acceptance tests.
+`acceptance/public/` covers public SDK API behavior, while `acceptance/private/` covers
+shared internal SDK behavior such as batching, storage, feature flags, sessions, and replay.
+Tags on each feature indicate whether scenarios apply to client SDKs, server SDKs, or both.
+
 ## Capabilities
 
 | Capability | Spec | Status |

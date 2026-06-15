@@ -76,10 +76,19 @@ Feature: Exception Steps
     Then the enqueued "$exception" event should include an exception step with message "kept step"
 
   @client
-  Scenario: Buffer resets when the session ends
+  Scenario: A user identity change does not clear the buffer
     Given the SDK is initialized with token "test-token"
-    When add exception step is called with message "old session step"
-    And the SDK session ends and a new session begins
+    When add exception step is called with message "before identity change"
+    And the current user identity is changed via reset
+    And capture exception is called for an exception with type "TypeError" and message "boom"
+    Then the enqueued "$exception" event should include an exception step with message "before identity change"
+
+  @client
+  Scenario: Steps are cleared on a clean launch
+    Given the SDK is initialized with token "test-token"
+    When add exception step is called with message "previous run step"
+    And the SDK is closed
+    And the SDK is launched cleanly with no pending crash report
     And capture exception is called for an exception with type "TypeError" and message "boom"
     Then the enqueued "$exception" event should not include property "$exception_steps"
 
@@ -125,4 +134,4 @@ Feature: Exception Steps
     And the process dies from a fatal crash before any capture
     And the SDK is restarted
     Then the "$exception" event reported for the crash should include an exception step with message "before crash"
-    And the persisted crash steps should be cleared once attached so the new session starts empty
+    And the persisted crash steps should be cleared once attached so the next launch starts empty

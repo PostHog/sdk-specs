@@ -2,11 +2,13 @@
 
 ## Purpose
 
-`exception-steps` lets the host app record **breadcrumb-style context records** ("steps") over time; the SDK attaches the accumulated steps to the **next** captured `$exception` event as `$exception_steps`, giving the PostHog error-tracking UI a timeline of what was happening right before the error.
+`exception-steps` lets the host app record **breadcrumb-style context records** ("steps") over time; the SDK keeps a rolling, byte-bounded buffer of these steps for the session and attaches a snapshot of it to **every** captured `$exception` event as `$exception_steps`, giving the PostHog error-tracking UI a timeline of recent activity leading up to each error.
 
 Steps are recorded manually via a public API in v1 — automatic breadcrumbs (navigation, console, network) are out of scope.
 
-The reference implementation is the browser SDK ([posthog-js#3389](https://github.com/PostHog/posthog-js/pull/3389)): `@posthog/core` ErrorTracking primitives wired in `packages/browser/src/posthog-exceptions.ts`. All buffer/attach/clear requirements trace to that shipped implementation; the crash-durable persistence requirement traces to the iOS port, where PLCrashReporter reconstructs the crash `$exception` on the next launch.
+The buffer lives for the session: two exceptions close together carry overlapping steps, exceptions further apart carry the delta that survives byte-budget eviction, and a fresh session starts empty.
+
+The reference implementation is the browser SDK ([posthog-js#3389](https://github.com/PostHog/posthog-js/pull/3389)): `@posthog/core` ErrorTracking primitives wired in `packages/browser/src/posthog-exceptions.ts`, source of the public API, buffer, and serialization primitives. The crash-durable persistence requirement traces to the iOS port, where PLCrashReporter reconstructs the crash `$exception` on the next launch.
 
 ## Applicability
 
@@ -50,7 +52,7 @@ Each SDK exposes an exception-steps config on its error-tracking options, named 
 5. **Normalize the step to its JSON-safe wire form once**, using the SDK's existing event-property normalizer, before any byte-counting, storage, or persistence.
 6. **Enforce the byte budget.** Evict oldest steps until the total fits within `maxBytes`; reject outright a single step larger than the budget.
 7. **Append to the instance's FIFO buffer**, and on fatal-crash-capable SDKs persist it durably alongside the platform's existing crash context.
-8. **On `$exception` capture:** attach the buffered steps as `$exception_steps` only if the caller did not supply that key, clear the buffer after a successful capture, and preserve it when the exception is dropped or suppressed.
+8. **On `$exception` capture:** attach a snapshot of the buffered steps as `$exception_steps`, only if the caller did not supply that key. The buffer is left intact for subsequent exceptions.
 
 ## State & lifecycle
 
@@ -62,8 +64,8 @@ Each SDK exposes an exception-steps config on its error-tracking options, named 
 
 ### State written
 
-- the in-memory step buffer (append, eviction, clear)
-- on fatal-crash SDKs: the durable step store, updated on each record and cleared once the crash `$exception` is captured
+- the in-memory step buffer (append, byte-budget eviction, reset on session end)
+- on fatal-crash SDKs: the durable step store, updated on each record and cleared once the crashed session's steps have been attached on the next launch
 - the `$exception_steps` property on the outgoing `$exception` event
 
 ## Error handling
@@ -80,7 +82,8 @@ Each SDK exposes an exception-steps config on its error-tracking options, named 
 
 ## Interactions
 
-- **`capture-exception` / the `$exception` capture path** is the attach point: buffered steps are added to the event as `$exception_steps` (only if the caller did not supply that key) and the buffer is cleared after a successful capture.
+- **`capture-exception` / the `$exception` capture path** is the attach point: a snapshot of the buffered steps is added to the event as `$exception_steps` (only if the caller did not supply that key).
+- **Session lifecycle:** the buffer is scoped to the session; when the session ends (a new session begins, e.g. on app relaunch or `reset()`) the buffer starts empty.
 - **Crash reporting:** durability is only required where the crash `$exception` is reconstructed **after process death** (e.g. crash-reporter flows like PLCrashReporter on iOS) — there the buffer is persisted with the platform's existing crash-context persistence, never a parallel store. SDKs whose fatal exceptions are captured in-process and ride the existing persisted event queue (e.g. a JVM `UncaughtExceptionHandler`) may stay in-memory, since steps attach before the event is persisted.
 
 ## Requirements
@@ -159,21 +162,21 @@ The SDK SHALL normalize each step to its JSON-safe wire form **once** — using 
 - **WHEN** steps are written to disk for a fatal-crash SDK
 - **THEN** the persisted form is the normalized wire form, so the next-launch attachment needs no further normalization and the on-disk byte size matches the in-memory budget
 
-### Requirement: Capture-flow attach and clear semantics
+### Requirement: Capture-flow attach semantics and session-scoped buffer
 
-On exception capture the SDK SHALL attach buffered steps to `$exception_steps` only if the caller did not already provide that key, and SHALL clear the buffer only after a successful capture. When an exception is dropped or suppressed, the buffer SHALL be preserved so steps roll forward to the next real exception. When the feature is disabled, recording SHALL be a no-op and nothing SHALL be attached.
+On exception capture the SDK SHALL attach a snapshot of the buffered steps to `$exception_steps` only if the caller did not already provide that key. The buffer is a rolling, session-scoped window that every exception reads from: it SHALL persist across captures and be reset only when the session ends, rotating in the meantime only by byte-budget eviction. When the feature is disabled, recording SHALL be a no-op and nothing SHALL be attached.
 
 #### Scenario: Attach only when absent
 - **WHEN** the caller captures an exception and already provides `$exception_steps`
 - **THEN** the SDK does not overwrite it with buffered steps
 
-#### Scenario: Clear on success
-- **WHEN** an exception is captured successfully
-- **THEN** the buffer is emptied so the same steps are not attached to a later exception
+#### Scenario: Steps persist across captures
+- **WHEN** steps A, B, C are recorded, one exception is captured, step D is then recorded, and a second exception is captured
+- **THEN** the first exception carries `[A, B, C]` and the second carries `[A, B, C, D]` (subject to byte-budget eviction)
 
-#### Scenario: Preserve on drop
-- **WHEN** an exception is dropped or suppressed before being sent
-- **THEN** the buffered steps are retained for the next captured exception
+#### Scenario: Buffer resets when the session ends
+- **WHEN** the session ends and a new session begins (e.g. app relaunch or `reset()`)
+- **THEN** the buffer starts empty for the new session
 
 #### Scenario: Disabled is a no-op
 - **WHEN** the feature is configured disabled
@@ -203,15 +206,17 @@ The `$timestamp` SHALL be captured at call time on the calling thread before any
 
 For any SDK that captures fatal crashes (where the crashing `$exception` is reported on the next process launch), buffered steps SHALL be persisted durably such that steps recorded before the crash survive process death and are attached to the crash `$exception` on the next launch. The persisted store SHALL integrate with the platform's existing crash-context persistence where one exists rather than introduce a parallel, independently-ordered store. SDKs that do not capture fatal crashes MAY use an in-memory buffer.
 
+A fatal crash ends the session. The crashed session's persisted steps therefore belong only to the crash `$exception`: once they have been attached on the next launch they SHALL be cleared so they are not re-attached and do not carry into the new session's buffer.
+
 #### Scenario: Steps survive a fatal crash
 - **WHEN** steps are recorded and the process then dies from a fatal crash before any capture
 - **THEN** on the next launch those steps are read back and attached to the `$exception` reported for that crash
 
-#### Scenario: Persisted steps cleared after the crash exception is captured
-- **WHEN** the crash `$exception` carrying restored steps is captured successfully on next launch
-- **THEN** the persisted steps are cleared so they are not attached again
+#### Scenario: Persisted crash steps do not bleed into the new session
+- **WHEN** the crashed session's steps have been attached to the crash `$exception` on next launch
+- **THEN** the persisted steps are cleared, so they are not attached again and the new session's buffer starts empty
 
 #### Scenario: In-memory fallback when no fatal-crash capture
 - **WHEN** an SDK does not capture fatal crashes
-- **THEN** an in-memory buffer matching the browser model is sufficient
+- **THEN** an in-memory, session-scoped buffer is sufficient
 

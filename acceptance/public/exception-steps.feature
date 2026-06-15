@@ -55,12 +55,33 @@ Feature: Exception Steps
     Then the enqueued event property "$exception_steps" should equal the caller-supplied value
 
   @client
-  Scenario: Buffer is cleared after a successful capture
+  Scenario: Buffered steps persist across captures
     Given the SDK is initialized with token "test-token"
     When add exception step is called with message "step A"
     And capture exception is called for an exception with type "TypeError" and message "first"
+    And add exception step is called with message "step B"
     And capture exception is called for an exception with type "TypeError" and message "second"
-    Then the second enqueued "$exception" event should not include property "$exception_steps"
+    Then the first enqueued "$exception" event should include an exception step with message "step A"
+    And the second enqueued "$exception" event should be an ordered array of steps with messages:
+      | $message |
+      | step A   |
+      | step B   |
+
+  @client
+  Scenario: Capture does not consume the buffer when an exception is dropped
+    Given the SDK is initialized with token "test-token"
+    When add exception step is called with message "kept step"
+    And an exception is captured but dropped before being sent
+    And capture exception is called for an exception with type "TypeError" and message "later"
+    Then the enqueued "$exception" event should include an exception step with message "kept step"
+
+  @client
+  Scenario: Buffer resets when the session ends
+    Given the SDK is initialized with token "test-token"
+    When add exception step is called with message "old session step"
+    And the SDK session ends and a new session begins
+    And capture exception is called for an exception with type "TypeError" and message "boom"
+    Then the enqueued "$exception" event should not include property "$exception_steps"
 
   @client
   Scenario: Oldest steps are evicted when the byte budget is exceeded
@@ -104,4 +125,4 @@ Feature: Exception Steps
     And the process dies from a fatal crash before any capture
     And the SDK is restarted
     Then the "$exception" event reported for the crash should include an exception step with message "before crash"
-    And the persisted steps should be cleared after the crash exception is captured
+    And the persisted crash steps should be cleared once attached so the new session starts empty

@@ -47,11 +47,11 @@ Each SDK exposes an exception-steps config on its error-tracking options, named 
 
 1. **Guard / no-op if disabled.** When the feature is disabled, recording does nothing and nothing is attached.
 2. **Validate the message.** Empty, missing, or non-string messages are ignored with a logged warning; the call never throws.
-3. **Capture `$timestamp` at call time** on the calling thread, before any dispatch.
+3. **Capture `$timestamp` at call time** on the calling thread.
 4. **Strip reserved keys** (`$message`, `$timestamp`) from user-supplied properties with a warning; the SDK sets the canonical values.
 5. **Normalize the step to its JSON-safe wire form once**, using the SDK's existing event-property normalizer, before any byte-counting, storage, or persistence.
 6. **Enforce the byte budget.** Evict oldest steps until the total fits within `maxBytes`; reject outright a single step larger than the budget.
-7. **Append to the instance's FIFO buffer**, and on fatal-crash-capable SDKs persist it durably alongside the platform's existing crash context.
+7. **Append to the instance's FIFO buffer** synchronously, so the call returns only once the step is recorded and a step recorded immediately before a crash is already buffered. Fatal-crash-capable SDKs hold the buffer in memory and make it crash-durable — preferably by flushing it to disk from the crash handler at crash time, falling back to synchronous per-step persistence only where a crash-time flush isn't possible (see "Crash-durable persistence").
 8. **On `$exception` capture:** attach a snapshot of the buffered steps as `$exception_steps`, only if the caller did not supply that key. The buffer is left intact for subsequent exceptions.
 
 ## State & lifecycle
@@ -65,7 +65,7 @@ Each SDK exposes an exception-steps config on its error-tracking options, named 
 ### State written
 
 - the in-memory step buffer (append, byte-budget eviction; cleared on a clean launch or `close()`, not by capture or identity changes)
-- on fatal-crash SDKs: the durable step store, updated on each record and cleared once the crashed run's steps have been attached on the next launch
+- on fatal-crash SDKs: the durable step store — written from the crash handler at crash time where possible, otherwise synchronously as steps are recorded — and cleared once the crashed run's steps have been attached on the next launch
 - the `$exception_steps` property on the outgoing `$exception` event
 
 ## Error handling
@@ -76,7 +76,7 @@ Each SDK exposes an exception-steps config on its error-tracking options, named 
 
 ## Concurrency & ordering guarantees
 
-- `$timestamp` is captured synchronously on the caller's thread; buffer mutation and serialization run on the SDK's existing background/serial queue, so `addExceptionStep` does not block the caller.
+- `$timestamp` is captured synchronously on the caller's thread, and recording is synchronous: normalization, byte-budget enforcement, and buffer mutation complete before `addExceptionStep` returns, so a step recorded immediately before an exception or a crash is never lost to a pending background write. Recording must stay efficient — bounded, allocation-light work that adds negligible latency, even when it touches disk.
 - Buffer access is thread-safe between the recording and capture paths.
 - FIFO order is preserved: `$exception_steps` is always oldest → newest, and eviction removes from the oldest end.
 
@@ -85,7 +85,7 @@ Each SDK exposes an exception-steps config on its error-tracking options, named 
 - **`capture-exception` / the `$exception` capture path** is the attach point: a snapshot of the buffered steps is added to the event as `$exception_steps` (only if the caller did not supply that key).
 - **Instance lifecycle:** the buffer belongs to the SDK instance — it rotates only by byte budget, is cleared on a clean launch and when the SDK is closed/shut down, and is **not** cleared by a user identity change (`reset()` / `identify`).
 - **Embedded native SDK (hybrid SDKs):** a managed-layer SDK (Dart/JS/C#) that embeds a native crash-capturing SDK forwards each recorded step to the native layer so that native crashes carry the same steps — one logical buffer across layers (see "Hybrid (multi-layer) SDKs").
-- **Crash reporting:** durability is only required where the crash `$exception` is reconstructed **after process death** (e.g. crash-reporter flows like PLCrashReporter on iOS) — there the buffer is persisted with the platform's existing crash-context persistence, never a parallel store. SDKs whose fatal exceptions are captured in-process and ride the existing persisted event queue (e.g. a JVM `UncaughtExceptionHandler`) may stay in-memory, since steps attach before the event is persisted.
+- **Crash reporting:** durability is only required where the crash `$exception` is reconstructed **after process death** (e.g. crash-reporter flows like PLCrashReporter on iOS). There the buffer is kept in memory and made durable through the platform's existing crash-context persistence (never a parallel store), preferably by flushing it from the crash handler at crash time rather than writing on every step. SDKs whose fatal exceptions are captured in-process and ride the existing persisted event queue (e.g. a JVM `UncaughtExceptionHandler`) may stay purely in-memory, since steps attach before the event is persisted.
 
 ## Requirements
 
@@ -195,13 +195,17 @@ Each SDK instance SHALL own exactly one logical buffer for the lifetime of the i
 - **WHEN** two SDK instances each record steps
 - **THEN** each instance's exceptions carry only that instance's steps
 
-### Requirement: Accurate timestamps and non-blocking recording
+### Requirement: Accurate timestamps and synchronous, efficient recording
 
-The `$timestamp` SHALL be captured at call time on the calling thread before any dispatch. Buffer mutation and serialization SHALL run on the SDK's existing background/serial queue so `addExceptionStep` does not block the caller, and buffer access SHALL be thread-safe across the recording and capture paths.
+The `$timestamp` SHALL be captured at call time on the calling thread. Recording SHALL be synchronous: normalization, byte-budget enforcement, and buffer mutation SHALL complete before `addExceptionStep` returns, so a step recorded immediately before an exception or a crash is present in the buffer when it is captured — the SDK SHALL NOT defer the work to a background queue that a crash could pre-empt. Recording SHALL nonetheless stay efficient — bounded, allocation-light work that adds negligible latency to the caller, even on SDKs where it touches disk. Buffer access SHALL be thread-safe across the recording and capture paths.
 
 #### Scenario: Timestamp reflects call time
-- **WHEN** a step is recorded and later serialized on a background queue
-- **THEN** its `$timestamp` reflects the moment `addExceptionStep` was called, not the moment it was serialized
+- **WHEN** a step is recorded
+- **THEN** its `$timestamp` reflects the moment `addExceptionStep` was called
+
+#### Scenario: Last step before a crash is recorded
+- **WHEN** a step is recorded immediately before the process crashes, with no further SDK activity in between
+- **THEN** that step is already in the buffer when the crash is captured, because recording completed synchronously rather than on a deferred queue
 
 #### Scenario: Concurrent access is safe
 - **WHEN** `addExceptionStep` and the capture path run on different threads simultaneously
@@ -211,11 +215,17 @@ The `$timestamp` SHALL be captured at call time on the calling thread before any
 
 For any SDK that captures fatal crashes (where the crashing `$exception` is reported on the next process launch), buffered steps SHALL be persisted durably such that steps recorded before the crash survive process death and are attached to the crash `$exception` on the next launch. The persisted store SHALL integrate with the platform's existing crash-context persistence where one exists rather than introduce a parallel, independently-ordered store. SDKs that do not capture fatal crashes MAY use an in-memory buffer.
 
+The buffer SHALL be held in memory during the run. Persistence SHALL be achieved **preferably by flushing the in-memory buffer to disk from the crash handler at crash time**, so the normal path does no per-step disk I/O. Where flushing from the crash handler is not possible or not safe on the platform, the SDK SHALL fall back to persisting synchronously as steps are recorded, keeping that write efficient. Either way the persisted form is the normalized wire form (see "Normalize to the wire form once") and is bounded by `maxBytes`.
+
 A fatal crash ends the run. The crashed run's persisted steps belong only to the crash `$exception`: once they have been attached on the next launch they SHALL be cleared so they are not re-attached and do not carry into the new instance's buffer. A clean shutdown (`close()`) SHALL likewise clear the persisted store, so a subsequent clean launch starts empty.
 
 #### Scenario: Steps survive a fatal crash
 - **WHEN** steps are recorded and the process then dies from a fatal crash before any capture
 - **THEN** on the next launch those steps are read back and attached to the `$exception` reported for that crash
+
+#### Scenario: Persistence prefers a crash-time flush over per-step disk writes
+- **WHEN** an SDK can flush its in-memory buffer from the crash handler
+- **THEN** it keeps steps in memory during normal operation and writes them to the durable store at crash time, rather than persisting on every `addExceptionStep`
 
 #### Scenario: Persisted crash steps do not bleed into the next launch
 - **WHEN** the crashed run's steps have been attached to the crash `$exception` on next launch

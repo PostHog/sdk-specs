@@ -84,6 +84,7 @@ Each SDK exposes an exception-steps config on its error-tracking options, named 
 
 - **`capture-exception` / the `$exception` capture path** is the attach point: a snapshot of the buffered steps is added to the event as `$exception_steps` (only if the caller did not supply that key).
 - **Instance lifecycle:** the buffer belongs to the SDK instance — it rotates only by byte budget, is cleared on a clean launch and when the SDK is closed/shut down, and is **not** cleared by a user identity change (`reset()` / `identify`).
+- **Embedded native SDK (hybrid SDKs):** a managed-layer SDK (Dart/JS/C#) that embeds a native crash-capturing SDK forwards each recorded step to the native layer so that native crashes carry the same steps — one logical buffer across layers (see "Hybrid (multi-layer) SDKs").
 - **Crash reporting:** durability is only required where the crash `$exception` is reconstructed **after process death** (e.g. crash-reporter flows like PLCrashReporter on iOS) — there the buffer is persisted with the platform's existing crash-context persistence, never a parallel store. SDKs whose fatal exceptions are captured in-process and ride the existing persisted event queue (e.g. a JVM `UncaughtExceptionHandler`) may stay in-memory, since steps attach before the event is persisted.
 
 ## Requirements
@@ -188,7 +189,7 @@ On exception capture the SDK SHALL attach a snapshot of the buffered steps to `$
 
 ### Requirement: Single-instance isolation
 
-Each SDK instance SHALL own exactly one global buffer for the lifetime of the instance (single-user client model). Steps SHALL NOT be shared across instances.
+Each SDK instance SHALL own exactly one logical buffer for the lifetime of the instance (single-user client model). Steps SHALL NOT be shared across instances. A hybrid SDK spanning multiple layers (see "Hybrid (multi-layer) SDKs") is still one instance with one logical buffer, even if that buffer is mirrored across layers.
 
 #### Scenario: One buffer per instance
 - **WHEN** two SDK instances each record steps
@@ -223,4 +224,18 @@ A fatal crash ends the run. The crashed run's persisted steps belong only to the
 #### Scenario: In-memory fallback when no fatal-crash capture
 - **WHEN** an SDK does not capture fatal crashes
 - **THEN** an in-memory, instance-lifetime buffer is sufficient
+
+### Requirement: Hybrid (multi-layer) SDKs
+
+For an SDK composed of a managed layer (e.g. Dart, JavaScript, C#) embedding a native SDK that captures fatal crashes (e.g. posthog-ios / posthog-android), errors are captured on different layers: the managed layer captures managed-runtime errors in-process, while the native SDK captures fatal native crashes (often reconstructed on the next launch). The public `addExceptionStep` records on the managed layer, but the buffer SHALL behave as one logical buffer shared across both layers so an `$exception` captured on either layer carries the same steps.
+
+Each step recorded on the managed layer SHALL be forwarded — in its normalized wire form (see "Normalize to the wire form once") — to the embedded native SDK, which retains it under the same FIFO byte-budget rules and persists it via the crash-durable store. The managed and native buffers SHALL therefore converge to identical contents, so a native crash reconstructed on the next launch carries the steps recorded before it. A given `$exception` SHALL carry the shared buffer's steps exactly once; the attach-if-absent rule prevents any layer from attaching a second time. Clearing (clean launch, `close()`, post-crash cleanup) SHALL apply across both layers, and a user identity change SHALL clear neither.
+
+#### Scenario: Native crash carries managed-layer steps
+- **WHEN** the app records steps through the managed-layer `addExceptionStep` and the process then dies from a native crash before any capture
+- **THEN** on the next launch the native crash `$exception` carries those steps, because they were forwarded to and persisted on the native layer before the crash
+
+#### Scenario: Steps are not duplicated across layers
+- **WHEN** an exception is captured on one layer and already has `$exception_steps` attached
+- **THEN** no other layer attaches or appends the shared buffer's steps again
 

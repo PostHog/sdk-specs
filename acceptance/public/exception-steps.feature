@@ -135,3 +135,13 @@ Feature: Exception Steps
     And the SDK is restarted
     Then the "$exception" event reported for the crash should include an exception step with message "before crash"
     And the persisted crash steps should be cleared once attached so the next launch starts empty
+
+  @client
+  Scenario: A native crash in a hybrid SDK carries managed-layer steps
+    Given a hybrid SDK whose managed layer embeds a native crash-capturing SDK
+    And the SDK is initialized with token "test-token"
+    When add exception step is called on the managed layer with message "before native crash"
+    And the process dies from a native crash before any capture
+    And the SDK is restarted
+    Then the native crash "$exception" reported on the next launch should include an exception step with message "before native crash"
+    And the step should be attached only once across layers

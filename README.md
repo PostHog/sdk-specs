@@ -27,6 +27,7 @@ Tags on each feature indicate whether scenarios apply to client SDKs, server SDK
 | Capture Exception | [`openspec/specs/capture-exception/spec.md`](openspec/specs/capture-exception/spec.md) | public API | Canonical |
 | Create Person Profile | [`openspec/specs/create-person-profile/spec.md`](openspec/specs/create-person-profile/spec.md) | public API | Canonical |
 | Debug | [`openspec/specs/debug/spec.md`](openspec/specs/debug/spec.md) | public API | Canonical |
+| Exception Steps | [`openspec/specs/exception-steps/spec.md`](openspec/specs/exception-steps/spec.md) | public API | Canonical |
 | Flush | [`openspec/specs/flush/spec.md`](openspec/specs/flush/spec.md) | public API | Canonical |
 | Get Anonymous ID | [`openspec/specs/get-anonymous-id/spec.md`](openspec/specs/get-anonymous-id/spec.md) | public API | Canonical |
 | Get Distinct ID | [`openspec/specs/get-distinct-id/spec.md`](openspec/specs/get-distinct-id/spec.md) | public API | Canonical |

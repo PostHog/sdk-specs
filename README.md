@@ -74,6 +74,7 @@ Tags on each feature indicate whether scenarios apply to client SDKs, server SDK
 | Remote Config | [`openspec/specs/remote-config/spec.md`](openspec/specs/remote-config/spec.md) | internal behavior | Canonical |
 | Retry Queue | [`openspec/specs/retry-queue/spec.md`](openspec/specs/retry-queue/spec.md) | internal behavior | Canonical |
 | Session Manager | [`openspec/specs/session-manager/spec.md`](openspec/specs/session-manager/spec.md) | internal behavior | Canonical |
+| Session Replay Ingestion Controls | [`openspec/specs/session-replay-ingestion-controls/spec.md`](openspec/specs/session-replay-ingestion-controls/spec.md) | internal behavior | Canonical |
 | Session Replay Privacy | [`openspec/specs/session-replay-privacy/spec.md`](openspec/specs/session-replay-privacy/spec.md) | internal behavior | Canonical |
 | Surveys | [`openspec/specs/surveys/spec.md`](openspec/specs/surveys/spec.md) | internal behavior | Canonical |
 

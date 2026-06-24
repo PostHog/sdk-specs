@@ -65,7 +65,7 @@ Unity awaits anonymous-context feature-flag reload before the returned task comp
    - opt-out state in the SDKs audited here
 5. **Preserve pending outbound events.** Reset affects future events only. Already-enqueued events remain queued for delivery and are not rewritten to the new anonymous identity.
 6. **Rotate session state.** Start a new session (or force the current session id to rotate) so post-reset activity is tracked in a new anonymous session.
-7. **Clear feature-flag bookkeeping and reload flags.** Flag-called trackers and related caches are cleared, then feature flags are reloaded for the anonymous context.
+7. **Clear feature-flag bookkeeping and reload flags.** Feature-flag-called dedupe trackers and related caches are cleared, then feature flags are reloaded for the anonymous context.
 8. **Notify local integrations / observers if the SDK has them.** iOS explicitly notifies integrations of the context change after reset. Other SDKs update local managers implicitly via their storage / identity abstractions.
 
 ## State & lifecycle
@@ -120,7 +120,7 @@ After `reset`, the SDK behaves like a fresh anonymous client instance:
 - **`capture`** — subsequent captures use the fresh anonymous identity and new session context.
 - **`group` / `groupIdentify`** — stored group membership is cleared, so group context must be re-established after reset.
 - **`register` / `unregister`** — registered/super properties are cleared and must be re-registered if still desired.
-- **Feature flags** — reset clears cached flag state and reloads flags for the anonymous user.
+- **Feature flags** — reset clears cached flag state, clears feature-flag-called dedupe tracking, and reloads flags for the anonymous user.
 - **Session replay / surveys / remote config** — implementations that persist these alongside identity clear their user-scoped caches during reset.
 - **Consent APIs (`opt_in` / `opt_out`)** — in the audited client SDKs, reset clears persisted opt-out state, so it should not be treated as a privacy-preserving alternative to opt-out.
 

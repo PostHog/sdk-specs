@@ -53,8 +53,9 @@ shutdown(timeoutMs?: number): void | Promise<void>
    - Native `void` implementations usually fire teardown on their internal queue and do not expose completion to callers.
 4. **Stop background workers / timers / pollers.** Shut down batch consumers, flush timers, feature-flag pollers, replay queues, or equivalent background machinery.
 5. **Tear down integrations / subsystems.** Depending on SDK, this may include session replay, error tracking, reachability, lifecycle handlers, or custom integrations.
-6. **Release or reset internal references.** Some SDKs nil out storage/api/config objects, remove API-key registrations, or destroy singleton objects.
-7. **Do not expect reuse.** After shutdown/close, callers should treat the instance as dead and create a new SDK instance if needed.
+6. **Clear transient tracking state.** Clear in-memory feature-flag-called tracker / dedupe state so it cannot outlive the SDK instance.
+7. **Release or reset internal references.** Some SDKs nil out storage/api/config objects, remove API-key registrations, or destroy singleton objects.
+8. **Do not expect reuse.** After shutdown/close, callers should treat the instance as dead and create a new SDK instance if needed.
 
 ## State & lifecycle
 
@@ -69,6 +70,7 @@ shutdown(timeoutMs?: number): void | Promise<void>
 
 - closed/shutdown flags/promises
 - stopped worker/timer state
+- cleared feature-flag-called tracker state
 - cleared internal references / singleton state
 - auxiliary subsystem teardown state
 
@@ -96,6 +98,7 @@ shutdown(timeoutMs?: number): void | Promise<void>
 - **`flush`** — shutdown commonly calls or subsumes flush behavior.
 - **retry-queue / event-batcher** — drained/stopped as part of shutdown.
 - **feature-flag pollers / cache providers** — stopped or shut down as part of teardown.
+- **feature-flag-called tracker** — cleared during teardown so dedupe state does not leak across SDK lifetimes.
 - **session replay / error tracking / integrations** — stopped/uninstalled as part of client shutdown.
 
 ## Requirements

@@ -35,9 +35,9 @@ In some SDKs, `shouldTrack` and `markSeen` are combined into one atomic "add if 
 2. **Check whether this combination was already reported.**
 3. **Suppress duplicate tracking events.** If the same combination has already been seen, do not emit another `$feature_flag_called` event.
 4. **Allow new tracking when the response or evaluation context changes.** If a flag's value changes for the same key, or if a server-side call evaluates the same flag/value for a different `distinct_id` or group context, allow a new `$feature_flag_called` event.
-5. **Reset on flag reload/change and lifecycle boundaries.** When feature flags are reloaded, caches are reset, identity is reset, or the SDK is closed/shut down, clear the dedupe tracker so post-reset/reloaded SDK state can emit fresh tracking events and shutdown state cannot leak across SDK lifetimes.
+5. **Reset on flag change and lifecycle boundaries.** When feature flag state changes, caches are reset, identity is reset, or the SDK is closed/shut down, clear the dedupe tracker so post-reset/reloaded SDK state can emit fresh tracking events and shutdown state cannot leak across SDK lifetimes. On client-side flag reloads, SDKs MAY retain the tracker if they can reliably compare the complete relevant flag state before and after reload (including flag keys, values, payloads, and other cached flag metadata used by accessors) and determine it is unchanged; otherwise, they SHOULD clear the tracker after reload.
 6. **Expose tracking controls unevenly at the wrapper layer when applicable.** For example, Flutter delegates to the underlying native/browser trackers and only exposes a per-call suppression flag on `getFeatureFlagResult(sendEvent: ...)`, while `getFeatureFlag(...)`, `getFeatureFlagPayload(...)`, and `isFeatureEnabled(...)` always use the default tracking path.
-7. **Cap memory usage where needed.** Larger-scale implementations evict old entries using bounded maps or LRU-style caches. When a bounded tracker reaches its capacity, it SHOULD evict the oldest or least-recently-used entries incrementally. Capacity pressure SHOULD NOT clear the entire tracker, because doing so can flood analytics with duplicate `$feature_flag_called` events. Full tracker clears are reserved for explicit lifecycle/context boundaries such as flag reload/cache reset, identity reset, or SDK close/shutdown.
+7. **Cap memory usage where needed.** Larger-scale implementations evict old entries using bounded maps or LRU-style caches. When a bounded tracker reaches its capacity, it SHOULD evict the oldest or least-recently-used entries incrementally. Capacity pressure SHOULD NOT clear the entire tracker, because doing so can flood analytics with duplicate `$feature_flag_called` events. Full tracker clears are reserved for explicit lifecycle/context boundaries such as observed flag-state change/cache reset, identity reset, or SDK close/shutdown.
 
 ## State & lifecycle
 
@@ -54,7 +54,8 @@ In some SDKs, `shouldTrack` and `markSeen` are combined into one atomic "add if 
 
 - The tracker starts empty when the SDK initializes.
 - Each flag access that would emit `$feature_flag_called` consults the tracker first.
-- Flag reloads reset the tracker so new values can be reported again.
+- Flag reloads reset the tracker when the SDK cannot reliably determine whether relevant flag state changed, or when it detects a change in flag keys, values, payloads, or other cached flag metadata used by accessors.
+- Client SDKs MAY keep tracker state across a flag reload when they can reliably compare the complete relevant flag state and determine it is unchanged.
 - Capacity-based eviction SHOULD remove only selected old/LRU entries instead of clearing the entire tracker.
 - SDKs that support identity reset flows MUST clear the tracker because the relevant flag-evaluation context changed.
 - SDK close/shutdown flows MUST clear the tracker so in-memory dedupe state does not outlive the SDK instance.
@@ -76,7 +77,7 @@ In some SDKs, `shouldTrack` and `markSeen` are combined into one atomic "add if 
 
 - **`get-feature-flag` / `is-feature-enabled` / `get-feature-flag-result`** — all commonly use this tracker before capturing `$feature_flag_called`.
 - **`get-feature-flag-payload`** — some SDKs route payload lookups through the same tracking/dedupe machinery, while others suppress tracking or expose only a compatibility wrapper.
-- **feature-flag cache reloads** — reset the tracker because flag values may have changed.
+- **feature-flag cache reloads** — reset the tracker when relevant flag state may have changed. SDKs MAY avoid clearing on reload when they can reliably compare the complete relevant cached flag state, including values and payloads, and determine it is unchanged.
 - **identity resets / context changes** — clear the tracker because subsequent evaluations use a new user context.
 - **server-side group context** — where groups are provided for feature-flag evaluation, the group type/key mapping is part of the dedupe context so the same user, flag, and value can be tracked separately for different group evaluations. Equivalent group mappings should dedupe even if represented in a different map/dictionary order.
 - **SDK close / shutdown** — clears the tracker as part of teardown so dedupe state does not leak across SDK lifetimes.

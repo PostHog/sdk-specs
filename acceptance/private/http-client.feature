@@ -34,3 +34,50 @@ Feature: HTTP Client
     And flush is called
     Then the call should not throw
     And the event named "Retry Me" should remain queued for retry
+
+  Scenario: Flags request retries one transient transport failure by default
+    Given the SDK is initialized with token "test-token"
+    And the current distinct id is "user-123"
+    And the next feature flag request will fail with a transient transport timeout before any HTTP response
+    And the following feature flag request will return feature flags:
+      | key     | value |
+      | beta-ui | true  |
+    When feature flags are loaded from the remote flags endpoint
+    Then exactly 2 feature flag requests should be sent
+    And the first retry should not be sent before 300ms have elapsed
+    And cached feature flags should include:
+      | key     | value |
+      | beta-ui | true  |
+
+  Scenario: Flags request does not retry HTTP status errors
+    Given the SDK is initialized with token "test-token"
+    And cached feature flags are:
+      | key     | value |
+      | beta-ui | true  |
+    And the next feature flag request will fail with HTTP status 503
+    When feature flags are loaded from the remote flags endpoint
+    Then exactly 1 feature flag request should be sent
+    And cached feature flags should still include:
+      | key     | value |
+      | beta-ui | true  |
+    And the call should not throw in normal client reload operation
+
+  Scenario: Zero configured flag retries disables retry
+    Given the SDK is initialized with token "test-token" and feature flag request max retries 0
+    And the next feature flag request will fail with a transient transport timeout before any HTTP response
+    When feature flags are loaded from the remote flags endpoint
+    Then exactly 1 feature flag request should be sent
+
+  Scenario: Configured flag retries use 300ms exponential backoff
+    Given the SDK is initialized with token "test-token" and feature flag request max retries 2
+    And the next 2 feature flag requests will fail with transient transport timeouts before any HTTP response
+    And the following feature flag request will return feature flags:
+      | key     | value |
+      | beta-ui | true  |
+    When feature flags are loaded from the remote flags endpoint
+    Then exactly 3 feature flag requests should be sent
+    And the first retry should not be sent before 300ms have elapsed
+    And the second retry should not be sent before 600ms have elapsed after the first retry
+    And cached feature flags should include:
+      | key     | value |
+      | beta-ui | true  |

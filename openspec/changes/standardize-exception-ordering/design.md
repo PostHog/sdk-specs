@@ -20,8 +20,8 @@ constrains the order of any of these today, and shipped SDKs diverge (audited 20
 | posthog-php | **crash-first** (`ExceptionPayloadBuilder.php` `getTrace`) | outermost | file-order, 5 lines |
 | posthog-go | **crash-first** (`error_tracking_stack_trace.go`) | single-only | none |
 | posthog-rs | **crash-first** (`error_tracking.rs`, test asserts it) | outermost (`exception_id`/`parent_id` links) | none |
-| posthog-elixir | no error tracking | — | — |
-| posthog-java | tombstoned; successor posthog-server unaudited | — | — |
+| posthog-elixir | **crash-first** (`handler.ex` `do_stacktrace`, native `__STACKTRACE__` order) | outermost | file-order, 5 lines |
+| posthog-server (java successor) | **crash-first** (shared `ThrowableCoercer.kt` in the posthog-android repo) | outermost | none |
 
 Consumer behavior (cymbal, the error-tracking ingestion pipeline):
 
@@ -45,8 +45,8 @@ Consumer behavior (cymbal, the error-tracking ingestion pipeline):
 - Requiring SDKs to capture source context or exception chains they do not have today
   (single-element lists and context-less frames remain valid).
 - Changing the fingerprint algorithm itself.
-- Specifying error tracking for posthog-elixir or posthog-server (unaudited successor to the
-  tombstoned posthog-java).
+- Specifying error tracking for the tombstoned posthog-java (its successor, posthog-server,
+  is covered by the audit above).
 
 ## Decisions
 
@@ -87,8 +87,9 @@ Consumer behavior (cymbal, the error-tracking ingestion pipeline):
 - [posthog-rs has a test asserting crash-first order] → that test must be inverted in the same
   PR as the reversal; the delta scenario "Crash-first runtime stacks are reversed before
   sending" is the replacement contract.
-- [posthog-server (java successor) is unaudited] → audit before porting this capability; the
-  semver gate design accommodates whatever it currently sends.
+- [posthog-server and posthog-android share `ThrowableCoercer.kt`] → one code change flips
+  both, but they release under different `$lib` names and version lines, so the pipeline gate
+  needs a separate cutoff entry per `$lib`.
 - [SDKs that reverse at capture time pay a small allocation cost] → negligible relative to
   exception coercion and network cost.
 
@@ -100,8 +101,9 @@ Consumer behavior (cymbal, the error-tracking ingestion pipeline):
    release of each SDK.
 3. SDKs ship the wire-order change in a **minor** release (never a patch) so `$lib_version`
    cleanly separates old-order from new-order payloads: frame reversal in posthog-android,
-   posthog-flutter, posthog-php, posthog-go, posthog-rs; exception-list flip in
-   posthog-python.
+   posthog-flutter, posthog-php, posthog-go, posthog-rs, posthog-elixir, and posthog-server
+   (shared coercer with posthog-android — one change, two `$lib` gate entries);
+   exception-list flip in posthog-python.
 4. Update `acceptance/public/capture-exception.feature` with the ordering scenarios; SDK
    acceptance harnesses adopt them with their flip release.
 
@@ -113,4 +115,6 @@ rollback needs no pipeline change.
 - Should single-list SDKs (posthog-ruby, posthog-go, posthog-flutter) adopt chain unwrapping
   where the platform supports it (e.g. Go's `errors.Unwrap`)? Out of scope here; the spec
   already permits single-element lists.
-- posthog-server (java successor) needs an audit before this capability is ported to it.
+- cymbal has no dedicated elixir language path under `src/core/types/langs/`, so elixir raw
+  stacks presumably flow through the `custom` handler — confirm how they are typed and handled
+  before adding the elixir gate entry.

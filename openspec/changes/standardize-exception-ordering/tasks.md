@@ -22,9 +22,10 @@
 
 - [ ] 3.1 posthog (cymbal): semver-gated normalization of legacy payloads per
       (`$lib`, `$lib_version`) plus fingerprint aliasing paired with each SDK's flip release
-- [ ] 3.2 Frame reversal in a minor release: posthog-android (`ThrowableCoercer.kt`),
-      posthog-flutter (`dart_exception_processor.dart`), posthog-php
-      (`ExceptionPayloadBuilder.php`), posthog-go (`error_tracking_stack_trace.go`),
-      posthog-rs (`error_tracking.rs`, invert the crash-first test)
+- [ ] 3.2 Frame reversal in a minor release: posthog-android + posthog-server (shared
+      `ThrowableCoercer.kt`; one change, two `$lib` gate entries), posthog-flutter
+      (`dart_exception_processor.dart`), posthog-php (`ExceptionPayloadBuilder.php`),
+      posthog-go (`error_tracking_stack_trace.go`), posthog-rs (`error_tracking.rs`, invert
+      the crash-first test), posthog-elixir (`handler.ex` `do_stacktrace`)
 - [ ] 3.3 posthog-python: flip `$exception_list` to outermost-first
       (`exception_utils.py:719`) in a minor release

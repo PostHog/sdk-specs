@@ -29,7 +29,8 @@ One canonical ordering restores cross-SDK grouping and display parity.
   - **Source context line order** (for SDKs that attach it): `context_line` plus `pre_context`
     / `post_context` arrays in file order (ascending line numbers).
 - **BREAKING** (wire order) for SDKs that emit crash-first frames today: posthog-android,
-  posthog-flutter, posthog-php, posthog-go, and posthog-rs MUST reverse frames.
+  posthog-flutter, posthog-php, posthog-go, posthog-rs, posthog-elixir, and posthog-server
+  MUST reverse frames.
 - **BREAKING** (wire order) for posthog-python: `$exception_list` is currently root-cause-first
   and must flip to outermost-first.
 - The source-context requirement codifies existing behavior — every SDK that sends context
@@ -59,18 +60,22 @@ Audit basis: SDK implementations and pipeline behavior verified 2026-07-02.
   - Crash-first (need reversal): posthog-android (`ThrowableCoercer.kt`), posthog-flutter
     (`dart_exception_processor.dart`), posthog-php (`ExceptionPayloadBuilder.php` `getTrace`),
     posthog-go (`error_tracking_stack_trace.go`), posthog-rs (`error_tracking.rs` — has a test
-    asserting crash-first that must be updated).
-  - No error tracking: posthog-elixir. posthog-java is tombstoned; its successor
-    (posthog-server) is unaudited.
+    asserting crash-first that must be updated), posthog-elixir (`handler.ex`
+    `do_stacktrace`), posthog-server (java successor; shares `ThrowableCoercer.kt` with
+    posthog-android, so one code change covers both `$lib`s).
+  - posthog-java is tombstoned; posthog-server (a module in the posthog-android repo) replaces
+    it and is audited above.
 - **Exception list order today:**
   - `[0]` = outermost (compliant): js-family, posthog-php, posthog-rs (with
-    `exception_id`/`parent_id` chain links), posthog-dotnet, posthog-android, posthog-ios.
+    `exception_id`/`parent_id` chain links), posthog-dotnet, posthog-android, posthog-ios,
+    posthog-elixir, posthog-server.
   - `[0]` = root cause (non-compliant, must flip): posthog-python (`exception_utils.py:719`
     reverses).
   - Single-element only: posthog-ruby, posthog-go, posthog-flutter.
-- **Source context today:** posthog-php, posthog-python, posthog-node, posthog-ruby, and
-  posthog-dotnet all already send file-order pre/post context (5 lines; node 7). posthog-rs,
-  posthog-go, posthog-android, posthog-ios, and posthog-flutter send none.
+- **Source context today:** posthog-php, posthog-python, posthog-node, posthog-ruby,
+  posthog-dotnet, and posthog-elixir all already send file-order pre/post context (5 lines;
+  node 7). posthog-rs, posthog-go, posthog-android, posthog-ios, posthog-flutter, and
+  posthog-server send none.
 - **Backend:** cymbal gains semver-gated normalization of legacy payloads plus fingerprint
   aliasing (see appendix and `design.md`).
 

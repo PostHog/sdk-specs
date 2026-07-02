@@ -49,7 +49,26 @@ Feature: HTTP Client
       | key     | value |
       | beta-ui | true  |
 
-  Scenario: Flags request does not retry HTTP status errors
+  Scenario Outline: Flags request retries transient gateway HTTP status errors by default
+    Given the SDK is initialized with token "test-token"
+    And the current distinct id is "user-123"
+    And the next feature flag request will fail with HTTP status <status>
+    And the following feature flag request will return feature flags:
+      | key     | value |
+      | beta-ui | true  |
+    When feature flags are loaded from the remote flags endpoint
+    Then exactly 2 feature flag requests should be sent
+    And the first retry should not be sent before 300ms have elapsed
+    And cached feature flags should include:
+      | key     | value |
+      | beta-ui | true  |
+
+    Examples:
+      | status |
+      | 502    |
+      | 504    |
+
+  Scenario: Flags request does not retry non-transient HTTP status errors
     Given the SDK is initialized with token "test-token"
     And cached feature flags are:
       | key     | value |

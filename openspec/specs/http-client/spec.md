@@ -152,9 +152,9 @@ The SDK SHALL implement the canonical `http-client` behavior described by this s
 
 The SDK SHALL apply a bounded, endpoint-specific retry policy to feature flag evaluation requests sent to `/flags` or an equivalent flag-evaluation endpoint. This policy is separate from the durable ingestion retry queue and applies to both client-side flag reloads and server-side direct flag evaluation when they use the remote flags endpoint.
 
-A flag evaluation request SHALL retry only when the SDK did not receive an HTTP/API response because request execution failed with a transient transport condition, such as a network error, connection reset/lost, timeout, DNS/socket/TLS transport failure, or equivalent platform error. SDKs MAY also treat response-body read failures before a valid flags response is available as transport failures. SDKs SHALL NOT retry serialization/programming errors that occur before a valid request can be sent.
+A flag evaluation request SHALL retry when the SDK did not receive an HTTP/API response because request execution failed with a transient transport condition, such as a network error, connection reset/lost, timeout, DNS/socket/TLS transport failure, or equivalent platform error. A flag evaluation request SHALL also retry HTTP `502 Bad Gateway` and `504 Gateway Timeout` responses from the flags endpoint. SDKs MAY also treat response-body read failures before a valid flags response is available as transport failures. SDKs SHALL NOT retry serialization/programming errors that occur before a valid request can be sent.
 
-A flag evaluation request SHALL NOT retry any HTTP/API status response from the flags endpoint. This includes `408 Request Timeout`, `429 Too Many Requests`, every `5xx` response, and all other non-2xx statuses. Those responses SHALL be surfaced to the feature-flag caller/cache layer according to the SDK's normal flag error behavior without issuing another flags request for the same evaluation.
+A flag evaluation request SHALL NOT retry any HTTP/API status response from the flags endpoint other than `502 Bad Gateway` or `504 Gateway Timeout`. Non-retryable responses include `408 Request Timeout`, `429 Too Many Requests`, `500 Internal Server Error`, `503 Service Unavailable`, all other `5xx` responses, and all other non-2xx statuses. Those responses SHALL be surfaced to the feature-flag caller/cache layer according to the SDK's normal flag error behavior without issuing another flags request for the same evaluation.
 
 The default retry budget SHALL be one retry after the initial attempt (two total attempts). SDKs that expose a flag-request retry configuration SHALL interpret `0` retries as disabled and SHALL bound any configured retry count so the SDK never retries indefinitely.
 
@@ -178,7 +178,29 @@ Retries SHALL use exponential backoff starting at 300ms before the first retry, 
   | key     | value |
   | beta-ui | true  |
 
-#### Scenario: Flags request does not retry HTTP status errors (@both)
+#### Scenario: Flags request retries transient gateway HTTP status errors by default (@both)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** the current distinct id is "user-123"
+- **AND** the next feature flag request will fail with HTTP status <status>
+- **AND** the following feature flag request will return feature flags:
+  | key     | value |
+  | beta-ui | true  |
+- **WHEN** feature flags are loaded from the remote flags endpoint
+- **THEN** exactly 2 feature flag requests should be sent
+- **AND** the first retry should not be sent before 300ms have elapsed
+- **AND** cached feature flags should include:
+  | key     | value |
+  | beta-ui | true  |
+  Examples:
+  | status |
+  | 502    |
+  | 504    |
+
+#### Scenario: Flags request does not retry non-transient HTTP status errors (@both)
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
 - **AND** persistent storage is empty

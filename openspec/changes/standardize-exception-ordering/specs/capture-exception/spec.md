@@ -11,6 +11,9 @@ innermost-first (crash-first) stacks MUST reverse the frames before building the
 
 > Note (non-normative): bottom-up matches the majority of PostHog's current event volume and
 > is the order the ingestion pipeline's fingerprinting and inline-frame expansion assume.
+> Wire order is not display order: the product UI renders from this canonical storage order
+> and applies its own display policy (most recent call first by default, for every platform).
+> SDKs never reorder frames for display reasons.
 
 #### Scenario: Frames are ordered entry point first, crash site last (@both)
 - **GIVEN** a fresh SDK acceptance test harness

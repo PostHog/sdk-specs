@@ -29,3 +29,7 @@
       the crash-first test), posthog-elixir (`handler.ex` `do_stacktrace`)
 - [ ] 3.3 posthog-python: flip `$exception_list` to outermost-first
       (`exception_utils.py:719`) in a minor release
+- [ ] 3.4 posthog (frontend): single display policy rendered from canonical storage — most
+      recent call first for every platform (optional per-user order toggle), auto-expand the
+      first in-app frame with source context, and remove per-surface ad-hoc reversals
+      (MCP StackTraceView, IssueTasks, release-preview kaboom-frame heuristic)

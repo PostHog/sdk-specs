@@ -77,6 +77,21 @@ Consumer behavior (cymbal, the error-tracking ingestion pipeline):
    are order-sensitive, so an unaccompanied flip would split every existing issue on the five
    crash-first SDKs plus python.
 
+5. **Display policy: most recent call first, for every platform (UI concern, not SDK).**
+   The UI renders from canonical storage and reverses once for display. Among PostHog's SDK
+   ecosystems only Python natively prints crash-last (`most recent call last`); every other
+   runtime — JVM, JS consoles, .NET, Go, Rust, PHP, Ruby (≥3.0, after reverting its 2.x
+   crash-last experiment), Dart, Erlang, iOS/Android crash logs — prints crash-first. Python's
+   rationale (the most useful line lands nearest the shell prompt) does not transfer to a web
+   UI, and Python debugger call-stack panes already show crash-first. A single direction keeps
+   the product consistent across platforms and makes "most relevant up front" behaviors
+   well-defined: auto-expanding the first in-app frame with source context, headlining the
+   most actionable exception in a chain, and position-based heuristics (crash frame, release
+   attribution). A per-user "most recent call first/last" toggle remains cheap to offer.
+   Alternative — mimic each ecosystem's native print order per `$lib` — rejected: it renders
+   the same product in two directions depending on the SDK, which reintroduces the mixed end
+   state this change removes, for the benefit of exactly one ecosystem's terminal convention.
+
 ## Risks / Trade-offs
 
 - [Fingerprint churn when an SDK flips order] → cymbal pairs the flip with fingerprint
@@ -110,11 +125,13 @@ Consumer behavior (cymbal, the error-tracking ingestion pipeline):
 Rollback: revert the SDK release; the semver gate makes older versions valid forever, so
 rollback needs no pipeline change.
 
-## Open Questions
+## Resolved questions
 
-- Should single-list SDKs (posthog-ruby, posthog-go, posthog-flutter) adopt chain unwrapping
-  where the platform supports it (e.g. Go's `errors.Unwrap`)? Out of scope here; the spec
-  already permits single-element lists.
-- cymbal has no dedicated elixir language path under `src/core/types/langs/`, so elixir raw
-  stacks presumably flow through the `custom` handler — confirm how they are typed and handled
-  before adding the elixir gate entry.
+- Chain unwrapping for single-list SDKs (posthog-ruby, posthog-go, posthog-flutter): out of
+  scope for this change by decision — the spec explicitly permits single-element lists, and
+  adopting `errors.Unwrap`-style chain walking is an independent per-SDK feature.
+- Elixir stacks in the pipeline: confirmed. posthog-elixir emits frames with
+  `platform: "custom"` and `lang: "elixir"` (`lib/posthog/handler.ex`), so they deserialize
+  into cymbal's `CustomFrame` and take the custom handler path. The normalization gate keys on
+  `$lib`/`$lib_version`, not on the frame platform tag, so the `posthog-elixir` gate entry
+  works without a dedicated elixir language path.

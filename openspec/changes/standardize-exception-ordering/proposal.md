@@ -92,3 +92,7 @@ This appendix is guidance for the rollout, not part of the spec delta.
   so the pipeline pairs the ordering flip with fingerprint aliasing — new-order fingerprints
   are aliased to the pre-flip fingerprints of the same logical error to avoid splitting
   existing issues.
+- Display is decoupled from the wire: the product UI renders from canonical storage with a
+  single display policy (most recent call first for every platform, optional order toggle),
+  shipping alongside the pipeline normalization so rendered order stays consistent — see
+  `design.md` decision 5.

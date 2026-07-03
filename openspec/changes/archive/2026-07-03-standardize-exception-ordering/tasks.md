@@ -14,8 +14,8 @@
 
 ## 2. Validation & sync
 
-- [ ] 2.1 Run `openspec validate --strict` and fix any findings
-- [ ] 2.2 Archive the change (`openspec archive`) so the delta syncs into
+- [x] 2.1 Run `openspec validate --strict` and fix any findings
+- [x] 2.2 Archive the change (`openspec archive`) so the delta syncs into
       `openspec/specs/capture-exception/spec.md`
 
 ## 3. Downstream coordination (tracked in other repos)

@@ -16,6 +16,16 @@ Feature: Bootstrap
     Then the returned feature flag value should be true
     And no feature flag network request should be sent
 
+  Scenario: Bootstrapped flags fire the flags-loaded callback at setup
+    Given a feature flag listener is registered at setup
+    When the SDK is initialized with token "test-token" and bootstrap feature flags:
+      | key     | value |
+      | beta-ui | true  |
+    Then the feature flag listener should be invoked with flags:
+      | key     | value |
+      | beta-ui | true  |
+    And no feature flag network request should be sent
+
   Scenario: Bootstrapped payload is served with its flag
     Given the SDK is initialized with token "test-token" and bootstrap feature flags:
       | key     | value     | payload          |

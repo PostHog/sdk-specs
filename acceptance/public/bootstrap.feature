@@ -34,6 +34,15 @@ Feature: Bootstrap
     And get feature flag "checkout" is called
     Then the returned feature flag value should be true
 
+  Scenario: A disabled bootstrap flag and its payload are not served
+    Given the SDK is initialized with token "test-token" and bootstrap feature flags:
+      | key      | value | payload   |
+      | enabled  | true  |           |
+      | disabled | false | {"k":"v"} |
+    When get feature flag "disabled" is called
+    Then the returned feature flag value should not be true
+    And the returned feature flag payload for "disabled" should be null
+
   Scenario: Bootstrapped identity seeds a fresh install
     Given persistent storage is empty
     When setup is called with token "test-token" and bootstrap distinct id "anon-abc"

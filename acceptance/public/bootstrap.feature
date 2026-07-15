@@ -24,6 +24,16 @@ Feature: Bootstrap
     Then the returned feature flag value should be "variant-a"
     And the returned feature flag payload for "beta-ui" should be {"color":"blue"}
 
+  Scenario: Bootstrap snapshot takes precedence over persisted flags
+    Given persistent storage contains feature flags:
+      | key      | value |
+      | checkout | false |
+    When setup is called with token "test-token" and bootstrap feature flags:
+      | key      | value |
+      | checkout | true  |
+    And get feature flag "checkout" is called
+    Then the returned feature flag value should be true
+
   Scenario: Bootstrapped identity seeds a fresh install
     Given persistent storage is empty
     When setup is called with token "test-token" and bootstrap distinct id "anon-abc"
@@ -59,7 +69,22 @@ Feature: Bootstrap
     Then get distinct id should return "user-existing"
     And a warning should be logged that the existing identity is preserved
 
-  Scenario: A loaded flags response overrides the bootstrapped value
+  Scenario: Identified bootstrap upgrades a matching anonymous id to identified
+    Given persistent storage contains anonymous id "user-123"
+    When setup is called with token "test-token" and bootstrap identified distinct id "user-123"
+    Then get distinct id should return "user-123"
+    And the current user should be identified
+    And no event named "$identify" should be enqueued
+
+  Scenario: Identified bootstrap reconciles an anonymous user while opted out
+    Given persistent storage contains opt-out state "true"
+    And persistent storage contains anonymous id "anon-abc"
+    When setup is called with token "test-token" and bootstrap identified distinct id "user-123"
+    Then get distinct id should return "user-123"
+    And the current user should be identified
+    And no events should be enqueued
+
+  Scenario: A complete flags response overrides the bootstrapped value
     Given the SDK is initialized with token "test-token" and bootstrap feature flags:
       | key     | value |
       | beta-ui | true  |
@@ -69,12 +94,34 @@ Feature: Bootstrap
     And get feature flag "beta-ui" is called
     Then the returned feature flag value should be false
 
-  Scenario: Bootstrapped-only keys survive a flags load
+  Scenario: A complete flags load drops bootstrapped-only keys
     Given the SDK is initialized with token "test-token" and bootstrap feature flags:
       | key     | value |
       | beta-ui | true  |
       | legacy  | true  |
     When feature flags are loaded with values:
+      | key     | value |
+      | beta-ui | false |
+    And get feature flag "legacy" is called
+    Then the returned feature flag value should not be true
+
+  Scenario: A complete flags load replaces the bootstrapped payload
+    Given the SDK is initialized with token "test-token" and bootstrap feature flags:
+      | key     | value     | payload          |
+      | beta-ui | variant-a | {"color":"blue"} |
+    When feature flags are loaded with values:
+      | key     | value     |
+      | beta-ui | variant-b |
+    And get feature flag "beta-ui" is called
+    Then the returned feature flag value should be "variant-b"
+    And the returned feature flag payload for "beta-ui" should be null
+
+  Scenario: A partial or errored response preserves un-recomputed flags
+    Given the SDK is initialized with token "test-token" and bootstrap feature flags:
+      | key     | value |
+      | beta-ui | true  |
+      | legacy  | true  |
+    When feature flags are loaded with errors while computing and values:
       | key     | value |
       | beta-ui | false |
     And get feature flag "legacy" is called
@@ -106,7 +153,7 @@ Feature: Bootstrap
       | $feature_flag_bootstrapped_response | true    |
       | $used_bootstrap_value               | true    |
 
-  Scenario: Flag call after a flags response reports bootstrap not used
+  Scenario: Flag call after a complete flags response reports bootstrap not used
     Given the SDK is initialized with token "test-token" and bootstrap feature flags:
       | key     | value |
       | beta-ui | true  |
@@ -114,6 +161,19 @@ Feature: Bootstrap
       | key     | value |
       | beta-ui | true  |
     When get feature flag "beta-ui" is called
+    Then one event named "$feature_flag_called" should be enqueued
+    And the enqueued event properties should include:
+      | property              | value |
+      | $used_bootstrap_value | false |
+
+  Scenario: Flag call after a partial or errored flags response reports bootstrap not used
+    Given the SDK is initialized with token "test-token" and bootstrap feature flags:
+      | key    | value |
+      | legacy | true  |
+    And feature flags are loaded with errors while computing and values:
+      | key     | value |
+      | beta-ui | false |
+    When get feature flag "legacy" is called
     Then one event named "$feature_flag_called" should be enqueued
     And the enqueued event properties should include:
       | property              | value |

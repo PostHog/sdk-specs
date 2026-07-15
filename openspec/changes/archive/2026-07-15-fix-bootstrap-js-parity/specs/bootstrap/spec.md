@@ -41,9 +41,38 @@ When `bootstrap.featureFlags` is non-empty, the SDK SHALL apply those values to 
 - **WHEN** `getFeatureFlag("checkout")` is called before any `/flags` response
 - **THEN** the call returns `true` from the bootstrapped value
 
-### Requirement: Loaded flags take precedence over bootstrapped flags
+### Requirement: Bootstrapped flag reporting on `$feature_flag_called`
 
-A complete `/flags` response SHALL replace the served feature flags and payloads entirely: bootstrapped keys absent from a complete response SHALL no longer be served, and a bootstrapped payload SHALL NOT be retained alongside a loaded flag value. Only a partial response (a subset of flags was requested) or a response reporting `errorsWhileComputingFlags` SHALL merge into the existing served flags, preserving values that were not recomputed. Before any response, bootstrapped values are served as the snapshot described in the previous requirement.
+When the SDK captures `$feature_flag_called` for a flag that was bootstrapped, it SHALL enrich the event with the bootstrapped context:
+
+- `$feature_flag_bootstrapped_response` — the bootstrapped value for that key, when one was provided.
+- `$feature_flag_bootstrapped_payload` — the bootstrapped payload for that key, when one was provided.
+- `$used_bootstrap_value` — true until the SDK has received a successful `/flags` response, otherwise false. The "flags loaded from remote" signal that drives this SHALL be set after any successful `/flags` response (HTTP 200), including a response that reports `errorsWhileComputingFlags`. It is a global "a remote response has been received" marker, not per-key provenance. It SHALL be cleared on `reset()`, so it correctly reports true again for a new identity until that identity's first `/flags` response.
+
+#### Scenario: Flag call before the first flags response reports bootstrap use
+- **GIVEN** the SDK is initialized with `bootstrap.featureFlags` `{ "beta-ui": true }`
+- **AND** no `/flags` response has been received
+- **WHEN** "beta-ui" is read and `$feature_flag_called` is captured
+- **THEN** the event has `$feature_flag_bootstrapped_response` true
+- **AND** the event has `$used_bootstrap_value` true
+
+#### Scenario: Flag call after a flags response reports bootstrap not used
+- **GIVEN** the SDK was initialized with `bootstrap.featureFlags` `{ "beta-ui": true }`
+- **AND** a `/flags` response has been received
+- **WHEN** "beta-ui" is read and `$feature_flag_called` is captured
+- **THEN** the event has `$used_bootstrap_value` false
+
+#### Scenario: A partial or errored flags response still marks bootstrap not used
+- **GIVEN** the SDK is initialized with `bootstrap.featureFlags` `{ "legacy": true }`
+- **AND** a `/flags` response reporting `errorsWhileComputingFlags` has been received
+- **WHEN** "legacy" is read and `$feature_flag_called` is captured
+- **THEN** the event has `$used_bootstrap_value` false
+
+## ADDED Requirements
+
+### Requirement: A complete flags response replaces bootstrapped flags
+
+A complete `/flags` response SHALL replace the served feature flags and payloads entirely: bootstrapped keys absent from a complete response SHALL no longer be served, and a bootstrapped payload SHALL NOT be retained alongside a loaded flag value. Only a partial response (a subset of flags was requested) or a response reporting `errorsWhileComputingFlags` SHALL merge into the existing served flags, preserving values that were not recomputed. Before any response, bootstrapped values are served as the snapshot described by the serving requirement.
 
 The retained bootstrap reporting state is dropped on `reset()` so a subsequent user is never served or reported the previous user's bootstrapped values.
 
@@ -80,35 +109,6 @@ The retained bootstrap reporting state is dropped on `reset()` so a subsequent u
 - **WHEN** feature flags are reloaded for the new user
 - **THEN** `getFeatureFlag("legacy")` does not return the bootstrapped value
 
-### Requirement: Bootstrapped flag reporting on `$feature_flag_called`
-
-When the SDK captures `$feature_flag_called` for a flag that was bootstrapped, it SHALL enrich the event with the bootstrapped context:
-
-- `$feature_flag_bootstrapped_response` — the bootstrapped value for that key, when one was provided.
-- `$feature_flag_bootstrapped_payload` — the bootstrapped payload for that key, when one was provided.
-- `$used_bootstrap_value` — true until the SDK has received a successful `/flags` response, otherwise false. The "flags loaded from remote" signal that drives this SHALL be set after any successful `/flags` response (HTTP 200), including a response that reports `errorsWhileComputingFlags`. It is a global "a remote response has been received" marker, not per-key provenance. It SHALL be cleared on `reset()`, so it correctly reports true again for a new identity until that identity's first `/flags` response.
-
-#### Scenario: Flag call before the first flags response reports bootstrap use
-- **GIVEN** the SDK is initialized with `bootstrap.featureFlags` `{ "beta-ui": true }`
-- **AND** no `/flags` response has been received
-- **WHEN** "beta-ui" is read and `$feature_flag_called` is captured
-- **THEN** the event has `$feature_flag_bootstrapped_response` true
-- **AND** the event has `$used_bootstrap_value` true
-
-#### Scenario: Flag call after a flags response reports bootstrap not used
-- **GIVEN** the SDK was initialized with `bootstrap.featureFlags` `{ "beta-ui": true }`
-- **AND** a `/flags` response has been received
-- **WHEN** "beta-ui" is read and `$feature_flag_called` is captured
-- **THEN** the event has `$used_bootstrap_value` false
-
-#### Scenario: A partial or errored flags response still marks bootstrap not used
-- **GIVEN** the SDK is initialized with `bootstrap.featureFlags` `{ "legacy": true }`
-- **AND** a `/flags` response reporting `errorsWhileComputingFlags` has been received
-- **WHEN** "legacy" is read and `$feature_flag_called` is captured
-- **THEN** the event has `$used_bootstrap_value` false
-
-## ADDED Requirements
-
 ### Requirement: Identified bootstrap upgrades a matching anonymous id
 
 When `isIdentifiedId` is true and the bootstrapped `distinctId` equals the existing local distinct id but the user is not yet marked identified, the SDK SHALL mark the user identified. Because the distinct id is unchanged, the SDK SHALL NOT emit a redundant `$identify` or re-link identities. This applies even when the SDK is opted out of tracking, since only the local identification state changes.
@@ -119,3 +119,9 @@ When `isIdentifiedId` is true and the bootstrapped `distinctId` equals the exist
 - **THEN** the current distinct id remains "user-123"
 - **AND** the user is in the identified state
 - **AND** no `$identify` event is emitted
+
+## REMOVED Requirements
+
+### Requirement: Loaded flags take precedence over bootstrapped flags
+
+**Reason**: Replaced by "A complete flags response replaces bootstrapped flags". The removed requirement stated bootstrapped-only keys survive a flags load (a merge model), which does not match `posthog-js` (`posthog-featureflags.ts:121-161`): a complete `/flags` response replaces flags and payloads, and only partial/`errorsWhileComputingFlags` responses merge.

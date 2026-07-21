@@ -16,7 +16,10 @@ to one of four verifiable sources, in priority order:
 3. **The shipped logs pipeline** — the `logs` capability spec plus the shipped logs/metrics SDK
    engines, which the APM team named as the template ("just like we did for logs"). Transport,
    encoding-preference, gating, retry, and config-vocabulary requirements deliberately mirror
-   `logs` (as amended by `update-logs-transport`).
+   `logs` — except that where the logs spec documents the shipped fallback transport
+   (JSON + `?token=`), traces targets the service's primary path (Bearer-first auth,
+   protobuf-first decode, verified in `export_traces_http`); aligning the logs spec is a
+   possible follow-up change.
 4. **The logs product's person-join convention** — logs SDKs auto-attach `posthogDistinctId`,
    and the logs product reads it via a configurable attribute key defaulting to
    `posthogDistinctId` (`products/logs/backend/models.py`). Trace↔person/session linking is on
@@ -65,7 +68,8 @@ for full dogfooding). Precedent: the logs engine removed its OpenTelemetry depen
 posthog-python #739). The spec therefore defines the wire shape explicitly rather than saying
 "do what OTel does."
 
-**Transport mirrors `update-logs-transport`, not the original logs spec.** The traces handler is
+**Transport targets the service's primary path (Bearer + protobuf), not the logs spec's
+shipped fallback (JSON + `?token=`).** The traces handler is
 literally the same service and code path family as logs: `Authorization: Bearer` checked first,
 `?token=` fallback; protobuf decoded first, JSON (object or JSONL) fallback; gzip sniffed by
 magic bytes with the `?compression=` query-param translation layer. Verified directly in
@@ -93,7 +97,10 @@ event (`exception.type`, `exception.message`) and then **rethrow the application
 the SDK-never-throws rule applies to the SDK's own failures, never to swallowing app control
 flow. Python already reads active-span context into `$trace_id`/`$span_id` on
 `capture_exception` (posthog-python #743); once the SDK owns the active span, that linkage
-becomes first-party.
+becomes first-party. `exception.stacktrace` is deliberately omitted from v1 exception events:
+stack formatting is platform-specific and span volume multiplies its weight —
+`exception.type`/`exception.message` are the v1 contract, and ports may propose the
+stacktrace attribute (or defer to `captureException` linking) as a follow-up.
 
 **Timestamps: wall-clock start, monotonic duration.** `startTimeUnixNano` is wall-clock at
 `startSpan`; `endTimeUnixNano` is start + a monotonically-measured elapsed time where the
@@ -158,6 +165,25 @@ they forced, beyond wording fixes:
 - **Wire `flags`**: the low byte carries W3C trace flags with sampled set; OTel's extra OTLP
   flag bits (has-is-remote masks) are allowed but not required — the server stores and
   ignores `flags` today, so byte-exact OTel parity is not load-bearing.
+
+**Fresh-eyes review resolutions (2026-07-21).** A third independent review pass closed the
+implementability gaps a first implementer would hit:
+
+- **`tracestate` got a concrete API path** — it was required behavior with no way in or out:
+  now a `tracestate` option beside `parent`, a `tracestate()` handle accessor, and an
+  optional `traceState` field in the span data model (the server stores `trace_state`,
+  verified in `trace_record.rs`).
+- **Python's manual form doubles as the scoped construct**: the handle activates only via the
+  context-manager/decorator protocol — resolving the `start_span`-vs-scoped ambiguity OTel
+  splits into two method names.
+- **No-op handles return null from `traceparent()`/`tracestate()`** (never a well-formed
+  header), scoped helpers still run their callback with a no-op span, and `getActiveSpan()`
+  is documented null inside such callbacks.
+- **413 halving is excluded from the retry budget** (self-bounded at log₂ of batch size).
+- **Age eviction may be evaluated lazily** — no dedicated timer required.
+- **Browser `?token=` + `?compression=gzip-js` blessed as the preflight-free path** — the
+  service's permissive CORS would accept `Authorization` (it mirrors request headers), but
+  every flush would then pay a CORS preflight, which posthog-js deliberately avoids.
 
 **SDK integration points verified (posthog-js + posthog-python origin/main, 2026-07-21).**
 The spec's assumptions about existing SDK machinery were checked against both first-target

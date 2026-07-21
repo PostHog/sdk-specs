@@ -27,6 +27,10 @@
   all-platform coverage (mobile background flush trigger, explicit-context variation for Go,
   sync/async helper overloads for Kotlin/Swift, error-value platforms, in-memory-on-mobile
   deviation documented, continuous-clock rule)
+- [x] 2.5 Fresh-eyes review pass (2026-07-21): tracestate API path, Python activation model,
+  no-op `traceparent()`, 413/retry-budget interplay, lazy age eviction, browser
+  preflight-free transport, `exception.stacktrace` deferral — resolutions in design.md
+  "Fresh-eyes review resolutions"
 
 ## 3. Prose alignment (applied at archive, outside the requirement-delta mechanism)
 
@@ -41,7 +45,7 @@
 
 ## 4. Validation
 
-- [ ] 4.1 Run `openspec validate --strict` and resolve any errors
+- [x] 4.1 Run `openspec validate --strict` and resolve any errors (passing as of 2026-07-21)
 - [ ] 4.2 Run `/opsx:apply` then `/opsx:archive` to create `specs/traces/spec.md`
 
 ## 5. Downstream follow-up (separate changes, not this one)

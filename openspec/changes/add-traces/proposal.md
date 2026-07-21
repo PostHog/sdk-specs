@@ -21,8 +21,10 @@ ingestion service's observed behavior.
   `traceparent` interop, the OTLP span data model and attribute encoding (shared with logs),
   PostHog auto-context attributes (`posthogDistinctId`, `sessionId`) that make PostHog traces
   joinable to persons and sessions, resource/scope identity, HTTP transport to `/i/v1/traces`
-  (Bearer primary, `?token=` fallback; protobuf canonical, JSON fallback — matching the
-  `update-logs-transport` decisions), compression, batching and flush, retry semantics, gating,
+  (Bearer primary, `?token=` fallback; protobuf canonical, JSON fallback — the service's
+  verified primary path; the logs spec today documents the shipped JSON + `?token=` fallback,
+  and aligning it is a possible follow-up change), compression, batching and flush, retry
+  semantics, gating,
   configuration knobs, and the verified server-side contract.
 - Traces is a **separate pipeline** from analytics events, session replay, and logs: its own
   queue, its own endpoint, its own flush cycle — mirroring how logs is modeled.

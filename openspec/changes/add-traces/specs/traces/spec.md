@@ -5,10 +5,13 @@
 The SDK SHALL expose two forms of span creation: the scoped helper (next requirement) as the
 recommended primary form, and a manual form, `startSpan`, for spans that cannot wrap a
 callback. `startSpan` accepts a `name` (string, required) plus optional `kind`, `attributes`,
-`parent`, and a caller-supplied `startTime` (platform-idiomatic time type, for backdating),
-and returns a **span handle** that is not made active (see the active-span requirement).
-`parent` SHALL accept either a span handle or a raw W3C `traceparent` string — there is no
-separate span-context type; the traceparent string is the serialized context. At the API
+`parent`, `tracestate`, and a caller-supplied `startTime` (platform-idiomatic time type, for
+backdating), and returns a **span handle** that is not made active (see the active-span
+requirement). `parent` SHALL accept either a span handle or a raw W3C `traceparent` string —
+there is no separate span-context type; the traceparent string is the serialized context.
+`tracestate` carries the incoming W3C `tracestate` string accompanying a `traceparent`-string
+`parent` (ignored otherwise); a child created from a span-handle `parent` inherits that
+span's tracestate. At the API
 surface, `kind` SHALL use the string names (`internal`, `server`, `client`, `producer`,
 `consumer`) and status the strings `ok` / `error`; the OTLP integer enums are a wire-level
 concern. Field and method names are semantic: each SDK SHALL spell them per its platform
@@ -16,7 +19,8 @@ conventions (e.g. `start_span` in Python).
 
 The handle SHALL support `setAttribute`/`setAttributes`, `addEvent(name, attributes?)`,
 `setStatus(ok | error, message?)` (last-write-wins), `recordException(error)`,
-`updateName(name)`, `traceparent()`, and `end(endTime?)`. `updateName` SHALL replace the name
+`updateName(name)`, `traceparent()`, `tracestate()` (the span's tracestate string, or the
+platform's null/empty value when none), and `end(endTime?)`. `updateName` SHALL replace the name
 up until `end()` — the low-cardinality name is often only knowable after work begins (e.g. a
 route template resolves mid-request). `end()` SHALL be idempotent: a span produces at most
 one record (exactly one when no gate drops it), and operations after the first `end()` —
@@ -48,6 +52,12 @@ Span-creating APIs SHALL return an inert no-op span handle whenever tracing cann
 supporting the full handle surface so caller code never branches. A no-op handle SHALL never
 be activated, SHALL not count toward the live-span bound, and a child started with a no-op
 handle as `parent` SHALL itself be a no-op — never an orphan with invented ids.
+`traceparent()` and `tracestate()` on a no-op handle SHALL return the platform's null/empty
+value — never a well-formed header — so an id that was never recorded cannot propagate.
+Scoped helpers still run their callback and return its value when the span is a no-op;
+because a no-op is never activated, `getActiveSpan()` inside such a callback returns the null
+value — callback code SHOULD use the handle it receives rather than re-reading the ambient
+context.
 
 #### Scenario: no-op span when opted out
 - **GIVEN** the user has opted out of capture
@@ -60,13 +70,27 @@ handle as `parent` SHALL itself be a no-op — never an orphan with invented ids
 - **WHEN** a span starts with `parent` set to N
 - **THEN** the child is itself a no-op and nothing is enqueued for either
 
+#### Scenario: no-op handle produces no traceparent
+- **GIVEN** a no-op handle
+- **WHEN** `traceparent()` is called
+- **THEN** it returns the platform's null/empty value, not a well-formed header
+
+#### Scenario: scoped helper still runs with tracing off
+- **GIVEN** an SDK initialized with no `traces` config
+- **WHEN** the app calls `withSpan("job", fn)`
+- **THEN** `fn` runs exactly once with a no-op handle and its return value is returned
+- **AND** `getActiveSpan()` inside `fn` returns the platform's null value
+
 ### Requirement: Scoped span helpers and exception recording
 
 The SDK SHALL provide a scoped helper that runs a callback inside a span and guarantees the
 span ends: in callback form (e.g. `withSpan(name, fn)` — `fn` receives the span handle) and,
-where idiomatic, the platform's scoped construct (Python context manager and decorator). The
-helper SHALL accept the same options as `startSpan`. While the callback runs, the span SHALL
-be the active span.
+where idiomatic, the platform's scoped construct (Python context manager and decorator).
+Where the scoped construct is the context-manager/decorator protocol, the manual form MAY
+double as the scoped form: the handle `start_span` returns activates only when entered
+(`with`) or applied as a decorator — calling `start_span` without entering it remains the
+manual, inactive form. The helper SHALL accept the same options as `startSpan`. While the
+callback runs, the span SHALL be the active span.
 
 The helper SHALL cover asynchronous callbacks with end-at-settle semantics: where the runtime
 can detect an awaitable return (JS Promise, Python coroutine), the same helper handles both;
@@ -81,7 +105,9 @@ span, and rethrow the original exception unmodified. On error-value platforms (G
 helper SHALL instead treat a non-nil/`Err` callback return as the failure signal and return
 it unmodified. `exception.type` derives from the platform's error type name, and
 `exception.message` from its message/description accessor. `recordException(error)` SHALL
-apply the same status-and-event treatment on a manually managed span without ending it.
+apply the same status-and-event treatment on a manually managed span without ending it. The
+`ok`-is-final rule guards only the helper's *automatic* recording: explicit `setStatus` calls
+and `recordException` (itself an explicit call) follow last-write-wins.
 
 #### Scenario: callback exception is recorded and rethrown
 - **WHEN** `withSpan("job", fn)` runs an `fn` that throws `TypeError("boom")`
@@ -134,7 +160,8 @@ silently orphaning the span.
 
 The SDK SHALL track an **active span** so spans nest without manual parent plumbing: a new
 span's parent defaults to the active span at start time. Only scoped helpers activate a span,
-for the duration of their callback; a manually created span is never made active implicitly.
+for the duration of their callback (on context-manager platforms, entering the handle is the
+scoped form); a manually created span is never made active implicitly.
 The SDK SHALL expose `getActiveSpan()`, returning the active span handle or the platform's
 null value when none is active. In a process running multiple SDK instances, the active-span
 context SHALL be scoped per instance. Other PostHog pipelines in the same SDK SHOULD consume
@@ -183,9 +210,11 @@ interchange format. `span.traceparent()` produces the header value
 (`00-{trace-id}-{span-id}-01`; the sampled flag is always set because v1 records every
 captured span). Passing an incoming `traceparent` string as `parent` continues a remote
 trace: spans started under it reuse the remote trace id and parent the remote span id,
-including when the incoming flags are `00`. An accompanying `tracestate` value SHALL be
-preserved opaquely — emitted as the continued spans' `traceState` and reproduced next to any
-produced `traceparent`. An invalid `traceparent` SHALL be ignored (fresh root context); an
+including when the incoming flags are `00`. An accompanying `tracestate` value, passed via
+the `tracestate` option, SHALL be preserved opaquely: emitted as the continued spans'
+`traceState` wire field, inherited by their children, and returned by `span.tracestate()` for
+onward propagation next to the produced `traceparent`. An invalid `traceparent` SHALL be
+ignored (fresh root context); an
 invalid `tracestate` SHALL be discarded without invalidating the `traceparent`. Automatic
 header injection/extraction is out of scope for this capability and arrives with
 per-platform instrumentation. This capability is distinct from the `tracing-headers`
@@ -203,9 +232,9 @@ capability (`X-POSTHOG-*` identity headers), which operates independently.
 
 #### Scenario: tracestate preserved opaquely
 - **GIVEN** an incoming `traceparent` accompanied by `tracestate` `vendor=abc`
-- **WHEN** a span continues that context
+- **WHEN** the app passes both as `parent` and `tracestate` and starts a span
 - **THEN** the span's record carries `traceState` `vendor=abc`
-- **AND** onward propagation reproduces it unchanged
+- **AND** `span.tracestate()` returns `vendor=abc` unchanged for onward propagation
 
 #### Scenario: malformed traceparent ignored
 - **WHEN** the app passes the string "garbage" as `parent`
@@ -214,7 +243,8 @@ capability (`X-POSTHOG-*` identity headers), which operates independently.
 ### Requirement: Span data model
 
 Each ended span SHALL become one OTLP span record with: `traceId`, `spanId`, optional
-`parentSpanId`; `name`; `kind` as the OTLP enum integer (unspecified 0, internal 1, server 2,
+`parentSpanId`, optional `traceState` (the continued context's tracestate string, omitted
+when none); `name`; `kind` as the OTLP enum integer (unspecified 0, internal 1, server 2,
 client 3, producer 4, consumer 5), defaulting to internal; `startTimeUnixNano` and
 `endTimeUnixNano` as **string** nanosecond timestamps; `attributes`; zero or more `events`
 (each with `name`, `timeUnixNano`, `attributes`); and `status` as `{ code, message? }` with
@@ -383,11 +413,13 @@ host with any trailing slash stripped, constructing the full path itself (never 
 a base-endpoint convention that appends `/v1/traces`). Auth SHALL use
 `Authorization: Bearer {projectApiKey}` as the primary method, with the URL-encoded
 `?token={projectApiKey}` query parameter as a fallback for platforms or send modes that
-cannot set headers. The body SHALL be OTLP: protobuf
+cannot set headers — or, on the browser, that deliberately avoid them: pairing `?token=` auth
+with the `?compression=gzip-js` signal keeps requests free of the CORS preflight that
+`Authorization` and `Content-Encoding` headers would force. The body SHALL be OTLP: protobuf
 (`Content-Type: application/x-protobuf`) is canonical where the encoder adds no meaningful
 dependency or binary-size cost (server platforms with mature codegen); mobile ports and the
-browser SHOULD send JSON (`Content-Type: application/json`), matching the logs transport
-decision on protobuf dependency cost. A successful response is HTTP 200 with body `{}`; the
+browser SHOULD send JSON (`Content-Type: application/json`) — the same
+protobuf-dependency-cost tradeoff the logs SDKs make. A successful response is HTTP 200 with body `{}`; the
 SDK SHALL treat any 2xx as success. This endpoint is exclusively for distributed-tracing
 spans — LLM analytics spans go to a different product endpoint.
 
@@ -444,7 +476,8 @@ than `maxSpanAgeMs` (a documented default on the order of tens of minutes; mobil
 choose a larger default since backgrounded time counts). At the count bound, `startSpan`
 returns a no-op handle. A live span exceeding the age bound SHALL be evicted from live
 accounting and its handle becomes a no-op (never exported) — eviction prevents a span leak
-from permanently disabling tracing for the rest of the process. A span legitimately spanning
+from permanently disabling tracing for the rest of the process. Eviction MAY be evaluated
+lazily — at the next span start, span end, or flush tick — no dedicated timer is required. A span legitimately spanning
 a long mobile background interval will be evicted by this rule; that is expected behavior,
 not a defect. All span drops — live-bound refusals, age evictions, queue overflow, and
 end-time gate drops — SHALL increment a single per-instance dropped-spans counter, with a
@@ -526,7 +559,9 @@ max; `408`/`429`/`5xx`/network error → retriable: keep the spans and retry wit
 backoff capped at ~30s, honoring `Retry-After` when present; other `4xx` (notably `400` and
 `401`) → non-retriable: drop the batch so a poison batch or bad key cannot wedge the queue.
 New spans SHALL continue to enqueue during backoff, subject to `maxQueueSize`. After a
-bounded, documented number of retries on the same batch the SDK SHALL drop it.
+bounded, documented number of retries on the same batch the SDK SHALL drop it. 413
+shrink-and-resend cycles do not consume that retry budget — halving is self-bounded (log₂ of
+the batch size); the budget applies to the retriable-failure path.
 
 #### Scenario: 413 shrinks the batch
 - **GIVEN** a 50-span batch returns 413

@@ -139,8 +139,8 @@ they forced, beyond wording fixes:
   inactive handle (OTel/Sentry `startInactiveSpan` model). Kills the browser async-context
   ambiguity for manual spans.
 - **No context type in v1**: `parent` is a union — span handle or raw `traceparent` string.
-  The traceparent string is the serialized context; a third concept adds surface without
-  power.
+  The traceparent string (plus the sibling `tracestate` option, added by the fresh-eyes pass
+  below) is the serialized context; a third concept adds surface without power.
 - **`beforeSpanSend` fails closed** (a throwing hook drops the span) — a deliberate,
   documented divergence from logs' fail-open `beforeSend`, forced by designating the hook as
   the PII scrubbing point: a broken scrubber must not leak the unscrubbed record.

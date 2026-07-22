@@ -30,10 +30,10 @@ failed flags request, or no flag with that key. The spec is behind this reality 
 - **New scenarios**: a caller default of `true` is returned for a missing flag; a flag that has a
   value (including `false` and variant values) beats the caller default.
 - **Prose alignment at archive** (outside the requirement delta): the client-side canonical
-  signature gains `defaultValue?: boolean`; the surface-variants list records the JS family forms
-  (`{ default_value }` in posthog-js, `{ defaultValue }` in posthog-js core / react-native /
-  js-lite); the client/server comparison table row and behavior-flow bullet for unknown flags
-  mention the caller-supplied default.
+  signature gains `defaultValue?: boolean`; the surface-variants list records the uniform JS
+  family form (`isFeatureEnabled(key, { defaultValue })` in posthog-js, posthog-js-lite, and
+  react-native); the client/server comparison table row and behavior-flow bullet for unknown
+  flags mention the caller-supplied default.
 
 ## Capabilities
 

@@ -8,7 +8,7 @@
 ## 2. Prose alignment (applied at archive, outside the requirement-delta mechanism)
 
 - [ ] 2.1 Add `defaultValue?: boolean` to the client-side canonical signature options in `openspec/specs/is-feature-enabled/spec.md`
-- [ ] 2.2 Update the surface-variants list: posthog-js `isFeatureEnabled(key, { default_value })`, posthog-js core / react-native / js-lite `isFeatureEnabled(key, { defaultValue })`
+- [ ] 2.2 Update the surface-variants list: `isFeatureEnabled(key, { defaultValue })` uniformly for posthog-js, posthog-js-lite, and react-native
 - [ ] 2.3 Update the client/server comparison table "Unknown flag behavior" row and the client/server behavior-flow bullets to mention the caller-supplied default
 - [ ] 2.4 Reword the client-side flow step 2 "SDKs vary between returning `undefined` and falling back to `false` / a supplied default" to reference the named variation in the requirement
 

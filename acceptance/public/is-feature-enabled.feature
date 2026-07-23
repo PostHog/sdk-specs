@@ -24,11 +24,30 @@ Feature: Is Feature Enabled
       | variant-a  | true    |
 
   @both
-  Scenario: Enabled check returns false for missing flags
+  Scenario Outline: Enabled check resolves missing flags to the default
     Given the SDK is initialized with token "test-token"
     And cached feature flags are empty
-    When is feature enabled "missing" is called
-    Then the returned enabled value should be false
+    When is feature enabled "missing" is called with default value <default>
+    Then the returned enabled value should be <default>
+
+    Examples:
+      | default |
+      | false   |
+      | true    |
+
+  @both
+  Scenario Outline: Enabled check prefers the flag value over the caller default
+    Given the SDK is initialized with token "test-token"
+    And cached feature flags are:
+      | key     | value        |
+      | feature | <flag_value> |
+    When is feature enabled "feature" is called with default value <default>
+    Then the returned enabled value should be <enabled>
+
+    Examples:
+      | flag_value | default | enabled |
+      | false      | true    | false   |
+      | variant-a  | false   | true    |
 
   @both
   Scenario: Enabled check can suppress tracking

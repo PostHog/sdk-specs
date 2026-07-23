@@ -22,7 +22,7 @@ In most SDKs, a multivariate string result is treated as **enabled**.
 | Identity source | Uses the SDK's current ambient identity and cached group/person context. | Caller passes `distinct_id` explicitly per call. |
 | Data source | Reads from locally cached feature flags previously loaded by initialization / `reloadFeatureFlags()`. | Evaluates locally and/or remotely on demand for the provided user context. |
 | Network I/O | Usually none at read time. | May perform remote evaluation depending on SDK/configuration. |
-| Unknown flag behavior | Varies between `undefined` and `false` when flags are missing/unloaded. | Varies between `undefined` / `None` and `false`, depending on SDK. |
+| Unknown flag behavior | Returns the caller-supplied `defaultValue` when flags are missing/unloaded; without one, varies between `undefined` and `false` (see the requirement's allowed variation). | Returns the caller-supplied `defaultValue` when provided; without one, varies between `undefined` / `None` and `false`, depending on SDK. |
 | Tracking side effect | Often emits `$feature_flag_called` by default. | Often emits `$feature_flag_called` by default. |
 
 ## Public signatures
@@ -34,6 +34,7 @@ isFeatureEnabled(
   key: string,
   options?: {
     sendFeatureFlagEvent?: boolean,
+    defaultValue?: boolean,
   },
 ): boolean | undefined
 ```
@@ -59,7 +60,7 @@ isFeatureEnabled(
 
 ### Surface variants
 
-- **posthog-js core / browser / react-native:** `isFeatureEnabled(key)`
+- **posthog-js core / browser / posthog-js-lite / react-native:** `isFeatureEnabled(key, { defaultValue })`
 - **flutter:** `isFeatureEnabled(key): Future<bool>`
 - **iOS:** `isFeatureEnabled(_ key: String)` and `isFeatureEnabled(_ key: String, sendFeatureFlagEvent: Bool)`
 - **Android:** `isFeatureEnabled(key, defaultValue = false, sendFeatureFlagEvent = null)`
@@ -79,7 +80,7 @@ isFeatureEnabled(
    - `true` stays `true`
    - `false` stays `false`
    - a non-empty variant string is treated as `true`
-   - if the flag is unavailable, SDKs vary between returning `undefined` and falling back to `false` / a supplied default
+   - if the flag is unavailable, the caller-supplied `defaultValue` is returned; with no default supplied, behavior follows the allowed variation named in the requirement (`false` by construction, or `undefined` for the three-state posthog-js family)
 3. **Optionally emit `$feature_flag_called`.** In audited client SDKs this is usually enabled by default and can be disabled per call in some implementations.
 4. **Do not fetch from the network directly.** The method uses the currently cached flags; callers wanting fresh values must reload flags separately.
 
@@ -91,7 +92,7 @@ isFeatureEnabled(
    - boolean-enabled → `true`
    - boolean-disabled → `false`
    - variant string → `true`
-   - unavailable / unknown → `undefined` / `None` in some SDKs, or `false` / default in others
+   - unavailable / unknown → the caller-supplied `defaultValue` when provided; otherwise `undefined` / `None` in some SDKs, or `false` in others
 4. **Optionally emit `$feature_flag_called`.** Server SDKs commonly track accesses by default.
 
 ## State & lifecycle
@@ -135,6 +136,10 @@ isFeatureEnabled(
 
 The SDK SHALL implement the canonical `is-feature-enabled` behavior described by this spec. Implementations MAY adapt method names, parameter casing, type syntax, and lifecycle hooks to platform idioms where this spec explicitly allows variation, but MUST preserve the observable outcomes in the scenarios below.
 
+The SDK SHALL accept a caller-supplied boolean default (`defaultValue`; parameter placement per platform idiom — `{ defaultValue }` in the options object across the posthog-js family, a positional `defaultValue` on Android and Unity) and SHALL return it whenever the flag has no value: flags not loaded yet, a failed flags request, or no flag with that key in the loaded flags. A flag that has a value — including `false` and variant strings — always wins over the caller-supplied default.
+
+Allowed variation for the no-default call: SDKs whose signature builds in a `false` default (Android, Unity) or hard-code `false` for missing values (iOS, Flutter) resolve missing flags to `false` by construction. SDKs whose boolean API is three-state (`boolean | undefined` — the posthog-js family) SHALL keep returning `undefined`/nullish when the caller supplies no default; collapsing that bare call to `false` is a breaking change reserved for their next major.
+
 #### Scenario: Enabled check maps flag values to booleans (@both)
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
@@ -152,15 +157,35 @@ The SDK SHALL implement the canonical `is-feature-enabled` behavior described by
   | false      | false   |
   | variant-a  | true    |
 
-#### Scenario: Enabled check returns false for missing flags (@both)
+#### Scenario: Enabled check resolves missing flags to the default (@both)
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
 - **AND** persistent storage is empty
 - **AND** the mock PostHog server is reset
 - **GIVEN** the SDK is initialized with token "test-token"
 - **AND** cached feature flags are empty
-- **WHEN** is feature enabled "missing" is called
-- **THEN** the returned enabled value should be false
+- **WHEN** is feature enabled "missing" is called with default value <default>
+- **THEN** the returned enabled value should be <default>
+  Examples:
+  | default |
+  | false   |
+  | true    |
+
+#### Scenario: Enabled check prefers the flag value over the caller default (@both)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** cached feature flags are:
+  | key     | value        |
+  | feature | <flag_value> |
+- **WHEN** is feature enabled "feature" is called with default value <default>
+- **THEN** the returned enabled value should be <enabled>
+  Examples:
+  | flag_value | default | enabled |
+  | false      | true    | false   |
+  | variant-a  | false   | true    |
 
 #### Scenario: Enabled check can suppress tracking (@both)
 - **GIVEN** a fresh SDK acceptance test harness
@@ -174,3 +199,4 @@ The SDK SHALL implement the canonical `is-feature-enabled` behavior described by
 - **WHEN** is feature enabled "feature" is called with tracking disabled
 - **THEN** the returned enabled value should be true
 - **AND** no event named "$feature_flag_called" should be enqueued
+

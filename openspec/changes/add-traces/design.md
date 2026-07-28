@@ -184,6 +184,10 @@ implementability gaps a first implementer would hit:
 - **Browser `?token=` + `?compression=gzip-js` blessed as the preflight-free path** — the
   service's permissive CORS would accept `Authorization` (it mirrors request headers), but
   every flush would then pay a CORS preflight, which posthog-js deliberately avoids.
+  Completed on PR review (frankh, 2026-07-28): `Content-Type: application/json` is itself
+  non-safelisted and triggers preflight, and the service never reads `Content-Type` (body is
+  sniffed) — so the browser sends the JSON body as `text/plain`, making the send a CORS
+  simple request end to end.
 
 **SDK integration points verified (posthog-js + posthog-python origin/main, 2026-07-21).**
 The spec's assumptions about existing SDK machinery were checked against both first-target
@@ -217,9 +221,10 @@ repos:
 
 ## Risks / Trade-offs
 
-- **The ingestion endpoint may move before GA** (the docs say so explicitly) → transport is
-  isolated in a single requirement so a move is a one-requirement follow-up change; SDK ports
-  ship the feature as explicitly pre-GA/opt-in config.
+- ~~The ingestion endpoint may move before GA~~ → resolved: the logs team confirmed on PR
+  review (jonmcwest + frankh, 2026-07-28) the endpoint is not changing; `/i/v1/traces` is
+  pinned. Transport remains isolated in a single requirement regardless; SDK ports still ship
+  the feature as explicitly pre-GA/opt-in config.
 - **One malformed span 400s the whole batch server-side, silently losing every span in it** →
   the spec makes client-side validity a SHALL (well-formed IDs, in-range timestamps) and
   classifies 400 as non-retriable poison so the queue never wedges; residual loss surfaces via
@@ -270,25 +275,34 @@ repos:
   the beta blog post, and the product went beta on 2026-07-14. The docs' "endpoint may change
   before GA" caveat appears stale. Treat as stable; a courtesy confirm rides along on the PR.
 
+## Resolved on PR review (2026-07-28)
+
+Answered by the logs team on the spec PR's inline question threads:
+
+- **Join-key spelling** — jonmcwest: "single source of truth, `posthogDistinctId` is fine."
+  CamelCase-only emission locked in.
+- **Client-side rate cap** — jonmcwest: rate limiting is performed in ingestion, so no client
+  cap is needed. The no-cap position stands; for the per-MB cost concern raised by ioannisj,
+  `beforeSpanSend` admits trace-consistent sampling today (drop when a deterministic hash of
+  `traceId` exceeds a threshold — whole traces kept or dropped, OTel's `TraceIdRatioBased` as
+  a hook), and a first-class `sampleRate` stays deferred to the pricing conversation.
+- **Server-side span limits** — none planned (jonmcwest); the client 128/128 caps are the
+  primary enforcement, and the truncate-and-annotate recommendation stands recorded for
+  whenever server limits are considered.
+- **`/i/v1/traces` stability** — confirmed not changing (jonmcwest, frankh); the docs'
+  "may change before GA" caveat is stale.
+- **`unknown_service` rendering** — confirmed fine (jonmcwest).
+- **`maxSpanAgeMs` default** — jonmcwest, with a production trace as evidence: real traces
+  routinely exceed 10 minutes. Default guidance raised from "tens of minutes" to the order of
+  an hour, comfortably above realistic trace durations.
+- **Browser `Content-Type`** — frankh: `application/json` breaks the preflight-free path and
+  the capture server never reads the header; the spec now has the browser send the JSON body
+  as `text/plain` (see the fresh-eyes preflight bullet above).
+
 ## Open Questions
 
-The genuinely-open items for the APM team, raised on the spec PR or a Slack thread linking to
-it (#team-apm / @jonmcwest, @frankh), resolved before archive:
-
-- **Join-key spelling — one or both?** For logs, Jon ruled (Slack, 2026-06-02) that the
-  product should read **both** `posthogDistinctId` and `posthog_distinct_id`, with docs
-  steering to a recommended spelling; the logs config default is still `posthogDistinctId`
-  and the traces product has no person-link config of its own yet.
-  **Recommendation: emit `posthogDistinctId` only.** Emitting both duplicates bytes on every
-  span under per-MB billing; the product side reads both spellings and its key is per-team
-  configurable, so a later org-wide rename is a config/docs change while an SDK emit change
-  is a slow multi-platform migration. One camelCase key also matches logs SDKs today.
-- **Rate cap:** logs has a client-side tumbling-window cap; v1 traces relies on the queue cap
-  only. **Recommendation: no client rate cap for traces, ever — sampling instead.** A
-  tumbling-window cap drops random spans mid-trace, producing partial waterfalls that mislead
-  more than they save; the trace-shaped volume control is head-based, parent-consistent
-  sampling (whole traces kept or dropped), deferred to the pricing conversation.
-  `maxQueueSize`, `maxLiveSpans`, and `beforeSpanSend` are the v1 pressure valves.
+The remaining items for the APM team (#team-apm / @jonmcwest, @frankh), resolved before
+archive:
 - **Capture-side quota signal:** quota is currently a silent post-200 drop.
   **Recommendation: no SDK change either way; if a capture-side signal lands before GA, shape
   it as 429 + `Retry-After`.** The spec's retry table already honors that combination with
@@ -298,10 +312,7 @@ it (#team-apm / @jonmcwest, @frankh), resolved before archive:
   `captureLog`); reserve a remote key for future auto-instrumentation only**, mirroring how
   `logs.captureConsoleLogs` gates console autocapture. Agreeing the key shape now costs
   nothing in v1 and avoids a breaking change when instrumentation ships.
-- **Server-side span limits:** the service currently has no per-span cap.
-  **Recommendation: client caps stay at OTel's 128/128 as primary enforcement; if the server
-  adds limits, truncate-and-annotate (like its timestamp clamping) rather than reject** — a
-  per-span reject would create a second whole-request-400 failure mode.
-- **Courtesy confirms:** `/i/v1/traces` stability (research says stable; the docs caveat
-  looks stale — consider removing it), and that rendering `unknown_service` for unnamed
-  services is acceptable to the UI (today those rows render blank).
+- **Mobile queue persistence and the invented API surface** — flagged for
+  @PostHog/team-client-libraries on the PR (in-memory-on-mobile acceptance; hardest-look
+  review of the span API) — no responses yet; marandaneto deferred first pass to the logs
+  team.

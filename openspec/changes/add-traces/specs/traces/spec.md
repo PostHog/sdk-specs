@@ -415,11 +415,14 @@ a base-endpoint convention that appends `/v1/traces`). Auth SHALL use
 `?token={projectApiKey}` query parameter as a fallback for platforms or send modes that
 cannot set headers — or, on the browser, that deliberately avoid them: pairing `?token=` auth
 with the `?compression=gzip-js` signal keeps requests free of the CORS preflight that
-`Authorization` and `Content-Encoding` headers would force. The body SHALL be OTLP: protobuf
-(`Content-Type: application/x-protobuf`) is canonical where the encoder adds no meaningful
-dependency or binary-size cost (server platforms with mature codegen); mobile ports and the
-browser SHOULD send JSON (`Content-Type: application/json`) — the same
-protobuf-dependency-cost tradeoff the logs SDKs make. A successful response is HTTP 200 with body `{}`; the
+`Authorization`, `Content-Encoding`, and a non-safelisted `Content-Type` would force. The
+body SHALL be OTLP: protobuf (`Content-Type: application/x-protobuf`) is canonical where the
+encoder adds no meaningful dependency or binary-size cost (server platforms with mature
+codegen); mobile ports and the browser SHOULD send JSON (`Content-Type: application/json`) —
+the same protobuf-dependency-cost tradeoff the logs SDKs make. The service never reads
+`Content-Type` (it sniffs the body, protobuf-first), so the browser SHOULD instead send the
+JSON body as `Content-Type: text/plain` — a CORS-safelisted type, unlike `application/json`
+— completing the preflight-free send. A successful response is HTTP 200 with body `{}`; the
 SDK SHALL treat any 2xx as success. This endpoint is exclusively for distributed-tracing
 spans — LLM analytics spans go to a different product endpoint.
 
@@ -433,6 +436,13 @@ spans — LLM analytics spans go to a different product endpoint.
 - **WHEN** the SDK flushes with host `https://us.i.posthog.com` and key `phc_abc`
 - **THEN** it POSTs to `https://us.i.posthog.com/i/v1/traces?token=phc_abc` with no
   `Authorization` header
+
+#### Scenario: browser send avoids CORS preflight
+- **GIVEN** a browser SDK flushing a gzipped JSON batch
+- **WHEN** the POST is built
+- **THEN** it uses `?token={projectApiKey}&compression=gzip-js` with
+  `Content-Type: text/plain` and no `Authorization` or `Content-Encoding` header
+- **AND** the request qualifies as a CORS simple request (no preflight)
 
 ### Requirement: Compression
 
@@ -472,8 +482,9 @@ but breaks assembled traces).
 ### Requirement: Live span bounds
 
 The SDK SHALL bound live spans: at most `maxLiveSpans` concurrently, and no live span older
-than `maxSpanAgeMs` (a documented default on the order of tens of minutes; mobile ports MAY
-choose a larger default since backgrounded time counts). At the count bound, `startSpan`
+than `maxSpanAgeMs`. The default SHALL comfortably exceed the platform's realistic worst-case
+trace duration — on the order of an hour, not minutes (production PostHog traces routinely
+exceed 10 minutes); mobile ports MAY choose a larger default since backgrounded time counts. At the count bound, `startSpan`
 returns a no-op handle. A live span exceeding the age bound SHALL be evicted from live
 accounting and its handle becomes a no-op (never exported) — eviction prevents a span leak
 from permanently disabling tracing for the rest of the process. Eviction MAY be evaluated

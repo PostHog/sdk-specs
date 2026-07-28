@@ -55,6 +55,6 @@ _None. (`logs` is untouched; the shared AnyValue attribute-encoding rules are re
 - Downstream per-platform port changes (`add-traces-js`, `add-traces-python`, then others)
   implement the contract; JS first, Python second, per the agreed dogfooding order.
 - The backend ingestion service (`rust/capture-logs`) is the source of truth for the transport
-  and server-contract requirements; no service change is required. The ingestion endpoint is
-  documented as subject to change before GA — if it moves, the transport requirement is updated
-  through a follow-up change.
+  and server-contract requirements; no service change is required. The `/i/v1/traces` endpoint
+  is confirmed stable by the logs team (PR review, 2026-07-28); the public docs' "may change
+  before GA" caveat is stale.

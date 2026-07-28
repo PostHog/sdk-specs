@@ -11,8 +11,9 @@
 - [x] 1.5 Empirical smoke test against production (2026-07-20): Bearer/JSON, gzip, `?token=`
   all 200; missing token 401; **invalid token 200** (finding folded into the server-contract
   requirement); trace rendered correctly in the project 2 waterfall UI
-- [ ] 1.6 When opening the spec PR, put the design.md Open Questions (with their
-  recommendations) to #team-apm — on the PR or in a Slack thread linking to it
+- [x] 1.6 When opening the spec PR, put the design.md Open Questions (with their
+  recommendations) to #team-apm — on the PR or in a Slack thread linking to it (submitted
+  2026-07-22; logs team answered 2026-07-28 — see design.md "Resolved on PR review")
 
 ## 2. Spec delta
 

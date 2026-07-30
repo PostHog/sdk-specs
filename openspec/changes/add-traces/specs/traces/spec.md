@@ -22,8 +22,11 @@ The handle SHALL support `setAttribute`/`setAttributes`, `addEvent(name, attribu
 `updateName(name)`, `traceparent()`, `tracestate()` (the span's tracestate string, or the
 platform's null/empty value when none), and `end(endTime?)`. `updateName` SHALL replace the name
 up until `end()` — the low-cardinality name is often only knowable after work begins (e.g. a
-route template resolves mid-request). `end()` SHALL be idempotent: a span produces at most
-one record (exactly one when no gate drops it), and operations after the first `end()` —
+route template resolves mid-request). `end(endTime?)`'s optional caller-supplied end time
+overrides the monotonic-derived end (backdating parity with `startTime`); an invalid or
+out-of-range value SHALL fall back to the derived end time, and end-before-start is corrected
+per the client-side validity requirement. `end()` SHALL be idempotent: a span produces at
+most one record (exactly one when no gate drops it), and operations after the first `end()` —
 including further `end()` calls — SHALL no-op with at most a debug warning.
 
 #### Scenario: start and end produces one record
@@ -44,6 +47,11 @@ including further `end()` calls — SHALL no-op with at most a debug warning.
 - **GIVEN** a span started as "HTTP request" before routing
 - **WHEN** `updateName("GET /users/:id")` is called before `end()`
 - **THEN** the exported record's name is "GET /users/:id"
+
+#### Scenario: explicit endTime overrides the derived end
+- **GIVEN** a span backdated with an explicit `startTime`
+- **WHEN** `end(endTime)` is called with a valid time after that start
+- **THEN** `endTimeUnixNano` reflects the supplied `endTime`, not the monotonic-derived end
 
 ### Requirement: No-op span handles
 
@@ -292,9 +300,11 @@ Span links are reserved at the wire level and are not part of the v1 public API.
 Because one malformed span rejects the entire request server-side, the SDK SHALL enqueue only
 well-formed records, sanitizing at end time: ids well-formed per the identifier requirement;
 `name` non-empty (an empty or non-string name at `startSpan` or `updateName` SHALL be
-replaced with `unknown` plus a debug warning); timestamps representable as signed 64-bit
-nanoseconds — an out-of-range `startTime` or event timestamp SHALL be replaced with the
-current time; end-before-start SHALL be corrected to end = start. The SDK SHOULD warn when a
+replaced with `unknown` plus a debug warning); timestamps within `[0, i64::MAX]` nanoseconds
+— OTLP declares the fields `fixed64` but the service parses signed 64-bit, so a negative
+(pre-epoch) value is as invalid as an overflow — a `startTime`, `endTime`, or event timestamp
+outside that range SHALL be replaced with the current time (for `endTime`, the derived end);
+end-before-start SHALL be corrected to end = start. The SDK SHOULD warn when a
 backdated `startTime` is more than 24 hours old, because the server clamps such timestamps to
 receive time.
 
@@ -336,7 +346,9 @@ Span, event, and resource attribute values SHALL use the same OTLP `AnyValue` en
 logs capability: string → `stringValue`; boolean → `boolValue`; integer → `intValue` as a
 stringified int64; float → `doubleValue`; non-finite float → `stringValue`
 ("NaN"/"Infinity"/"-Infinity"); array → `arrayValue`; map → `kvlistValue`; `null`/`undefined`
-SHALL drop the key. Because the ingestion service flattens attribute values to strings for
+SHALL drop the key. An integer outside `[-2^63, 2^63-1]` (e.g. a Python or JS bigint) SHALL
+be encoded as `stringValue` (its decimal string) with a debug warning — mirroring the
+non-finite-float rule — never as `intValue`, which would 400 the entire batch. Because the ingestion service flattens attribute values to strings for
 storage, SDKs SHOULD prefer primitive values and SHOULD document that nested structures
 survive only as serialized strings.
 
@@ -347,6 +359,11 @@ survive only as serialized strings.
 #### Scenario: null attribute dropped
 - **WHEN** a span attribute value is `null`
 - **THEN** the key is omitted from the record
+
+#### Scenario: integer beyond int64 encoded as string
+- **WHEN** a span attribute value is 2^64 (outside the int64 range)
+- **THEN** the wire encoding is `{ "stringValue": "18446744073709551616" }`, not an
+  `intValue`, and a debug warning is emitted
 
 ### Requirement: Auto-captured context attributes
 
@@ -484,7 +501,10 @@ but breaks assembled traces).
 The SDK SHALL bound live spans: at most `maxLiveSpans` concurrently, and no live span older
 than `maxSpanAgeMs`. The default SHALL comfortably exceed the platform's realistic worst-case
 trace duration — on the order of an hour, not minutes (production PostHog traces routinely
-exceed 10 minutes); mobile ports MAY choose a larger default since backgrounded time counts. At the count bound, `startSpan`
+exceed 10 minutes); mobile ports MAY choose a larger default since backgrounded time counts.
+Age SHALL be the monotonic elapsed time since handle creation, independent of any
+caller-supplied `startTime` — a backdated span is not instantly evicted, a future-dated
+leaked span cannot evade the bound, and wall-clock jumps do not affect it. At the count bound, `startSpan`
 returns a no-op handle. A live span exceeding the age bound SHALL be evicted from live
 accounting and its handle becomes a no-op (never exported) — eviction prevents a span leak
 from permanently disabling tracing for the rest of the process. Eviction MAY be evaluated
@@ -541,13 +561,30 @@ Each POST SHALL carry at most `maxExportBatchSize` spans; the default SHALL be c
 full batch sits comfortably under the 2 MB server cap, with the reactive 413 path (not
 proactive byte measurement) as the overflow mechanism. Only one flush SHALL be in flight at a
 time, on a worker/queue separate from the analytics-events pipeline; the drain loop is
-bounded by the queue length at flush start. All public tracing APIs SHALL be safe to call
-from any thread.
+bounded by the queue length at flush start. Every export attempt SHALL carry a finite
+deadline (request timeout); an attempt exceeding it counts as a network error — retriable —
+and releases the single-flight slot, so a request that never settles cannot wedge the
+pipeline. A flush trigger arriving during an active flush SHALL NOT be lost: it joins the
+active flush and guarantees a follow-up drain pass covering spans enqueued after the active
+flush's watermark — a trigger MAY no-op only when such a pass is already pending. All public
+tracing APIs SHALL be safe to call from any thread.
 
 #### Scenario: single flight
 - **GIVEN** a flush in progress
 - **WHEN** a second flush triggers
 - **THEN** it joins or no-ops rather than double-sending the queue head
+
+#### Scenario: hung request cannot wedge the pipeline
+- **GIVEN** an export request that never settles
+- **WHEN** the attempt's deadline elapses
+- **THEN** the attempt is treated as a retriable network error and the single-flight slot is
+  released
+
+#### Scenario: mid-flush trigger drains later spans
+- **GIVEN** a flush in progress with watermark W
+- **WHEN** a manual `flush()` arrives and spans enqueue after W
+- **THEN** a follow-up drain pass covers the post-W spans before the joined flush is
+  considered complete
 
 ### Requirement: Shutdown flush
 
@@ -595,8 +632,10 @@ the batch size); the budget applies to the retriable-failure path.
 
 ### Requirement: Gating and beforeSpanSend
 
-Tracing public APIs SHALL never throw to the caller, and tracing background work SHALL never
-crash application code — the same two-sided rule the capture and retry-queue specs establish.
+Tracing public APIs SHALL never surface an SDK-originated failure to the caller, and tracing
+background work SHALL never crash application code — the same two-sided rule the capture and
+retry-queue specs establish. (The scoped helper rethrowing the application's own callback
+exception is propagation of app control flow, not an SDK throw.)
 A span SHALL be dropped at end time (never throwing) when any gate fails, evaluated in order:
 (1) SDK not enabled/initialized, (2) user opted out, (3) `beforeSpanSend` returned `null`;
 the span-limit caps and client-side validity sanitization then apply to whatever the hook
@@ -606,8 +645,11 @@ code holding live span handles.
 
 `beforeSpanSend` SHALL receive the completed span as a plain pre-encoding representation
 (name, kind and status as strings, attributes as a plain map — not the OTLP wire encoding),
-after auto-context attributes are attached, and may mutate or drop it; a single function or
-an array run left-to-right. It is the designated scrubbing point for sensitive attribute
+including **read-only** `traceId`, `spanId`, and `parentSpanId` — exposed so hooks can make
+trace-consistent decisions (e.g. sampling on a `traceId` hash), never mutated: a change to an
+identity field SHALL be ignored with a debug warning, since rewriting ids after children
+exist corrupts parentage. The hook runs after auto-context attributes are attached and may
+mutate the rest or drop the span; a single function or an array run left-to-right. It is the designated scrubbing point for sensitive attribute
 values, and SDK documentation SHALL present it as such — for that reason a hook that throws
 SHALL drop the span (fail-closed): a broken scrubber must not leak the unscrubbed record.
 This deliberately diverges from the logs `beforeSend` fail-open rule, which does not carry a
@@ -627,6 +669,11 @@ scrubbing designation.
 - **WHEN** `beforeSpanSend` inspects a span with attribute `userId: 42`
 - **THEN** it reads a plain map entry `userId: 42`, not an OTLP `{ "intValue": "42" }`
   structure
+
+#### Scenario: identity fields are readable but immutable
+- **WHEN** `beforeSpanSend` reads `traceId` and assigns a new value to it
+- **THEN** the read succeeds, the assignment is ignored with a debug warning, and the
+  exported record keeps the original ids
 
 #### Scenario: opt-out mid-trace is safe
 - **GIVEN** a live span started before opt-out
@@ -665,18 +712,25 @@ pre-GA; enabling it SHALL require no more than providing that config.
 
 The SDK SHALL design to the ingestion service's observed contract. The request body is
 capped at 2 MB, raw or gzip-decompressed; exceeding it returns 413. A request with no token
-at all returns 401, as does a manually-blocked token. An **unknown token is accepted with
-200**: capture does not validate tokens against projects, so a misconfigured API key
-produces successful-looking responses while every span is dropped downstream, and the SDK
-cannot detect this from responses. SDK documentation SHALL NOT present a 2xx export as
-confirmation that tracing is correctly configured. The body is decoded as OTLP protobuf
+at all returns 401, as does a manually-blocked token — and, once posthog/posthog#75090 (in
+flight) lands, a token that cannot be a project API key at all (wrong prefix such as `phx_`,
+over 64 characters, non-ASCII). A **well-formed but unknown token is accepted with 200**:
+capture does not validate tokens against projects (that would require a database at the
+ingest edge), so a mistyped-but-plausible `phc_` key produces successful-looking responses
+while every span is dropped downstream, and the SDK cannot detect this from responses. SDK
+documentation SHALL NOT present a 2xx export as confirmation that tracing is correctly
+configured. The body is decoded as OTLP protobuf
 first, then JSON (a single `ExportTraceServiceRequest` object or JSONL lines merged); a body
 that decodes as neither returns 400. A span whose fields fail decoding or row conversion —
 e.g. a timestamp that does not fit signed 64-bit nanoseconds — **400s the entire request**,
 which is why the client-side validity requirement exists; note the distinction between an
 *unrepresentable* timestamp (rejected) and a representable-but-stale one (clamped, below).
-Success is 200 with body `{}`. The service emits only 200/400/401/413/500 and never
-`429`/`Retry-After`/`quota_limited`.
+Success is 200 with body `{}`. The service today emits only 200/400/401/413/500 and never
+`429`/`Retry-After`/`quota_limited`; posthog/posthog#75090 (in flight) adds per-signal quota
+enforcement at capture, after which an over-quota project receives **429 with `Retry-After`**
+before anything reaches Kafka, with logs, metrics, and traces each on their own quota bucket.
+The SDK SHALL NOT *require* a quota signal, but SHALL honor `429` + `Retry-After` when
+present — the retry requirement already does.
 
 The server further: zeroes trace/span/parent ids that are not exactly 16/8 bytes; replaces a
 zero start time with receive time; clamps representable timestamps outside ±24h of receive
@@ -684,10 +738,11 @@ time to now, preserving the original in `$originalTimestamp` (RFC3339); defaults
 time to the (clamped) start time; sets its own observed timestamp; flattens attribute values
 to strings; stores events and links as serialized JSON; flattens scope to
 `"{name}@{version}"`; reads `service_name` only from the `service.name` resource attribute
-(empty string when absent); and assigns each span a server-generated UUID. Quota
-(`traces_mb_ingested`) is enforced in the downstream Kafka consumer after capture has
-returned 200: over-quota spans are accepted and silently dropped, so the SDK receives no
-quota signal and SHALL NOT treat a 200 as proof of ingestion.
+(empty string when absent); and assigns each span a server-generated UUID. The downstream Kafka consumer reads a
+`traces_mb_ingested` quota set after capture has returned 200 — a set nothing currently
+populates (the billing `QuotaResource` enum has no traces entry), so the filter is inert
+today; #75090 moves quota enforcement to capture. Under every one of these regimes the SDK
+receives no per-request proof of ingestion and SHALL NOT treat a 200 as proof of ingestion.
 
 #### Scenario: oversize body
 - **WHEN** a request body exceeds 2 MB
@@ -714,7 +769,9 @@ quota signal and SHALL NOT treat a 200 as proof of ingestion.
 - **THEN** the server accepts it, stores the receive time, and keeps the original in
   `$originalTimestamp`
 
-#### Scenario: no quota signal
+#### Scenario: no quota signal required
 - **WHEN** the SDK handles export responses
-- **THEN** it does not depend on `429`, `Retry-After`, or `quota_limited` from the traces
-  endpoint
+- **THEN** it does not *require* `429`, `Retry-After`, or `quota_limited` from the traces
+  endpoint to function correctly
+- **AND** when a `429` with `Retry-After` does arrive, it backs off per the retry
+  requirement rather than ignoring it

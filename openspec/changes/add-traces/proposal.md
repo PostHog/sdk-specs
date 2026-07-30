@@ -47,6 +47,13 @@ ingestion service's observed behavior.
 _None. (`logs` is untouched; the shared AnyValue attribute-encoding rules are restated in the
 `traces` spec rather than cross-referenced, since each spec is standalone.)_
 
+The cross-pipeline behaviors this spec references — `captureLog` defaulting trace ids from
+the active span, the global `flush()` draining the traces queue — are stated here as the
+traces-side target only (SHOULD-level, binding the traces implementation). The canonical
+`logs` and `flush` capability deltas ship with the per-platform port changes where that
+behavior first becomes real, keeping archived specs true to shipped behavior per the repo
+norm.
+
 ## Impact
 
 - `openspec/specs/traces/spec.md` — created on archive from this change's delta.

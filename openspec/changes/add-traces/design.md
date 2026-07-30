@@ -261,12 +261,15 @@ repos:
   operations table renders the raw value, and the facet rail just filters empty strings out
   of selections. The spec's `unknown_service` default therefore strictly improves the UI
   (visible label instead of a blank cell) with no server change needed.
-- **Quota drops happen after a 200, with no signal.** Over-quota spans are accepted by
-  capture and dropped in the downstream Kafka consumer (`TracesIngestionConsumer` →
-  `filterQuotaLimitedMessages`, Redis set `@posthog/quota-limits/traces_mb_ingested`); the
-  capture-side `TokenDropper` is a static env-var list (`DROP_EVENTS_BY_TOKEN`), not dynamic
-  quota. The spec's server contract now states a 200 is not proof of ingestion. Billing
-  plumbing shipped in quotahog#39.
+- **No quota signal today — and the quota filter itself is inert.** *(Corrected 2026-07-30
+  after DanielVisca's review.)* The downstream Kafka consumer does filter against the Redis
+  set `@posthog/quota-limits/traces_mb_ingested` (`traces-ingestion-consumer.ts`), but
+  nothing populates that set: the billing `QuotaResource` enum
+  (`ee/billing/quota_limiting.py`) has no traces entry. Our earlier citation of quotahog#39
+  as "billing plumbing" was wrong — that PR is quotahog's own tracing telemetry. The
+  capture-side `TokenDropper` remains a static env-var list, not dynamic quota. The operative
+  SDK-facing fact is unchanged — a 200 is not proof of ingestion — and posthog/posthog#75090
+  (in flight) becomes the real quota story: per-signal 429 + `Retry-After` at capture.
 - **Span links are dead weight today.** Accepted at ingest into the Kafka row, but nothing in
   the product stores a links column, queries, or renders them. Reserving them at wire level
   with no v1 API is the right call; nothing on the visible roadmap needs them.
@@ -282,10 +285,16 @@ Answered by the logs team on the spec PR's inline question threads:
 - **Join-key spelling** — jonmcwest: "single source of truth, `posthogDistinctId` is fine."
   CamelCase-only emission locked in.
 - **Client-side rate cap** — jonmcwest: rate limiting is performed in ingestion, so no client
-  cap is needed. The no-cap position stands; for the per-MB cost concern raised by ioannisj,
-  `beforeSpanSend` admits trace-consistent sampling today (drop when a deterministic hash of
-  `traceId` exceeds a threshold — whole traces kept or dropped, OTel's `TraceIdRatioBased` as
-  a hook), and a first-class `sampleRate` stays deferred to the pricing conversation.
+  cap is needed. Refined by DanielVisca (2026-07-30): ingestion limiting is a **volume
+  guard**, not a trace-shaped one — it is a per-team KB token bucket dropping whole Kafka
+  messages, and one message is one export request, so a trace spread over several flushes or
+  services gets partially dropped. The no-cap position stands; the trace-shaped control is
+  the `beforeSpanSend` sampling recipe (drop when a deterministic hash of `traceId` exceeds
+  a threshold — whole traces kept or dropped). The recipe SHOULD match the server's
+  `hash01FromTraceId` semantics exactly — `sha256(trace_id)`, first four bytes over
+  `0xffffffff`, keep when under the rate — so a client rate and a (future) server rate
+  compose instead of fighting; a first-class `sampleRate` stays deferred to the pricing
+  conversation.
 - **Server-side span limits** — none planned (jonmcwest); the client 128/128 caps are the
   primary enforcement, and the truncate-and-annotate recommendation stands recorded for
   whenever server limits are considered.
@@ -299,20 +308,29 @@ Answered by the logs team on the spec PR's inline question threads:
   the capture server never reads the header; the spec now has the browser send the JSON body
   as `text/plain` (see the fresh-eyes preflight bullet above).
 
+## Resolved on PR review (2026-07-30)
+
+- **Capture-side quota signal** — DanielVisca: posthog/posthog#75090 (in flight) adds
+  per-signal quota enforcement at capture — over-quota projects get **429 + `Retry-After`**
+  before Kafka, one bucket each for logs, metrics, and traces — exactly the shape the
+  recommendation asked for. It also 401s tokens that cannot be project API keys (shape
+  validation only; a well-formed unknown key still 200s — resolving a token to a team needs
+  Postgres, deliberately kept out of the ingest edge). The spec's server contract records
+  both the today-behavior and the in-flight change; the retry table needs no change.
+- **Remote-config gating** — DanielVisca: agreed `startSpan` stays ungated; reserve the
+  auto-instrumentation boolean plus `sampleRate` (a gate's only lever is "all tracing off",
+  which is the wrong tool). Matches the spec's reserved-names list.
+
 ## Open Questions
 
-The remaining items for the APM team (#team-apm / @jonmcwest, @frankh), resolved before
-archive:
-- **Capture-side quota signal:** quota is currently a silent post-200 drop.
-  **Recommendation: no SDK change either way; if a capture-side signal lands before GA, shape
-  it as 429 + `Retry-After`.** The spec's retry table already honors that combination with
-  bounded retries, so every conformant SDK would gain backoff with zero SDK releases.
-- **Remote config:** will remote config eventually gate tracing?
-  **Recommendation: the manual `startSpan` API is never remote-gated (parity with
-  `captureLog`); reserve a remote key for future auto-instrumentation only**, mirroring how
-  `logs.captureConsoleLogs` gates console autocapture. Agreeing the key shape now costs
-  nothing in v1 and avoids a breaking change when instrumentation ships.
 - **Mobile queue persistence and the invented API surface** — flagged for
   @PostHog/team-client-libraries on the PR (in-memory-on-mobile acceptance; hardest-look
-  review of the span API) — no responses yet; marandaneto deferred first pass to the logs
-  team.
+  review of the span API). marandaneto's 2026-07-30 review pass hardened the API/pipeline
+  requirements (end-time semantics, timestamp/int ranges, export deadline, flush watermark,
+  hook identity immutability, age basis, never-throw wording); the in-memory-on-mobile
+  question itself remains open.
+- **Cross-capability deltas** — marandaneto: the traces spec references behavior of other
+  capabilities (`captureLog` trace correlation, global `flush()` draining traces). Position
+  taken in the proposal: those canonical `logs`/`flush` deltas ride with the per-platform
+  port changes where the behavior first ships, keeping archived specs true to shipped
+  behavior; awaiting his ack.

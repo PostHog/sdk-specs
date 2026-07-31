@@ -40,7 +40,7 @@ renderSurvey(displaySurvey, onShown, onResponse, onClosed): void
 2. **Load survey definitions.** Implementations fetch or receive survey definitions from the PostHog surveys/remote-config path, cache them in memory and sometimes persistence, and dedupe in-flight loads where applicable.
 3. **Wait for dependent state.** Survey eligibility commonly depends on feature flags, remote config, SDK readiness, consent state, and platform lifecycle callbacks. Wrappers should wait for those prerequisites before selecting a survey.
 4. **Track local seen/in-progress state.** SDKs remember which surveys have been seen, dismissed, responded to, or are currently in progress so that the same prompt is not repeatedly shown unless the survey explicitly allows repeated activation.
-5. **Filter active matching surveys.** Eligibility checks include active/running status, device type, wait-period rules, linked/targeting/internal feature flags, optional event/action activation conditions, and platform-specific display constraints.
+5. **Filter active matching surveys.** Eligibility checks include active/running status, device type, wait-period rules, linked/targeting/internal feature flags, optional event/action activation conditions, and platform-specific display constraints. Non-web/native SDKs MUST exclude surveys whose only display-targeting conditions are web-only (a CSS `selector` and/or `url` match) — those conditions are unevaluable outside a browser DOM, so displaying such a survey natively renders an inert prompt with no working targeting.
 6. **Handle event activation.** For surveys activated by a captured event or DOM/native action, the survey subsystem maps event/action conditions to survey ids and marks matching surveys as activated when an observed event satisfies the configured filters.
 7. **Render through a platform UI layer.** Browser implementations render Preact/shadow-DOM survey UI or inline/popover widgets. Mobile SDKs convert raw survey definitions into display models and delegate rendering to native or React Native UI components.
 8. **Allow only one active prompt unless explicitly designed otherwise.** Implementations keep active/focus state so multiple eligible popovers are queued or skipped while another survey is displayed.
@@ -122,6 +122,17 @@ The SDK SHALL implement the canonical `surveys` behavior described by this spec.
   | survey-1 | NPS Survey | true   |
 - **WHEN** surveys are loaded
 - **THEN** cached surveys should include survey "survey-1"
+
+#### Scenario: Web-only-conditioned surveys are excluded on non-web SDKs (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and surveys enabled
+- **AND** the SDK is running on a non-web platform
+- **AND** cached surveys include an active survey "survey-1" whose only display condition is a CSS selector or URL match
+- **WHEN** survey eligibility is evaluated
+- **THEN** survey display callback should not be invoked for survey "survey-1"
 
 #### Scenario: Eligible survey is shown once per presentation rules
 - **GIVEN** a fresh SDK acceptance test harness

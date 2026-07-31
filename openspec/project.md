@@ -34,6 +34,9 @@ capability per folder.
 
 - **Source of truth:** `openspec/specs/<capability>/spec.md`. Never hand-edit it — change it
   through a proposal in `openspec/changes/` and let `openspec archive` sync the delta in.
+- **One PR per change:** once review approves the proposal, run apply + archive on the same
+  branch, so the PR merges already archived — canonical spec synced, capability lists updated,
+  archive-time tasks checked. Don't split propose and archive into separate PRs.
 - **One capability per spec folder.** A new capability is a new sibling, never folded into an
   existing spec.
 - **Spec format:** `### Requirement:` (SHALL/MUST) → one or more `#### Scenario:` with

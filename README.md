@@ -110,6 +110,9 @@ Workflow (OpenSpec CLI + `/opsx` slash commands):
 3. **Archive** — `/opsx:archive` syncs the delta into `specs/<capability>/spec.md` and moves the
    change to `changes/archive/YYYY-MM-DD-<name>/`.
 
+All three steps happen on one branch: once review approves the proposal, apply and archive on
+the same PR so it merges already archived.
+
 Two kinds of change:
 - **New capability** → `add-<capability>` (e.g. `add-feature-flags`) creates a new spec folder.
 - **Porting a capability to a new SDK** → `add-<capability>-<platform>` (e.g. `add-logs-android`),

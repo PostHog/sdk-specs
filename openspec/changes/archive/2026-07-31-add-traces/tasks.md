@@ -35,19 +35,19 @@
 
 ## 3. Prose alignment (applied at archive, outside the requirement-delta mechanism)
 
-- [ ] 3.1 Add a Purpose section to `openspec/specs/traces/spec.md` (logs-style, 2-3
+- [x] 3.1 Add a Purpose section to `openspec/specs/traces/spec.md` (logs-style, 2-3
   paragraphs): traces as a separate pipeline (own queue, `/i/v1/traces`, own flush), distinct
   from `tracing-headers` and LLM analytics, plus derivation provenance ("derived from the
   Rust `capture-logs` ingestion service, verified empirically against production 2026-07-20,
   and the logs pipeline as template — spec precedes the first SDK implementation")
-- [ ] 3.2 Add the traces pipeline to the Capabilities list in `openspec/project.md`
-- [ ] 3.3 Add a Traces row to the Capabilities table in the top-level `README.md`
+- [x] 3.2 Add the traces pipeline to the Capabilities list in `openspec/project.md`
+- [x] 3.3 Add a Traces row to the Capabilities table in the top-level `README.md`
   (`product` scope, like Logs)
 
 ## 4. Validation
 
 - [x] 4.1 Run `openspec validate --strict` and resolve any errors (passing as of 2026-07-21)
-- [ ] 4.2 Run `/opsx:apply` then `/opsx:archive` to create `specs/traces/spec.md`
+- [x] 4.2 Run `/opsx:apply` then `/opsx:archive` to create `specs/traces/spec.md`
 
 ## 5. Downstream follow-up (separate changes, not this one)
 

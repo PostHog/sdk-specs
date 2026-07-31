@@ -54,7 +54,7 @@ Modifier.postHogUnmask()
 1. **Default to masking sensitive UI.** Replay capture masks text input values by default. Native/mobile implementations also default to masking textual content and images, or at least password/sensitive inputs, unless the local replay configuration disables those categories.
 2. **Honor explicit mask markers.** Elements/views tagged with PostHog masking markers such as `ph-no-capture`, `postHogMask(...)`, `Modifier.postHogMask(...)`, or wrapper components are treated as masked even when broad category masking is disabled.
 3. **Honor explicit unmask markers where supported.** Platform-specific unmask controls such as iOS `postHogNoMask()` and Android `Modifier.postHogUnmask(...)` take precedence over automatic category masking and prevent that subtree/node from being redacted.
-4. **Apply masks before serialization/upload.** Browser replay passes masking/blocking options into the rrweb recorder before DOM/input events are serialized. Native screenshot replay computes mask rectangles from the current view/render tree and paints opaque masks over screenshots before image encoding. Native wireframe replay replaces sensitive text values with masked strings and omits or placeholders sensitive image content before wireframes are converted to dictionaries/payloads.
+4. **Apply masks before serialization/upload.** Browser replay passes masking/blocking options into the rrweb recorder before DOM/input events are serialized. Native screenshot replay computes mask rectangles from the current view/render tree and paints opaque masks over screenshots before image encoding. Native wireframe replay replaces sensitive text values with masked strings and omits or placeholders sensitive image content before wireframes are converted to dictionaries/payloads. Mask rectangle/element discovery MUST traverse the full matched subtree and include every element that matches a masking rule — not only the first match encountered, and not skipping nodes because a traversal shortcut (e.g. only descending into children that themselves have multiple children) happened to bypass them; a masked wrapper's own rect must be included alongside its matching descendants' rects.
 5. **Support remote and local masking configuration.** Browser replay merges client `session_recording` masking settings with remote replay masking config, with client-provided values taking precedence. Native/mobile SDKs expose local replay config for text/image masking; remote config may separately control whether replay runs, but masking categories are applied by the local replay capture path where implemented.
 6. **Preserve privacy in screenshot mode.** Screenshot-based recorders must discover sensitive rectangles synchronously with capture where possible and draw masks into the screenshot bitmap/canvas before converting it to base64/PNG/WebP. If a concurrent screen change makes mask rectangles unreliable, implementations should discard that snapshot rather than upload a potentially stale/unmasked image.
 7. **Treat password and sensitive controls specially.** Password/secure text fields remain masked even when broad text masking is disabled. Native implementations inspect secure text traits/input types or obscured text widgets in addition to global masking settings.
@@ -126,6 +126,16 @@ The SDK SHALL implement the canonical `session-replay-privacy` behavior describe
 - **WHEN** a replay snapshot is captured for an element marked as masked containing text "secret"
 - **THEN** the replay snapshot should not contain text "secret"
 - **AND** the replay snapshot should contain masked text only
+
+#### Scenario: Replay privacy masks every matching element in a subtree, not only the first match
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and session recording is active
+- **WHEN** a replay snapshot is captured for an explicitly masked subtree containing multiple children, including at least one child that does not itself match any masking rule
+- **THEN** the replay snapshot should not reveal any content from that subtree
+- **AND** every matching descendant within the subtree should be masked, not only the first one discovered during tree traversal
 
 #### Scenario: Replay privacy excludes no-capture elements
 - **GIVEN** a fresh SDK acceptance test harness

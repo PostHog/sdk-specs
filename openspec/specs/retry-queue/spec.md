@@ -51,6 +51,10 @@ nextDelay(attempt, retryAfterHeader?): Duration
 6. **Preserve queued events for retry.**
    - Retryable failures keep the same events in the queue/storage for a later attempt.
    - Successful sends delete/remove the events from the queue/storage.
+   - Removal after a successful send identifies sent events by object identity or a stable
+     event id, not by their position/index in the live queue, so events captured concurrently
+     while the batch was in flight (for example when a full queue is refilled with new events
+     mid-flush) are not mistaken for the just-sent batch and dropped.
 7. **Drop or delete on terminal failure.**
    - If a batch is non-retryable, the events are dropped/deleted.
    - Some SDKs also drop after a maximum retry count is exceeded.
@@ -95,6 +99,7 @@ nextDelay(attempt, retryAfterHeader?): Duration
 - Queue mutation is synchronized with locks, thread-safe queues/channels, or serialized JS execution.
 - Most SDKs guarantee at-least-once best effort, not exactly-once delivery.
 - Concurrent producers can enqueue while a flush is in progress; backpressure behavior when full is SDK-specific.
+- Events captured while an earlier batch is in flight, including replacement events added to a queue that hit capacity mid-flush, MUST remain queued and be delivered by a subsequent flush — SDKs must not drop them by mistaking them for the batch that was just sent.
 
 ## Interactions
 
@@ -143,3 +148,18 @@ The SDK SHALL implement the canonical `retry-queue` behavior described by this s
 - **WHEN** three events are added to the retry queue
 - **THEN** the retry queue size should be 2
 - **AND** the SDK should record a queue capacity warning
+
+#### Scenario: Events captured while a full queue is flushing are preserved, not dropped
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and retry queue capacity is 3
+- **AND** the mock server will delay the next ingestion request until released
+- **WHEN** three events named "initial-1", "initial-2", and "initial-3" are added to the retry queue
+- **AND** flush is called
+- **AND** three replacement events named "replacement-1", "replacement-2", and "replacement-3" are added to the retry queue while the flush is in flight
+- **AND** the delayed ingestion request is released and succeeds
+- **THEN** the mock server should receive events "initial-1", "initial-2", and "initial-3" in the first batch
+- **AND** the three replacement events should remain queued for delivery
+- **AND** a subsequent flush should deliver the three replacement events

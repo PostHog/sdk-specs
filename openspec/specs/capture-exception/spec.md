@@ -242,12 +242,7 @@ ingestion pipeline caps at 10 per side).
 
 ### Requirement: Stack trace preservation over synthesis
 
-When the supplied error-like input already carries stack trace information (for example an
-`Error` instance with a native stack, or an object with an existing `stack`/`stacktrace`
-string), the SDK SHALL preserve and use that existing stack when building the exception
-payload's `stacktrace.frames`, rather than discarding it in favor of a stack synthesized from
-other available metadata (such as the message or a source location). Synthesizing frames from
-location metadata is appropriate only when the input carries no genuine stack trace.
+When the supplied error-like input already carries stack trace information (for example an `Error` instance with a native stack, or an object with an existing `stack`/`stacktrace` string), the SDK SHALL preserve and use that existing stack when building the exception payload's `stacktrace.frames`, rather than discarding it in favor of a stack synthesized from other available metadata (such as the message or a source location). Synthesizing frames from location metadata is appropriate only when the input carries no genuine stack trace.
 
 #### Scenario: An existing stack trace is preserved, not replaced by a synthesized one (@both)
 - **GIVEN** a fresh SDK acceptance test harness

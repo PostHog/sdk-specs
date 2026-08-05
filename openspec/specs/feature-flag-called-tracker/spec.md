@@ -207,6 +207,7 @@ When gated on, the event's properties SHALL be reduced to an allowlist covering,
 - **Group and person-processing context** needed for correct downstream handling (e.g. `$groups`, `$process_person_profile`).
 - **Session/SDK linkage** (e.g. `$session_id`, `$lib`, `$lib_version`) and, on server SDKs, the server marker (e.g. `$is_server`).
 - **Static, low-cardinality platform/runtime identity properties** the SDK already attaches to every event, kept for platform/runtime breakdowns on flag-call debugging (e.g. `$os`/`$python_version` on posthog-python; the equivalent OS/runtime identity fields on other SDKs).
+- **Session-attribution properties** — `$referring_domain` and the canonical campaign/click-id params the SDK already registers as super properties (e.g. `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`, `gad_source`, `mc_cid`, and click-id params such as `gclid`/`fbclid`). Web-analytics session-initial attribution (UTM values, channel type) is read from the **first event in a session**, and a minimized event can be that first event; stripping these would silently null out the whole session's attribution. Full `$referrer` remains excluded — only `$referring_domain` and the bare campaign-param keys survive minimization.
 
 Everything else — including super properties, custom event properties passed by the caller, and other enriched context tags — SHALL be stripped from a minimized event.
 
@@ -272,6 +273,26 @@ The gate SHALL persist alongside cached flag/local-evaluation definition state (
   | $feature_flag_response | true |
   | $feature_flag_has_experiment | false |
 - **AND** the enqueued event properties should not include "team"
+
+#### Scenario: Minimal event preserves session-attribution properties but not the full referrer (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** the server reports the minimal-event gate as enabled
+- **AND** cached feature flags are:
+  | key     | value |
+  | beta-ui | true  |
+- **AND** the flag "beta-ui" reports `has_experiment` as false
+- **AND** a super property "$referring_domain" with value "google.com" is registered
+- **AND** a super property "utm_source" with value "google" is registered
+- **AND** a super property "$referrer" with value "https://google.com/search?q=posthog" is registered
+- **WHEN** get feature flag "beta-ui" is called
+- **THEN** the enqueued "$feature_flag_called" event properties should include:
+  | property           | value      |
+  | $referring_domain  | google.com |
+  | utm_source         | google     |
+- **AND** the enqueued event properties should not include "$referrer"
 
 #### Scenario: Gate persists across a local-evaluation definitions refresh (@server)
 - **GIVEN** a fresh SDK acceptance test harness

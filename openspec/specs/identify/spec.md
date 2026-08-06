@@ -21,7 +21,7 @@ The canonical event name emitted is **`$identify`** (with a leading `$`), regard
 | `distinct_id` | Optional override. Defaults to the SDK's current distinct id; if a new one is provided, the SDK **updates its persistent state** (becomes the new ambient distinct id). | Required per-call argument. Not persisted. |
 | `$anon_distinct_id` | Stamped on the event (the previous distinct id, i.e. the anonymous / device id) so the server can merge profiles. | Not stamped. The server has no concept of the user's anonymous history. |
 | Ambient "identified" flag | Set to `true` on success; persisted. Consulted by `capture` (stamps `$is_identified`). | Not held. |
-| Duplicate-call suppression | If called with the same distinct id while already identified, the event is suppressed or downgraded to a `$set` event. | No suppression — every call emits `$identify`. |
+| Duplicate-call suppression | If called with the same distinct id while already identified, the event is suppressed or downgraded to a `$set` event. If called with the same distinct id while still anonymous, the SDK transitions to identified and emits a `$set` instead of suppressing. | No suppression — every call emits `$identify`. |
 | Side effects | Reloads feature flags; updates cached person properties; notifies crash-reporting integrations of the context change. | None beyond enqueuing the event. |
 | Input validation | Empty distinct id → dropped with log. | Empty distinct id → dropped (client SDKs) or raises (Ruby, Go, .NET validators). |
 | Return | `void` / `Unit` / `Future<void>` (no meaningful result). | Varies — UUID (Python via `set()`), bool (Ruby, PHP, Go's `Enqueue`), or Unit. Python has **no `identify()` method** — see below. |
@@ -108,8 +108,9 @@ identify(
 2. **Resolve distinct ids.** Let `previousDistinctId = current persisted distinct id (or the device/anonymous id)`. Let `newDistinctId = caller-provided value` (if any) `else previousDistinctId`.
 3. **Decide the emission path:**
    - **New distinct id, not yet identified** → emit `$identify`. Persist `newDistinctId` as the distinct id, persist `previousDistinctId` as the anonymous id (unless `reuseAnonymousId` is true), mark `isIdentified = true`. Reload feature flags. Notify integrations (crash reporting, surveys) of the context change. Update cached person-properties hash.
-   - **Same distinct id, but userProperties / userPropertiesSetOnce provided** → emit `$set` (not `$identify`), with the new properties. Feature flags are **not** reloaded (property changes are processed async server-side). A hash check suppresses no-op duplicate calls with the same properties.
-   - **Same distinct id, no properties** → log "already identified", drop.
+   - **Same distinct id, still anonymous (`isIdentified` is `false`)** → treat this as the anonymous → identified transition even though the distinct id is unchanged: mark `isIdentified = true` and emit a single `$set` event (not `$identify` — there is no anonymous id to merge, since the caller-supplied id already *is* the persisted anonymous/device id), carrying any supplied `userProperties`/`userPropertiesSetOnce` (or empty `$set`/`$set_once` if none were supplied — the transition itself is the effect being recorded). The person-properties dedup hash is updated only *after* this event is captured, so a stale hash from an earlier no-op call cannot suppress the transition. Feature flags are reloaded only if properties were supplied (the identified-state flag alone is not part of the `/flags` request).
+   - **Same distinct id, already identified, but userProperties / userPropertiesSetOnce provided** → emit `$set` (not `$identify`), with the new properties. Feature flags are **not** reloaded (property changes are processed async server-side). A hash check suppresses no-op duplicate calls with the same properties.
+   - **Same distinct id, already identified, no properties** → log "already identified", drop.
    - **New distinct id but user is already identified** → in most SDKs, the call is logged and dropped; callers must `reset()` first to identify a different user. (Some SDKs always emit.)
 4. **Construct the `$identify` event** with properties:
    - `$anon_distinct_id`: the pre-identify id (the anonymous / device id), **unless** `reuseAnonymousId` is true, in which case it is omitted and the anonymous id is not rotated.
@@ -193,6 +194,19 @@ The SDK SHALL implement the canonical `identify` behavior described by this spec
   | distinct_id          | user-123       |
   | $anon_distinct_id    | anon-123       |
   | $set.email           | user@test.test |
+
+#### Scenario: Identify with a distinct id already matching the anonymous id transitions to identified (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** the current distinct id is "anon-123"
+- **AND** the SDK has not yet identified a user
+- **WHEN** identify is called with distinct id "anon-123"
+- **THEN** get distinct id should return "anon-123"
+- **AND** one event named "$set" should be enqueued
+- **AND** no event named "$identify" should be enqueued
 
 #### Scenario: Server identify sends a profile update for explicit distinct id (@server)
 - **GIVEN** a fresh SDK acceptance test harness

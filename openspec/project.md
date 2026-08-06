@@ -16,13 +16,17 @@ their own repos (`posthog-android`, `posthog-ios`, `posthog-js`, `posthog-flutte
 
 ## Capabilities
 
-Specs now cover three groups of canonical SDK behavior:
+Specs now cover four groups of canonical SDK behavior:
 
 - **Public SDK APIs** such as capture, identify, groups, feature-flag getters, opt-in/out,
   session-replay controls, setup, flush, shutdown, and property registration.
 - **Internal SDK components** such as lifecycle handling, autocapture, batching, retry queues,
   persistent storage, remote config, feature-flag caches/evaluators, session management, surveys,
   consent gating, replay privacy, and client/server tracing-header correlation.
+- **Transports** such as capture v1, the versioned analytics-events ingestion path at
+  `POST {host}/i/v1/analytics/events` with Bearer-only auth and a per-event result protocol
+  (`ok`/`warning`/`drop`/`retry`) that supports partial retry — a wire contract downstream of the
+  generic `capture` API, selected by configuration alongside the legacy `/batch/` transport.
 - **Product pipelines** such as logs, whose records are enriched, batched, and shipped as
   OpenTelemetry Logs (OTLP/HTTP JSON) at `POST {host}/i/v1/logs`, and traces, whose spans are
   shipped as OpenTelemetry Traces (OTLP/HTTP JSON) at `POST {host}/i/v1/traces`.

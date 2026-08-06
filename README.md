@@ -26,6 +26,7 @@ Tags on each feature indicate whether scenarios apply to client SDKs, server SDK
 | Alias | [`openspec/specs/alias/spec.md`](openspec/specs/alias/spec.md) | public API | Canonical |
 | Capture | [`openspec/specs/capture/spec.md`](openspec/specs/capture/spec.md) | public API | Canonical |
 | Capture Exception | [`openspec/specs/capture-exception/spec.md`](openspec/specs/capture-exception/spec.md) | public API | Canonical |
+| Capture V1 | [`openspec/specs/capture-v1/spec.md`](openspec/specs/capture-v1/spec.md) | transport | Canonical |
 | Create Person Profile | [`openspec/specs/create-person-profile/spec.md`](openspec/specs/create-person-profile/spec.md) | public API | Canonical |
 | Debug | [`openspec/specs/debug/spec.md`](openspec/specs/debug/spec.md) | public API | Canonical |
 | Exception Steps | [`openspec/specs/exception-steps/spec.md`](openspec/specs/exception-steps/spec.md) | public API | Canonical |

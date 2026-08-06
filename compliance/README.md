@@ -29,9 +29,9 @@ this compliance-only PR).
 | posthog-js | 34/59 fully compliant (58%) | 34 | 15 | 7 | 3 | 0 | 2026-08-06 · `e1efa57` | 22 | [posthog-js.md](posthog-js.md) |
 | posthog-python | 10/59 fully compliant (17%; 29 contracts N/A on a server SDK) | 10 | 13 | 7 | 29 | 0 | 2026-08-06 · `55370ee` | 20 | [posthog-python.md](posthog-python.md) |
 | posthog-android | 33/59 fully compliant (56%) | 33 | 19 | 4 | 3 | 0 | 2026-08-06 · `0d2b16b` | 23 | [posthog-android.md](posthog-android.md) |
-| posthog-ios | Pending initial audit | – | – | – | – | – | never | – | – |
-| posthog-node | Pending initial audit | – | – | – | – | – | never | – | – |
-| posthog-flutter | Pending initial audit | – | – | – | – | – | never | – | – |
+| posthog-ios | 33/59 fully compliant (56%) | 33 | 17 | 6 | 3 | 0 | 2026-08-06 · `057f4d6` | 23 | [posthog-ios.md](posthog-ios.md) |
+| posthog-node | 11/59 fully compliant (19%; 27 contracts N/A on a server SDK) | 11 | 15 | 6 | 27 | 0 | 2026-08-06 · `e1efa57` (posthog-js monorepo) | 21 | [posthog-node.md](posthog-node.md) |
+| posthog-flutter | 20/59 fully compliant (34%) | 20 | 22 | 6 | 5 | 6 | 2026-08-06 · `05b53dc` | 34 | [posthog-flutter.md](posthog-flutter.md) |
 | posthog-react-native | Pending initial audit | – | – | – | – | – | never | – | – |
 | posthog-php | Pending initial audit | – | – | – | – | – | never | – | – |
 | posthog-ruby | Pending initial audit | – | – | – | – | – | never | – | – |
@@ -39,9 +39,13 @@ this compliance-only PR).
 | posthog-java | Pending initial audit | – | – | – | – | – | never | – | – |
 | posthog-dotnet | Pending initial audit | – | – | – | – | – | never | – | – |
 
-"Overall" for posthog-python is computed against the 30 contracts actually applicable to a
-server SDK (10 Pass / 30 applicable = 33% of applicable contracts pass; shown above as raw
-Pass/59 for comparability with client SDKs, which see N/A far less often).
+"Overall" for posthog-python and posthog-node is computed against the contracts actually
+applicable to a server SDK (posthog-python: 10 Pass / 30 applicable = 33%; posthog-node: 11 Pass
+/ 32 applicable = 34%); shown above as raw Pass/59 for comparability with client SDKs, which see
+N/A far less often. **posthog-node note:** the standalone `PostHog/posthog-node` repo has been
+archived/redirected — its code now lives at `packages/node` + `packages/core` inside the
+`posthog-js` monorepo, so its audited commit is a `posthog-js` SHA (`e1efa57`), not a
+`posthog-node` SHA.
 
 ## Global open gaps (Fail before Partial, by SDK)
 
@@ -64,6 +68,21 @@ Pass/59 for comparability with client SDKs, which see N/A far less often).
 | posthog-android | Start Session Recording | Backward-compatible | `startSessionReplay()` has no `isOptedOut()` guard — [posthog-android.md#n13](posthog-android.md) |
 | posthog-android | Autocapture | Backward-compatible | No generic UI-interaction autocapture (`$autocapture`) at all — [posthog-android.md#n16](posthog-android.md) |
 | posthog-android | Traces | Backward-compatible | No OTLP traces/spans implementation — [posthog-android.md#n26](posthog-android.md) |
+| posthog-ios | Get Feature Flags | Backward-compatible | No flat bulk flag getter, only internal machinery — [posthog-ios.md#n11](posthog-ios.md) |
+| posthog-ios | Get Feature Flags And Payloads | Backward-compatible | No combined flags+payloads getter under any name — [posthog-ios.md#n12](posthog-ios.md) |
+| posthog-ios | On Feature Flags | Backward-compatible | No public multi-subscriber listener API exposed — [posthog-ios.md#n17](posthog-ios.md) |
+| posthog-ios | Session Replay Privacy | Needs deprecation path | Default wireframe-capture mode never checks `ph-no-capture` for plain `UIView`s — a silent privacy leak in the default mode — [posthog-ios.md#n22](posthog-ios.md) |
+| posthog-ios | Shutdown | Backward-compatible | `close()` never calls `flush()` before stopping queues — [posthog-ios.md#n24](posthog-ios.md) |
+| posthog-ios | Traces | Backward-compatible | No OTLP span/traces implementation anywhere — [posthog-ios.md#n26](posthog-ios.md) |
+| posthog-node | Traces | Backward-compatible | No OTLP `/i/v1/traces` pipeline anywhere in the monorepo (industry-wide gap, matches posthog-python/-js) — [posthog-node.md#n2](posthog-node.md) |
+| posthog-node | Is Feature Enabled | Backward-compatible | Neither `isFeatureEnabled()` nor its successor accepts a caller `defaultValue` (hard SHALL, no server carve-out) — [posthog-node.md#n11](posthog-node.md) |
+| posthog-node | Set/Reset Person/Group Properties For Flags (×4) | Backward-compatible | Zero implementation; methods exist only on the client-only base class node doesn't extend — [posthog-node.md#n13](posthog-node.md) |
+| posthog-flutter | Get Anonymous ID | Backward-compatible | Method doesn't exist in the Dart API at all (standing `// TODO`) — [posthog-flutter.md#n14](posthog-flutter.md) |
+| posthog-flutter | Get Feature Flags | Backward-compatible | No bulk flag getter anywhere in Dart — [posthog-flutter.md#n16](posthog-flutter.md) |
+| posthog-flutter | Get Feature Flags And Payloads | Backward-compatible | No combined flags+payloads getter anywhere in Dart — [posthog-flutter.md#n17](posthog-flutter.md) |
+| posthog-flutter | Shutdown | Backward-compatible | `close()` never flushes; complete no-op on Web — [posthog-flutter.md#n34](posthog-flutter.md) |
+| posthog-flutter | Traces | Backward-compatible | No implementation; net-new, pre-GA — [posthog-flutter.md#n38](posthog-flutter.md) |
+| posthog-flutter | Tracing Headers | Backward-compatible | No implementation; Flutter has no Dart-side HTTP client of its own to intercept app traffic with — [posthog-flutter.md#n39](posthog-flutter.md) |
 
 ### 🟡 Partial (highlights — see per-SDK files for the full list)
 
@@ -77,35 +96,61 @@ Pass/59 for comparability with client SDKs, which see N/A far less often).
 | posthog-android | Feature Flag Called Tracker | Backward-compatible | Same allowlist gap as posthog-python, already fixed in posthog-js/-node per the audit notes — [posthog-android.md#n19](posthog-android.md) |
 | posthog-android | Session Replay Privacy | Needs deprecation path | `ph-no-capture` ignored outside screenshot mode; default capture mode can leak tagged views — [posthog-android.md#n24](posthog-android.md) |
 | posthog-android | Surveys | Needs deprecation path | Web-only `url`/`selector`-targeted surveys aren't excluded on Android as the spec requires — [posthog-android.md#n25](posthog-android.md) |
+| posthog-ios | Screen | Needs deprecation path | Caller-supplied `$screen_name` silently overrides the explicit `screenTitle` argument, the inverse of spec precedence — [posthog-ios.md#n21](posthog-ios.md) |
+| posthog-node | Flush / Retry Queue (v1 pipeline) | Needs deprecation path | `V1CaptureSender` never throws on exhausted retry, so failed batches are evicted from the queue as if delivered — [posthog-node.md#n8](posthog-node.md) |
+| posthog-node | Feature Flag Called Tracker | Backward-compatible | Allowlist itself is fully compliant (inherited from posthog-js via shared `@posthog/core`), but capacity eviction is a full clear rather than incremental, violating the spec's anti-thundering-herd requirement — [posthog-node.md#n19](posthog-node.md) |
+| posthog-flutter | Session Replay Privacy | Backward-compatible (mostly) | Independent Dart replay pipeline has no no-capture marker, no general unmask primitive, inconsistent password-field masking — [posthog-flutter.md#n31](posthog-flutter.md) |
 
-Full contract-by-contract detail (all 47 posthog-js, 38 posthog-python, and 47 posthog-android
-non-Pass cells) is in the respective per-SDK files.
+Full contract-by-contract detail (all 47 posthog-js, 38 posthog-python, 47 posthog-android, 26
+posthog-ios, 21 posthog-node, and 39 posthog-flutter non-Pass cells) is in the respective
+per-SDK files.
 
 ## Cross-cutting pattern worth flagging
 
 The **Feature Flag Called Tracker** minimal-event allowlist gap (missing session-attribution
-properties from the most recently merged spec change) shows up as Partial in both
-posthog-python and posthog-android this run, and was already noted as fixed in posthog-js/-node
-by the posthog-js auditor. Worth a human check on posthog-ios/-flutter/-react-native/-php/-ruby/-go/-java/-dotnet
-when they're audited, since this looks like a fix that was rolled out to some SDKs but not
-others.
+properties from the most recently merged spec change, sdk-specs commit `b59e8b4`) shows up as
+Partial in posthog-python and posthog-android, and was already fixed in posthog-js. This run
+confirmed **posthog-node also has the fix** (it shares `@posthog/core` with posthog-js, so it
+inherited the fix for free) — narrowing the gap to posthog-python and posthog-android only among
+audited SDKs so far. posthog-flutter's own Dart code has zero allowlist logic (100% delegated to
+embedded native SDKs), so its status is ❓ Unknown rather than assumed — worth a human check once
+posthog-ios (Swift, own allowlist implementation — confirmed 🟡 Partial this run, missing the
+same session-attribution properties, see [posthog-ios.md#n8](posthog-ios.md)) and the remaining
+posthog-react-native/-php/-ruby/-go/-java/-dotnet are audited, since this looks like a fix rolled
+out to some SDKs but not others.
 
 ## Unknown (❓) cells needing human review
 
-None this run — all three audited SDKs (posthog-js, posthog-python, posthog-android) resolved
-every one of their 59 contracts to a concrete ✅/🟡/❌/➖ status with direct code evidence.
+**posthog-flutter — 6 cells**, all stemming from its architecture as a thin Dart wrapper that
+delegates most transport/queueing mechanics to embedded native SDKs (posthog-android/posthog-ios)
+or, on web, to an existing `window.posthog` (posthog-js) — behavior the Flutter repo alone cannot
+verify:
+- **Event Batcher** — [posthog-flutter.md#n10](posthog-flutter.md)
+- **Feature Flag Called Tracker** — allowlist logic is 100% delegated to native SDKs; plausibly
+  inherits the same gap found in embedded posthog-android, but not independently verifiable —
+  [posthog-flutter.md#n11](posthog-flutter.md)
+- **HTTP Client** — [posthog-flutter.md#n20](posthog-flutter.md)
+- **Persistent Storage** — [posthog-flutter.md#n26](posthog-flutter.md)
+- **Remote Config** — [posthog-flutter.md#n28](posthog-flutter.md)
+- **Retry Queue** — [posthog-flutter.md#n29](posthog-flutter.md)
+
+No Unknown cells in posthog-ios or posthog-node this run — both resolved every one of their 59
+contracts to a concrete ✅/🟡/❌/➖ status with direct code evidence.
 
 ## Pending initial audit
 
-posthog-ios, posthog-node, posthog-flutter, posthog-react-native, posthog-php, posthog-ruby,
-posthog-go, posthog-java, posthog-dotnet — no compliance file exists yet for any of these.
+posthog-react-native, posthog-php, posthog-ruby, posthog-go, posthog-java, posthog-dotnet — no
+compliance file exists yet for any of these. (6 of 12 in-scope SDKs remain; posthog-js,
+posthog-python, posthog-android, posthog-ios, posthog-node, and posthog-flutter are now audited.)
 
 ## Queued for next run
 
-This run's bootstrap cap (3 SDKs/run) was spent on posthog-js, posthog-python, and
-posthog-android — the three SDKs most touched by spec changes merged in the last few weeks
-(traces, retry-queue durability, capture-exception ordering, session-replay idle-rotation,
-feature-flag-called session attribution). All 9 remaining pending-initial-audit SDKs are queued;
-next run should continue draining that backlog, prioritizing posthog-ios and posthog-node (also
-referenced heavily in the same recent spec changes) before rotating to posthog-flutter,
-posthog-react-native, posthog-php, posthog-ruby, posthog-go, posthog-java, and posthog-dotnet.
+This run's cap (3 SDKs/run) was spent on posthog-ios, posthog-node, and posthog-flutter —
+continuing to drain the bootstrap backlog per last run's recommendation (posthog-ios and
+posthog-node were referenced heavily in recent spec churn; posthog-flutter was next in rotation).
+All 6 remaining pending-initial-audit SDKs are queued for future runs, in recommended order:
+posthog-react-native (shares core logic with posthog-js/posthog-node's `@posthog/core`, so likely
+a fast audit next), then posthog-php, posthog-ruby, posthog-go, posthog-java, and posthog-dotnet.
+Once the bootstrap backlog is fully drained, the staleness backstop takes over — re-auditing
+whichever SDK has gone longest since its last full audit (starting with whichever of the six
+already-audited SDKs is oldest by then).

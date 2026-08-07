@@ -40,7 +40,7 @@ evaluateAllFlags(context): { results, fallbackToRemote }
 3. **Short-circuit inactive flags.** Disabled flags return `false` locally.
 4. **Handle group-scoped flags specially.** If the flag targets a group aggregation index, evaluate it against the matching group key/properties instead of person properties.
 5. **Resolve bucketing value.** Use `distinct_id` by default, or `device_id` when the flag's bucketing mode requires it.
-6. **Match flag conditions locally.** Evaluate property filters, rollout percentages, multivariate overrides, and dependency chains using local definitions.
+6. **Match flag conditions locally.** Evaluate property filters, rollout percentages, multivariate overrides, and dependency chains using local definitions. See "String prefix/suffix property filter operators" below for the `starts_with`/`ends_with` family.
 7. **Return either a boolean or variant string.** Multivariate flags resolve to a variant key; boolean flags resolve to `true` / `false`.
 8. **Resolve payload from the chosen value.** Payload lookup uses the computed match value (or an explicitly supplied override match value in some SDKs).
 9. **Signal fallback when local evaluation is impossible.** If required context is missing, a dependency cannot be resolved, a feature uses unsupported behavior (for example experience continuity / static cohorts), or the evaluator cannot reach a conclusive answer, it raises/returns an "inconclusive" / "requires server evaluation" signal.
@@ -141,3 +141,40 @@ The SDK SHALL implement the canonical `local-feature-flag-evaluator` behavior de
 - **THEN** the local evaluation payload should include:
   | field | value |
   | copy  | new   |
+
+### Requirement: String prefix/suffix property filter operators
+
+The local evaluator's property-filter matching SHALL support the `starts_with`,
+`not_starts_with`, `ends_with`, and `not_ends_with` operators. Matching SHALL stringify both the
+property value and the filter value, lowercase them using ASCII case-folding, and compare with a
+prefix check (`starts_with`/`not_starts_with`) or suffix check (`ends_with`/`not_ends_with`),
+negating the result for the `not_*` variants — the same case-insensitive, stringify-first
+approach already used for `icontains`. These operators mirror the corresponding server-side
+flags-service operators so that locally-evaluated results agree with remote evaluation.
+
+When the property required for evaluation is absent from the supplied context, matching SHALL be
+inconclusive (deferring to remote evaluation), consistent with how other operators handle a
+missing property.
+
+#### Scenario: A starts_with filter matches locally (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and local evaluation enabled
+- **AND** local feature flag definitions include a flag "enterprise-ui" matching person property
+  "email" with operator "starts_with" and value "admin@"
+- **WHEN** local feature flag "enterprise-ui" is evaluated for a person with property "email"
+  equal to "Admin@Example.com"
+- **THEN** the local evaluation result should be true
+
+#### Scenario: A starts_with filter is inconclusive when the property is missing (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and local evaluation enabled
+- **AND** local feature flag definitions include a flag "enterprise-ui" matching person property
+  "email" with operator "starts_with" and value "admin@"
+- **WHEN** local feature flag "enterprise-ui" is evaluated for a person with no "email" property
+- **THEN** local evaluation should be inconclusive

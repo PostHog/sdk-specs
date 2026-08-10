@@ -42,7 +42,7 @@ renderSurvey(displaySurvey, onShown, onResponse, onClosed): void
 4. **Track local seen/in-progress state.** SDKs remember which surveys have been seen, dismissed, responded to, or are currently in progress so that the same prompt is not repeatedly shown unless the survey explicitly allows repeated activation.
 5. **Filter active matching surveys.** Eligibility checks include active/running status, device type, wait-period rules, linked/targeting/internal feature flags, optional event/action activation conditions, and platform-specific display constraints. Non-web/native SDKs MUST exclude surveys whose only display-targeting conditions are web-only (a CSS `selector` and/or `url` match) — those conditions are unevaluable outside a browser DOM, so displaying such a survey natively renders an inert prompt with no working targeting.
 6. **Handle event activation.** For surveys activated by a captured event or DOM/native action, the survey subsystem maps event/action conditions to survey ids and marks matching surveys as activated when an observed event satisfies the configured filters.
-7. **Render through a platform UI layer.** Browser implementations render Preact/shadow-DOM survey UI or inline/popover widgets. Mobile SDKs convert raw survey definitions into display models and delegate rendering to native or React Native UI components.
+7. **Render through a platform UI layer.** Browser implementations render Preact/shadow-DOM survey UI or inline/popover widgets. Mobile SDKs convert raw survey definitions into display models and delegate rendering to native or React Native UI components. An optional leading intro screen and trailing confirmation message may bracket the question flow without being questions themselves — see the *Survey intro screen* requirement below.
 8. **Allow only one active prompt unless explicitly designed otherwise.** Implementations keep active/focus state so multiple eligible popovers are queued or skipped while another survey is displayed.
 9. **Apply branching and response-key compatibility.** Survey response handling computes the next question from branching rules and writes both current question-id response keys and legacy index-based keys when required for backward compatibility.
 10. **Emit standardized events through the normal capture pipeline.** Survey UI emits fixed events such as `survey shown`, `survey sent`, `survey dismissed`, and, where supported, `survey abandoned`. These events include survey id/name/iteration metadata, response properties, `$survey_questions`, and `$set` interaction markers.
@@ -170,3 +170,90 @@ The SDK SHALL implement the canonical `surveys` behavior described by this spec.
 - **AND** analytics capture is opted out
 - **WHEN** surveys are loaded
 - **THEN** no survey response or display event should be enqueued
+
+### Requirement: Survey intro screen
+
+The SDK SHALL support an optional intro screen shown before the first survey question, configured
+via `SurveyAppearance` fields: `displayIntroScreen` (off by default), `introScreenHeader`,
+`introScreenDescription`, `introScreenDescriptionContentType`, and `introScreenButtonText`. The
+intro screen is a leading mirror of the existing trailing confirmation ("thank you") message,
+letting survey authors set context before question 1 without recording a throwaway first
+question.
+
+Advancing past the intro screen SHALL NOT emit any capture event, SHALL NOT record a survey
+response, and SHALL NOT affect completion or partial-response accounting for the survey.
+Question indices SHALL be unaffected by the intro screen's presence — the first real question
+keeps its natural index whether or not an intro screen precedes it.
+
+The intro screen SHALL be skipped (the survey starts directly at its first question or
+confirmation branch) when either of the following holds:
+
+- the survey is resumed with existing in-progress answers, including answers sourced from a
+  URL-prefilled response; or
+- the current user has already completed the survey, in which case the confirmation branch takes
+  precedence over the intro screen.
+
+Dismissing the intro screen (e.g. via a close/X control) SHALL emit the survey's normal
+`survey dismissed` event, the same as dismissing the survey at any other point.
+
+Intro screen copy fields SHALL be translatable using the same per-language translation mechanism
+already used for other survey appearance and confirmation-message fields.
+
+#### Scenario: Intro screen is shown before the first question when enabled
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and surveys enabled
+- **AND** survey "survey-1" has appearance field `displayIntroScreen` set to true
+- **AND** survey "survey-1" is visible
+- **WHEN** survey "survey-1" is rendered
+- **THEN** the intro screen should be shown before the first question
+
+#### Scenario: Intro screen is off by default
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and surveys enabled
+- **AND** survey "survey-1" does not set the `displayIntroScreen` appearance field
+- **AND** survey "survey-1" is visible
+- **WHEN** survey "survey-1" is rendered
+- **THEN** the first question should be shown immediately with no intro screen
+
+#### Scenario: Advancing the intro screen records no response and no event
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and surveys enabled
+- **AND** survey "survey-1" has appearance field `displayIntroScreen` set to true
+- **AND** the intro screen for survey "survey-1" is currently shown
+- **WHEN** the user advances past the intro screen
+- **THEN** no event should be enqueued
+- **AND** no response should be recorded for survey "survey-1"
+- **AND** the first question should now be shown
+
+#### Scenario: Intro screen is skipped for a resumed in-progress survey
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and surveys enabled
+- **AND** survey "survey-1" has appearance field `displayIntroScreen` set to true
+- **AND** survey "survey-1" has an in-progress response already recorded
+- **WHEN** survey "survey-1" is rendered
+- **THEN** the intro screen should not be shown
+- **AND** the survey should resume at its in-progress question
+
+#### Scenario: Dismissing the intro screen emits survey dismissed
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and surveys enabled
+- **AND** survey "survey-1" has appearance field `displayIntroScreen` set to true
+- **AND** the intro screen for survey "survey-1" is currently shown
+- **WHEN** the user dismisses survey "survey-1" from the intro screen
+- **THEN** one event named "survey dismissed" should be enqueued
+

@@ -40,3 +40,12 @@ Feature: Surveys
     And analytics capture is opted out
     When surveys are loaded
     Then no survey response or display event should be enqueued
+
+  Scenario: Advancing the intro screen records no response and no event
+    Given the SDK is initialized with token "test-token" and surveys enabled
+    And survey "survey-1" has appearance field "displayIntroScreen" set to true
+    And the intro screen for survey "survey-1" is currently shown
+    When the user advances past the intro screen
+    Then no event should be enqueued
+    And no response should be recorded for survey "survey-1"
+    And the first question should now be shown

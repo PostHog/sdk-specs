@@ -59,6 +59,18 @@ A producer SHALL omit any common field whose value it cannot determine; it MUST 
 - **WHEN** a low-level builder creates `$exception_list`
 - **THEN** the resulting mechanism should preserve all four fields and values
 
+#### Scenario: Malformed supplied common fields are omitted safely (@both)
+- **GIVEN** an integration or typed override supplies a common mechanism field with the wrong JSON type, an empty `type` or `source`, or `null`
+- **WHEN** the SDK validates and serializes the exception event
+- **THEN** the malformed common field should be omitted
+- **AND** other valid mechanism fields and JSON-safe platform extensions should be preserved
+- **AND** event creation should not throw into the host application
+
+#### Scenario: Empty supplied mechanism is omitted (@both)
+- **GIVEN** all supplied common mechanism fields are invalid or unknown and there are no platform extensions
+- **WHEN** the SDK serializes the exception entry
+- **THEN** the entry should omit `mechanism`
+
 ### Requirement: Capture category and concrete capture source
 
 `mechanism.type` identifies the semantic mechanism by which an exception entry entered the event. On the outermost exception it identifies the capture-boundary category. Public or manual capture SHALL use `generic` unless a more specific integration category is known. Common outermost categories include `logger`, `onconsole`, `onuncaughtexception`, `onunhandledrejection`, `middleware`, `task`, `panic`, `signal`, and `crash_reporter`. A nested exception reached through another entry MAY use `chained`; `mechanism.source` then preserves the specific relationship. The vocabulary is extensible, and builders MUST preserve unknown non-empty typed integration values.
@@ -89,7 +101,7 @@ The outermost exception SHALL serialize `mechanism.handled` when the capture bou
 
 A framework, SDK, global handler, or crash reporter observing an exception does not by itself make the exception handled. When handled state is unknown, the producer SHALL omit `mechanism.handled`; it MUST NOT serialize unknown as `false`. A top-level `$exception_handled` property does not replace the nested mechanism field.
 
-Each nested entry SHALL preserve its own independently known handled state. A producer MUST NOT copy the outermost handled state to nested entries solely because they belong to the same event.
+Each nested entry SHALL preserve its own independently known handled state. Being wrapped, unwrapped, grouped, suppressed, or reached as a cause does not by itself establish that nested entry's handled state. Unless the runtime or integration supplies an independent disposition for the nested entry, the producer SHALL omit its `mechanism.handled`. It MUST NOT copy, invert, or otherwise derive the value solely from the outermost entry.
 
 #### Scenario: Manual capture marks the outermost exception handled (@both)
 - **WHEN** the public exception API captures a caught exception
@@ -109,6 +121,7 @@ Each nested entry SHALL preserve its own independently known handled state. A pr
 - **GIVEN** a producer knows the outermost handled state but not a nested exception's handled state
 - **WHEN** it serializes both entries
 - **THEN** the nested exception should omit `mechanism.handled`
+- **AND** the producer should not infer handled state from the nested exception being a cause or member
 
 ### Requirement: Explicit synthetic state
 
@@ -198,6 +211,8 @@ An SDK-owned capture path SHALL apply the following defaults:
 
 For each field, precedence SHALL be: a valid typed integration override; recognized native source metadata; the capture-boundary default; then omission. Invalid or unknown values MUST NOT be converted into misleading defaults by a context-free builder. Level, type, source, handled state, and synthetic state remain independent.
 
+Generic caller-supplied event-property bags MUST NOT override SDK-owned `$exception_list`, `$exception_level`, `$exception_source`, `$debug_images`, or processor-owned properties. An SDK MAY expose documented typed overrides for level, source, mechanism metadata, debug images, or custom fingerprinting; only those typed and validated inputs participate in the precedence above. `$exception_fingerprint` MAY also be accepted from a documented generic property key when that is the SDK's explicit custom-fingerprint API. Unrecognized reserved exception properties SHALL be ignored or replaced by the canonical generated value, and this handling MUST NOT throw into the host application. This exception-specific precedence supersedes the generic property-precedence variation allowed by the public `capture-exception` capability for these reserved keys; non-reserved caller properties keep that capability's existing merge behavior.
+
 #### Scenario: Manual capture emits canonical defaults (@both)
 - **WHEN** the public exception API captures a caught exception without overrides
 - **THEN** `$exception_level` should equal `error`
@@ -214,6 +229,13 @@ For each field, precedence SHALL be: a valid typed integration override; recogni
 - **GIVEN** a capture boundary observes a failure expected to terminate the app or process
 - **WHEN** it captures the failure
 - **THEN** `$exception_level` should equal `fatal`
+- **AND** the outermost exception should have `mechanism.handled` equal to `false`
+
+#### Scenario: Deferred native crash retains original boundary metadata (@both)
+- **GIVEN** a native crash reporter records a terminating failure and reconstructs its event on the next launch
+- **WHEN** the reconstructed event is enqueued
+- **THEN** its metadata should describe the original terminating crash boundary rather than the next-launch enqueue operation
+- **AND** `$exception_level` should equal `fatal`
 - **AND** the outermost exception should have `mechanism.handled` equal to `false`
 
 ### Requirement: Native debug image metadata

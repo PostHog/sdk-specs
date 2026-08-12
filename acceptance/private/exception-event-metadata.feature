@@ -61,6 +61,12 @@ Feature: Exception Event Metadata
     And the enqueued event property "$exception_level" should equal "fatal"
     And the outermost exception should have "mechanism.handled" equal to false
 
+  Scenario: A deferred native crash retains original boundary metadata
+    Given a native crash reporter records a terminating failure for next-launch delivery
+    When the SDK reconstructs and enqueues the event on the next launch
+    Then the enqueued event property "$exception_level" should equal "fatal"
+    And the outermost exception should have "mechanism.handled" equal to false
+
   Scenario: Native frame carries matching debug image metadata
     Given the SDK captures a native frame with an authoritative debug identifier
     When the SDK captures the exception
@@ -72,6 +78,19 @@ Feature: Exception Event Metadata
     When the middleware captures the exception
     Then the enqueued event property "$exception_source" should equal "django.middleware"
     And the SDK-generated event should omit "$exception_sources"
+
+  Scenario: Generic properties cannot override canonical exception metadata
+    Given generic caller properties contain reserved exception metadata that conflicts with the capture boundary
+    When capture exception is called for a caught exception
+    Then the SDK-generated "$exception_list" and "$exception_level" should win
+    And event creation should not throw
+
+  Scenario: Malformed supplied mechanism metadata is omitted safely
+    Given a typed integration supplies one malformed common mechanism field and one valid common field
+    When the integration captures an exception
+    Then the malformed mechanism field should be omitted
+    And the valid mechanism field should be preserved
+    And event creation should not throw
 
   Scenario: A low-level producer preserves unknown metadata as absent
     Given a low-level exception payload producer has no capture-boundary context

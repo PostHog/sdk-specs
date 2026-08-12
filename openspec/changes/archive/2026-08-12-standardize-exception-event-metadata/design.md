@@ -81,13 +81,13 @@ The capture path supplies defaults:
 | Terminating crash/panic/signal | `fatal` | stable terminating category | `false` | concrete runtime hook |
 | Context-free builder | omitted | omitted | omitted | omitted |
 
-Typed integration metadata wins over recognized native metadata, which wins over the boundary default. Unknown values remain absent.
+Typed integration metadata wins over recognized native metadata, which wins over the boundary default. Unknown or malformed values remain absent. Generic property bags cannot override SDK-owned canonical exception metadata; only documented typed and validated overrides participate in this precedence.
 
 ### 7. Include native debug images as optional symbolication metadata
 
 Native SDKs know loaded binary addresses and authoritative build identifiers; Cymbal cannot reconstruct them after the process exits. `$debug_images` therefore belongs to the producer envelope and links to native `instruction_addr` and `image_addr` frame fields.
 
-The contract defines the accepted object shape and linkage invariants but leaves Mach-O, ELF, and PDB identifier algorithms to native symbolication implementations.
+The contract defines the accepted object shape and linkage invariants but leaves Mach-O, ELF, and PDB identifier algorithms to native symbolication implementations. Deferred crash reporters preserve the original crash-boundary metadata when reconstructing and enqueueing an event on the next launch.
 
 ### 8. Record grouping and release inputs without owning their policies
 
@@ -105,6 +105,7 @@ The wire changes are additive. Existing `$exception_source` producers continue t
 
 - [The capability becomes broad] → Limit it to exception-specific envelope fields and ownership; reference separate stack, steps, grouping, and release capabilities.
 - [Existing source names are not namespaced] → Preserve existing values while requiring stable namespaced values for new integrations and converging old integrations incrementally.
+- [Generic properties can conflict with canonical metadata] → Reserve SDK-owned and processor-owned exception keys; allow overrides only through documented typed inputs.
 - [Branched trees lack portable parent links] → Define relationship semantics now and defer a single linkage representation until ingestion and SDK evidence support it.
 - [Native schemas vary] → Require only the fields Cymbal needs and allow optional format-specific metadata.
 - [Processor ownership differs from legacy SDK output] → Treat nested mechanism metadata as canonical while accepting legacy denormalizations during migration.

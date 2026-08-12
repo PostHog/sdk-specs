@@ -1,9 +1,5 @@
 ---
-name: "OPSX: Explore"
 description: "Enter explore mode - think through ideas, investigate problems, clarify requirements"
-allowed-tools: Bash(openspec:*)
-category: Workflow
-tags: [workflow, explore, experimental, thinking]
 ---
 
 Enter explore mode. Think deeply. Visualize freely. Follow the conversation wherever it goes.
@@ -14,7 +10,8 @@ Enter explore mode. Think deeply. Visualize freely. Follow the conversation wher
 
 **Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`). Other commands do not take the flag. Hints printed by commands already carry the flag; keep it on follow-ups. Without a store, commands act on the nearest local `openspec/` root.
 
-**Input**: The argument after `/opsx:explore` is whatever the user wants to think about. Could be:
+**Input**: The argument after `/opsx-explore` is whatever the user wants to think about. Could be:
+**Provided arguments**: $@
 - A vague idea: "real-time collaboration"
 - A specific problem: "the auth system is getting unwieldy"
 - A change name: "add-dark-mode" (to explore in context of that change)

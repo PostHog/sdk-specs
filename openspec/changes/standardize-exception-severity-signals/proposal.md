@@ -1,6 +1,6 @@
 ## Why
 
-PostHog SDKs disagree on whether `$exception` events include `$exception_level` and `mechanism.handled`, and several capture paths send values that do not describe how the exception was captured. The ingestion pipeline can only assign an initial issue severity safely when SDKs provide explicit, trustworthy signals.
+PostHog SDKs disagree on whether `$exception` events include `$exception_level` and `mechanism.handled`, and several capture paths send values that do not describe how the exception was captured. A shared wire contract lets every consumer interpret these signals consistently without relying on SDK-specific behavior.
 
 ## What Changes
 
@@ -32,5 +32,4 @@ Audit basis: the latest `origin/main` of sibling SDK repositories fetched on 202
 - **posthog-ruby:** add `$exception_level`; distinguish handled Rails reports from unhandled middleware and job failures.
 - **posthog-php:** add `$exception_level`; map manual capture, PHP error severities, uncaught exceptions, and shutdown failures without changing its existing explicit handled metadata.
 - **posthog-elixir:** copy the Logger level into `$exception_level` and retain explicit handled state derived from crash metadata.
-- **Backend coordination:** PostHog/Cymbal infers initial issue severity only from recognized explicit signals and leaves severity unset for incomplete or unknown metadata (PostHog/posthog#81913).
 - **Spec artifacts:** update the `capture-exception` delta and `acceptance/public/capture-exception.feature`; implementation changes remain in each SDK repository.

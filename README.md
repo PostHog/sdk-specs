@@ -67,6 +67,7 @@ Tags on each feature indicate whether scenarios apply to client SDKs, server SDK
 | Consent Gating | [`openspec/specs/consent-gating/spec.md`](openspec/specs/consent-gating/spec.md) | internal behavior | Canonical |
 | Device ID Generator | [`openspec/specs/device-id-generator/spec.md`](openspec/specs/device-id-generator/spec.md) | internal behavior | Canonical |
 | Event Batcher | [`openspec/specs/event-batcher/spec.md`](openspec/specs/event-batcher/spec.md) | internal behavior | Canonical |
+| Exception Event Mechanism | [`openspec/specs/exception-event-mechanism/spec.md`](openspec/specs/exception-event-mechanism/spec.md) | internal behavior (client/server) | Canonical |
 | Feature Flag Cache | [`openspec/specs/feature-flag-cache/spec.md`](openspec/specs/feature-flag-cache/spec.md) | internal behavior | Canonical |
 | Feature Flag Called Tracker | [`openspec/specs/feature-flag-called-tracker/spec.md`](openspec/specs/feature-flag-called-tracker/spec.md) | internal behavior | Canonical |
 | Flag Definition Loader | [`openspec/specs/flag-definition-loader/spec.md`](openspec/specs/flag-definition-loader/spec.md) | internal behavior | Canonical |

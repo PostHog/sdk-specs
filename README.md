@@ -89,20 +89,26 @@ This repo uses [OpenSpec](https://github.com/Fission-AI/OpenSpec) for spec-drive
 Install the CLI to propose and validate changes:
 
 ```bash
-npm install -g @fission-ai/openspec   # provides the `openspec` command + /opsx slash commands
+npm install -g @fission-ai/openspec
 ```
+
+The repo includes OpenSpec integrations for Claude Code (`.claude/`) and pi (`.pi/`). The
+commands below use Claude Code syntax; in pi, replace `:` with `-` (for example,
+`/opsx-propose`). Both integrations also support standalone OpenSpec stores when a store is
+named.
 
 The source of truth is `openspec/specs/<capability>/spec.md`. You never hand-edit it — you
 propose a **change**, implement it, and archiving syncs the change into the spec.
 
 ```
 openspec/
+├── config.yaml                workflow schema and artifact rules
 ├── project.md                 project context + conventions
 ├── specs/<capability>/spec.md current truth (one folder per capability)
 └── changes/                   in-flight proposals; archive/ holds finished ones
 ```
 
-Workflow (OpenSpec CLI + `/opsx` slash commands):
+Workflow (OpenSpec CLI + `/opsx` agent commands):
 
 1. **Propose** — `/opsx:propose add-<capability>` (or `openspec new change "<name>"`).
    Creates `changes/<name>/` with `proposal.md`, `design.md`, `tasks.md`, and a **delta** spec

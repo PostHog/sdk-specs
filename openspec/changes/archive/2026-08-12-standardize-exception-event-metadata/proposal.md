@@ -10,11 +10,12 @@ A shared producer envelope and ownership model lets SDKs converge without requir
 - Define the canonical `$exception` envelope and common `$exception_list[].mechanism` fields.
 - Separate semantic capture category (`mechanism.type`), concrete integration (`$exception_source`), nested relationship (`mechanism.source`), and processor-derived source files (`$exception_sources`).
 - Define handled, synthetic, and exception-level semantics at the capture boundary.
-- Define metadata precedence and omission for context-free builders.
+- Define typed override fallback, internal integration channels, reserved-property precedence, and omission for context-free builders.
+- Define deterministic flattened tree linkage for linear causes and branched aggregates.
 - Define optional native `$debug_images` and frame-to-image linkage.
 - Record explicit custom fingerprint and release-context ownership without defining grouping or release policy.
 - Distinguish SDK-produced fields from Cymbal-derived fields.
-- Add private client/server acceptance scenarios for manual, framework, logger, terminating, nested, and native paths.
+- Add private client/server acceptance scenarios and canonical JSON examples for manual, framework, logger, terminating, nested, aggregate, malformed, and native paths.
 
 ## Capabilities
 
@@ -32,11 +33,11 @@ Audit basis: maintained first-party SDK repositories and Cymbal's current raw an
 
 - **All SDKs:** use one capture-boundary model for level, source, category, handled state, and synthetic provenance; preserve valid supplied metadata and omit unknown or malformed values.
 - **Framework integrations:** emit a semantic mechanism category plus a concrete namespaced `$exception_source` such as `django.middleware` or `fastapi.exception_handler`.
-- **Cause and aggregate builders:** reserve `mechanism.source` for nested relationships such as `cause`, `context`, `unwrap`, or `member`.
+- **Cause and aggregate builders:** emit deterministic depth-first `exception_id`/`parent_id` linkage, use `chained` for nested entries, and reserve `mechanism.source` for relationships such as `cause`, `context`, `unwrap`, or `member`.
 - **Native-capable SDKs:** emit authoritative `$debug_images` linked to native frame addresses when available, including crash events reconstructed on the next launch.
 - **posthog-dotnet:** omit empty source values, classify middleware boundaries explicitly, and avoid copying outer handled state to inner exceptions without evidence.
 - **posthog-unity:** distinguish manual, log-derived, and automatic boundaries; normalize level and avoid copying outer state to causes without evidence.
 - **posthog-roblox:** separate concrete `$exception_source` from nested relationship source, retain known mechanism metadata, and classify fatal boundaries only where the runtime confirms termination.
 - **posthog-kmp:** remains a forwarding facade; conformance follows the Android, iOS, and JavaScript wire producers it delegates to.
-- **Cymbal:** remains authoritative for `$exception_sources`, `$exception_functions`, `$exception_types`, `$exception_values`, handled denormalization, grouping outputs, issue linkage, and resolved release metadata.
+- **Cymbal:** preserve and validate canonical mechanism tree linkage; remain authoritative for `$exception_sources`, `$exception_functions`, `$exception_types`, `$exception_values`, handled denormalization, grouping outputs, issue linkage, and resolved release metadata.
 - **Spec artifacts:** add `openspec/specs/exception-event-metadata/spec.md` and `acceptance/private/exception-event-metadata.feature`; implementation changes remain in each SDK and Cymbal repository.

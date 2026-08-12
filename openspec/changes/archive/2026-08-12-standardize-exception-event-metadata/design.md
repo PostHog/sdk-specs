@@ -29,7 +29,7 @@ This contract applies to SDK-owned manual and automatic capture paths in client 
 - Define stack parsing, frame ordering, source context, or symbol-upload algorithms.
 - Define product presentation, suppression, assignment, or notification behavior.
 - Replace the `exception-steps` capability.
-- Standardize a portable parent-link representation for branched exception trees in this change.
+- Replace the flat `$exception_list` envelope with recursively nested exception objects.
 - Backfill historical events.
 
 ## Decisions
@@ -65,7 +65,7 @@ Synthetic state describes the represented exception or stack, not severity or ha
 
 Nested relationships are not always causes. Runtimes expose implicit contexts, aggregate members, suppressed exceptions, inner exceptions, and scalar or multi-error unwrap relationships. `mechanism.source` preserves that relationship when known.
 
-Parents appear before children, but this change does not define portable parent identifiers for branched trees. Existing JSON-safe platform linkage fields remain allowed pending a dedicated tree-linkage contract.
+The list is a deterministic depth-first, parent-before-child flattening. Every entry carries `mechanism.exception_id`; every nested entry carries `mechanism.parent_id`, `type: chained`, and its relationship source. This adjacency-list representation supports linear and branched trees while preserving the existing flat `$exception_list` envelope.
 
 ### 6. Derive boundary defaults at the owner
 
@@ -81,7 +81,7 @@ The capture path supplies defaults:
 | Terminating crash/panic/signal | `fatal` | stable terminating category | `false` | concrete runtime hook |
 | Context-free builder | omitted | omitted | omitted | omitted |
 
-Typed integration metadata wins over recognized native metadata, which wins over the boundary default. Unknown or malformed values remain absent. Generic property bags cannot override SDK-owned canonical exception metadata; only documented typed and validated overrides participate in this precedence.
+Typed integration metadata wins over recognized native metadata, which wins over the boundary default. An invalid override is ignored before precedence continues; a context-free builder omits an invalid value when no lower-precedence source exists. Generic application property bags cannot override SDK-owned canonical exception metadata. Internal integration channels and documented typed public overrides are distinct from generic property bags and participate in typed precedence.
 
 ### 7. Include native debug images as optional symbolication metadata
 
@@ -106,22 +106,22 @@ The wire changes are additive. Existing `$exception_source` producers continue t
 - [The capability becomes broad] → Limit it to exception-specific envelope fields and ownership; reference separate stack, steps, grouping, and release capabilities.
 - [Existing source names are not namespaced] → Preserve existing values while requiring stable namespaced values for new integrations and converging old integrations incrementally.
 - [Generic properties can conflict with canonical metadata] → Reserve SDK-owned and processor-owned exception keys; allow overrides only through documented typed inputs.
-- [Branched trees lack portable parent links] → Define relationship semantics now and defer a single linkage representation until ingestion and SDK evidence support it.
+- [Existing SDKs place linkage fields inconsistently] → Standardize `exception_id` and `parent_id` inside `mechanism`, matching maintained SDK evidence and preserving the flat exception list.
 - [Native schemas vary] → Require only the fields Cymbal needs and allow optional format-specific metadata.
 - [Processor ownership differs from legacy SDK output] → Treat nested mechanism metadata as canonical while accepting legacy denormalizations during migration.
 
 ## Migration Plan
 
 1. Publish the canonical `exception-event-metadata` capability and private acceptance scenarios.
-2. Update shared builders to preserve supplied metadata and omit unknown or empty mechanism values.
+2. Update shared builders to preserve valid supplied metadata, omit unknown optional fields, and emit required tree linkage on final events.
 3. Update capture boundaries with semantic types, concrete `$exception_source` values, handled state, level, and synthetic provenance.
 4. Update cause and aggregate builders to preserve relationship-specific `mechanism.source` values.
 5. Add native debug-image conformance where SDKs capture address-based native frames.
 6. Keep Cymbal authoritative for derived query, grouping, issue, and release properties.
-7. Add portable tree linkage in a follow-up only after auditing existing `id`, `exception_id`, and `parent_id` representations.
+7. Converge linear and aggregate builders on deterministic `exception_id`/`parent_id` tree linkage.
 
 Rollback consists of reverting an SDK release. Older SDKs continue to omit optional fields, so no coordinated consumer rollback or data migration is required.
 
 ## Open Questions
 
-The portable representation for parent linkage in branched exception trees remains intentionally deferred. SDK-specific API spelling, exact extensible mechanism categories, native identifier algorithms, and release sequencing remain implementation details within this contract.
+SDK-specific API spelling, extensible outermost mechanism categories, native identifier algorithms, and release sequencing remain implementation details within this contract.

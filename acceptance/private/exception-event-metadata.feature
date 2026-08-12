@@ -28,8 +28,26 @@ Feature: Exception Event Metadata
   Scenario: A nested cause identifies its relationship
     Given an outer exception wraps another exception as its cause
     When the SDK captures the outer exception
-    Then the outermost exception should omit "mechanism.source"
+    Then the outermost exception should have "mechanism.exception_id" equal to 0
+    And the outermost exception should omit "mechanism.parent_id" and "mechanism.source"
+    And the nested exception should have "mechanism.type" equal to "chained"
+    And the nested exception should have "mechanism.parent_id" equal to 0
     And the nested exception should have "mechanism.source" equal to "cause"
+
+  Scenario: An aggregate serializes a deterministic flattened tree
+    Given an aggregate exception contains two ordered members and the second member wraps a cause
+    When the SDK captures the aggregate
+    Then the exception list should be depth-first with each parent before its children
+    And every exception should have a unique "mechanism.exception_id"
+    And every nested exception should have "mechanism.type" equal to "chained"
+    And every nested exception should have "mechanism.parent_id" identifying its parent
+
+  Scenario: Cycles and oversized exception trees are bounded
+    Given an exception graph contains a cycle or more than 50 reachable entries
+    When the SDK captures the exception graph
+    Then no exception object should be serialized more than once
+    And the exception list should contain at most 50 entries
+    And retained entries should be the earliest entries in depth-first order
 
   Scenario: A preserved runtime stack is not synthetic
     Given an actual runtime exception has a usable stack
@@ -83,17 +101,30 @@ Feature: Exception Event Metadata
     Given generic caller properties contain reserved exception metadata that conflicts with the capture boundary
     When capture exception is called for a caught exception
     Then the SDK-generated "$exception_list" and "$exception_level" should win
+    And the generic properties should not set "$exception_source"
     And event creation should not throw
 
-  Scenario: Malformed supplied mechanism metadata is omitted safely
-    Given a typed integration supplies one malformed common mechanism field and one valid common field
+  Scenario: Internal integration metadata participates in typed precedence
+    Given an SDK-owned integration supplies valid metadata through its internal integration channel
     When the integration captures an exception
-    Then the malformed mechanism field should be omitted
-    And the valid mechanism field should be preserved
+    Then the valid typed integration metadata should override the integration boundary defaults
+
+  Scenario: Invalid typed metadata falls back at an SDK-owned boundary
+    Given manual capture receives an invalid typed mechanism type and level plus a valid synthetic state
+    When the SDK captures the exception
+    Then the outermost exception should have "mechanism.type" equal to "generic"
+    And the enqueued event property "$exception_level" should equal "error"
+    And the valid "mechanism.synthetic" value should be preserved
     And event creation should not throw
+
+  Scenario: Invalid metadata remains absent in a context-free builder
+    Given a context-free builder receives an invalid handled value with no other handled-state source
+    When the builder creates an exception event
+    Then the generated mechanism should omit "handled"
 
   Scenario: A low-level producer preserves unknown metadata as absent
     Given a low-level exception payload producer has no capture-boundary context
     When the producer creates a "$exception" event without caller-supplied metadata
     Then the generated event should omit "$exception_level", "$exception_source", "$exception_fingerprint", and "$debug_images"
-    And the generated exception entry should omit "mechanism"
+    And the generated mechanism should have "exception_id" equal to 0
+    And the generated mechanism should omit "type", "handled", "source", "synthetic", and "parent_id"

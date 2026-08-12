@@ -8,9 +8,9 @@
 ## 2. Internal wire capability
 
 - [x] 2.1 Add the client/server `exception-event-metadata` capability for SDK-generated exception events
-- [x] 2.2 Define the canonical event envelope and omission semantics
+- [x] 2.2 Define the canonical event envelope, required linkage fields, and optional-field omission semantics
 - [x] 2.3 Define `$exception_level`, `$exception_source`, and capture-boundary defaults
-- [x] 2.4 Define mechanism type, handled state, synthetic state, and nested relationship source
+- [x] 2.4 Define mechanism type, handled state, synthetic state, nested relationship source, and deterministic tree linkage
 - [x] 2.5 Define metadata precedence, reserved generic-property handling, malformed-field behavior, and low-level builder preservation
 - [x] 2.6 Define optional native debug-image and frame-linkage metadata
 - [x] 2.7 Document custom fingerprint and release-input ownership without downstream policy
@@ -18,9 +18,10 @@
 
 ## 3. Acceptance and discoverability
 
-- [x] 3.1 Add private client/server scenarios for manual, framework, logger, terminating, deferred native crash, nested, malformed, reserved-property, native, and unknown-metadata paths
-- [x] 3.2 Add the internal capability to the root capability index and project context
-- [x] 3.3 Keep public `capture-exception`, stack ordering, and `exception-steps` capabilities independent
+- [x] 3.1 Add private client/server scenarios for manual, framework, logger, terminating, deferred native crash, nested, aggregate, malformed, reserved-property, native, and unknown-metadata paths
+- [x] 3.2 Add canonical JSON examples for manual, middleware, nested cause, aggregate, deferred native crash, and malformed typed input
+- [x] 3.3 Add the internal capability to the root capability index and project context
+- [x] 3.4 Keep public `capture-exception`, stack ordering, and `exception-steps` capabilities independent
 
 ## 4. Validation and archive
 

@@ -125,7 +125,7 @@ An SDK-owned capture path SHALL set event-level severity and outermost exception
 | Uncaught boundary that may continue | `error` | stable boundary type | `false` |
 | Crash, panic, or uncaught boundary expected to terminate | `fatal` | stable crash/boundary type | `false` |
 
-If a typed exception-capture API accepts an explicit supported level, mechanism type, or source, the SDK SHALL normalize and preserve it instead of the boundary default. Level, type, source, handled state, and synthetic state remain independent. A deliberate `fatal` logger call remains handled, and an unhandled exception is not necessarily synthetic. This metadata SHALL NOT affect exception grouping or fingerprint construction.
+If a typed exception-capture API accepts an explicit supported level, mechanism type, or source, the SDK SHALL normalize and preserve it instead of the boundary default. Level, type, source, handled state, and synthetic state remain independent. A deliberate `fatal` logger call remains handled, and an unhandled exception is not necessarily synthetic.
 
 #### Scenario: Manual capture emits generic handled error metadata (@both)
 - **WHEN** the SDK's public exception API captures a caught exception without explicit overrides

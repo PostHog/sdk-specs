@@ -4,12 +4,12 @@
 
 ### Requirement: Unrecognized property-filter operators degrade to inconclusive
 
-When the local evaluator encounters a property-filter operator string it does not recognize
-(for example, a new server-side operator not yet supported by that SDK's evaluator), matching
-SHALL be treated as inconclusive for that flag — deferring to remote evaluation for that flag
-only — rather than raising an unhandled error. This inconclusive signal SHALL NOT disable or
-interrupt local evaluation of other flags in the same evaluation pass; only the flag using the
-unrecognized operator falls back to remote evaluation.
+The local evaluator SHALL treat any property-filter operator string it does not recognize as
+inconclusive for that flag — deferring to remote evaluation for that flag only — rather than
+raising an unhandled error. This includes, for example, a new server-side operator not yet
+supported by that SDK's evaluator. This inconclusive signal SHALL NOT disable or interrupt local
+evaluation of other flags in the same evaluation pass; only the flag using the unrecognized
+operator falls back to remote evaluation.
 
 This mirrors how other inconclusive conditions in this evaluator are scoped (for example a
 missing required property), so that one flag definition using an operator ahead of a given

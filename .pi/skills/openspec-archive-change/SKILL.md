@@ -59,7 +59,8 @@ Archive a completed change in the experimental workflow.
    Use `artifactPaths.specs.existingOutputPaths` from status JSON to check for delta specs. If none exist, proceed without sync prompt.
 
    **If delta specs exist:**
-   - Compare each delta spec with its corresponding main spec at `openspec/specs/<capability>/spec.md`
+   - Resolve each corresponding main spec from the selected planning root at `<planningHome.root>/openspec/specs/<capability>/spec.md`
+   - Compare each delta spec with that main spec
    - Determine what changes would be applied (adds, modifications, removals, renames)
    - Show a combined summary before prompting
 
@@ -67,7 +68,12 @@ Archive a completed change in the experimental workflow.
    - If changes needed: "Sync now (recommended)", "Archive without syncing"
    - If already synced: "Archive now", "Sync anyway", "Cancel"
 
-   If user chooses sync, use Task tool (subagent_type: "general-purpose", prompt: "Use Skill tool to invoke openspec-sync-specs for change '<name>'. Delta spec analysis: <include the analyzed delta spec summary>"). Proceed to archive regardless of choice.
+   If the user chooses sync:
+   - Use Task tool synchronously (subagent_type: "general-purpose", prompt: "Use Skill tool to invoke openspec-sync-specs for change '<name>'. Delta spec analysis: <include the analyzed delta spec summary>") and wait for it to finish.
+   - Verify every delta was successfully applied to its corresponding main spec under `<planningHome.root>/openspec/specs/`.
+   - If the sync task fails or any delta cannot be verified, report the failure and stop. Do not move `changeRoot`.
+
+   Proceed to archive only after the requested sync succeeds and is verified, or when the user explicitly chooses to archive without syncing.
 
 5. **Perform the archive**
 
@@ -114,5 +120,6 @@ All artifacts complete. All tasks complete.
 - Don't block archive on warnings - just inform and confirm
 - Preserve .openspec.yaml when moving to archive (it moves with the directory)
 - Show clear summary of what happened
-- If sync is requested, use openspec-sync-specs approach (agent-driven)
+- Resolve main specs under `<planningHome.root>/openspec/specs/`, never relative to the current working directory
+- If sync is requested, use the openspec-sync-specs approach synchronously, verify every delta was applied, and stop without archiving on any failure
 - If delta specs exist, always run the sync assessment and show the combined summary before prompting

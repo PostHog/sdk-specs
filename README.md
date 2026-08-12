@@ -25,6 +25,7 @@ Tags on each feature indicate whether scenarios apply to client SDKs, server SDK
 | Tracing Headers | [`openspec/specs/tracing-headers/spec.md`](openspec/specs/tracing-headers/spec.md) | cross-SDK correlation | Canonical |
 | Alias | [`openspec/specs/alias/spec.md`](openspec/specs/alias/spec.md) | public API | Canonical |
 | Capture | [`openspec/specs/capture/spec.md`](openspec/specs/capture/spec.md) | public API | Canonical |
+| Capture AI | [`openspec/specs/capture-ai/spec.md`](openspec/specs/capture-ai/spec.md) | public API (server) | Canonical |
 | Capture Exception | [`openspec/specs/capture-exception/spec.md`](openspec/specs/capture-exception/spec.md) | public API | Canonical |
 | Create Person Profile | [`openspec/specs/create-person-profile/spec.md`](openspec/specs/create-person-profile/spec.md) | public API | Canonical |
 | Debug | [`openspec/specs/debug/spec.md`](openspec/specs/debug/spec.md) | public API | Canonical |

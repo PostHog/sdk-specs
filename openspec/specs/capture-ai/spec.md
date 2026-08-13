@@ -84,11 +84,14 @@ stripped regardless of this flag.
    size caps, batching, and retry policy; they never share a send cycle with
    analytics events. The queue starts lazily — clients that never capture AI
    events pay no overhead.
-4. **Delivery.** At-least-once delivery is permitted (retries may duplicate)
-   only because of rule 2 — the server dedupes on
-   `[timestamp, distinct_id, event, uuid]`. At-most-once (drop after retry
-   exhaustion) is equally compliant. The invariant is the UUID, not the
-   delivery count.
+4. **Delivery.** At-least-once delivery is permitted (retries may duplicate):
+   a retry MUST resend the event with its entire original envelope
+   unchanged — timestamp, distinct id, event name, and UUID, all stamped once
+   at enqueue — never regenerated per attempt. The server dedupes on that
+   full envelope (`[timestamp, distinct_id, event, uuid]`), which is what
+   makes at-least-once delivery safe: duplicates collapse to one stored
+   event. At-most-once (drop after retry exhaustion) is equally compliant.
+   The invariant is the stable envelope, not the delivery count.
 
 ## Error handling
 
@@ -161,7 +164,9 @@ the scenarios below.
 - **AND** the SDK is flushed
 - **THEN** the event received on the AI batch endpoint should carry a client-generated uuid
 - **WHEN** capture_ai is called with an explicit valid uuid
+- **AND** the SDK is flushed
 - **THEN** the event received on the AI batch endpoint should carry exactly that uuid
+- **AND** handling of an invalid supplied uuid is platform-idiomatic (replace or reject)
 
 #### Scenario: oversized events are dropped logging name and size only (@server)
 - **GIVEN** a fresh SDK acceptance test harness

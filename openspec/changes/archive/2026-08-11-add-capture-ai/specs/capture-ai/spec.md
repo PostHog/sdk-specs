@@ -41,6 +41,7 @@ the scenarios below.
 - **AND** the SDK is flushed
 - **THEN** the event received on the AI batch endpoint should carry a client-generated uuid
 - **WHEN** capture_ai is called with an explicit valid uuid
+- **AND** the SDK is flushed
 - **THEN** the event received on the AI batch endpoint should carry exactly that uuid
 - **AND** handling of an invalid supplied uuid is platform-idiomatic (replace or reject)
 

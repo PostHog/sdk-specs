@@ -1,0 +1,184 @@
+{
+  "manual": {
+    "event": "$exception",
+    "properties": {
+      "$exception_level": "error",
+      "$exception_list": [
+        {
+          "type": "CheckoutError",
+          "value": "Checkout failed",
+          "mechanism": {
+            "type": "generic",
+            "handled": true,
+            "synthetic": false,
+            "exception_id": 0
+          }
+        }
+      ]
+    }
+  },
+  "django_middleware": {
+    "event": "$exception",
+    "properties": {
+      "$exception_level": "error",
+      "$exception_source": "django.middleware",
+      "$exception_list": [
+        {
+          "type": "RequestError",
+          "value": "Request failed",
+          "mechanism": {
+            "type": "middleware",
+            "handled": false,
+            "synthetic": false,
+            "exception_id": 0
+          }
+        }
+      ]
+    }
+  },
+  "nested_cause": {
+    "event": "$exception",
+    "properties": {
+      "$exception_level": "error",
+      "$exception_list": [
+        {
+          "type": "CheckoutError",
+          "value": "Checkout failed",
+          "mechanism": {
+            "type": "generic",
+            "handled": true,
+            "synthetic": false,
+            "exception_id": 0
+          }
+        },
+        {
+          "type": "DatabaseError",
+          "value": "Connection failed",
+          "mechanism": {
+            "type": "chained",
+            "source": "cause",
+            "synthetic": false,
+            "exception_id": 1,
+            "parent_id": 0
+          }
+        }
+      ]
+    }
+  },
+  "aggregate": {
+    "event": "$exception",
+    "properties": {
+      "$exception_level": "error",
+      "$exception_list": [
+        {
+          "type": "AggregateError",
+          "value": "Two operations failed",
+          "mechanism": {
+            "type": "task",
+            "handled": false,
+            "synthetic": false,
+            "exception_id": 0
+          }
+        },
+        {
+          "type": "NetworkError",
+          "value": "Network failed",
+          "mechanism": {
+            "type": "chained",
+            "source": "member",
+            "synthetic": false,
+            "exception_id": 1,
+            "parent_id": 0
+          }
+        },
+        {
+          "type": "ValidationError",
+          "value": "Validation failed",
+          "mechanism": {
+            "type": "chained",
+            "source": "member",
+            "synthetic": false,
+            "exception_id": 2,
+            "parent_id": 0
+          }
+        },
+        {
+          "type": "ParseError",
+          "value": "Invalid value",
+          "mechanism": {
+            "type": "chained",
+            "source": "cause",
+            "synthetic": false,
+            "exception_id": 3,
+            "parent_id": 2
+          }
+        }
+      ]
+    }
+  },
+  "deferred_native_crash": {
+    "event": "$exception",
+    "properties": {
+      "$exception_level": "fatal",
+      "$exception_source": "ios.crash_reporter",
+      "$exception_list": [
+        {
+          "type": "SIGABRT",
+          "value": "Abort trap",
+          "mechanism": {
+            "type": "signal",
+            "handled": false,
+            "synthetic": false,
+            "exception_id": 0
+          },
+          "stacktrace": {
+            "type": "raw",
+            "frames": [
+              {
+                "platform": "native",
+                "instruction_addr": "0x104f01234",
+                "image_addr": "0x104f00000"
+              }
+            ]
+          }
+        }
+      ],
+      "$debug_images": [
+        {
+          "type": "macho",
+          "debug_id": "A1B2C3D4-E5F6-7890-ABCD-EF1234567890",
+          "image_addr": "0x104f00000",
+          "image_size": 524288,
+          "code_file": "MyApp",
+          "arch": "arm64"
+        }
+      ]
+    }
+  },
+  "malformed_typed_input_normalized_at_manual_boundary": {
+    "typed_input": {
+      "mechanism": {
+        "type": "",
+        "handled": "yes",
+        "synthetic": false
+      },
+      "$exception_level": "verbose"
+    },
+    "event": "$exception",
+    "properties": {
+      "$exception_level": "error",
+      "$exception_list": [
+        {
+          "type": "CheckoutError",
+          "value": "Checkout failed",
+          "mechanism": {
+            "type": "generic",
+            "handled": true,
+            "synthetic": false,
+            "exception_id": 0
+          }
+        }
+      ]
+    }
+  }
+}

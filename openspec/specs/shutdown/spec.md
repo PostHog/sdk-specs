@@ -83,7 +83,7 @@ shutdown(timeoutMs?: number): void | Promise<void>
 ## Error handling
 
 - Teardown should not crash application code under normal use.
-- Promise-based SDKs may reject on timeout or unrecoverable flush failure, but try to absorb/log ordinary transport errors during the final drain.
+- Promise-based SDKs SHOULD resolve (not reject) when the shutdown timeout elapses, logging a critical diagnostic instead — an unhandled rejection at shutdown time can crash the host process, which is worse than the already-logged loss of in-flight events. Reject is still permitted for other unrecoverable flush failures. Absorb/log ordinary transport errors during the final drain.
 - Native/client `close()` / `Shutdown()` methods usually swallow/log teardown errors internally.
 - Cache-provider/integration shutdown failures are commonly logged but do not prevent the rest of shutdown from proceeding.
 

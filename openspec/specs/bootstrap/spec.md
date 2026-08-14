@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`bootstrap` lets a caller seed identity and feature-flag state at SDK setup so the first events carry a known distinct id and feature-flag reads return real values before the first `/flags` response. It is a first-session concept: applied once when identity is first established, overlaid by freshly loaded flags, and dropped on `reset()`.
+`bootstrap` lets a caller seed identity and feature-flag state at SDK setup so the first events carry a known distinct id and feature-flag reads return real values before the first `/flags` response. It is a first-session concept: applied once when identity is first established, overlaid by freshly loaded flags, and dropped on a plain `reset()` — though some SDKs allow a caller to supply a fresh bootstrap explicitly to `reset()` itself, which is applied for the next identity (see the `reset` capability's "Reset MAY accept bootstrap options" requirement).
 ## Requirements
 ### Requirement: Bootstrap configuration surface
 

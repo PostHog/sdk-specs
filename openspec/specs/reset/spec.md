@@ -173,12 +173,12 @@ The SDK SHALL implement the canonical `reset` behavior described by this spec. I
 
 ### Requirement: Reset MAY accept bootstrap options to seed the next identity
 
-A client SDK MAY accept an options form of `reset` that carries a `bootstrap` object (the same
-shape documented by the `bootstrap` capability: `distinctId`/`isIdentifiedId`, `featureFlags`,
-`featureFlagPayloads`, and — for SDKs with a session manager — `sessionID`), alongside the existing
-device-id-rotation toggle. This is an allowed, SDK-specific extension, mirroring how the
-`bootstrap` capability already documents its own optional `sessionID` extension as applicable only
-to SDKs that support it.
+A client SDK MAY implement this extension; if it does, it MUST accept an options form of `reset`
+that carries a `bootstrap` object (the same shape documented by the `bootstrap` capability:
+`distinctId`/`isIdentifiedId`, `featureFlags`, `featureFlagPayloads`, and — for SDKs with a session
+manager — `sessionID`), alongside the existing device-id-rotation toggle. This is an allowed,
+SDK-specific extension, mirroring how the `bootstrap` capability already documents its own optional
+`sessionID` extension as applicable only to SDKs that support it.
 
 When a `bootstrap` object is supplied to `reset`, the SDK SHALL apply it after the reset completes:
 seeding the new anonymous or identified distinct id, serving the given feature flags and payloads

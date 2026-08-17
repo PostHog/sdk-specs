@@ -37,7 +37,10 @@ flush(): void | Promise<void>
 - **posthog-js core / react-native:** `flush(): Promise<void>`
 - **Flutter:** `flush(): Future<void>`
 - **Node:** `flush(): Promise<void>`
-- **Ruby:** `flush(): void`
+- **Ruby:** `flush(timeout: nil): Boolean` — accepts an optional timeout; returns `true` when
+  the queue drains within it, `false` if the timeout elapses first (sync-mode clients always
+  return `true` and ignore the timeout). Omitting `timeout` preserves the original
+  blocking-until-drained behavior.
 - **iOS:** `flush(): void`
 - **Android:** `flush(): void`
 - **Unity:** `Flush(): void`

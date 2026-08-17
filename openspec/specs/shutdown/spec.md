@@ -39,6 +39,10 @@ shutdown(timeoutMs?: number): void | Promise<void>
 
 - **posthog-js core / node:** `shutdown(shutdownTimeoutMs?: number): Promise<void>`
 - **Python:** `shutdown(): void`
+- **Ruby:** `shutdown(timeout: nil): Boolean` — spends up to `timeout` seconds flushing, then up
+  to one more second stopping workers/transports; returns `true` on a clean drain, `false` if
+  the timeout elapsed first. Omitting `timeout` preserves the original blocking-until-complete
+  behavior.
 - **iOS:** `close(): void`
 - **Android:** `close(): void`
 - **Flutter:** `close(): Future<void>`

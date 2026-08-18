@@ -60,3 +60,12 @@ Feature: Capture
     When before-send is changed to drop every event
     And capture is called with event "Dropped Event"
     Then no event named "Dropped Event" should be enqueued
+
+  @both
+  Scenario: Capture drops an event when before-send throws
+    Given the SDK is initialized with token "test-token"
+    And before-send throws an exception
+    When capture is called with event "Sensitive Event"
+    Then the capture call should not throw
+    And no event named "Sensitive Event" should be enqueued
+    And the SDK should record a before-send warning

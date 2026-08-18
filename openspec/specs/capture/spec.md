@@ -104,7 +104,7 @@ The following steps are the canonical flow for a single capture call. Client and
    6. Session properties (`$session_id`, `$window_id`) on client SDKs that support session replay.
    7. `$groups` if the event was called with group info or the client has registered groups.
 5. **Attach envelope fields.** Assign `timestamp` (caller override or `now()` in ISO 8601 with timezone), `uuid` (caller override or a freshly generated UUIDv7), `distinct_id`, and `event` to the message. Server SDKs additionally stamp `$lib` / `$lib_version` onto properties here if not already present.
-6. **Run `before_send` hook.** If the SDK has been configured with a `before_send` callback (Python, Go, posthog-js, .NET), invoke it with the fully-assembled message. The callback may return a modified message, or return `null`/`None` to drop the event. An exception inside the callback is logged and the original message is used (server SDKs) or the event is dropped (varies — follow the SDK's documented platform variation).
+6. **Run `before_send` hook.** If the SDK has been configured with a `before_send` callback (Python, Go, posthog-js, .NET), invoke it with the fully-assembled message. The callback may return a modified message, or return `null`/`None` to drop the event. If the callback throws, log a warning, stop the hook chain, and drop the event. Never enqueue the original or partially processed message after a hook failure.
 7. **Deliver.**
    - **Server (and `posthog-node`, `posthog-js/core` stateless):** push onto an in-memory queue (`max_queue_size` default 10,000). If the queue is full, drop the oldest element and log a warning (posthog-js core; `posthog-python` drops the new element). If queue size ≥ `flush_at` (default 20 client/core, 100 python-server), kick off a background flush. A periodic timer (`flush_interval`, typically 10s client / 10s–30s server) also triggers flushes.
    - **Client (browser):** forward to the request queue (`_requestQueue.enqueue`) unless `send_instantly` is set or batching is disabled, in which case send directly via `_send_retriable_request`. Flushes are opportunistic and aligned with network availability / page lifecycle (e.g. `sendBeacon` on `pagehide`).
@@ -120,7 +120,8 @@ The following steps are the canonical flow for a single capture call. Client and
 ## Error handling
 
 - **Drop silently** on: disabled SDK, opted-out user, empty/invalid event name, invalid distinct id (server), `before_send` returning null, bot user-agent (browser only, when `opt_out_useragent_filter` is false), client-side rate limit (browser only).
-- **Log and swallow** internal exceptions (property enrichment failures, feature-flag-fetch errors, before_send exceptions). A failure to enqueue must not surface as an exception to the caller — the contract is that `capture` is fire-and-forget.
+- **Log and drop** when `before_send` throws. The SDK must not enqueue a fallback event because the failed hook may have been responsible for removing sensitive data.
+- **Log and swallow** other internal exceptions such as property enrichment or feature-flag-fetch failures. A failure to enqueue must not surface as an exception to the caller — the contract is that `capture` is fire-and-forget.
 - **Return sentinel** (`null`/`None`/`undefined`) when a drop occurs and the SDK's signature lets it express that. Some SDKs (Go, Java) lack a return value and communicate failure only via logging.
 - **Never throw** to the caller under normal operation. Capture is latency-sensitive and lives on the hot path of application code; SDKs are expected to absorb all I/O and serialization errors internally.
 
@@ -213,3 +214,15 @@ The SDK SHALL implement the canonical `capture` behavior described by this spec.
 - **WHEN** before-send is changed to drop every event
 - **AND** capture is called with event "Dropped Event"
 - **THEN** no event named "Dropped Event" should be enqueued
+
+#### Scenario: Capture drops an event when before-send throws (@both)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** before-send throws an exception
+- **WHEN** capture is called with event "Sensitive Event"
+- **THEN** the capture call should not throw
+- **AND** no event named "Sensitive Event" should be enqueued
+- **AND** the SDK should record a before-send warning

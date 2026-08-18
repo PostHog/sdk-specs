@@ -37,5 +37,6 @@ If any before-send hook throws, the SDK SHALL catch the exception, record a warn
 - **WHEN** capture is called with event "Safe Event"
 - **THEN** the capture call should not throw
 - **AND** no event should be enqueued
+- **AND** no network request should be sent
 - **AND** the final before-send hook should not be invoked
 - **AND** the SDK should record a before-send warning

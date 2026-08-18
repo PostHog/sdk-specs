@@ -27,5 +27,6 @@ Feature: Before Send Hook
     When capture is called with event "Safe Event"
     Then the capture call should not throw
     And no event should be enqueued
+    And no network request should be sent
     And the final before-send hook should not be invoked
     And the SDK should record a before-send warning

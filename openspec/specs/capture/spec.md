@@ -215,14 +215,16 @@ The SDK SHALL implement the canonical `capture` behavior described by this spec.
 - **AND** capture is called with event "Dropped Event"
 - **THEN** no event named "Dropped Event" should be enqueued
 
-#### Scenario: Capture drops an event when before-send throws (@both)
+#### Scenario: Capture drops an immediately delivered event when before-send throws (@both)
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
 - **AND** persistent storage is empty
 - **AND** the mock PostHog server is reset
 - **GIVEN** the SDK is initialized with token "test-token"
+- **AND** capture is configured for immediate delivery
 - **AND** before-send throws an exception
 - **WHEN** capture is called with event "Sensitive Event"
 - **THEN** the capture call should not throw
 - **AND** no event named "Sensitive Event" should be enqueued
+- **AND** no network request should be sent
 - **AND** the SDK should record a before-send warning

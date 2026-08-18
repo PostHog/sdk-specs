@@ -27,14 +27,15 @@ If any before-send hook throws, the SDK SHALL catch the exception, record a warn
 - **WHEN** capture is called with event "Secret Event"
 - **THEN** no event named "Secret Event" should be enqueued
 
-#### Scenario: Before-send exceptions drop events without crashing callers
+#### Scenario: Before-send exceptions stop the chain and drop transformed events
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
 - **AND** persistent storage is empty
 - **AND** the mock PostHog server is reset
 - **GIVEN** the SDK is initialized with token "test-token"
-- **AND** before-send throws an exception
+- **AND** before-send is configured with a hook chain that transforms the event, then throws, then records invocation
 - **WHEN** capture is called with event "Safe Event"
 - **THEN** the capture call should not throw
-- **AND** no event named "Safe Event" should be enqueued
+- **AND** no event should be enqueued
+- **AND** the final before-send hook should not be invoked
 - **AND** the SDK should record a before-send warning

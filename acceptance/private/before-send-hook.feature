@@ -21,10 +21,11 @@ Feature: Before Send Hook
     When capture is called with event "Secret Event"
     Then no event named "Secret Event" should be enqueued
 
-  Scenario: Before-send exceptions drop events without crashing callers
+  Scenario: Before-send exceptions stop the chain and drop transformed events
     Given the SDK is initialized with token "test-token"
-    And before-send throws an exception
+    And before-send is configured with a hook chain that transforms the event, then throws, then records invocation
     When capture is called with event "Safe Event"
     Then the capture call should not throw
-    And no event named "Safe Event" should be enqueued
+    And no event should be enqueued
+    And the final before-send hook should not be invoked
     And the SDK should record a before-send warning

@@ -48,9 +48,11 @@ Server SDKs MAY retain any of these APIs for compatibility, and formal deprecati
 
 `evaluateFlags(...)` SHALL resolve a distinct id from the explicit call input or, where the SDK supports request context, from the active request context. It SHALL accept platform-appropriate evaluation inputs for groups, person properties, group properties, local-only evaluation, GeoIP control, and an optional list of flag keys. SDKs that support device-continuity evaluation MAY additionally accept a device id.
 
-The SDK SHALL use a cached evaluated result or attempt local evaluation when its architecture supports either source. When local evaluation does not produce the required set and local-only mode is false, the SDK MAY make at most one direct remote `/flags` (or equivalent) evaluation request for the call. A locally resolved value SHALL NOT be overwritten by a remote fallback value for the same key in the resulting snapshot.
+The SDK SHALL use a cached evaluated result or attempt local evaluation when its architecture supports either source. When local evaluation does not produce the required set and local-only mode is false, the SDK MAY make at most one direct remote `/flags` (or equivalent) evaluation request for the call.
 
-When local-only mode is true, the SDK SHALL NOT make a remote evaluation request; flags that cannot be resolved locally SHALL be absent from the snapshot. When a request-time key list is supplied, any remote evaluation request and the resulting snapshot SHALL be scoped to those keys. An internal local evaluator MAY inspect additional definitions, but values outside the requested set SHALL be dropped before the snapshot is returned.
+When local flag definitions are loaded and a request-time key list includes a key with no local definition, the SDK SHALL treat the requested set as incomplete. If local-only mode is false, the SDK SHALL make one direct remote `/flags` (or equivalent) fallback request using the caller's original requested key scope, including keys that resolved locally. This request remains subject to the one-request limit above. A locally resolved value SHALL NOT be overwritten by a remote fallback value for the same key in the resulting snapshot.
+
+When local-only mode is true, the SDK SHALL NOT make a remote evaluation request; flags that cannot be resolved locally, including requested keys with no local definition, SHALL be absent from the snapshot. When a request-time key list is supplied, any remote evaluation request and the resulting snapshot SHALL be scoped to those keys. An internal local evaluator MAY inspect additional definitions, but values outside the requested set SHALL be dropped before the snapshot is returned.
 
 #### Scenario: Remote fallback fills unresolved flags once
 - **GIVEN** local evaluation resolves "local-flag" but cannot resolve "remote-flag"
@@ -59,6 +61,15 @@ When local-only mode is true, the SDK SHALL NOT make a remote evaluation request
 - **THEN** at most one remote feature-flag evaluation request is made
 - **AND** the snapshot contains the locally resolved "local-flag" value
 - **AND** the snapshot contains the remotely resolved "remote-flag" value when remote evaluation succeeds
+
+#### Scenario: Missing requested local definition triggers scoped remote fallback
+- **GIVEN** local flag definitions are loaded and resolve "local-flag"
+- **AND** the requested key "missing-local-flag" has no local definition
+- **AND** remote evaluation is enabled
+- **WHEN** `evaluateFlags(...)` is called with requested keys `["local-flag", "missing-local-flag"]`
+- **THEN** exactly one remote feature-flag evaluation request is made using the original requested key scope
+- **AND** the snapshot retains the locally resolved "local-flag" value even if the remote response differs
+- **AND** the snapshot contains the remotely resolved "missing-local-flag" value when remote evaluation succeeds
 
 #### Scenario: Local-only evaluation omits unresolved flags
 - **GIVEN** local evaluation resolves "local-flag" but cannot resolve "remote-flag"

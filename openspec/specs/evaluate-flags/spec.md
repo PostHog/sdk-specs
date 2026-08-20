@@ -50,7 +50,9 @@ Server SDKs MAY retain any of these APIs for compatibility, and formal deprecati
 
 The SDK SHALL use a cached evaluated result or attempt local evaluation when its architecture supports either source. When local evaluation does not produce the required set and local-only mode is false, the SDK MAY make at most one direct remote `/flags` (or equivalent) evaluation request for the call.
 
-When local flag definitions are loaded and a request-time key list includes a key with no local definition, the SDK SHALL treat the requested set as incomplete. If local-only mode is false, the SDK SHALL make one direct remote `/flags` (or equivalent) fallback request using the caller's original requested key scope, including keys that resolved locally. This request remains subject to the one-request limit above. A locally resolved value SHALL NOT be overwritten by a remote fallback value for the same key in the resulting snapshot.
+When local flag definitions are loaded and a request-time key list includes a key with no local definition, the SDK SHALL treat the requested set as incomplete. If local-only mode is false, the SDK SHALL make one direct remote `/flags` (or equivalent) fallback request using the caller's original requested key scope, including keys that resolved locally, unless the SDK has retained valid missing-key knowledge as described below. This request remains subject to the one-request limit above. A locally resolved value SHALL NOT be overwritten by a remote fallback value for the same key in the resulting snapshot.
+
+An SDK MAY retain negative knowledge for a requested key that is absent from both the loaded local definitions and a successful remote fallback response. While that knowledge remains valid, the SDK MAY omit the key without making another fallback request. The SDK SHALL NOT establish negative knowledge from a failed response, a quota-limited response, or a response that reports errors while computing flags. An SDK that retains negative knowledge SHALL clear it after the next successful local-definition refresh, including a successful unchanged or not-modified refresh, before evaluating a later call. This bounds a permanently missing or deleted key to at most one successful probe per definitions-refresh interval while allowing newly created flags to be probed again after definitions are refreshed.
 
 When local-only mode is true, the SDK SHALL NOT make a remote evaluation request; flags that cannot be resolved locally, including requested keys with no local definition, SHALL be absent from the snapshot. When a request-time key list is supplied, any remote evaluation request and the resulting snapshot SHALL be scoped to those keys. An internal local evaluator MAY inspect additional definitions, but values outside the requested set SHALL be dropped before the snapshot is returned.
 
@@ -65,11 +67,28 @@ When local-only mode is true, the SDK SHALL NOT make a remote evaluation request
 #### Scenario: Missing requested local definition triggers scoped remote fallback
 - **GIVEN** local flag definitions are loaded and resolve "local-flag"
 - **AND** the requested key "missing-local-flag" has no local definition
+- **AND** no valid negative knowledge is retained for "missing-local-flag"
 - **AND** remote evaluation is enabled
 - **WHEN** `evaluateFlags(...)` is called with requested keys `["local-flag", "missing-local-flag"]`
 - **THEN** exactly one remote feature-flag evaluation request is made using the original requested key scope
 - **AND** the snapshot retains the locally resolved "local-flag" value even if the remote response differs
 - **AND** the snapshot contains the remotely resolved "missing-local-flag" value when remote evaluation succeeds
+
+#### Scenario: Optional negative knowledge bounds probes until definitions refresh
+- **GIVEN** an SDK retains missing-key knowledge
+- **AND** loaded local definitions do not contain requested key "deleted-flag"
+- **AND** a successful, non-quota-limited remote fallback response also omits "deleted-flag" and reports no flag-computation errors
+- **WHEN** `evaluateFlags(...)` is called again for "deleted-flag" before a successful local-definition refresh
+- **THEN** the SDK MAY omit "deleted-flag" without another remote fallback request
+- **WHEN** the local definitions are next refreshed successfully, including with an unchanged or not-modified result
+- **THEN** the retained missing-key knowledge is cleared
+- **AND** the next non-local-only evaluation requesting "deleted-flag" makes one remote fallback request
+
+#### Scenario: Unsuccessful remote responses do not establish missing-key knowledge
+- **GIVEN** loaded local definitions do not contain requested key "missing-local-flag"
+- **AND** the remote fallback fails, is quota limited, or reports errors while computing flags
+- **WHEN** that fallback response is processed
+- **THEN** the SDK does not retain negative knowledge for "missing-local-flag" from that response
 
 #### Scenario: Local-only evaluation omits unresolved flags
 - **GIVEN** local evaluation resolves "local-flag" but cannot resolve "remote-flag"

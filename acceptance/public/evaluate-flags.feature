@@ -128,7 +128,7 @@ Feature: Evaluate Flags
     Then the filtered snapshot should contain only "beta-ui"
     And no additional remote feature flag evaluation request should have been sent
 
-  Scenario: Missing requested local definition triggers scoped remote fallback
+  Scenario: First missing requested local definition triggers scoped remote fallback
     Given local feature flag definitions resolve "beta-ui" for distinct id "user-123" as true
     And no local feature flag definition is loaded for "checkout"
     And remote feature flag evaluation for distinct id "user-123" returns:

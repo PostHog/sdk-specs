@@ -219,3 +219,43 @@ SDK's support does not take down local evaluation project-wide.
 - **AND** local feature flag "beta-ui" is evaluated for distinct id "user-123"
 - **THEN** local evaluation should be inconclusive for "future-op-flag"
 - **AND** the local evaluation result for "beta-ui" should be true
+
+### Requirement: Fractional rollout percentages
+
+The local evaluator SHALL treat a flag condition group's `rollout_percentage` as a
+floating-point number, not an integer. It MUST NOT truncate or round `rollout_percentage`
+before comparing it against a distinct id's bucketing hash — truncating a fractional value such
+as `0.1` toward zero (or rounding it) can move users into or out of the rollout bucket
+incorrectly. An absent `rollout_percentage` SHALL be treated as an unbounded rollout (matches
+every distinct id), and `0.0` / `100.0` SHALL behave as the exclusive lower and inclusive upper
+bounds respectively, exactly as they did before any given SDK widened the field's numeric type.
+
+#### Scenario: A fractional rollout percentage matches only the intended bucket
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and local evaluation enabled
+- **AND** local feature flag definitions include a flag "fractional-rollout" with rollout
+  percentage "0.1"
+- **WHEN** local feature flag "fractional-rollout" is evaluated for a distinct id whose bucketing
+  hash falls inside the 0.1% bucket
+- **THEN** the local evaluation result should be true
+- **WHEN** local feature flag "fractional-rollout" is evaluated for a distinct id whose bucketing
+  hash falls outside the 0.1% bucket
+- **THEN** the local evaluation result should be false
+
+#### Scenario: Rollout percentage boundaries keep behaving after widening to a float
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and local evaluation enabled
+- **AND** local feature flag definitions include a flag "boundary-rollout" with rollout
+  percentage "100.0"
+- **WHEN** local feature flag "boundary-rollout" is evaluated for any distinct id
+- **THEN** the local evaluation result should be true
+- **GIVEN** local feature flag definitions include a flag "zero-rollout" with rollout
+  percentage "0.0"
+- **WHEN** local feature flag "zero-rollout" is evaluated for any distinct id
+- **THEN** the local evaluation result should be false

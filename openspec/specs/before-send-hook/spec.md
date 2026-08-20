@@ -14,7 +14,7 @@ This component is the last application-controlled interception point before deli
 
 ## Applicability
 
-`both` — audited client and server SDKs expose a before-send-style hook, though the exact event shape and error semantics vary.
+`both` — audited client and server SDKs expose a before-send-style hook, though the exact event shape varies.
 
 ## Public signature(s)
 
@@ -40,7 +40,7 @@ beforeSend: BeforeSendFn | BeforeSendFn[]
 5. **Stop the chain when a hook drops the event.** Later hooks are not invoked after a `null` / `nil` return.
 6. **Convert between internal and user-facing event shapes where needed.** Some SDKs expose a simplified capture-result-style object to the hook, then map hook mutations back onto the internal message.
 7. **Log suspicious or dropped results.** Implementations commonly log when an event is rejected or when the hook returns an event with no properties.
-8. **Handle hook exceptions defensively.** Most SDKs catch exceptions from the hook and either continue with the original event or continue with the last good value instead of crashing caller code.
+8. **Fail closed on hook exceptions.** Catch the exception, record a warning, stop the remaining hook chain, and drop the event. Never enqueue the original event or the last successfully transformed value after a hook fails.
 
 ## State & lifecycle
 
@@ -62,14 +62,9 @@ Usually none directly. The hook returns a transformed event object that higher l
 
 ## Error handling
 
-- Hook failures should not crash the application.
+- Hook failures must not crash the application.
 - Returning `null` / `nil` is treated as an intentional drop, not an error.
-- Exceptions thrown by the hook are logged and handled according to SDK policy:
-  - js-core keeps the last good event and continues
-  - Ruby falls back to the original event
-  - iOS simply uses the hook's returned value and logs if it is `nil`
-  - Flutter logs the callback exception and continues with the current event value
-  - Node treats `null` as drop and warns on empty properties; hook exceptions are not expected to escape normal event preparation paths
+- An exception thrown by any hook is logged, the remaining hook chain is stopped, and the event is dropped. This fail-closed rule prevents a failed privacy filter or PII scrubber from leaking an unprocessed or partially processed event.
 
 ## Concurrency & ordering guarantees
 
@@ -90,6 +85,8 @@ Usually none directly. The hook returns a transformed event object that higher l
 ### Requirement: Canonical before-send-hook behavior
 
 The SDK SHALL implement the canonical `before-send-hook` behavior described by this spec. Implementations MAY adapt method names, parameter casing, type syntax, and lifecycle hooks to platform idioms where this spec explicitly allows variation, but MUST preserve the observable outcomes in the scenarios below.
+
+If any before-send hook throws, the SDK SHALL catch the exception, record a warning, stop the remaining hook chain, and drop the event. The SDK MUST NOT enqueue the original event or the last successfully transformed value because the failed hook may have been responsible for removing sensitive data.
 
 #### Scenario: Before-send can mutate an assembled event before enqueue
 - **GIVEN** a fresh SDK acceptance test harness
@@ -112,13 +109,16 @@ The SDK SHALL implement the canonical `before-send-hook` behavior described by t
 - **WHEN** capture is called with event "Secret Event"
 - **THEN** no event named "Secret Event" should be enqueued
 
-#### Scenario: Before-send exceptions do not crash callers
+#### Scenario: Before-send exceptions stop the chain and drop transformed events
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
 - **AND** persistent storage is empty
 - **AND** the mock PostHog server is reset
 - **GIVEN** the SDK is initialized with token "test-token"
-- **AND** before-send throws an exception
+- **AND** before-send is configured with a hook chain that transforms the event, then throws, then records invocation
 - **WHEN** capture is called with event "Safe Event"
 - **THEN** the capture call should not throw
+- **AND** no event should be enqueued
+- **AND** no network request should be sent
+- **AND** the final before-send hook should not be invoked
 - **AND** the SDK should record a before-send warning

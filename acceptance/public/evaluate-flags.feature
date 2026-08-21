@@ -128,6 +128,22 @@ Feature: Evaluate Flags
     Then the filtered snapshot should contain only "beta-ui"
     And no additional remote feature flag evaluation request should have been sent
 
+  Scenario: First missing requested local definition triggers scoped remote fallback
+    Given local feature flag definitions resolve "beta-ui" for distinct id "user-123" as true
+    And no local feature flag definition is loaded for "checkout"
+    And remote feature flag evaluation for distinct id "user-123" returns:
+      | key      | value |
+      | beta-ui  | false |
+      | checkout | blue  |
+    When evaluate flags is called for distinct id "user-123" with flag keys:
+      | key      |
+      | beta-ui  |
+      | checkout |
+    Then exactly one remote feature flag evaluation request should have been sent
+    And the remote feature flag evaluation request should include only flag keys "beta-ui" and "checkout"
+    And the snapshot should contain "beta-ui" with value true
+    And the snapshot should contain "checkout" with value "blue"
+
   Scenario: Request-time keys scope locally evaluated snapshot results
     Given local feature flag definitions resolve for distinct id "user-123":
       | key      | value |

@@ -358,6 +358,33 @@ Feature: Evaluate Flags
     And the second evaluation snapshot should contain "previously-missing" with value true
     And the third evaluation snapshot should contain "previously-missing" with value false
 
+  Scenario: Delayed non-owned omission cannot overwrite newer positive evidence
+    Given the SDK supports successful local feature flag definition refreshes
+    And no local feature flag definitions are loaded for "previously-missing", "missing-a", and "missing-b"
+    And remote feature flag evaluation for distinct id "user-123" returns no flags
+    When evaluate flags is called for distinct id "user-123" with flag key "previously-missing"
+    And the delayed remote feature flag evaluation response for distinct id "user-456" returns no flags
+    And remote feature flag evaluation for distinct id "user-789" returns:
+      | key                | value |
+      | previously-missing | true  |
+      | missing-a           | true  |
+    And evaluate flags is started for distinct id "user-456" with flag keys:
+      | key                |
+      | previously-missing |
+      | missing-b           |
+    And evaluate flags is called for distinct id "user-789" with flag keys:
+      | key                |
+      | previously-missing |
+      | missing-a           |
+    Then the third evaluation snapshot should contain "previously-missing" with value true
+    When the delayed remote feature flag evaluation response is released
+    And remote feature flag evaluation for distinct id "user-final" returns:
+      | key                | value |
+      | previously-missing | false |
+    And evaluate flags is called for distinct id "user-final" with flag key "previously-missing"
+    Then exactly four remote feature flag evaluation requests should have been sent
+    And the fourth evaluation snapshot should contain "previously-missing" with value false
+
   Scenario: Request-time keys scope locally evaluated snapshot results
     Given local feature flag definitions resolve for distinct id "user-123":
       | key      | value |

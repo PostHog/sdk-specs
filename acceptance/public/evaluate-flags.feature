@@ -290,13 +290,29 @@ Feature: Evaluate Flags
     And the second evaluation snapshot should contain "remote-flag" with value false
 
     Examples:
-      | context input     |
-      | device id         |
-      | groups            |
-      | person properties |
-      | group properties  |
-      | GeoIP control     |
+      | context input       |
+      | groups              |
+      | person properties   |
+      | group properties    |
+      | GeoIP control       |
       | requested key scope |
+
+  Scenario: A remotely returned key is evaluated separately for each supported device id
+    Given the SDK supports device-continuity feature flag evaluation
+    And no local feature flag definition is loaded for "remote-flag"
+    And two evaluations for distinct id "user-123" have different device ids
+    And the delayed remote feature flag evaluation response for the first device id returns:
+      | key         | value |
+      | remote-flag | true  |
+    And the following remote feature flag evaluation response for the second device id returns:
+      | key         | value |
+      | remote-flag | false |
+    When both evaluate flags calls are started concurrently with flag key "remote-flag"
+    Then exactly one remote feature flag evaluation request should be in flight
+    When the delayed remote feature flag evaluation response is released
+    Then exactly two remote feature flag evaluation requests should have been sent
+    And the first evaluation snapshot should contain "remote-flag" with value true
+    And the second evaluation snapshot should contain "remote-flag" with value false
 
   Scenario: Unrelated missing-key probes are not serialized
     Given no local feature flag definitions are loaded for "missing-a" and "missing-b"

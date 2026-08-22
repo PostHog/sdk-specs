@@ -5,9 +5,9 @@ A requested key that is missing both locally and remotely can currently trigger 
 ## What Changes
 
 - Require SDKs with a successful local-definition refresh lifecycle to retain a clean remote omission until the next successful refresh.
-- Require suppression to clear after modified, unchanged or `304`, and successful shared-cache definition refreshes.
+- Require suppression to clear after modified, unchanged or `304`, and successful shared-cache definition refreshes, and reject stale in-flight omission results from an earlier definitions generation.
 - Keep failed, quota-limited, and computation-error responses ineligible to establish suppression, and require a later evaluation to retry.
-- Require concurrent first probes for the same cleanly omitted key to share one in-flight request while allowing unrelated missing keys to proceed independently.
+- Require concurrent first probes for the same cleanly omitted key to share one in-flight request while allowing disjoint missing-key sets to proceed independently and preserving original scope for mixed overlapping calls.
 - Keep the first missing-key fallback, original request scope, local-wins merge, result filtering, and local-only behavior unchanged.
 - **BREAKING**: This changes refresh-capable SDKs from optional per-call probing to a bounded request contract.
 

@@ -52,11 +52,11 @@ The SDK SHALL use a cached evaluated result or attempt local evaluation when its
 
 When local flag definitions are loaded and a request-time key list includes a key with no local definition, the SDK SHALL treat the requested set as incomplete. If local-only mode is false, the SDK SHALL make one direct remote `/flags` (or equivalent) fallback request using the caller's original requested key scope, including keys that resolved locally, unless the SDK has retained valid missing-key knowledge as described below. This request remains subject to the one-request limit above. A locally resolved value SHALL NOT be overwritten by a remote fallback value for the same key in the resulting snapshot.
 
-An SDK that has a successful local-definition refresh lifecycle SHALL retain negative knowledge for a requested key that is absent from both the loaded local definitions and a clean remote fallback response. A clean response is successful, is not feature-flag quota limited, and reports no errors while computing flags. While that knowledge remains valid, the SDK SHALL omit the key without making another fallback request solely for that key. The knowledge SHALL be cleared after every successful local-definition refresh, including a changed response, an unchanged or not-modified response, or a successful shared-cache load, before evaluating a later call. A failed definitions refresh SHALL NOT clear valid knowledge. This bounds a permanently missing or deleted key to one clean existence probe per definitions-refresh interval while allowing newly created flags to be probed again after definitions are refreshed.
+An SDK that has a successful local-definition refresh lifecycle SHALL retain negative knowledge for a requested key that is absent from both the loaded local definitions and a clean remote fallback response. A clean response is successful, is not feature-flag quota limited, and reports no errors while computing flags. While that knowledge remains valid, the SDK SHALL omit the key without making another fallback request solely for that key. The knowledge SHALL be cleared after every successful local-definition refresh, including a changed response, an unchanged or not-modified response, or a successful shared-cache load, before evaluating a later call. A failed definitions refresh SHALL NOT clear valid knowledge. A remote response SHALL establish negative knowledge only if no successful definitions refresh completed after its request began; implementations SHALL associate an in-flight probe with its definitions generation and discard its omission result when that generation changes. This bounds a permanently missing or deleted key to one clean existence probe per definitions-refresh interval while allowing newly created flags to be probed again after definitions are refreshed.
 
 A failed remote response, a quota-limited response, or a response that reports errors while computing flags SHALL NOT establish negative knowledge. A later evaluation for the same identity and requested scope SHALL remain eligible to make a new direct fallback request, even when a general evaluated-result cache contains the inconclusive response. An SDK without a successful local-definition refresh lifecycle MAY continue probing on each call rather than retain knowledge that it cannot safely invalidate.
 
-Before negative knowledge is established, concurrent evaluations that overlap on the same unknown missing key SHALL coordinate the key's existence probe. If the shared probe cleanly omits the key, the overlapping evaluations SHALL NOT make duplicate probes for that key. If the response returns the key, later identity-specific requests MAY proceed to obtain values for their own evaluation contexts. Probe coordination SHALL be per missing key: an in-flight probe for one key SHALL NOT prevent a direct fallback for a different missing key from beginning.
+Before negative knowledge is established, concurrent evaluations that overlap on the same unknown missing key SHALL coordinate the key's existence probe. If the shared probe cleanly omits the key, the overlapping evaluations SHALL NOT make duplicate probes for that key. If the response returns the key, later identity-specific requests MAY proceed to obtain values for their own evaluation contexts. Evaluations with disjoint missing-key sets SHALL be able to begin their direct fallbacks independently. When one evaluation's missing-key set contains both a key with an in-flight probe and a different uncoordinated key, it SHALL wait for the overlapping probe to settle before deciding whether to make its at-most-one fallback with the caller's original requested scope.
 
 When local-only mode is true, the SDK SHALL NOT make a remote evaluation request; flags that cannot be resolved locally, including requested keys with no local definition, SHALL be absent from the snapshot. When a request-time key list is supplied, any remote evaluation request and the resulting snapshot SHALL be scoped to those keys. An internal local evaluator MAY inspect additional definitions, but values outside the requested set SHALL be dropped before the snapshot is returned.
 
@@ -97,6 +97,12 @@ When local-only mode is true, the SDK SHALL NOT make a remote evaluation request
 - **THEN** the retained missing-key knowledge remains valid
 - **AND** a later evaluation omits "deleted-flag" without another remote fallback request solely for that key
 
+#### Scenario: Refresh invalidates an in-flight probe generation
+- **GIVEN** a remote existence probe for "deleted-flag" is in flight
+- **WHEN** local definitions refresh successfully before that remote response completes
+- **THEN** the old response does not establish negative knowledge in the new definitions generation
+- **AND** a later evaluation requesting "deleted-flag" makes one new remote fallback request
+
 #### Scenario: Unsuccessful remote response permits retry
 - **GIVEN** loaded local definitions do not contain requested key "missing-local-flag"
 - **AND** the remote fallback fails, is quota limited, or reports errors while computing flags
@@ -115,8 +121,15 @@ When local-only mode is true, the SDK SHALL NOT make a remote evaluation request
 #### Scenario: Unrelated missing keys are not serialized
 - **GIVEN** loaded local definitions do not contain requested keys "missing-a" and "missing-b"
 - **AND** no valid negative knowledge is retained for either key
-- **WHEN** separate evaluations concurrently request "missing-a" and "missing-b"
+- **WHEN** separate evaluations with disjoint missing-key sets concurrently request "missing-a" and "missing-b"
 - **THEN** the direct fallback for each key can begin without waiting for the other key's response
+
+#### Scenario: Mixed missing-key scope waits for its overlap
+- **GIVEN** an existence probe for "missing-a" is in flight
+- **AND** a second evaluation requests both "missing-a" and "missing-b"
+- **WHEN** the second evaluation coordinates its missing keys
+- **THEN** it waits for the "missing-a" probe to settle before starting another direct fallback
+- **AND** any fallback it subsequently makes uses the second caller's original requested scope
 
 #### Scenario: Local-only evaluation omits unresolved flags
 - **GIVEN** local evaluation resolves "local-flag" but cannot resolve "remote-flag"

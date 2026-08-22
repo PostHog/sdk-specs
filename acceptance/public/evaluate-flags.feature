@@ -197,6 +197,18 @@ Feature: Evaluate Flags
       | deleted-flag |
     Then exactly one remote feature flag evaluation request should have been sent
 
+  Scenario: Successful refresh invalidates a delayed probe from the previous generation
+    Given no local feature flag definition is loaded for "deleted-flag"
+    And the first clean remote response omitting "deleted-flag" is delayed
+    And the following remote feature flag evaluation response returns no flags
+    When evaluate flags is started for distinct id "user-123" with flag key "deleted-flag"
+    Then exactly one remote feature flag evaluation request should be in flight
+    When local feature flag definitions are refreshed successfully using "changed definitions"
+    And evaluate flags is called for distinct id "user-456" with flag key "deleted-flag"
+    Then exactly two remote feature flag evaluation requests should have been sent
+    When the delayed remote feature flag evaluation response is released
+    Then both evaluation snapshots should not contain "deleted-flag"
+
   Scenario Outline: Inconclusive missing-key fallback allows same-identity retry
     Given local feature flag definitions resolve "beta-ui" for distinct id "user-123" as true
     And no local feature flag definition is loaded for "new-flag"
@@ -230,8 +242,25 @@ Feature: Evaluate Flags
   Scenario: Unrelated missing-key probes are not serialized
     Given no local feature flag definitions are loaded for "missing-a" and "missing-b"
     And remote feature flag evaluation responses for "missing-a" and "missing-b" are delayed
-    When evaluate flags is started concurrently for "missing-a" and "missing-b"
+    When evaluate flags is started concurrently for disjoint scopes containing "missing-a" and "missing-b"
     Then two remote feature flag evaluation requests should be in flight before either response is released
+
+  Scenario: Mixed missing-key scope waits for its overlapping probe
+    Given no local feature flag definitions are loaded for "missing-a" and "missing-b"
+    And the first clean remote response omitting "missing-a" is delayed
+    And the following remote feature flag evaluation response returns:
+      | key       | value |
+      | missing-b | true  |
+    When evaluate flags is started for distinct id "user-123" with flag key "missing-a"
+    And evaluate flags is started for distinct id "user-456" with flag keys:
+      | key       |
+      | missing-a |
+      | missing-b |
+    Then exactly one remote feature flag evaluation request should be in flight
+    When the delayed remote feature flag evaluation response is released
+    Then exactly two remote feature flag evaluation requests should have been sent
+    And the second remote feature flag evaluation request should include only flag keys "missing-a" and "missing-b"
+    And the second evaluation snapshot should contain "missing-b" with value true
 
   Scenario: Request-time keys scope locally evaluated snapshot results
     Given local feature flag definitions resolve for distinct id "user-123":

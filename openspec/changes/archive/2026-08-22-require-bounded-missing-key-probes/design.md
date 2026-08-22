@@ -28,7 +28,7 @@ For a deleted flag or stale application reference, per-call probing scales remot
 
 An SDK that refreshes local definitions records a requested key only after both the loaded definitions and a clean remote response omit it. The knowledge is scoped to the current definitions generation rather than to one identity because the probe establishes whether the requested key exists, not the value it has for a particular identity.
 
-The state is cleared after every successful definitions refresh. This includes changed definitions, an unchanged or `304` response, and a successful shared-cache load. A failed refresh leaves the current generation and its omission knowledge intact.
+The state is cleared after every successful definitions refresh. This includes changed definitions, an unchanged or `304` response, and a successful shared-cache load. A failed refresh leaves the current generation and its omission knowledge intact. Each in-flight probe captures its starting generation and may publish an omission only if that generation is still current when the response completes. This prevents a delayed pre-refresh response from installing stale knowledge after refresh.
 
 Permanent suppression was rejected because it would hide a key created after the omission. Per-call probing was rejected for refresh-capable SDKs because it does not bound recurring traffic.
 
@@ -42,7 +42,7 @@ A later call with the same identity and scope remains eligible to probe after an
 
 Concurrent evaluations whose only new missing-key work overlaps wait for one in-flight existence probe for that key. After the probe completes, waiters re-evaluate the state. A clean omission suppresses their duplicate probes. If the key is returned, each identity may still need its own remote evaluation to obtain an identity-specific value.
 
-Coordination is per key. Different missing keys may probe concurrently, and no global coordination lock may be held across network I/O. Global request serialization was rejected because one slow key would delay unrelated evaluations.
+Coordination is per key. Evaluations with disjoint missing-key sets may probe concurrently, and no global coordination lock may be held across network I/O. A mixed-scope evaluation that overlaps an in-flight key waits for that probe before deciding whether it still needs one fallback using its original scope. Launching a subset-scope request for only its new key was rejected because it would violate the original-request-scope contract, while launching the original scope immediately would duplicate the overlapping in-flight probe. Global serialization of disjoint key sets was rejected because one slow key would delay unrelated evaluations.
 
 ### Keep cache APIs platform-specific
 

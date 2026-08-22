@@ -192,6 +192,7 @@ Feature: Evaluate Flags
     Examples:
       | refresh result               |
       | changed definitions          |
+      | unchanged definitions        |
       | 304 not modified             |
       | successful shared-cache load |
 
@@ -228,6 +229,7 @@ Feature: Evaluate Flags
     Examples:
       | refresh result               |
       | changed definitions          |
+      | unchanged definitions        |
       | 304 not modified             |
       | successful shared-cache load |
 

@@ -11,7 +11,7 @@
 - [x] 2.1 Add acceptance coverage that concurrent calls for the same cleanly omitted key share one existence probe.
 - [x] 2.2 Add acceptance coverage that probes for disjoint missing-key sets can begin independently.
 - [x] 2.3 Cover mixed scopes that overlap an in-flight probe while preserving the caller's original request scope.
-- [x] 2.4 Cover returned keys being evaluated separately for distinct identity and property contexts.
+- [x] 2.4 Cover returned keys being evaluated separately when distinct ID, device ID, groups, properties, GeoIP control, or requested scope differs.
 
 ## 3. Validation
 

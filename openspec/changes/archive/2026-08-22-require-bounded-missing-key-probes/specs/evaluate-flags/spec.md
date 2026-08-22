@@ -8,7 +8,7 @@ The SDK SHALL use a cached evaluated result or attempt local evaluation when its
 
 When local flag definitions are loaded and a request-time key list includes a key with no local definition, the SDK SHALL treat the requested set as incomplete. If local-only mode is false, the SDK SHALL make one direct remote `/flags` (or equivalent) fallback request using the caller's original requested key scope, including keys that resolved locally, unless the SDK has retained valid missing-key knowledge as described below. This request remains subject to the one-request limit above. A locally resolved value SHALL NOT be overwritten by a remote fallback value for the same key in the resulting snapshot.
 
-An SDK that has a successful local-definition refresh lifecycle SHALL retain negative knowledge for a requested key that is absent from both the loaded local definitions and a clean remote fallback response. A clean response is successful, is not feature-flag quota limited, and reports no errors while computing flags. While that knowledge remains valid, the SDK SHALL omit the key without making another fallback request solely for that key. The knowledge SHALL be cleared after every successful local-definition refresh, including a changed response, an unchanged or not-modified response, or a successful shared-cache load, before evaluating a later call. A failed definitions refresh SHALL NOT clear valid knowledge. A remote response SHALL establish negative knowledge only if no successful definitions refresh completed after its request began; implementations SHALL associate an in-flight probe with its definitions generation and discard its omission result when that generation changes. This bounds a permanently missing or deleted key to one clean fallback caused solely by that key per definitions-refresh interval while allowing newly created flags to be probed again after definitions are refreshed.
+An SDK that has a successful local-definition refresh lifecycle SHALL retain negative knowledge for a requested key that is absent from both the loaded local definitions and a clean remote fallback response. A clean response is successful, is not feature-flag quota limited, and reports no errors while computing flags. Retention SHALL use a finite-capacity in-memory store. When adding a new entry at capacity, the SDK MAY evict a previously retained entry; eviction removes knowledge rather than establishing absence, so a later request for the evicted key is eligible to probe again. While knowledge remains retained and valid, the SDK SHALL omit the key without making another fallback request solely for that key. The knowledge SHALL be cleared after every successful local-definition refresh, including a changed response, an unchanged or not-modified response, or a successful shared-cache load, before evaluating a later call. A failed definitions refresh SHALL NOT clear valid knowledge. A remote response SHALL establish negative knowledge only if no successful definitions refresh completed after its request began; implementations SHALL associate an in-flight probe with its definitions generation and discard its omission result when that generation changes. While its knowledge remains retained, this bounds a permanently missing or deleted key to one clean fallback caused solely by that key per definitions-refresh interval while allowing newly created flags to be probed again after definitions are refreshed.
 
 A failed remote response, a quota-limited response, or a response that reports errors while computing flags SHALL NOT establish negative knowledge. A later evaluation for the same identity and requested scope SHALL remain eligible to make a new direct fallback request, even when a general evaluated-result cache contains the inconclusive response. An SDK without a successful local-definition refresh lifecycle MAY continue probing on each call rather than retain knowledge that it cannot safely invalidate.
 
@@ -41,11 +41,18 @@ When local-only mode is true, the SDK SHALL NOT make a remote evaluation request
 - **WHEN** `evaluateFlags(...)` is called again for any identity requesting "deleted-flag" before a successful local-definition refresh
 - **THEN** the SDK omits "deleted-flag" without another remote fallback request solely for that key
 
+#### Scenario: Capacity eviction forgets rather than suppresses
+- **GIVEN** valid missing-key knowledge for "evicted-flag" is retained
+- **AND** adding another clean omission at capacity evicts "evicted-flag"
+- **WHEN** a later evaluation requests "evicted-flag"
+- **THEN** the evicted knowledge does not suppress a new remote fallback request
+
 #### Scenario: Every successful definitions refresh clears omission knowledge
 - **GIVEN** the SDK has retained valid missing-key knowledge for "deleted-flag"
 - **WHEN** local definitions are refreshed successfully with changed definitions, an unchanged or not-modified response, or a successful shared-cache load
 - **THEN** the retained missing-key knowledge is cleared
-- **AND** the next non-local-only evaluation requesting "deleted-flag" makes one remote fallback request
+- **WHEN** the refreshed definitions still omit "deleted-flag" and no complete cached result applies
+- **THEN** the next non-local-only evaluation requesting "deleted-flag" makes one remote fallback request
 
 #### Scenario: Failed definitions refresh preserves omission knowledge
 - **GIVEN** the SDK has retained valid missing-key knowledge for "deleted-flag"
@@ -57,7 +64,8 @@ When local-only mode is true, the SDK SHALL NOT make a remote evaluation request
 - **GIVEN** a remote existence probe for "deleted-flag" is in flight
 - **WHEN** local definitions refresh successfully before that remote response completes
 - **THEN** the old response does not establish negative knowledge in the new definitions generation
-- **AND** a later evaluation requesting "deleted-flag" makes one new remote fallback request
+- **WHEN** the refreshed definitions still omit "deleted-flag" and no complete cached result applies
+- **THEN** a later evaluation requesting "deleted-flag" makes one new remote fallback request
 
 #### Scenario: Unsuccessful remote response permits retry
 - **GIVEN** loaded local definitions do not contain requested key "missing-local-flag"

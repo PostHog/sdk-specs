@@ -8,7 +8,7 @@ For a deleted flag or stale application reference, per-call probing scales remot
 
 **Goals:**
 
-- Bound a cleanly omitted key to one fallback caused solely by that key per definitions-refresh interval.
+- While its knowledge remains retained, bound a cleanly omitted key to one fallback caused solely by that key per definitions-refresh interval.
 - Clear omission knowledge after every successful refresh, regardless of whether definitions changed or came from the API or shared cache.
 - Prevent failures, quota limits, and computation errors from suppressing a later required probe.
 - Coalesce concurrent first probes for the same missing key without serializing unrelated keys.
@@ -28,7 +28,7 @@ For a deleted flag or stale application reference, per-call probing scales remot
 
 An SDK that refreshes local definitions records a requested key only after both the loaded definitions and a clean remote response omit it. The knowledge is scoped to the current definitions generation rather than to one identity because the probe establishes whether the requested key exists, not the value it has for a particular identity.
 
-The state is cleared after every successful definitions refresh. This includes changed definitions, an unchanged or `304` response, and a successful shared-cache load. A failed refresh leaves the current generation and its omission knowledge intact. Each in-flight probe captures its starting generation and may publish an omission only if that generation is still current when the response completes. This prevents a delayed pre-refresh response from installing stale knowledge after refresh.
+The state is held in a finite-capacity in-memory store and cleared after every successful definitions refresh. This includes changed definitions, an unchanged or `304` response, and a successful shared-cache load. A failed refresh leaves the current generation and its retained omission knowledge intact. Adding a new key at capacity may evict an older key, which becomes eligible for a fresh probe. Each in-flight probe captures its starting generation and may publish an omission only if that generation is still current when the response completes. This prevents a delayed pre-refresh response from installing stale knowledge after refresh.
 
 Permanent suppression was rejected because it would hide a key created after the omission. Per-call probing was rejected for refresh-capable SDKs because it does not bound recurring traffic.
 
@@ -52,5 +52,5 @@ The specification defines request counts and invalidation outcomes, not the publ
 
 - **A newly created flag can remain suppressed until the next successful refresh** -> Clear state on every successful refresh, including unchanged responses and shared-cache loads.
 - **Additional concurrent state increases implementation complexity** -> Specify only observable outcomes and let each platform use native synchronization primitives.
-- **Arbitrary unique requested keys can grow state within one refresh interval** -> Implementations may use bounded internal storage where necessary, but must preserve the required behavior for retained entries and must never treat eviction as proof of absence.
+- **Capacity eviction can allow another probe before definitions refresh** -> Require finite-capacity storage, define eviction as forgetting rather than absence, and apply suppression guarantees only while an entry remains retained.
 - **An SDK without a refresh lifecycle cannot safely invalidate omission knowledge** -> Allow that architecture to continue probing per call rather than retain indefinitely.

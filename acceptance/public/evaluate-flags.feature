@@ -160,6 +160,15 @@ Feature: Evaluate Flags
     Then exactly one remote feature flag evaluation request should have been sent
     And both evaluation snapshots should not contain "deleted-flag"
 
+  Scenario: Capacity eviction makes a missing key eligible to probe again
+    Given the SDK supports successful local feature flag definition refreshes
+    And valid missing-key knowledge for "evicted-flag" has been evicted at the store capacity
+    And no local feature flag definition is loaded for "evicted-flag"
+    And remote feature flag evaluation for distinct id "user-123" returns no flags
+    When evaluate flags is called for distinct id "user-123" with flag key "evicted-flag"
+    Then exactly one remote feature flag evaluation request should have been sent
+    And the evaluation snapshot should not contain "evicted-flag"
+
   Scenario Outline: Every successful definitions refresh clears missing-key knowledge
     Given local feature flag definitions resolve "beta-ui" for distinct id "user-123" as true
     And no local feature flag definition is loaded for "deleted-flag"
@@ -168,7 +177,8 @@ Feature: Evaluate Flags
       | key          |
       | beta-ui      |
       | deleted-flag |
-    And local feature flag definitions are refreshed successfully using "<refresh result>"
+    And local feature flag definitions are refreshed successfully using "<refresh result>" and still omit "deleted-flag"
+    And no complete cached feature flag evaluation result exists for distinct id "user-456"
     And remote feature flag evaluation for distinct id "user-456" returns no flags
     And evaluate flags is called for distinct id "user-456" with flag keys:
       | key          |
@@ -205,8 +215,9 @@ Feature: Evaluate Flags
     And the following remote feature flag evaluation response returns no flags
     When evaluate flags is started for distinct id "user-123" with flag key "deleted-flag"
     Then exactly one remote feature flag evaluation request should be in flight
-    When local feature flag definitions are refreshed successfully using "changed definitions"
+    When local feature flag definitions are refreshed successfully using "changed definitions" and still omit "deleted-flag"
     And the delayed remote feature flag evaluation response is released
+    And no complete cached feature flag evaluation result exists for distinct id "user-456"
     And evaluate flags is called for distinct id "user-456" with flag key "deleted-flag"
     Then exactly two remote feature flag evaluation requests should have been sent
     And both evaluation snapshots should not contain "deleted-flag"

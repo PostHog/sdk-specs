@@ -4,6 +4,7 @@
 - [x] 1.2 Cover successful changed, not-modified, and shared-cache refresh invalidation, plus failed-refresh retention.
 - [x] 1.3 Cover same-identity retries after failed, quota-limited, and computation-error responses.
 - [x] 1.4 Cover a successful refresh invalidating a delayed probe from the previous definitions generation.
+- [x] 1.5 Define finite-capacity retention and make evicted keys eligible for a fresh probe.
 
 ## 2. Concurrent Probe Coordination
 

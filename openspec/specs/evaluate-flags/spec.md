@@ -56,7 +56,7 @@ An SDK that has a successful local-definition refresh lifecycle SHALL retain neg
 
 A failed remote response, a quota-limited response, or a response that reports errors while computing flags SHALL NOT establish negative knowledge. A later evaluation for the same identity and requested scope SHALL remain eligible to make a new direct fallback request, even when a general evaluated-result cache contains the inconclusive response. An SDK without a successful local-definition refresh lifecycle MAY continue probing on each call rather than retain knowledge that it cannot safely invalidate.
 
-Before negative knowledge is established, concurrent evaluations that overlap on the same unknown missing key SHALL coordinate while that key's existence probe is in flight. If the shared probe cleanly omits the key, an overlapping evaluation with no other reason to fall back SHALL NOT make a duplicate request. If the response returns the key, later identity-specific requests MAY proceed to obtain values for their own evaluation contexts. Evaluations with disjoint missing-key sets SHALL be able to begin their direct fallbacks independently. When one evaluation's missing-key set contains both a key with an in-flight probe and a different uncoordinated key, it SHALL wait for the overlapping probe to settle before deciding whether to make its at-most-one fallback with the caller's original requested scope. That later original-scope request MAY include a settled or suppressed key, but it is not a fallback caused solely by that key.
+Before negative knowledge is established, concurrent evaluations that overlap on the same unknown missing key SHALL coordinate while that key's existence probe is in flight. If the shared probe cleanly omits the key, an overlapping evaluation with no other reason to fall back SHALL NOT make a duplicate request. If the response returns the key, its identity-specific value SHALL NOT be reused for a waiting evaluation with a different distinct id, groups, person properties, or group properties; that waiter SHALL make its own fallback before producing its snapshot. An evaluated-result cache MAY satisfy a waiter only when its complete evaluation context is safely reusable. Evaluations with disjoint missing-key sets SHALL be able to begin their direct fallbacks independently. When one evaluation's missing-key set contains both a key with an in-flight probe and a different uncoordinated key, it SHALL wait for the overlapping probe to settle before deciding whether to make its at-most-one fallback with the caller's original requested scope. That later original-scope request MAY include a settled or suppressed key, but it is not a fallback caused solely by that key.
 
 When local-only mode is true, the SDK SHALL NOT make a remote evaluation request; flags that cannot be resolved locally, including requested keys with no local definition, SHALL be absent from the snapshot. When a request-time key list is supplied, any remote evaluation request and the resulting snapshot SHALL be scoped to those keys. An internal local evaluator MAY inspect additional definitions, but values outside the requested set SHALL be dropped before the snapshot is returned.
 
@@ -125,6 +125,13 @@ When local-only mode is true, the SDK SHALL NOT make a remote evaluation request
 - **WHEN** multiple evaluations concurrently request "deleted-flag"
 - **THEN** they make one direct remote existence probe for "deleted-flag"
 - **AND** every evaluation omits "deleted-flag" from its snapshot
+
+#### Scenario: Returned key is evaluated for each distinct context
+- **GIVEN** concurrent evaluations for different identities overlap on unknown key "remote-flag"
+- **AND** the shared probe returns "remote-flag" for the first identity
+- **WHEN** the waiting evaluation resumes
+- **THEN** it makes its own fallback for its distinct evaluation context
+- **AND** neither identity receives the other identity's value or payload
 
 #### Scenario: Unrelated missing keys are not serialized
 - **GIVEN** loaded local definitions do not contain requested keys "missing-a" and "missing-b"

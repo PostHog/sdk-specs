@@ -208,19 +208,25 @@ Feature: Evaluate Flags
       | deleted-flag |
     Then exactly one remote feature flag evaluation request should have been sent
 
-  Scenario: Successful refresh invalidates a delayed probe from the previous generation
+  Scenario Outline: Every successful refresh invalidates a delayed probe from the previous generation
     Given the SDK supports successful local feature flag definition refreshes
     And no local feature flag definition is loaded for "deleted-flag"
     And the first clean remote response omitting "deleted-flag" is delayed
     And the following remote feature flag evaluation response returns no flags
     When evaluate flags is started for distinct id "user-123" with flag key "deleted-flag"
     Then exactly one remote feature flag evaluation request should be in flight
-    When local feature flag definitions are refreshed successfully using "changed definitions" and still omit "deleted-flag"
+    When local feature flag definitions are refreshed successfully using "<refresh result>" and still omit "deleted-flag"
     And the delayed remote feature flag evaluation response is released
     And no complete cached feature flag evaluation result exists for distinct id "user-456"
     And evaluate flags is called for distinct id "user-456" with flag key "deleted-flag"
     Then exactly two remote feature flag evaluation requests should have been sent
     And both evaluation snapshots should not contain "deleted-flag"
+
+    Examples:
+      | refresh result               |
+      | changed definitions          |
+      | 304 not modified             |
+      | successful shared-cache load |
 
   Scenario Outline: Inconclusive missing-key fallback allows same-identity retry
     Given local feature flag definitions resolve "beta-ui" for distinct id "user-123" as true
@@ -251,6 +257,21 @@ Feature: Evaluate Flags
     When the delayed remote feature flag evaluation response is released
     Then both evaluation snapshots should not contain "deleted-flag"
     And exactly one remote feature flag evaluation request should have been sent
+
+  Scenario: A remotely returned key is evaluated for each identity
+    Given no local feature flag definition is loaded for "remote-flag"
+    And the delayed remote feature flag evaluation response for distinct id "user-123" returns:
+      | key         | value |
+      | remote-flag | true  |
+    And the following remote feature flag evaluation response for distinct id "user-456" returns:
+      | key         | value |
+      | remote-flag | false |
+    When evaluate flags is started concurrently for distinct ids "user-123" and "user-456" with flag key "remote-flag"
+    Then exactly one remote feature flag evaluation request should be in flight
+    When the delayed remote feature flag evaluation response is released
+    Then exactly two remote feature flag evaluation requests should have been sent
+    And the first evaluation snapshot should contain "remote-flag" with value true
+    And the second evaluation snapshot should contain "remote-flag" with value false
 
   Scenario: Unrelated missing-key probes are not serialized
     Given no local feature flag definitions are loaded for "missing-a" and "missing-b"

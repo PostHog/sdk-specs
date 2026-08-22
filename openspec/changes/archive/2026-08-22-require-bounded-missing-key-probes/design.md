@@ -8,7 +8,7 @@ For a deleted flag or stale application reference, per-call probing scales remot
 
 **Goals:**
 
-- Bound a cleanly omitted key to one successful existence probe per definitions-refresh interval.
+- Bound a cleanly omitted key to one fallback caused solely by that key per definitions-refresh interval.
 - Clear omission knowledge after every successful refresh, regardless of whether definitions changed or came from the API or shared cache.
 - Prevent failures, quota limits, and computation errors from suppressing a later required probe.
 - Coalesce concurrent first probes for the same missing key without serializing unrelated keys.
@@ -42,7 +42,7 @@ A later call with the same identity and scope remains eligible to probe after an
 
 Concurrent evaluations whose only new missing-key work overlaps wait for one in-flight existence probe for that key. After the probe completes, waiters re-evaluate the state. A clean omission suppresses their duplicate probes. If the key is returned, each identity may still need its own remote evaluation to obtain an identity-specific value.
 
-Coordination is per key. Evaluations with disjoint missing-key sets may probe concurrently, and no global coordination lock may be held across network I/O. A mixed-scope evaluation that overlaps an in-flight key waits for that probe before deciding whether it still needs one fallback using its original scope. Launching a subset-scope request for only its new key was rejected because it would violate the original-request-scope contract, while launching the original scope immediately would duplicate the overlapping in-flight probe. Global serialization of disjoint key sets was rejected because one slow key would delay unrelated evaluations.
+Coordination is per key. Evaluations with disjoint missing-key sets may probe concurrently, and no global coordination lock may be held across network I/O. A mixed-scope evaluation that overlaps an in-flight key waits for that probe before deciding whether it still needs one fallback using its original scope. If another key still requires fallback after the overlap settles, the original-scope request may include the settled key again, but that key did not cause the request. Launching a subset-scope request for only the new key was rejected because it would violate the original-request-scope contract, while launching the original scope immediately would duplicate an in-flight probe. Global serialization of disjoint key sets was rejected because one slow key would delay unrelated evaluations.
 
 ### Keep cache APIs platform-specific
 

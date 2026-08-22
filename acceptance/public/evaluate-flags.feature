@@ -145,7 +145,8 @@ Feature: Evaluate Flags
     And the snapshot should contain "checkout" with value "blue"
 
   Scenario: Clean remote omission suppresses probes across identities until refresh
-    Given local feature flag definitions resolve "beta-ui" for distinct id "user-123" as true
+    Given the SDK supports successful local feature flag definition refreshes
+    And local feature flag definitions resolve "beta-ui" for distinct id "user-123" as true
     And no local feature flag definition is loaded for "deleted-flag"
     And remote feature flag evaluation for distinct id "user-123" returns no flags
     When evaluate flags is called for distinct id "user-123" with flag keys:
@@ -198,16 +199,17 @@ Feature: Evaluate Flags
     Then exactly one remote feature flag evaluation request should have been sent
 
   Scenario: Successful refresh invalidates a delayed probe from the previous generation
-    Given no local feature flag definition is loaded for "deleted-flag"
+    Given the SDK supports successful local feature flag definition refreshes
+    And no local feature flag definition is loaded for "deleted-flag"
     And the first clean remote response omitting "deleted-flag" is delayed
     And the following remote feature flag evaluation response returns no flags
     When evaluate flags is started for distinct id "user-123" with flag key "deleted-flag"
     Then exactly one remote feature flag evaluation request should be in flight
     When local feature flag definitions are refreshed successfully using "changed definitions"
+    And the delayed remote feature flag evaluation response is released
     And evaluate flags is called for distinct id "user-456" with flag key "deleted-flag"
     Then exactly two remote feature flag evaluation requests should have been sent
-    When the delayed remote feature flag evaluation response is released
-    Then both evaluation snapshots should not contain "deleted-flag"
+    And both evaluation snapshots should not contain "deleted-flag"
 
   Scenario Outline: Inconclusive missing-key fallback allows same-identity retry
     Given local feature flag definitions resolve "beta-ui" for distinct id "user-123" as true

@@ -144,6 +144,95 @@ Feature: Evaluate Flags
     And the snapshot should contain "beta-ui" with value true
     And the snapshot should contain "checkout" with value "blue"
 
+  Scenario: Clean remote omission suppresses probes across identities until refresh
+    Given local feature flag definitions resolve "beta-ui" for distinct id "user-123" as true
+    And no local feature flag definition is loaded for "deleted-flag"
+    And remote feature flag evaluation for distinct id "user-123" returns no flags
+    When evaluate flags is called for distinct id "user-123" with flag keys:
+      | key          |
+      | beta-ui      |
+      | deleted-flag |
+    And evaluate flags is called for distinct id "user-456" with flag keys:
+      | key          |
+      | beta-ui      |
+      | deleted-flag |
+    Then exactly one remote feature flag evaluation request should have been sent
+    And both evaluation snapshots should not contain "deleted-flag"
+
+  Scenario Outline: Every successful definitions refresh clears missing-key knowledge
+    Given local feature flag definitions resolve "beta-ui" for distinct id "user-123" as true
+    And no local feature flag definition is loaded for "deleted-flag"
+    And remote feature flag evaluation for distinct id "user-123" returns no flags
+    When evaluate flags is called for distinct id "user-123" with flag keys:
+      | key          |
+      | beta-ui      |
+      | deleted-flag |
+    And local feature flag definitions are refreshed successfully using "<refresh result>"
+    And remote feature flag evaluation for distinct id "user-456" returns no flags
+    And evaluate flags is called for distinct id "user-456" with flag keys:
+      | key          |
+      | beta-ui      |
+      | deleted-flag |
+    Then exactly two remote feature flag evaluation requests should have been sent
+
+    Examples:
+      | refresh result               |
+      | changed definitions          |
+      | 304 not modified             |
+      | successful shared-cache load |
+
+  Scenario: Failed definitions refresh preserves missing-key knowledge
+    Given local feature flag definitions resolve "beta-ui" for distinct id "user-123" as true
+    And no local feature flag definition is loaded for "deleted-flag"
+    And remote feature flag evaluation for distinct id "user-123" returns no flags
+    When evaluate flags is called for distinct id "user-123" with flag keys:
+      | key          |
+      | beta-ui      |
+      | deleted-flag |
+    And the next local feature flag definitions refresh fails
+    And local feature flag definitions are refreshed
+    And evaluate flags is called for distinct id "user-456" with flag keys:
+      | key          |
+      | beta-ui      |
+      | deleted-flag |
+    Then exactly one remote feature flag evaluation request should have been sent
+
+  Scenario Outline: Inconclusive missing-key fallback allows same-identity retry
+    Given local feature flag definitions resolve "beta-ui" for distinct id "user-123" as true
+    And no local feature flag definition is loaded for "new-flag"
+    And the next remote feature flag evaluation request has outcome "<outcome>"
+    And the following remote feature flag evaluation request returns:
+      | key      | value |
+      | new-flag | true  |
+    When evaluate flags is called twice for distinct id "user-123" with flag keys:
+      | key      |
+      | beta-ui  |
+      | new-flag |
+    Then exactly two remote feature flag evaluation requests should have been sent
+    And the second evaluation snapshot should contain "new-flag" with value true
+
+    Examples:
+      | outcome                       |
+      | transport failure             |
+      | feature flag quota limited    |
+      | errors while computing flags  |
+
+  Scenario: Concurrent clean omissions share one missing-key probe
+    Given local feature flag definitions resolve "beta-ui" for distinct id "user-123" as true
+    And no local feature flag definition is loaded for "deleted-flag"
+    And the clean remote response omitting "deleted-flag" is delayed
+    When evaluate flags is started concurrently for distinct ids "user-123" and "user-456" with flag key "deleted-flag"
+    Then exactly one remote feature flag evaluation request should be in flight
+    When the delayed remote feature flag evaluation response is released
+    Then both evaluation snapshots should not contain "deleted-flag"
+    And exactly one remote feature flag evaluation request should have been sent
+
+  Scenario: Unrelated missing-key probes are not serialized
+    Given no local feature flag definitions are loaded for "missing-a" and "missing-b"
+    And remote feature flag evaluation responses for "missing-a" and "missing-b" are delayed
+    When evaluate flags is started concurrently for "missing-a" and "missing-b"
+    Then two remote feature flag evaluation requests should be in flight before either response is released
+
   Scenario: Request-time keys scope locally evaluated snapshot results
     Given local feature flag definitions resolve for distinct id "user-123":
       | key      | value |

@@ -36,7 +36,7 @@ Permanent suppression was rejected because it would hide a key created after the
 
 A response may establish omission knowledge only when remote evaluation completed successfully, was not quota limited, and reported no flag-computation errors. Transport and API failures have no trustworthy absence information.
 
-A later call with the same identity and scope remains eligible to probe after an inconclusive response. Implementations with a general evaluated-result cache must bypass or distinguish cached inconclusive entries when that cache would suppress the required retry.
+A current-generation response that explicitly returns a retained-missing key removes the contradictory omission immediately, including when another unresolved key caused the original-scope fallback. A later call with the same identity and scope remains eligible to probe after an inconclusive response. Implementations with a general evaluated-result cache must bypass or distinguish cached inconclusive entries when that cache would suppress the required retry.
 
 ### Coordinate unknown-key existence probes by key
 

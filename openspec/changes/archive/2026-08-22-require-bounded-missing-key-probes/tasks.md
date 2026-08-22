@@ -5,6 +5,7 @@
 - [x] 1.3 Cover same-identity retries after failed, quota-limited, and computation-error responses.
 - [x] 1.4 Cover changed, not-modified, and shared-cache refreshes invalidating a delayed probe from the previous definitions generation.
 - [x] 1.5 Define finite-capacity retention and make evicted keys eligible for a fresh probe.
+- [x] 1.6 Cover positive remote evidence clearing an earlier retained omission.
 
 ## 2. Concurrent Probe Coordination
 

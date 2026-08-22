@@ -337,6 +337,27 @@ Feature: Evaluate Flags
     And the second remote feature flag evaluation request should include only flag keys "missing-a" and "missing-b"
     And the second evaluation snapshot should contain "missing-b" with value true
 
+  Scenario: Positive remote evidence clears an earlier retained omission
+    Given the SDK supports successful local feature flag definition refreshes
+    And no local feature flag definitions are loaded for "previously-missing" and "other-missing"
+    And remote feature flag evaluation for distinct id "user-123" returns no flags
+    When evaluate flags is called for distinct id "user-123" with flag key "previously-missing"
+    And remote feature flag evaluation for distinct id "user-456" returns:
+      | key                | value |
+      | previously-missing | true  |
+      | other-missing      | true  |
+    And evaluate flags is called for distinct id "user-456" with flag keys:
+      | key                |
+      | previously-missing |
+      | other-missing      |
+    And remote feature flag evaluation for distinct id "user-789" returns:
+      | key                | value |
+      | previously-missing | false |
+    And evaluate flags is called for distinct id "user-789" with flag key "previously-missing"
+    Then exactly three remote feature flag evaluation requests should have been sent
+    And the second evaluation snapshot should contain "previously-missing" with value true
+    And the third evaluation snapshot should contain "previously-missing" with value false
+
   Scenario: Request-time keys scope locally evaluated snapshot results
     Given local feature flag definitions resolve for distinct id "user-123":
       | key      | value |

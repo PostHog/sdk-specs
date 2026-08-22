@@ -6,7 +6,7 @@ A requested key that is missing both locally and remotely can currently trigger 
 
 - Require SDKs with a successful local-definition refresh lifecycle to retain a clean remote omission in a finite-capacity store until the next successful refresh or capacity eviction.
 - Require suppression to clear after modified, unchanged or `304`, and successful shared-cache definition refreshes, and reject stale in-flight omission results from an earlier definitions generation.
-- Keep failed, quota-limited, and computation-error responses ineligible to establish suppression, and require a later evaluation to retry.
+- Keep failed, quota-limited, and computation-error responses ineligible to establish suppression, require a later evaluation to retry, and remove stale omission knowledge when a later current-generation response returns the key.
 - Require concurrent first probes for the same cleanly omitted key to share one in-flight request while allowing disjoint missing-key sets to proceed independently, preserving original scope for mixed overlapping calls, and never sharing returned context-specific values across differing evaluation inputs.
 - Keep the first missing-key fallback, original request scope, local-wins merge, result filtering, and local-only behavior unchanged.
 - **BREAKING**: This changes refresh-capable SDKs from optional per-call probing to a bounded request contract.
@@ -27,7 +27,7 @@ The audited server SDK implementations currently differ:
 
 | SDK | Current behavior | Required implementation change |
 |---|---|---|
-| Android | Retains clean omissions until every successful definitions refresh, invalidates modified, `304`, and shared-cache loads, coalesces same-key probes, keeps unrelated keys concurrent, and retries inconclusive probes. Its retained-key sets do not currently have an explicit capacity bound. | Add a finite capacity or eviction policy to the retained-key state. It remains the behavioral reference implementation. |
+| Android | Retains clean omissions until every successful definitions refresh, invalidates modified, `304`, and shared-cache loads, coalesces same-key probes, keeps unrelated keys concurrent, and retries inconclusive probes. Its retained-key sets do not currently have an explicit capacity bound, and a later mixed-scope positive response does not clear a retained omission. | Add finite-capacity eviction and reconcile positive remote evidence with retained omissions. It remains the closest behavioral reference implementation. |
 | Python | Makes one scoped fallback per evaluation call and retains no missing-key knowledge. | Add finite-capacity, refresh-scoped clean-omission state and same-key in-flight coordination. |
 | Node.js | Makes one scoped fallback per evaluation call and retains no missing-key knowledge. | Add finite-capacity, refresh-scoped clean-omission state and same-key in-flight coordination. |
 | Go | Makes one scoped fallback per evaluation call and retains no missing-key knowledge. | Add finite-capacity, refresh-scoped clean-omission state and same-key in-flight coordination. |

@@ -162,12 +162,15 @@ Feature: Evaluate Flags
 
   Scenario: Capacity eviction makes a missing key eligible to probe again
     Given the SDK supports successful local feature flag definition refreshes
-    And valid missing-key knowledge for "evicted-flag" has been evicted at the store capacity
-    And no local feature flag definition is loaded for "evicted-flag"
+    And clean remote omissions have filled the missing-key knowledge store to its configured capacity
+    When one additional clean remote omission is retained
+    Then one previously retained missing key should be evicted
+    And the missing-key knowledge store should not exceed its configured capacity
+    Given no local feature flag definition is loaded for the evicted key
     And remote feature flag evaluation for distinct id "user-123" returns no flags
-    When evaluate flags is called for distinct id "user-123" with flag key "evicted-flag"
-    Then exactly one remote feature flag evaluation request should have been sent
-    And the evaluation snapshot should not contain "evicted-flag"
+    When evaluate flags is called for distinct id "user-123" with the evicted flag key
+    Then one additional remote feature flag evaluation request should have been sent
+    And the evaluation snapshot should not contain the evicted key
 
   Scenario Outline: Every successful definitions refresh clears missing-key knowledge
     Given local feature flag definitions resolve "beta-ui" for distinct id "user-123" as true

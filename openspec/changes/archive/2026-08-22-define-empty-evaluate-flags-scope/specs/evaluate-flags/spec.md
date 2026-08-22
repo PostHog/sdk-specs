@@ -4,7 +4,7 @@
 
 `evaluateFlags(...)` SHALL resolve a distinct id from the explicit call input or, where the SDK supports request context, from the active request context. It SHALL accept platform-appropriate evaluation inputs for groups, person properties, group properties, local-only evaluation, GeoIP control, and an optional list of flag keys. SDKs that support device-continuity evaluation MAY additionally accept a device id.
 
-The SDK SHALL distinguish the presence of the optional flag-key list from its length. When the list is omitted or null, the call is unscoped and SHALL evaluate all flags available through the SDK's normal evaluation path. When the list is explicitly supplied and empty, the call SHALL return an empty snapshot and SHALL NOT make a direct remote `/flags` (or equivalent) evaluation request. When the list is non-empty, local evaluation, any direct remote evaluation request, and the resulting snapshot SHALL be scoped to exactly those keys.
+The SDK SHALL distinguish the presence of the optional flag-key list from its length. When the list is omitted or null, the call is unscoped and SHALL evaluate all flags available through the SDK's normal evaluation path. When the list is explicitly supplied and empty, the call SHALL return an empty snapshot without consulting an evaluated-result cache, attempting local evaluation, or making a direct remote `/flags` (or equivalent) evaluation request. When the list is non-empty, local evaluation, any direct remote evaluation request, and the resulting snapshot SHALL be scoped to exactly those keys.
 
 The SDK SHALL use a cached evaluated result or attempt local evaluation when its architecture supports either source. When local evaluation does not produce the required set and local-only mode is false, the SDK MAY make at most one direct remote `/flags` (or equivalent) evaluation request for the call.
 
@@ -20,9 +20,11 @@ When local-only mode is true, the SDK SHALL NOT make a remote evaluation request
 - **THEN** the returned snapshot contains "checkout" and "search"
 
 #### Scenario: Empty key list is a no-op
-- **GIVEN** flags "checkout" and "search" are available
+- **GIVEN** cached, local, and remote evaluation sources could provide flags "checkout" and "search"
 - **WHEN** `evaluateFlags(...)` is called with an explicitly empty flag-key list
 - **THEN** the returned snapshot contains no flags
+- **AND** no cached evaluated result is consulted
+- **AND** no local feature-flag evaluation is attempted
 - **AND** no direct remote feature-flag evaluation request is made
 
 #### Scenario: Remote fallback fills unresolved flags once

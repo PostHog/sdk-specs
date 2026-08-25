@@ -94,10 +94,11 @@ Install the CLI to propose and validate changes:
 npm install -g @fission-ai/openspec
 ```
 
-The repo includes OpenSpec integrations for Claude Code (`.claude/`) and pi (`.pi/`). The
-commands below use Claude Code syntax; in pi, replace `:` with `-` (for example,
-`/opsx-propose`). Both integrations also support standalone OpenSpec stores when a store is
-named.
+The repo includes shared OpenSpec agent skills for Codex and pi under `.agents/skills/`.
+Claude Code uses the same files through the `.claude` symlink, while pi-specific prompt
+templates remain under `.pi/prompts/`. The commands below use Claude Code syntax; in pi,
+replace `:` with `-` (for example, `/opsx-propose`). All integrations also support standalone
+OpenSpec stores when a store is named.
 
 The source of truth is `openspec/specs/<capability>/spec.md`. You never hand-edit it — you
 propose a **change**, implement it, and archiving syncs the change into the spec.

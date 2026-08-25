@@ -1,0 +1,9 @@
+## 1. Canonical contract
+
+- [x] 1.1 Sync the `is_set` null, falsey-value, and missing-context requirement into `openspec/specs/local-feature-flag-evaluator/spec.md`.
+- [x] 1.2 Add private acceptance scenarios for explicit null, falsey non-null values, and omitted property context to `acceptance/private/local-feature-flag-evaluator.feature`.
+
+## 2. Validation and follow-up
+
+- [x] 2.1 Validate all OpenSpec artifacts and acceptance feature syntax.
+- [x] 2.2 Confirm the implementation follow-up list identifies Node.js, Ruby, Go, PHP, and Elixir as currently divergent, without changing SDK repositories in this spec change.

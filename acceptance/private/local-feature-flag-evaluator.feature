@@ -39,14 +39,14 @@ Feature: Local Feature Flag Evaluator
       | field | value |
       | copy  | new   |
 
-  Scenario: Explicit null does not match is_set
+  Scenario: Explicit null matches is_set
     Given the SDK is initialized with token "test-token" and local evaluation enabled
     And local feature flag definitions include a flag "profile-complete" matching person property "plan" with operator "is_set"
     When local feature flag "profile-complete" is evaluated with person property "plan" explicitly set to null
-    Then the local evaluation result should be false
+    Then the local evaluation result should be true
     And the SDK should not require remote fallback solely to interpret the explicit null value
 
-  Scenario Outline: Falsey non-null values match is_set
+  Scenario Outline: Other falsey present values match is_set
     Given the SDK is initialized with token "test-token" and local evaluation enabled
     And local feature flag definitions include a flag "profile-complete" matching person property "plan" with operator "is_set"
     When local feature flag "profile-complete" is evaluated with person property "plan" set to <value>

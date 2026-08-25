@@ -112,6 +112,20 @@ Feature: Evaluate Flags
     And snapshot only accessed is called before a value or enablement read
     Then the filtered snapshot should contain no flags
 
+  Scenario: Empty request-time key list is a no-op
+    Given cached feature flag evaluation for distinct id "user-123" contains:
+      | key     | value |
+      | beta-ui | true  |
+    And local feature flag definitions resolve "checkout" for distinct id "user-123" as "blue"
+    And remote feature flag evaluation for distinct id "user-123" can return:
+      | key    | value |
+      | search | false |
+    When evaluate flags is called for distinct id "user-123" with an empty flag key list
+    Then the returned evaluation snapshot should be empty
+    And no cached feature flag evaluation result should have been consulted
+    And no local feature flag evaluation should have been attempted
+    And no remote feature flag evaluation request should have been sent
+
   Scenario: Request-time keys and in-memory filtering are distinct
     Given remote feature flag evaluation for distinct id "user-123" can return:
       | key      | value |

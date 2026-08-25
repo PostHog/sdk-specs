@@ -58,5 +58,5 @@ capability per folder.
 
 ## Tooling
 
-- OpenSpec CLI (v1.3.1) with `/opsx:propose | apply | archive` slash commands and the
-  agent skills under `.claude/skills/`.
+- OpenSpec CLI (v1.3.1) with shared agent skills under `.agents/skills/`, Claude Code
+  commands through `.claude/commands/`, and pi prompt templates under `.pi/prompts/`.

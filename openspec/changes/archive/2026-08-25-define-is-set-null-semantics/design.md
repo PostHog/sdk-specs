@@ -6,8 +6,8 @@ Current server SDK behavior differs on explicit null evaluation properties:
 
 | Behavior | SDKs and inspected revisions |
 |---|---|
-| Null is treated as set | Node.js `a816e2f09`, Ruby `8b1e2fe`, Go `5cfdbb4`, PHP `b28a880`, Elixir PR implementation |
-| Null is treated as not set | Python `b72fed3`, Android server SDK `54553db4`, .NET `b25ea94` |
+| Null is treated as set | Node.js `a816e2f09`, Ruby `8b1e2fe`, Go `5cfdbb4`, PHP `b28a880` |
+| Null is treated as not set | Python `b72fed3`, Android server SDK `54553db4`, .NET `b25ea94`, Elixir PR #192 `a68e720` |
 
 All implementations distinguish a missing map key from a present key for at least some operators. The important local-evaluation constraint is that omission from caller-supplied properties does not prove that the property is absent in PostHog, so missing context must remain inconclusive rather than being treated as a definitive `is_set` non-match.
 
@@ -33,7 +33,7 @@ All implementations distinguish a missing map key from a present key for at leas
 
 An `is_set` filter matches only a present non-null property value. This follows PostHog query behavior and the user-facing description that the property must have a value, rather than relying only on container key presence.
 
-The alternative was key-presence semantics, as currently used by Node.js, Ruby, Go, PHP, and Elixir. That approach is easy to implement with map membership, but it lets local evaluation enable a flag that remote evaluation would not enable for the same explicit null value.
+The alternative was key-presence semantics, as currently used by Node.js, Ruby, Go, and PHP. That approach is easy to implement with map membership, but it lets local evaluation enable a flag that remote evaluation would not enable for the same explicit null value.
 
 ### Falsey non-null values remain set
 

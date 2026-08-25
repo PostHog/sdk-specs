@@ -22,4 +22,4 @@ None.
 
 ## Impact
 
-The local feature flag evaluators in Node.js, Ruby, Go, PHP, and Elixir currently use key-presence semantics and will require follow-up changes if this proposal is accepted. Python, the Android server SDK, and .NET already treat explicit null as not set. Public method signatures and wire formats do not change, but affected SDKs can return a different local flag value for callers that explicitly provide null evaluation properties.
+The local feature flag evaluators in Node.js, Ruby, Go, and PHP currently use key-presence semantics and will require follow-up changes if this proposal is accepted. Python, the Android server SDK, and .NET already treat explicit null as not set. The pending Elixir local-evaluation implementation was aligned with this proposal in PostHog/posthog-elixir#192 before release. Public method signatures and wire formats do not change, but affected SDKs can return a different local flag value for callers that explicitly provide null evaluation properties.

@@ -6,4 +6,4 @@
 ## 2. Validation and follow-up
 
 - [x] 2.1 Validate all OpenSpec artifacts and acceptance feature syntax.
-- [x] 2.2 Confirm the implementation follow-up list identifies Node.js, Ruby, Go, PHP, and Elixir as currently divergent, without changing SDK repositories in this spec change.
+- [x] 2.2 Confirm the implementation follow-up list identifies Node.js, Ruby, Go, and PHP as currently divergent and records that the pending Elixir implementation was aligned separately.

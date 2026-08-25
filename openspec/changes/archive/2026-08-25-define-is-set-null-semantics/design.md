@@ -26,6 +26,7 @@ All implementations distinguish a missing map key from a present key for at leas
 
 - Redefine analytics query, storage, ingestion, or property-unset behavior.
 - Require SDKs to infer stored PostHog properties that are absent from request-time evaluation context.
+- Define an SDK evaluation option or `/flags` request field for callers to assert that a property is known to be absent.
 - Change equality, `is_not`, or other property operators.
 - Standardize language-specific representations beyond each SDK's JSON null equivalent.
 

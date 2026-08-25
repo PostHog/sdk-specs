@@ -8,6 +8,8 @@ Boolean false, numeric zero, an empty string, and empty collections SHALL also c
 
 When the required property key is absent from caller-supplied local evaluation context, the evaluator SHALL remain inconclusive and defer to remote evaluation when remote fallback is enabled. Omission from request-time properties does not prove that the property is absent from PostHog's stored person or group properties.
 
+Caller-supplied property maps therefore represent present values or unavailable context; they do not currently represent affirmative knowledge that a property is absent. An explicit known-absence input would require a separate SDK evaluation option and corresponding `/flags` request contract and is outside this requirement.
+
 #### Scenario: Explicit null matches is_set
 - **GIVEN** local feature flag "profile-complete" matches person property "plan" with operator "is_set"
 - **WHEN** the flag is evaluated locally with person property "plan" explicitly set to null

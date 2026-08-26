@@ -38,3 +38,61 @@ Feature: Local Feature Flag Evaluator
     Then the local evaluation payload should include:
       | field | value |
       | copy  | new   |
+
+  Scenario: Explicit null matches is_set
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag definitions include a flag "profile-complete" matching person property "plan" with operator "is_set"
+    When local feature flag "profile-complete" is evaluated with person property "plan" explicitly set to null
+    Then the local evaluation result should be true
+    And the SDK should not require remote fallback solely to interpret the explicit null value
+
+  Scenario Outline: Other falsey present values match is_set
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag definitions include a flag "profile-complete" matching person property "plan" with operator "is_set"
+    When local feature flag "profile-complete" is evaluated with person property "plan" set to <value>
+    Then the local evaluation result should be true
+
+    Examples:
+      | value           |
+      | false           |
+      | 0               |
+      | an empty string |
+      | an empty list   |
+      | an empty object |
+
+  Scenario: Missing property context leaves is_set inconclusive
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And remote feature flag evaluation is enabled
+    And local feature flag definitions include a flag "profile-complete" matching person property "plan" with operator "is_set"
+    When local feature flag "profile-complete" is evaluated without a "plan" entry in the supplied person properties
+    Then local evaluation should be inconclusive
+    And remote evaluation should remain eligible
+
+  Scenario: Explicit null does not match is_not_set
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag definitions include a flag "profile-incomplete" matching person property "plan" with operator "is_not_set"
+    When local feature flag "profile-incomplete" is evaluated with person property "plan" explicitly set to null
+    Then the local evaluation result should be false
+    And the SDK should not require remote fallback solely to interpret the explicit null value
+
+  Scenario Outline: Other falsey present values do not match is_not_set
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag definitions include a flag "profile-incomplete" matching person property "plan" with operator "is_not_set"
+    When local feature flag "profile-incomplete" is evaluated with person property "plan" set to <value>
+    Then the local evaluation result should be false
+
+    Examples:
+      | value           |
+      | false           |
+      | 0               |
+      | an empty string |
+      | an empty list   |
+      | an empty object |
+
+  Scenario: Missing property context leaves is_not_set inconclusive
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And remote feature flag evaluation is enabled
+    And local feature flag definitions include a flag "profile-incomplete" matching person property "plan" with operator "is_not_set"
+    When local feature flag "profile-incomplete" is evaluated without a "plan" entry in the supplied person properties
+    Then local evaluation should be inconclusive
+    And remote evaluation should remain eligible

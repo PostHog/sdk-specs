@@ -29,7 +29,7 @@ enqueue(event): boolean | void
 flush(): Promise<void> | void
 retryLoop(batch): void
 shouldRetry(error): boolean
-nextDelay(attempt, retryAfterHeader?): Duration
+nextDelay(attempt): Duration
 ```
 
 ## Behavior
@@ -49,7 +49,7 @@ nextDelay(attempt, retryAfterHeader?): Duration
    - Retryable: network errors, many server errors, rate limits / `429`, timeouts, and some transient transport errors.
    - Non-retryable: malformed payloads, most 4xx client errors, or SDK-specific parse/serialization failures.
 6. **Apply retry policy for retryable failures.**
-   - Retry after an exponential or linear backoff delay and respect `Retry-After` when the transport exposes it.
+   - Retry after an exponential or linear backoff delay.
    - Some SDKs pause flushing globally until the backoff window expires.
    - A retry-count budget may end an active failure-driven flush sequence, but it is independent from retention in a bounded durable queue.
 7. **Preserve durable queued events for retry.**
@@ -74,7 +74,7 @@ nextDelay(attempt, retryAfterHeader?): Duration
 
 - queued events, stable queue-entry identities, and persisted queue contents
 - retry counters, active flush-sequence state, and backoff policy state
-- transport error metadata such as HTTP status or `Retry-After`
+- transport error metadata such as HTTP status
 - network connectivity state where the SDK exposes it
 
 ### State written
@@ -111,7 +111,7 @@ nextDelay(attempt, retryAfterHeader?): Duration
 
 - **`capture` / `identify` / `alias` / `group-identify`** — feed events into the retry queue.
 - **persistent storage** — backs durable queues on client SDKs that survive restarts.
-- **HTTP client / transport** — supplies retryable vs non-retryable errors and `Retry-After` metadata.
+- **HTTP client / transport** — supplies retryable vs non-retryable errors.
 - **consent gating / opt-out** — may prevent enqueue entirely or clear queued events in some SDKs.
 - **before-send-hook / wrapper preprocessing** — some wrappers can modify or drop events before they ever reach the queue. Flutter's Dart `beforeSend` callbacks and exception/screen preprocessing run before delegated native/browser enqueue.
 - **flush()** — forces the retry queue to attempt immediate delivery.

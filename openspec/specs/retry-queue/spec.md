@@ -39,15 +39,15 @@ nextDelay(attempt, retryAfterHeader?): Duration
    - Some SDKs cap queue size and drop when full.
 2. **Flush in batches or on timers.**
    - Batches are built according to queue size, configured batch size, flush interval, or explicit flush requests.
-3. **Attempt upload.**
-   - The batch is sent to PostHog using the configured HTTP transport.
-4. **Classify failures.**
-   - Retryable: network errors, many server errors, rate limits / `429`, timeouts, and some transient transport errors.
-   - Non-retryable: malformed payloads, most 4xx client errors, or SDK-specific parse/serialization failures.
-5. **Pause while positively known to be offline.**
+3. **Pause while positively known to be offline.**
    - When the platform reports that no network is available, do not start a transport request or consume a flush retry attempt.
    - Continue accepting records subject to queue capacity, and make queued work eligible for normal processing when connectivity returns.
    - If connectivity state is unknown or unavailable, attempt delivery and classify any resulting transport failure normally.
+4. **Attempt upload.**
+   - The batch is sent to PostHog using the configured HTTP transport.
+5. **Classify failures.**
+   - Retryable: network errors, many server errors, rate limits / `429`, timeouts, and some transient transport errors.
+   - Non-retryable: malformed payloads, most 4xx client errors, or SDK-specific parse/serialization failures.
 6. **Apply retry policy for retryable failures.**
    - Retry after an exponential or linear backoff delay and respect `Retry-After` when the transport exposes it.
    - Some SDKs pause flushing globally until the backoff window expires.

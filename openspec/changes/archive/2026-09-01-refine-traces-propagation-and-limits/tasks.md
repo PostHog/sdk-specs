@@ -14,8 +14,8 @@
 
 ## 3. Validate and Review
 
-- [ ] 3.1 Run `openspec validate --specs --strict --no-interactive` and `openspec validate refine-traces-propagation-and-limits --strict`.
-- [ ] 3.2 Run `git diff --check`.
-- [ ] 3.3 Resolve the open question on whether `maxAttributeValueLength` carries one cross-SDK default.
-- [ ] 3.4 Decide whether acceptance scenarios belong in `acceptance/` for the propagation cases, or whether spec scenarios suffice while traces has one implementation.
-- [ ] 3.5 Archive into the canonical `traces` spec once accepted.
+- [x] 3.1 Run `openspec validate --specs --strict --no-interactive` and `openspec validate refine-traces-propagation-and-limits --strict`.
+- [x] 3.2 Run `git diff --check`.
+- [ ] 3.3 Resolve the open question on whether `maxAttributeValueLength` carries one cross-SDK default. Left open in `design.md`: the knob is specified per-platform like every other knob in this capability, and a single number can be pinned by a follow-up once a second SDK implements traces.
+- [x] 3.4 Decide whether acceptance scenarios belong in `acceptance/` for the propagation cases. Spec scenarios suffice for now: `acceptance/` carries no traces feature file, so the harness would have to be stood up before any traces scenario could run.
+- [x] 3.5 Archive into the canonical `traces` spec.

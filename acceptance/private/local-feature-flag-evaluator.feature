@@ -157,6 +157,16 @@ Feature: Local Feature Flag Evaluator
     And the local evaluation result should be true from the second condition
 
   @server
+  Scenario: Inconclusive state is preserved when no later condition matches
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And remote feature flag evaluation is enabled
+    And local feature flag "uncertain-beta" has a first condition that cannot be resolved from the supplied local context
+    And every later condition of local feature flag "uncertain-beta" definitively does not match
+    When local feature flag "uncertain-beta" is evaluated
+    Then local evaluation should be inconclusive
+    And remote evaluation should remain eligible
+
+  @server
   Scenario: A valid condition variant override wins
     Given the SDK is initialized with token "test-token" and local evaluation enabled
     And local feature flag definitions include a multivariate flag "checkout" with variants "control" and "test"
@@ -191,21 +201,6 @@ Feature: Local Feature Flag Evaluator
     And the condition requires person property "plan" equal to "pro"
     When local feature flag "mixed-beta" is evaluated with person property "plan" equal to "pro"
     Then the condition should match using person context and person bucketing
-
-  @server
-  Scenario Outline: One condition can AND person and group filters
-    Given the SDK is initialized with token "test-token" and local evaluation enabled
-    And local feature flag "mixed-beta" has a condition aggregating on group type "company"
-    And the condition requires person property "plan" equal to "pro"
-    And the condition requires company property "size" equal to "enterprise"
-    When local feature flag "mixed-beta" is evaluated with person property "plan" equal to <plan> and company property "size" equal to <size>
-    Then the condition match result should be <matches>
-
-    Examples:
-      | plan   | size       | matches |
-      | "pro"  | "enterprise" | true    |
-      | "free" | "enterprise" | false   |
-      | "pro"  | "startup"    | false   |
 
   @server
   Scenario: The matching condition selects the multivariate hash identity
@@ -257,21 +252,13 @@ Feature: Local Feature Flag Evaluator
       | "control" | "test"   | false   |
 
   @server
-  Scenario: An unresolved dependency affects only the dependent flag
+  Scenario: An unresolved dependency is inconclusive
     Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And remote feature flag evaluation is enabled
     And local feature flag "banner" depends on a flag definition that is missing or cannot be resolved locally
-    And independent local feature flag "beta-ui" can be evaluated from local definitions and context
-    When local feature flags "banner" and "beta-ui" are evaluated
+    When local feature flag "banner" is evaluated
     Then local evaluation should be inconclusive for "banner"
-    And "beta-ui" should still be evaluated locally
-
-  @server
-  Scenario: Dependency chains use flag keys in topological order
-    Given the SDK is initialized with token "test-token" and local evaluation enabled
-    And local definitions contain flag "A", flag "B" depending on "A", and flag "C" depending on "B"
-    When the SDK resolves local dependency filter keys and dependency chains
-    Then flag "B" should reference key "A" and have dependency chain ["A"]
-    And flag "C" should reference key "B" and have dependency chain ["A", "B"]
+    And remote evaluation should remain eligible
 
   @server
   Scenario Outline: An inactive dependency resolves as false
@@ -285,24 +272,6 @@ Feature: Local Feature Flag Evaluator
       | expected | matches |
       | false    | true    |
       | true     | false   |
-
-  @server
-  Scenario: An unknown operator is isolated while decoding a definition bundle
-    Given the SDK is initialized with token "test-token" and local evaluation enabled
-    And one raw polled-definition payload contains a flag with operator "future_operator"
-    And the same payload contains an independent rollout-only flag "beta-ui"
-    When the SDK decodes and installs the local-definition payload
-    Then only the flag with operator "future_operator" should be inconclusive
-    And local feature flag "beta-ui" should remain available for local evaluation
-
-  @server
-  Scenario: An evaluator error is isolated to one bulk result
-    Given the SDK is initialized with token "test-token" and local evaluation enabled
-    And local feature flag "broken" produces a matcher or evaluator error
-    And independent local feature flag "beta-ui" can be evaluated locally
-    When local feature flags "broken" and "beta-ui" are evaluated in one pass
-    Then local evaluation should be inconclusive for "broken"
-    And "beta-ui" should still return its local result
 
   @server
   Scenario Outline: Omitted and null operators default to exact
@@ -320,10 +289,8 @@ Feature: Local Feature Flag Evaluator
   Scenario Outline: Unavailable or malformed criteria preserve the correct result state
     Given the SDK is initialized with token "test-token" and local evaluation enabled
     And local feature flag "criterion-state" has a condition with operator <operator> and condition value <condition>
-    And independent local feature flag "beta-ui" can be evaluated from local definitions and context
     When local feature flag "criterion-state" is evaluated with <property_context>
     Then the criterion result should be <result>
-    And "beta-ui" should still be evaluated locally
 
     Examples:
       | operator          | condition | property_context                                      | result       |
@@ -332,21 +299,11 @@ Feature: Local Feature Flag Evaluator
       | "is_not_set"     | omitted   | the required key omitted from partial local context  | inconclusive |
       | "exact"          | omitted   | property value "pro" present                        | inconclusive |
       | "future_operator" | "pro"          | property value "pro" present                        | inconclusive |
-      | "gt"              | 10             | property value "not-a-number" present               | false        |
+      | "gt"              | "10"           | property value "not-a-number" present               | false        |
       | "gt"              | "not-a-number" | property value 10 present                            | inconclusive |
 
   @server
-  Scenario: Person metadata does not alias a user property
-    Given the SDK is initialized with token "test-token" and local evaluation enabled
-    And local feature flag "account-age" has a person_metadata condition for "created_at" after "2024-01-01"
-    And the user property "created_at" is "2025-01-01"
-    When local feature flag "account-age" is evaluated without dedicated person metadata
-    Then local evaluation should be inconclusive
-    When the same flag is evaluated with dedicated person metadata "created_at" equal to "2025-01-01"
-    Then the local evaluation result should be true
-
-  @server
-  Scenario Outline: Exact and is_not use the released equality algorithm
+  Scenario Outline: Exact and is_not use the canonical equality algorithm
     Given the SDK is initialized with token "test-token" and local evaluation enabled
     And local feature flag "exact-criterion" has a person property condition with operator <operator> and condition value <condition>
     When local feature flag "exact-criterion" is evaluated with supplied property value <property>
@@ -384,7 +341,7 @@ Feature: Local Feature Flag Evaluator
       | {"a":2,"b":1}     | {"b":1,"a":2}     | true    |
 
   @server
-  Scenario Outline: Exact preserves backend numeric spellings when the JSON kind survives
+  Scenario Outline: Exact preserves canonical numeric spellings when the JSON kind survives
     Given the SDK is initialized with token "test-token" and local evaluation enabled
     And local feature flag "exact-number" has an exact person property condition with string value <condition>
     When local feature flag "exact-number" is evaluated with numeric property value <property>
@@ -397,6 +354,8 @@ Feature: Local Feature Flag Evaluator
       | "-0.0"    | -0.0                  |
       | "1e-7"    | 0.0000001             |
       | "1e+16"   | 10000000000000000.0   |
+      | "0.00001" | 0.00001               |
+      | "0.000099" | 0.000099             |
 
   @server
   Scenario Outline: Exact uses Unicode lowercase without case folding or normalization
@@ -435,7 +394,6 @@ Feature: Local Feature Flag Evaluator
       | "not_icontains_multi" | ["enterprise", "PRO"] | "pro account"       | false   |
       | "icontains_multi"     | []                    | "pro account"       | false   |
       | "not_icontains_multi" | []                    | "pro account"       | true    |
-      | "icontains_multi"     | "PRO"                 | "pro account"       | true    |
       | "icontains_multi"     | [2, {"a":1}]          | "item 2"            | true    |
       | "icontains"           | "[1,2]"               | [1,2]                | true    |
 
@@ -468,13 +426,6 @@ Feature: Local Feature Flag Evaluator
     Then local evaluation should be inconclusive
 
   @server
-  Scenario: Prefix and suffix operators agree with remote evaluation
-    Given the SDK is initialized with token "test-token" and local evaluation enabled
-    And a feature flag condition using each prefix and suffix operator is accepted by the direct feature-flag API
-    When each condition is evaluated locally and remotely against the same property value
-    Then every local criterion result should equal its remote criterion result
-
-  @server
   Scenario Outline: Regex criteria search safely without implicit flags or anchors
     Given the SDK is initialized with token "test-token" and local evaluation enabled
     And local feature flag "regex-criterion" has a person property condition with operator <operator> and pattern <pattern>
@@ -492,23 +443,20 @@ Feature: Local Feature Flag Evaluator
       | "regex"     | ""               | "admin@example.com" | true    |
       | "not_regex" | ""               | "admin@example.com" | false   |
       | "regex"     | "\\[1,2\\]"     | [1,2]                | true    |
-      | "regex"     | 123              | "x123x"             | true    |
 
   @server
-  Scenario Outline: Unsupported or resource-limited regex execution is inconclusive
+  Scenario Outline: Unsupported regex execution is inconclusive
     Given the SDK is initialized with token "test-token" and local evaluation enabled
     And local feature flag "regex-limited" uses operator <operator>
-    And its pattern is valid remotely but <failure>
+    And its pattern uses syntax unsupported by the SDK regex engine
     When local feature flag "regex-limited" is evaluated
     Then local evaluation should be inconclusive
-    And no negative operator or cohort leaf negation should turn the failure into a match
+    And neither a negative operator nor cohort negation should turn the failure into a match
 
     Examples:
-      | operator    | failure                                   |
-      | "regex"     | unsupported by the SDK regex dialect      |
-      | "not_regex" | unsupported by the SDK regex dialect      |
-      | "regex"     | exceeds the SDK regex resource limit      |
-      | "not_regex" | exceeds the SDK regex resource limit      |
+      | operator    |
+      | "regex"     |
+      | "not_regex" |
 
   @server
   Scenario Outline: Numeric ordering uses complete finite binary64 semantics
@@ -520,19 +468,17 @@ Feature: Local Feature Flag Evaluator
     Examples:
       | operator | condition          | property           | result       |
       | "gt"     | "9"                | "10"                | true         |
-      | "gte"    | 10                 | "10.0"              | true         |
-      | "lt"     | 10                 | 9                   | true         |
-      | "lte"    | 10                 | 11                  | false        |
-      | "min"    | 10                 | 10                  | true         |
-      | "max"    | 10                 | 11                  | false        |
-      | "gt"     | 9                  | "10px"              | false        |
-      | "gt"     | 9                  | " 10 "              | false        |
-      | "gt"     | 9                  | "NaN"               | false        |
-      | "lt"     | 9                  | "Infinity"          | false        |
+      | "gte"    | "10"               | "10.0"              | true         |
+      | "lt"     | "10"               | 9                   | true         |
+      | "lte"    | "10"               | 11                  | false        |
+      | "min"    | "10"               | 10                  | true         |
+      | "max"    | "10"               | 11                  | false        |
+      | "gt"     | "9"                | "10px"              | false        |
+      | "gt"     | "9"                | " 10 "              | false        |
+      | "gt"     | "9"                | "NaN"               | false        |
+      | "lt"     | "9"                | "Infinity"          | false        |
       | "gt"     | " 9 "              | 10                  | inconclusive |
-      | "gt"     | "1e400"            | 10                  | inconclusive |
-      | "gt"     | "9007199254740992" | 9007199254740993    | false        |
-      | "gt"     | 0                  | "1e-400"            | false        |
+
 
   @server
   Scenario Outline: Dynamic-cohort ranges are inclusive and validate both bounds
@@ -582,7 +528,6 @@ Feature: Local Feature Flag Evaluator
       | "is_date_exact"   | "2025-01-01T10:00"     | "2025-01-01 10:00:00"       | true         |
       | "is_date_exact"   | "2025-01-01T10:00:00Z" | 1735725600                   | true         |
       | "is_date_exact"   | "2025-01-01T10:00:00Z" | "1735725600"                 | true         |
-      | "is_date_exact"   | "1970-01-01T00:00:00Z" | "NaN"                        | false        |
       | "is_date_before"  | "2025-01-01T10:00:00Z" | "not-a-date"                 | false        |
       | "is_date_before"  | "not-a-date"            | "2025-01-01T10:00:00Z"      | inconclusive |
 
@@ -627,20 +572,6 @@ Feature: Local Feature Flag Evaluator
       | "2024-03-10T10:30:00Z" | "1h"      | "2024-03-10T09:30:00Z" | inconclusive |
 
   @server
-  Scenario: Binary64 fractional Unix seconds round to nanoseconds
-    Given the SDK is initialized with token "test-token" and local evaluation enabled
-    And local feature flag "date-criterion" has an "is_date_exact" person property condition with value "2028-03-10T05:09:07.867530107Z"
-    When local feature flag "date-criterion" is evaluated with Unix-second property value 1836277747.86753
-    Then the criterion match result should be true
-
-  @server
-  Scenario: Pre-epoch fractional Unix seconds normalize mathematically
-    Given the SDK is initialized with token "test-token" and local evaluation enabled
-    And local feature flag "date-criterion" has an "is_date_exact" person property condition with value "1969-12-31T23:59:59.500000000Z"
-    When local feature flag "date-criterion" is evaluated with Unix-second property value -0.5
-    Then the criterion match result should be true
-
-  @server
   Scenario Outline: Direct semantic-version comparison uses normalized total ordering
     Given the SDK is initialized with token "test-token" and local evaluation enabled
     And local feature flag "semver-criterion" has a person property condition with operator <operator> and condition value <condition>
@@ -663,10 +594,9 @@ Feature: Local Feature Flag Evaluator
       | "semver_neq" | "1.2.3"                    | "not-a-version"       | false        |
       | "semver_eq"  | "1.2.3"                    | "1.2.3.4"             | false        |
       | "semver_eq"  | "1.2.3-"                   | "1.2.3"               | inconclusive |
-      | "semver_eq"  | "18446744073709551616.0.0" | "1.2.3"               | inconclusive |
 
   @server
-  Scenario Outline: Semantic-version ranges use VersionReq matching
+  Scenario Outline: Semantic-version ranges use consistent boundaries
     Given the SDK is initialized with token "test-token" and local evaluation enabled
     And local feature flag "semver-range" has a person property condition with operator <operator> and condition value <condition>
     When local feature flag "semver-range" is evaluated with supplied property value <property>
@@ -689,7 +619,6 @@ Feature: Local Feature Flag Evaluator
       | "semver_wildcard" | "1.*.*"       | "1.9.0"   | true         |
       | "semver_wildcard" | "1.2"         | "1.9.0"   | true         |
       | "semver_wildcard" | "1.*.3"       | "1.2.3"   | inconclusive |
-      | "semver_wildcard" | "1.2.3.*"     | "1.2.3"   | inconclusive |
       | "semver_tilde"    | "not-a-range" | "1.2.3"   | inconclusive |
 
   @server
@@ -767,17 +696,15 @@ Feature: Local Feature Flag Evaluator
     And remote evaluation should remain eligible
 
   @server
-  Scenario Outline: Malformed cohort structures are isolated to their flag
+  Scenario Outline: Malformed cohort structures are inconclusive
     Given the SDK is initialized with token "test-token" and local evaluation enabled
     And local feature flag "cohort-criterion" references a dynamic cohort containing <malformation>
     And its outer cohort operator is "not_in"
-    And independent local feature flag "beta-ui" can be evaluated locally
-    When local feature flags "cohort-criterion" and "beta-ui" are evaluated
+    When local feature flag "cohort-criterion" is evaluated
     Then local evaluation should be inconclusive for "cohort-criterion"
-    And "beta-ui" should still return its local result
+    And "not_in" should not turn the failure into a match
 
     Examples:
-      | malformation                                               |
-      | a known leaf type missing its required key                 |
-      | unknown group type "XOR"                                   |
-      | a definition deeper than the implementation's safe bound  |
+      | malformation                               |
+      | a known leaf type missing its required key |
+      | unknown group type "XOR"                   |

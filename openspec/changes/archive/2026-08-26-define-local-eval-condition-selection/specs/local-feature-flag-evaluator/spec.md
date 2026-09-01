@@ -8,7 +8,7 @@ After every filter in a group matches, the evaluator SHALL apply that group's `r
 
 For a matching multivariate condition, a condition-level `variant` SHALL be used only when it names one of the flag's defined variants. If the override is absent or invalid, the evaluator SHALL select a variant with the normal deterministic variant hash. A matching non-multivariate condition SHALL return `true`.
 
-The flag-level `early_exit` selector SHALL default to `false`. When it is `true`, the evaluator SHALL return `false` immediately, with no variant or payload, only when every filter in the current group matched but that group's rollout excluded the effective bucketing identifier. A property, cohort, or dependency mismatch SHALL continue to the next group and SHALL NOT trigger `early_exit`. A locally inconclusive group SHALL also not itself trigger `early_exit`; the evaluator SHALL continue so another independently evaluable group can match, and SHALL preserve the existing inconclusive/remote-fallback outcome if no group produces a definitive result.
+The flag-level `early_exit` selector SHALL default to `false`. When it is `true`, the evaluator SHALL return `false` immediately, with no variant or payload, only when every filter in the current group matched but that group's rollout excluded the effective bucketing identifier. A property, cohort, or dependency mismatch SHALL continue to the next group and SHALL NOT trigger `early_exit`. A locally inconclusive group SHALL also not itself trigger `early_exit`; the evaluator SHALL continue so another independently evaluable group can match. If no later group matches and at least one group was inconclusive, the flag SHALL remain inconclusive even when other groups definitively do not match.
 
 #### Scenario: The first matching condition wins without variant-priority sorting (@server)
 - **GIVEN** a multivariate flag has a first condition that matches person property "plan" equal to "pro" with no variant override
@@ -57,6 +57,13 @@ The flag-level `early_exit` selector SHALL default to `false`. When it is `true`
 - **THEN** the first condition should remain inconclusive and should not trigger `early_exit`
 - **AND** the local evaluation result should be true from the second condition
 
+#### Scenario: Inconclusive state is preserved when no later condition matches (@server)
+- **GIVEN** a flag's first condition cannot be resolved from the supplied local context
+- **AND** every later condition definitively does not match
+- **WHEN** the flag is evaluated locally
+- **THEN** local evaluation should be inconclusive
+- **AND** remote evaluation should remain eligible
+
 #### Scenario: A valid condition variant override wins (@server)
 - **GIVEN** a multivariate flag defines variants "control" and "test"
 - **AND** its first matching condition specifies variant override "test"
@@ -75,7 +82,7 @@ The flag-level `early_exit` selector SHALL default to `false`. When it is `true`
 
 A condition group MAY select its own aggregation with `aggregation_group_type_index`. When the field is absent from the condition, the evaluator SHALL inherit the flag-level aggregation for backwards compatibility. When the field is present with a null value, the condition SHALL explicitly use person aggregation. When it contains a group type index, the condition SHALL use that group aggregation even when it differs from the flag-level value.
 
-Each filter SHALL resolve against the context named by its filter type. Person and person-metadata filters SHALL use person context; group filters SHALL use the group context named by their own group type index, falling back to the condition's effective group aggregation when the filter has no index; cohort filters SHALL use person context; and flag-dependency filters SHALL use dependency evaluation results. A single condition MAY combine person and group filters, and all of them SHALL match before rollout is applied.
+Person conditions SHALL use person properties, and group conditions SHALL use properties for their selected group type. Cohort filters SHALL use person context, while flag-dependency filters SHALL use dependency results. All filters in the condition SHALL match before rollout is applied.
 
 The condition's effective aggregation SHALL choose the identifier for its rollout and multivariate hashes. A person-aggregated condition SHALL use the flag's person bucketing identifier (`distinct_id` by default or the required device id for device-bucketed flags). A group-aggregated condition SHALL use the selected group key and SHALL NOT switch to device-id bucketing. Variant assignment after a match SHALL use the same effective aggregation as that matching condition.
 
@@ -94,15 +101,6 @@ If context required by one condition cannot be resolved locally, the evaluator S
 - **AND** the condition requires person property "plan" equal to "pro"
 - **WHEN** the flag is evaluated locally with person property "plan" equal to "pro"
 - **THEN** the condition should match using person context and person bucketing
-
-#### Scenario: One condition can AND person and group filters (@server)
-- **GIVEN** a condition aggregates on group type "company"
-- **AND** it requires person property "plan" equal to "pro"
-- **AND** it requires company property "size" equal to "enterprise"
-- **WHEN** the flag is evaluated locally for a pro person in an enterprise company
-- **THEN** the condition should match
-- **WHEN** either the person property or company property does not match
-- **THEN** the condition should not match
 
 #### Scenario: The matching condition selects the multivariate hash identity (@server)
 - **GIVEN** a multivariate flag has a group-aggregated condition followed by a person-aggregated condition
@@ -131,7 +129,9 @@ If context required by one condition cannot be resolved locally, the evaluator S
 
 A condition filter with property type `flag` SHALL use the `flag_evaluates_to` operator and compare its expected value with the referenced flag's evaluated value. Expected boolean `true` SHALL match boolean `true` and any multivariate variant string, but SHALL NOT match boolean `false`. Expected boolean `false` SHALL match only boolean `false`. An expected string SHALL match only the identical multivariate variant string, using a case-sensitive comparison.
 
-Dependency filters SHALL be ANDed with every other filter in their condition. The evaluator SHALL resolve dependencies before selecting the dependent condition and MAY cache each dependency result for the current evaluation pass. A missing definition, unresolved dependency, or cycle SHALL make the dependent flag locally inconclusive and eligible for remote fallback; it SHALL NOT prevent independent flags in the same evaluation pass from being evaluated locally.
+Dependency filters SHALL be ANDed with every other filter in their condition. A dependency filter's `key` SHALL identify the referenced feature-flag key.
+
+A missing definition, unresolved dependency, or cycle SHALL make the dependent flag locally inconclusive and eligible for remote fallback. An inactive or filtered referenced definition remains resolvable as boolean `false`: a dependency expecting `false` matches definitively, while one expecting `true` definitively does not match.
 
 #### Scenario: Flag dependency filters compare evaluated values (@server)
 - **GIVEN** flag "banner" has a `flag_evaluates_to` condition referencing flag "checkout"
@@ -148,9 +148,16 @@ Dependency filters SHALL be ANDed with every other filter in their condition. Th
   | `"test"` | `"Test"` | false |
   | `"control"` | `"test"` | false |
 
-#### Scenario: An unresolved dependency affects only the dependent flag (@server)
+#### Scenario: An unresolved dependency is inconclusive (@server)
 - **GIVEN** flag "banner" depends on a flag definition that is missing or cannot be resolved locally
-- **AND** independent flag "beta-ui" can be evaluated from local definitions and context
-- **WHEN** both flags are evaluated locally
+- **WHEN** "banner" is evaluated locally
 - **THEN** local evaluation should be inconclusive for "banner"
-- **AND** "beta-ui" should still be evaluated locally
+- **AND** remote evaluation should remain eligible
+
+#### Scenario: An inactive dependency resolves as false (@server)
+- **GIVEN** inactive flag `A` is retained as a dependency of active flags `B` and `C`
+- **AND** `B` expects `A` to evaluate to false
+- **AND** `C` expects `A` to evaluate to true
+- **WHEN** `B` and `C` are evaluated locally
+- **THEN** the dependency criterion for `B` should match
+- **AND** the dependency criterion for `C` should not match

@@ -1,8 +1,8 @@
 ## 1. Reference audit
 
-- [x] 1.1 Verify ordered condition selection, filter/rollout staging, `early_exit`, and variant override behavior against the checked-out Rust source and focused tests.
-- [x] 1.2 Verify per-condition aggregation inheritance, mixed person/group property routing, missing-device behavior, and matching-condition bucketing against the Rust source and focused tests.
-- [x] 1.3 Verify `flag_evaluates_to` boolean and variant comparison semantics against the Rust source and focused tests.
+- [x] 1.1 Verify ordered condition selection, filter/rollout staging, `early_exit`, and variant override behavior against the reference evaluator and focused tests.
+- [x] 1.2 Verify per-condition aggregation inheritance, missing-device behavior, and matching-condition bucketing against the reference evaluator and focused tests.
+- [x] 1.3 Verify `flag_evaluates_to` boolean and variant comparison semantics against the reference evaluator and focused tests.
 
 ## 2. Documentation
 

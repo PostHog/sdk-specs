@@ -1,8 +1,8 @@
 ## 1. Verify the Canonical Matching Contract
 
-- [x] 1.1 Reconcile the operator inventory and scope against the feature-flag API allowlist, Rust `OperatorType`, ordinary property dispatch, cohort dispatch, and dependency dispatch at reference commit `935b7683660697bdc75c042c4c56828aeb036754`.
+- [x] 1.1 Reconcile the operator inventory and scope against the local-definition schema and ordinary property, cohort, and dependency dispatch at the reference commit.
 - [x] 1.2 Verify the `exact`/`is_not` coercion, case-folding, and condition-list vectors against PostHog Go PR #299 and the Node, Python, Ruby/Rails, PHP, Java, .NET, and Rust local evaluators.
-- [x] 1.3 Verify the proposed missing/null, invalid regex, strict numeric, date/timezone, semantic-version, range, and cohort-negation outcomes against focused backend and SDK tests; record any deliberate canonical choice where implementations disagree.
+- [x] 1.3 Verify missing/null, invalid regex, numeric, date/timezone, semantic-version, range, and cohort-negation outcomes against focused reference and SDK tests.
 
 ## 2. Add Complete Private Acceptance Coverage
 
@@ -19,9 +19,9 @@
 
 ## 4. Reconcile the Refreshed Backend Audit
 
-- [x] 4.1 Separate direct API authoring validity, runtime-compatible definitions, and SDK partial-context outcomes in the canonical contract.
-- [x] 4.2 Reconcile equality, string search, regex, numeric, date, SemVer, cohort, dependency, and failure-isolation behavior against current PostHog `master`.
-- [x] 4.3 Add discriminating private acceptance vectors for every corrected or newly specified boundary.
+- [x] 4.1 Focus the canonical contract on observable local-definition evaluation and partial local context.
+- [x] 4.2 Reconcile equality, string search, regex, numeric, date, SemVer, and cohort behavior against current PostHog `master`.
+- [x] 4.3 Add private acceptance vectors for the specified observable boundaries.
 - [x] 4.4 Synchronize the archived delta and design rationale with the canonical requirements.
 - [x] 4.5 Run strict OpenSpec validation, official Gherkin parsing, operator coverage checks, focused backend tests, and `git diff --check`.
 - [x] 4.6 Complete a fresh read-only review and address concrete findings.

@@ -361,8 +361,9 @@ report only the error's type, since a hook's exception message can embed the rec
 handed. Where a platform's hook signature makes throwing unrepresentable, this requirement is
 satisfied without further handling.
 
-This matches the `beforeSpanSend` rule in the traces capability: both hooks are scrubbing points,
-so both fail closed.
+This matches the `beforeSpanSend` rule in the traces capability, and the fail-closed rule the
+`before-send-hook` capability already sets for analytics events: every before-send-style hook in
+this repo fails closed.
 
 `beforeSend` SHALL run before the rate cap. (Web MAY omit `beforeSend` today; new SDKs SHALL
 implement it.)

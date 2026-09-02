@@ -32,9 +32,11 @@ more so than a structured analytics event. Fail-open means the one record whose 
 is the one that ships unscrubbed, arriving indistinguishable from a record no hook was meant to
 touch. The missing scrubbing designation is the bug; the fail-open rule is downstream of it.
 
-So the two hooks should not diverge. Rather than change five SDKs to match a line none of them
-implemented, this gives the logs hook the designation it already has in practice and aligns the
-failure rule with traces.
+So the two hooks should not diverge. Analytics already settled here — `before-send-hook` has
+required fail-closed since 2026-08-18, for the same "a failed privacy filter must not leak the
+event" reason — which leaves the logs hook as the only one this repo still specs fail-open.
+Rather than change five SDKs to match a line none of them implemented, this gives the logs hook
+the designation it already has in practice and aligns the failure rule with its two siblings.
 
 `posthog-node`'s `beforeSpanSend` (PostHog/posthog-js#4584) ships fail-closed today and currently
 documents the logs hook as an implementation that does not match its own spec. That note goes
@@ -53,11 +55,16 @@ away with this change.
 - Replace the `throwing hook is contained` scenario, which asserts the behavior being removed.
 - Update the `traces` cross-reference, which asserts a divergence that no longer exists.
 
-Deliberately not in scope: the **analytics** `before_send` hook, where implementations genuinely
-disagree (`posthog-python` and `posthog-ruby` continue with the original event; `posthog-js`,
-`posthog-node`, `posthog-go`, `posthog-dotnet` and `posthog-android` drop it). No spec covers that
-hook's failure behavior today, and settling it means changing shipped behavior in at least two
-SDKs. It deserves its own proposal.
+Deliberately not in scope: bringing the **analytics** `before_send` implementations into line.
+That hook's failure behavior is already settled — `before-send-hook` has required fail-closed
+since `2026-08-18-fail-closed-before-send-hook-errors`: catch, warn, stop the chain, and drop,
+never enqueuing "the original event or the last successfully transformed value". `posthog-js`,
+`posthog-node`, `posthog-go`, `posthog-dotnet`, `posthog-android` and `posthog-flutter`
+(PostHog/posthog-flutter#542) match it; `posthog-python` (`client.py`, "Continue with the original
+message if callback fails") and `posthog-ruby` (`process_before_send`, "using original event")
+still continue with the pre-hook event and are in deviation from it. Closing that is an
+implementation gap in two SDKs against an existing requirement, not a spec question, so it is
+tracked there rather than reopened here.
 
 ## Capabilities
 
@@ -81,5 +88,5 @@ None.
 - A future SDK reading the spec literally would have shipped fail-open and leaked unscrubbed
   records. This is the change that stops that.
 - Users lose no records they have today, since no implementation ships the fail-open behavior.
-- The two scrubbing hooks become one rule, so a port implementing both writes the same handling
-  twice rather than remembering which signal fails which way.
+- All three before-send-style hooks become one rule, so a port implementing more than one writes
+  the same handling twice rather than remembering which signal fails which way.

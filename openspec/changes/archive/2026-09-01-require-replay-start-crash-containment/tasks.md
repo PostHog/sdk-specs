@@ -8,6 +8,9 @@
 
 ## 2. Publish the canonical specification
 
-- [x] 2.1 Validate the OpenSpec change in strict mode.
+- [x] 2.1 Validate the OpenSpec change in strict mode (run post-archive against a scratch copy
+      of this change directory: `openspec validate --changes --strict` passes)
 - [x] 2.2 Archive the completed change and sync the canonical specification.
-- [x] 2.3 Validate all canonical specifications and archived artifacts in strict mode.
+- [x] 2.3 Validate all canonical specifications and archived artifacts in strict mode
+      (`openspec validate --all --strict --no-interactive`, `@fission-ai/openspec@1.4.1` — the
+      package `.github/workflows/openspec.yml` installs: 62/62 items pass)

@@ -27,3 +27,17 @@
 - **WHEN** start session recording is called
 - **THEN** the call should not throw
 - **AND** session recording should remain inactive
+
+#### Scenario: Replay integration initialization failure does not crash the caller
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** session replay is configured and eligible to start
+- **AND** the session replay integration fails to initialize
+- **AND** session recording is inactive
+- **WHEN** start session recording is called
+- **THEN** the call should not throw
+- **AND** promise-returning start variants should resolve rather than reject
+- **AND** session recording should remain inactive

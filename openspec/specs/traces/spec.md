@@ -789,8 +789,7 @@ exist corrupts parentage. The hook runs after auto-context attributes are attach
 mutate the rest or drop the span; a single function or an array run left-to-right. It is the designated scrubbing point for sensitive attribute
 values, and SDK documentation SHALL present it as such — for that reason a hook that throws
 SHALL drop the span (fail-closed): a broken scrubber must not leak the unscrubbed record.
-This deliberately diverges from the logs `beforeSend` fail-open rule, which does not carry a
-scrubbing designation.
+This is the same rule the logs `beforeSend` hook follows, for the same reason.
 
 #### Scenario: beforeSpanSend drops a span
 - **WHEN** `beforeSpanSend` returns `null` for a span

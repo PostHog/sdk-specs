@@ -17,5 +17,5 @@
 
 - [x] 3.1 Run `openspec validate --specs --strict --no-interactive` and `openspec validate require-fail-closed-logs-before-send --strict`.
 - [x] 3.2 Run `git diff --check`.
-- [ ] 3.3 Decide whether the analytics `before_send` split gets its own proposal, and whether it resolves toward drop or continue.
-- [ ] 3.4 Decide whether the two hooks should converge further than failure handling — the logs hook drops on a blanked body, the traces hook has no equivalent.
+- [x] 3.3 Decide whether the analytics `before_send` split gets its own proposal, and whether it resolves toward drop or continue. No proposal needed: `before-send-hook` already requires drop (`2026-08-18-fail-closed-before-send-hook-errors`); `posthog-python` and `posthog-ruby` are implementation deviations from it, tracked against that requirement.
+- [ ] 3.4 Decide whether the hooks should converge further than failure handling — the logs hook drops on a blanked body, the traces hook has no equivalent. Deferred; not blocking this change.

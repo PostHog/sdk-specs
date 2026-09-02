@@ -48,9 +48,9 @@ capture path. A `captureLog` call with no `level` SHALL default to `info`.
 
 A `captureLog` call SHALL be **silently dropped** (never throwing) when any gate fails. The gates
 SHALL be evaluated in this order: (1) SDK not enabled/initialized, (2) user opted out, (3) body
-empty or whitespace-only, (4) `beforeSend` returned `null` or blanked the body, (5) rate cap for
-the current window exceeded. There SHALL be no per-call "logs enabled" config flag and no remote
-gate on `captureLog`.
+empty or whitespace-only, (4) `beforeSend` returned `null`, blanked the body, or threw, (5) rate
+cap for the current window exceeded. There SHALL be no per-call "logs enabled" config flag and no
+remote gate on `captureLog`.
 
 #### Scenario: opted-out user drops the log
 - **GIVEN** the user has opted out of capture

@@ -42,3 +42,25 @@ implement it.)
 - **WHEN** the app calls the logs capture API
 - **THEN** the call returns normally, the SDK emits a diagnostic naming `beforeSend`, and a
   subsequent record whose hook does not throw is still enqueued
+
+### Requirement: Capture-time gating
+
+A `captureLog` call SHALL be **silently dropped** (never throwing) when any gate fails. The gates
+SHALL be evaluated in this order: (1) SDK not enabled/initialized, (2) user opted out, (3) body
+empty or whitespace-only, (4) `beforeSend` returned `null`, blanked the body, or threw, (5) rate
+cap for the current window exceeded. There SHALL be no per-call "logs enabled" config flag and no
+remote gate on `captureLog`.
+
+#### Scenario: opted-out user drops the log
+- **GIVEN** the user has opted out of capture
+- **WHEN** `captureLog({ body: "x" })` is called
+- **THEN** no record is enqueued and no error is thrown
+
+#### Scenario: whitespace-only body is dropped
+- **WHEN** `captureLog({ body: "   " })` is called
+- **THEN** the body is treated as empty and the record is dropped
+
+#### Scenario: gates short-circuit in order
+- **GIVEN** the SDK is disabled
+- **WHEN** `captureLog` is called
+- **THEN** the SDK returns before evaluating `beforeSend` or the rate cap

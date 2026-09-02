@@ -53,6 +53,8 @@ away with this change.
 - Require the drop to be diagnosable, while allowing an SDK to report only the error type — a
   hook's exception message can embed the very record body it was handed.
 - Replace the `throwing hook is contained` scenario, which asserts the behavior being removed.
+- Add the throw to the `Capture-time gating` drop list, which enumerates why gate 4 drops a
+  record and would otherwise read as exhaustive while missing the new cause.
 - Update the `traces` cross-reference, which asserts a divergence that no longer exists.
 
 Deliberately not in scope: bringing the **analytics** `before_send` implementations into line.

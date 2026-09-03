@@ -107,7 +107,10 @@ what this repo is for.
 
 - `openspec/specs/traces/spec.md` and `openspec/specs/logs/spec.md` — source of truth, updated via
   this change's delta on archive.
-- `metrics` has no spec of its own; posthog-js applies the same policy to its metrics queue.
+- `metrics` has no spec of its own and stays that way for now: posthog-js is the only SDK that
+  ships a metrics queue, and it applies the `logs` policy to it unchanged. Worth revisiting only if
+  a second SDK ships metrics, or if its retry policy has to diverge from `logs` — at which point the
+  "the two SHALL NOT diverge" clause above would need a third capability named in it.
 - **posthog-android** is the one shipped SDK that contradicts the clarified rule (replacement, no
   clamp). Migrating it is a behavior change to its retry timing and belongs in its own change.
 - **posthog-ios** and **posthog-go** already floor but apply no clamp; both need one.

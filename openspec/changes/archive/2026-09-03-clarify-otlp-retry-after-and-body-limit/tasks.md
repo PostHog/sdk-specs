@@ -21,4 +21,3 @@
 
 - [ ] 4.1 **posthog-android** — `PostHogQueue.calculateDelay` lets `retryAfterSeconds` replace the backoff and applies no clamp. Migrate to the floor rule and add a documented maximum
 - [ ] 4.2 **posthog-ios** and **posthog-go** — both already floor (`max(backoffDelay, retryAfter)`, `backoffV1`) but apply no clamp; add one to each
-- [ ] 4.3 Consider whether `metrics` needs a spec of its own, or whether it stays covered by the `logs` policy by reference

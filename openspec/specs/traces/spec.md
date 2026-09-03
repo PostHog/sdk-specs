@@ -23,7 +23,6 @@ session replay: its own queue, its own endpoint (`/i/v1/traces`), and its own fl
 It is also distinct from the `tracing-headers` capability (which only propagates correlation
 headers on outgoing requests without recording spans) and from LLM analytics traces (which are
 captured as analytics events, not OTLP).
-
 ## Requirements
 ### Requirement: Public span API
 
@@ -695,10 +694,16 @@ volume is bounded by instrumentation, and `maxQueueSize`, `maxLiveSpans`, and
 ### Requirement: Batch assembly and concurrency
 
 Each POST SHALL carry at most `maxExportBatchSize` spans; the default SHALL be chosen so a
-full batch sits comfortably under the 2 MB server cap, with the reactive 413 path (not
-proactive byte measurement) as the overflow mechanism. Only one flush SHALL be in flight at a
-time, on a worker/queue separate from the analytics-events pipeline; the drain loop is
-bounded by the queue length at flush start. Every export attempt SHALL carry a finite
+full batch sits comfortably under the 2 MB server cap. The reactive 413 path SHALL remain the
+overflow mechanism, since neither the SDK's batch-size default nor any limit compiled into it is
+authoritative — a proxy in front of capture can lower the limit and a self-hosted deployment can
+raise it. An SDK MAY additionally measure the assembled body and report it as oversized without
+sending, when the measurement matches how the endpoint applies its own limit: **on the
+uncompressed body**, since the endpoint decompresses before it measures, and **in bytes** rather
+than in the platform's string units. Such a measurement SHALL feed the same shrink-and-drop path a
+413 does, so behavior is identical apart from the request not being spent. Only one flush SHALL be
+in flight at a time, on a worker/queue separate from the analytics-events pipeline; the drain loop
+is bounded by the queue length at flush start. Every export attempt SHALL carry a finite
 deadline (request timeout); an attempt exceeding it counts as a network error — retriable —
 and releases the single-flight slot, so a request that never settles cannot wedge the
 pipeline. A flush trigger arriving during an active flush SHALL NOT be lost: it joins the
@@ -722,6 +727,17 @@ tracing APIs SHALL be safe to call from any thread.
 - **WHEN** a manual `flush()` arrives and spans enqueue after W
 - **THEN** a follow-up drain pass covers the post-W spans before the joined flush is
   considered complete
+
+#### Scenario: a body over the known cap is not sent
+- **GIVEN** an SDK that measures the assembled body
+- **WHEN** the uncompressed body exceeds the limit the SDK knows the endpoint applies
+- **THEN** it takes the shrink-and-drop path without spending a request, and a single oversized
+  span is dropped with the same warning a 413 would have produced
+
+#### Scenario: the 413 path still applies below the SDK's own limit
+- **GIVEN** a proxy that enforces a lower limit than the SDK knows about
+- **WHEN** a body under the SDK's limit is refused with 413
+- **THEN** the SDK halves and retries as it would without any local measurement
 
 ### Requirement: Shutdown flush
 
@@ -748,6 +764,23 @@ bounded, documented number of retries on the same batch the SDK SHALL drop it. 4
 shrink-and-resend cycles do not consume that retry budget — halving is self-bounded (log₂ of
 the batch size); the budget applies to the retriable-failure path.
 
+`Retry-After` is a **floor on the wait, not a replacement for the backoff**: the SDK SHALL wait
+the longer of its own next backoff delay and the header. Taking the header literally would let a
+`Retry-After: 1` pull a queue that had already backed off to 30s into a hot loop; HTTP semantics
+are "not before this", which the longer of the two satisfies in both directions.
+
+The SDK SHALL parse **both** wire forms — delta-seconds and HTTP-date. A value it cannot parse, a
+date already in the past, or a non-positive delta SHALL fall back to the SDK's own backoff, never
+to zero. The SDK SHALL clamp the parsed wait to a documented maximum: nothing upstream bounds this
+header, and an unbounded value from a misconfigured proxy would strand a queue indefinitely. The
+maximum is per-SDK — a short-lived process (serverless, a mobile background window) is served by a
+tighter bound than a long-running one — and SHOULD fall between the ~30s backoff ceiling and five
+minutes.
+
+Where an SDK exempts a caller-driven flush from the wait — an explicit `flush()`, or a host
+keep-alive drain that has no later attempt — it SHALL NOT charge the resulting refusal against the
+batch's retry budget, so honoring the endpoint costs a request rather than the spans.
+
 #### Scenario: 413 shrinks the batch
 - **GIVEN** a 50-span batch returns 413
 - **WHEN** the SDK retries
@@ -766,6 +799,28 @@ the batch size); the budget applies to the retriable-failure path.
 - **GIVEN** exports are backing off after a 500
 - **WHEN** spans end
 - **THEN** they still enqueue (up to `maxQueueSize`) for the next attempt
+
+#### Scenario: Retry-After never shortens the backoff
+- **GIVEN** a queue that has backed off to 30s after repeated failures
+- **WHEN** the next refusal carries `Retry-After: 1`
+- **THEN** the SDK still waits 30s, not 1s
+
+#### Scenario: Retry-After lengthens the backoff
+- **GIVEN** a queue whose next backoff delay is 10s
+- **WHEN** a refusal carries `Retry-After: 120`
+- **THEN** the SDK waits 120s
+
+#### Scenario: HTTP-date form is honored
+- **WHEN** a refusal carries `Retry-After: Wed, 21 Oct 2015 07:28:00 GMT`
+- **THEN** the SDK waits until that instant, subject to the documented maximum
+
+#### Scenario: unparseable Retry-After falls back to the backoff
+- **WHEN** a refusal carries `Retry-After: 10 minutes`
+- **THEN** the SDK ignores the header and uses its own backoff, rather than retrying immediately
+
+#### Scenario: an oversized Retry-After is clamped
+- **WHEN** a refusal carries a `Retry-After` beyond the SDK's documented maximum
+- **THEN** the SDK waits the maximum and retries then
 
 ### Requirement: Gating and beforeSpanSend
 
@@ -859,9 +914,10 @@ must not silently disable tracing.
 
 The SDK SHALL design to the ingestion service's observed contract. The request body is
 capped at 2 MB, raw or gzip-decompressed; exceeding it returns 413. A request with no token
-at all returns 401, as does a manually-blocked token — and, once posthog/posthog#75090 (in
-flight) lands, a token that cannot be a project API key at all (wrong prefix such as `phx_`,
-over 64 characters, non-ASCII). A **well-formed but unknown token is accepted with 200**:
+at all returns 401, as does a manually-blocked token. Rejecting a token that cannot be a project
+API key at all (wrong prefix such as `phx_`, over 64 characters, non-ASCII) would have arrived with
+posthog/posthog#75090, which was closed unmerged; capture accepts such tokens today. A
+**well-formed but unknown token is accepted with 200**:
 capture does not validate tokens against projects (that would require a database at the
 ingest edge), so a mistyped-but-plausible `phc_` key produces successful-looking responses
 while every span is dropped downstream, and the SDK cannot detect this from responses. SDK
@@ -872,12 +928,14 @@ that decodes as neither returns 400. A span whose fields fail decoding or row co
 e.g. a timestamp that does not fit signed 64-bit nanoseconds — **400s the entire request**,
 which is why the client-side validity requirement exists; note the distinction between an
 *unrepresentable* timestamp (rejected) and a representable-but-stale one (clamped, below).
-Success is 200 with body `{}`. The service today emits only 200/400/401/413/500 and never
-`429`/`Retry-After`/`quota_limited`; posthog/posthog#75090 (in flight) adds per-signal quota
-enforcement at capture, after which an over-quota project receives **429 with `Retry-After`**
-before anything reaches Kafka, with logs, metrics, and traces each on their own quota bucket.
-The SDK SHALL NOT *require* a quota signal, but SHALL honor `429` + `Retry-After` when
-present — the retry requirement already does.
+Success is 200 with body `{}`. The service emits only 200/400/401/413/500 and never
+`429`/`Retry-After`/`quota_limited`. posthog/posthog#75090 would have added per-signal quota
+enforcement at capture, giving an over-quota project **429 with `Retry-After`** before anything
+reached Kafka, with logs, metrics and traces each on their own bucket; it was closed unmerged on
+2026-08-17 and nothing has replaced it. So any `429` with a `Retry-After` that an SDK sees comes
+from shared infrastructure in front of capture — a proxy, CDN or load balancer — which is also why
+the retry requirement bounds how long the SDK will honor one. The SDK SHALL NOT *require* a quota
+signal, but SHALL honor `429` + `Retry-After` when present — the retry requirement already does.
 
 The server further: zeroes trace/span/parent ids that are not exactly 16/8 bytes; replaces a
 zero start time with receive time; clamps representable timestamps outside ±24h of receive
@@ -887,9 +945,10 @@ to strings; stores events and links as serialized JSON; flattens scope to
 `"{name}@{version}"`; reads `service_name` only from the `service.name` resource attribute
 (empty string when absent); and assigns each span a server-generated UUID. The downstream Kafka consumer reads a
 `traces_mb_ingested` quota set after capture has returned 200 — a set nothing currently
-populates (the billing `QuotaResource` enum has no traces entry), so the filter is inert
-today; #75090 moves quota enforcement to capture. Under every one of these regimes the SDK
-receives no per-request proof of ingestion and SHALL NOT treat a 200 as proof of ingestion.
+populates (the billing `QuotaResource` enum has no traces entry), so the filter is inert today and
+no replacement for #75090 has moved quota enforcement to capture. Under every one of these regimes
+the SDK receives no per-request proof of ingestion and SHALL NOT treat a 200 as proof of
+ingestion.
 
 #### Scenario: oversize body
 - **WHEN** a request body exceeds 2 MB

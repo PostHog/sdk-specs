@@ -21,6 +21,4 @@
 
 - [ ] 4.1 **posthog-android** — `PostHogQueue.calculateDelay` lets `retryAfterSeconds` replace the backoff and applies no clamp. Migrate to the floor rule and add a documented maximum
 - [ ] 4.2 **posthog-ios** and **posthog-go** — both already floor (`max(backoffDelay, retryAfter)`, `backoffV1`) but apply no clamp; add one to each
-- [ ] 4.3 **posthog-python** and **posthog-rs** — `capture_v1._backoff` and `retry::backoff_duration` already implement both halves; confirm no change is needed
-- [ ] 4.4 **posthog-js** — PostHog/posthog-js#4726 implements the clarified rule; its single 5-minute clamp diverges from the recommended per-queue-ceiling default and should be revisited once the archived text lands
-- [ ] 4.5 Consider whether `metrics` needs a spec of its own, or whether it stays covered by the `logs` policy by reference
+- [ ] 4.3 Consider whether `metrics` needs a spec of its own, or whether it stays covered by the `logs` policy by reference

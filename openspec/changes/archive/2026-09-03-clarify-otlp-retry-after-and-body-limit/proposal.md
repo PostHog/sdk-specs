@@ -98,6 +98,13 @@ _None._
 
 ## Impact
 
+**This is not a breaking change to shipped SDKs; it moves the canonical target ahead of the
+implementations.** On merge, three SDKs stop conforming: posthog-android (replaces the backoff
+rather than flooring it, and applies no clamp), and posthog-ios and posthog-go (floor correctly but
+apply no clamp). None of them changes behavior because this merges, and none needs to land first —
+each migrates in its own change, tracked in `tasks.md` §4. Stating the winner where SDKs diverge is
+what this repo is for.
+
 - `openspec/specs/traces/spec.md` and `openspec/specs/logs/spec.md` — source of truth, updated via
   this change's delta on archive.
 - `metrics` has no spec of its own; posthog-js applies the same policy to its metrics queue.
@@ -107,8 +114,8 @@ _None._
 - **posthog-rs** and **posthog-python** already implement both halves and need no change.
 - **posthog-js** #4726 implements the clarified rule for logs, metrics and traces, and is the origin
   of this proposal. Its 2 MB pre-send check is the proactive measurement this change permits. It
-  clamps with a single 5-minute constant rather than per-queue ceilings; that is a deliberate
-  divergence from the recommended default, recorded here so it is visible rather than silent.
+  clamps with a single 5-minute constant rather than per-queue ceilings — conformant, since the
+  per-queue rule is a SHOULD, and recorded here so the divergence is visible rather than silent.
 - No service change is required. The `retry-queue` and `http-client` capabilities already describe
   `Retry-After` as transport metadata the queue consumes; neither pins the semantics, so neither
   needs a delta.

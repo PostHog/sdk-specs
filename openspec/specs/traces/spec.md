@@ -753,16 +753,21 @@ effective substitute.
 
 ### Requirement: Error handling and retries
 
-The SDK SHALL handle export results as: 2xx → remove batch, reset backoff; **413** → halve
-the batch and retry the same spans, dropping a single-span batch with a warning; after a 413
-shrink the SDK SHOULD ramp the batch size back up (+1 per healthy send) toward the configured
-max; `408`/`429`/`5xx`/network error → retriable: keep the spans and retry with exponential
-backoff capped at ~30s, floored by `Retry-After` when present; other `4xx` (notably `400` and
-`401`) → non-retriable: drop the batch so a poison batch or bad key cannot wedge the queue.
-New spans SHALL continue to enqueue during backoff, subject to `maxQueueSize`. After a
-bounded, documented number of retries on the same batch the SDK SHALL drop it. 413
-shrink-and-resend cycles do not consume that retry budget — halving is self-bounded (log₂ of
-the batch size); the budget applies to the retriable-failure path.
+The SDK SHALL handle export results as: 2xx → remove the exact acknowledged batch and reset
+backoff; **413** → halve the batch and retry the same spans, dropping a single-span batch with a
+warning; after a 413 shrink the SDK SHOULD ramp the batch size back up (+1 per healthy send)
+toward the configured max; `408`/`429`/`5xx`/network error → retriable: keep the spans and retry
+with exponential backoff capped at ~30s, floored by `Retry-After` when present; other `4xx`
+(notably `400` and `401`) → non-retriable: drop the affected batch so a poison batch or bad key
+cannot wedge the queue.
+
+New spans SHALL continue to enqueue during backoff, subject to `maxQueueSize`. After a bounded,
+documented number of retries on the same batch, the SDK SHALL end the active failure-driven
+sequence. The canonical in-memory span queue SHALL drop that batch and resume with the next batch.
+A port with a documented bounded durable queue deviation MUST instead retain the batch for a later
+independent flush trigger. 413 shrink-and-resend cycles do not consume the retry budget because
+halving is self-bounded (log₂ of the batch size). Successful acknowledgement MUST NOT remove spans
+accepted into a full queue while the acknowledged request was in flight.
 
 `Retry-After` is a **floor on the wait, not a replacement for the backoff**, and the documented
 maximum bounds the header rather than the result. The wait SHALL be
@@ -800,10 +805,17 @@ reasons; the two SHALL NOT diverge.
 - **WHEN** a batch returns 400
 - **THEN** the SDK drops the batch and does not retry it
 
-#### Scenario: retries are bounded
-- **GIVEN** a batch that has failed with 500 the documented maximum number of times
-- **WHEN** the final retry fails
-- **THEN** the SDK drops the batch and resumes normal sending with the next batch
+#### Scenario: retries are bounded for the canonical in-memory queue
+- **GIVEN** a batch has failed with 500 the documented maximum number of times
+- **WHEN** the final failure-driven retry fails
+- **THEN** the SDK drops that batch and resumes normal sending with the next batch
+
+#### Scenario: retry exhaustion preserves a durable trace queue deviation
+- **GIVEN** a port documents a bounded durable trace queue
+- **AND** a batch has failed with 500 the documented maximum number of times
+- **WHEN** the final failure-driven retry fails
+- **THEN** the active retry sequence ends
+- **AND** the batch remains queued for a later independent flush trigger
 
 #### Scenario: enqueue continues during backoff
 - **GIVEN** exports are backing off after a 500

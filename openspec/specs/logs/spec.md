@@ -384,15 +384,21 @@ implement it.)
 
 ### Requirement: Error handling and retries
 
-The SDK SHALL handle send results as: 2xx → remove batch, reset retry counter; **413** → halve the
-per-request batch size and retry the same records, and if the batch was already a single record,
-drop it with a warning; `408`/`429`/`5xx`/network error → retriable, keep records and retry later;
-other `4xx` → non-retriable, drop the batch so it cannot block the queue. After a 413 shrink, the
-SDK SHOULD ramp the batch size back up (+1 per healthy send) toward the configured max. Between
-retries the SDK SHALL pause sends while continuing to accept new `captureLog` enqueues, using the
-canonical backoff of exponential backoff capped at ~30s, floored by `Retry-After` when present.
-After `maxRetries` on the same batch the SDK SHALL drop it. Offline records SHALL remain
-persisted and retry on the next timer tick / reconnect.
+The SDK SHALL handle send results as: 2xx → remove the exact acknowledged batch and reset retry
+state; **413** → halve the per-request batch size and retry the same records, and if the batch was
+already a single record, drop it with a warning; `408`/`429`/`5xx`/network error → retriable, keep
+records and retry later; other `4xx` → non-retriable, drop the affected batch so it cannot block
+the queue. After a 413 shrink, the SDK SHOULD ramp the batch size back up (+1 per healthy send)
+toward the configured max.
+
+Between retries the SDK SHALL pause sends while continuing to accept new `captureLog` enqueues,
+using the canonical backoff of exponential backoff capped at ~30s, floored by `Retry-After` when
+present. After `maxRetries` on the same batch, the SDK SHALL end the active failure-driven
+sequence. A bounded durable queue MUST retain the affected records for a later independent flush
+trigger; the documented in-memory-only web buffer MAY drop them according to its page-lifetime
+policy. Offline records SHALL remain persisted and become eligible on the next timer tick or
+reconnect. Successful acknowledgement MUST NOT remove records accepted into a full queue while
+the acknowledged request was in flight.
 
 `Retry-After` is a **floor on the wait, not a replacement for the backoff**, and the documented
 maximum bounds the header rather than the result. The wait SHALL be
@@ -433,12 +439,17 @@ reasons; the two SHALL NOT diverge.
 
 #### Scenario: poison 4xx dropped
 - **WHEN** a batch returns HTTP 400
-- **THEN** the SDK drops the batch rather than retrying forever
+- **THEN** the SDK drops the affected batch rather than retrying forever
 
 #### Scenario: enqueue continues during backoff
 - **GIVEN** the queue is paused for retry backoff
 - **WHEN** a new log is captured
 - **THEN** it is still persisted to the queue
+
+#### Scenario: retry exhaustion preserves durable logs
+- **GIVEN** a bounded durable log queue whose active retry sequence has reached its retry budget
+- **WHEN** the final attempt fails with HTTP 503
+- **THEN** the affected logs remain queued for a later independent flush trigger
 
 #### Scenario: Retry-After never shortens the backoff
 - **GIVEN** a queue that has backed off to 30s after repeated failures

@@ -757,29 +757,39 @@ The SDK SHALL handle export results as: 2xx → remove batch, reset backoff; **4
 the batch and retry the same spans, dropping a single-span batch with a warning; after a 413
 shrink the SDK SHOULD ramp the batch size back up (+1 per healthy send) toward the configured
 max; `408`/`429`/`5xx`/network error → retriable: keep the spans and retry with exponential
-backoff capped at ~30s, honoring `Retry-After` when present; other `4xx` (notably `400` and
+backoff capped at ~30s, floored by `Retry-After` when present; other `4xx` (notably `400` and
 `401`) → non-retriable: drop the batch so a poison batch or bad key cannot wedge the queue.
 New spans SHALL continue to enqueue during backoff, subject to `maxQueueSize`. After a
 bounded, documented number of retries on the same batch the SDK SHALL drop it. 413
 shrink-and-resend cycles do not consume that retry budget — halving is self-bounded (log₂ of
 the batch size); the budget applies to the retriable-failure path.
 
-`Retry-After` is a **floor on the wait, not a replacement for the backoff**: the SDK SHALL wait
-the longer of its own next backoff delay and the header. Taking the header literally would let a
-`Retry-After: 1` pull a queue that had already backed off to 30s into a hot loop; HTTP semantics
-are "not before this", which the longer of the two satisfies in both directions.
+`Retry-After` is a **floor on the wait, not a replacement for the backoff**, and the documented
+maximum bounds the header rather than the result. The wait SHALL be
+`max(ownBackoff, min(parsedRetryAfter, documentedMaximum))`, evaluated in that order — clamp the
+header first, then take the longer of it and the SDK's own next backoff delay. Taking the header
+literally would let a `Retry-After: 1` pull a queue that had already backed off to 30s into an
+aggressive one-second retry cadence; HTTP semantics are "not before this", which the longer of the
+two satisfies in both directions. Clamping the header rather than the result is what keeps the
+SDK's own backoff — which the caller configured — from being truncated by the bound.
 
-The SDK SHALL parse **both** wire forms — delta-seconds and HTTP-date. A value it cannot parse, a
-date already in the past, or a non-positive delta SHALL fall back to the SDK's own backoff, never
-to zero. The SDK SHALL clamp the parsed wait to a documented maximum: nothing upstream bounds this
-header, and an unbounded value from a misconfigured proxy would strand a queue indefinitely. The
-maximum is per-SDK — a short-lived process (serverless, a mobile background window) is served by a
+The SDK SHALL parse **both** wire forms — delta-seconds and HTTP-date. A value it cannot parse, an
+HTTP-date already in the past, or a non-positive delta SHALL be treated as absent, leaving the
+SDK's own backoff, never zero. The documented maximum exists because nothing upstream bounds this
+header, and an unbounded value from a misconfigured proxy would strand a queue indefinitely. Its
+value is per-SDK — a short-lived process (serverless, a mobile background window) is served by a
 tighter bound than a long-running one — and SHOULD fall between the ~30s backoff ceiling and five
 minutes.
 
 Where an SDK exempts a caller-driven flush from the wait — an explicit `flush()`, or a host
 keep-alive drain that has no later attempt — it SHALL NOT charge the resulting refusal against the
-batch's retry budget, so honoring the endpoint costs a request rather than the spans.
+batch's retry budget, so honoring the endpoint costs a request rather than the batch.
+
+A reconnect signal SHALL NOT end an open `Retry-After` window. Connectivity returning says nothing
+about the rate limit the endpoint set, and platforms fire it on every network handover.
+
+This policy is stated in the same words in the `logs` and `traces` capabilities, for the same
+reasons; the two SHALL NOT diverge.
 
 #### Scenario: 413 shrinks the batch
 - **GIVEN** a 50-span batch returns 413
@@ -805,22 +815,34 @@ batch's retry budget, so honoring the endpoint costs a request rather than the s
 - **WHEN** the next refusal carries `Retry-After: 1`
 - **THEN** the SDK still waits 30s, not 1s
 
-#### Scenario: Retry-After lengthens the backoff
-- **GIVEN** a queue whose next backoff delay is 10s
-- **WHEN** a refusal carries `Retry-After: 120`
-- **THEN** the SDK waits 120s
+#### Scenario: a Retry-After within the maximum lengthens the backoff
+- **GIVEN** a queue whose next backoff delay is 10s and whose documented maximum is 60s
+- **WHEN** a refusal carries `Retry-After: 30`
+- **THEN** the SDK waits 30s
+
+#### Scenario: an oversized Retry-After is clamped, then floored
+- **GIVEN** a queue whose next backoff delay is 10s and whose documented maximum is 60s
+- **WHEN** a refusal carries `Retry-After: 3600`
+- **THEN** the SDK waits 60s — the header clamped to the maximum, which is still the longer of the
+  two
 
 #### Scenario: HTTP-date form is honored
+- **GIVEN** a queue whose next backoff delay is 10s and whose documented maximum is 60s
+- **WHEN** a refusal carries a `Retry-After` HTTP-date 30 seconds in the future
+- **THEN** the SDK waits until that instant
+
+#### Scenario: an HTTP-date already in the past is treated as absent
 - **WHEN** a refusal carries `Retry-After: Wed, 21 Oct 2015 07:28:00 GMT`
-- **THEN** the SDK waits until that instant, subject to the documented maximum
+- **THEN** the SDK waits its own backoff, not zero
 
 #### Scenario: unparseable Retry-After falls back to the backoff
 - **WHEN** a refusal carries `Retry-After: 10 minutes`
 - **THEN** the SDK ignores the header and uses its own backoff, rather than retrying immediately
 
-#### Scenario: an oversized Retry-After is clamped
-- **WHEN** a refusal carries a `Retry-After` beyond the SDK's documented maximum
-- **THEN** the SDK waits the maximum and retries then
+#### Scenario: reconnect does not end the window
+- **GIVEN** an open `Retry-After` window
+- **WHEN** the platform reports connectivity restored
+- **THEN** the SDK clears its failure backoff but still waits the window out before sending
 
 ### Requirement: Gating and beforeSpanSend
 
@@ -914,11 +936,12 @@ must not silently disable tracing.
 
 The SDK SHALL design to the ingestion service's observed contract. The request body is
 capped at 2 MB, raw or gzip-decompressed; exceeding it returns 413. A request with no token
-at all returns 401, as does a manually-blocked token. Rejecting a token that cannot be a project
-API key at all (wrong prefix such as `phx_`, over 64 characters, non-ASCII) would have arrived with
-posthog/posthog#75090, which was closed unmerged; capture accepts such tokens today. A
-**well-formed but unknown token is accepted with 200**:
-capture does not validate tokens against projects (that would require a database at the
+at all returns 401, as does a manually-blocked token. A token whose *shape* rules it out as a
+project API key (wrong prefix such as `phx_`, over 64 characters, non-ASCII, empty) also returns
+401: posthog/posthog#76501, split out of the abandoned #75090, landed shared shape validation in
+the capture-logs authorizer on 2026-08-04, and the traces, logs and metrics endpoints all run it.
+A **well-formed but unknown token is still accepted with 200**, and that is the gap that matters:
+capture does not resolve tokens against projects (that would require Postgres at the
 ingest edge), so a mistyped-but-plausible `phc_` key produces successful-looking responses
 while every span is dropped downstream, and the SDK cannot detect this from responses. SDK
 documentation SHALL NOT present a 2xx export as confirmation that tracing is correctly
@@ -932,7 +955,8 @@ Success is 200 with body `{}`. The service emits only 200/400/401/413/500 and ne
 `429`/`Retry-After`/`quota_limited`. posthog/posthog#75090 would have added per-signal quota
 enforcement at capture, giving an over-quota project **429 with `Retry-After`** before anything
 reached Kafka, with logs, metrics and traces each on their own bucket; it was closed unmerged on
-2026-08-17 and nothing has replaced it. So any `429` with a `Retry-After` that an SDK sees comes
+2026-08-17. Only its token-shape half was salvaged, as #76501 above; the quota half has no
+replacement. So any `429` with a `Retry-After` that an SDK sees comes
 from shared infrastructure in front of capture — a proxy, CDN or load balancer — which is also why
 the retry requirement bounds how long the SDK will honor one. The SDK SHALL NOT *require* a quota
 signal, but SHALL honor `429` + `Retry-After` when present — the retry requirement already does.

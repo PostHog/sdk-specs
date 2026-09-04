@@ -14,27 +14,34 @@ which reads as additive. The shipped SDKs have split accordingly:
 
 | SDK | Rule | Cap on the header |
 |---|---|---|
-| posthog-rs (`retry::backoff_duration`) | floor | own ceiling, `retry_max_backoff_ms` (default 30s) |
-| posthog-python (`capture_v1._backoff`) | floor | own ceiling, `_MAX_BACKOFF_SECONDS` (30s) |
-| posthog-go (`client.backoffV1`) | floor | none |
+| posthog-rs (`retry::backoff_duration`) | floor | own ceiling, `retry_max_backoff_ms` — **configurable**, default 30s |
+| posthog-python (`capture_v1._backoff`) | floor | own ceiling, `_MAX_BACKOFF_SECONDS` — fixed 30s |
+| posthog-go (`client.retryDelayV1`, [#255](https://github.com/PostHog/posthog-go/pull/255)) | floor | `defaultMaxBackoff` — fixed 30s, **capture-v1 path only** |
+| posthog-go (`client.sendBatch`, legacy `/batch/` — the default `CaptureMode`) | floor | none |
 | posthog-ios (`PostHogQueue`) | `max(backoffDelay, retryAfter)` — floor | none |
 | posthog-android (`PostHogQueue.calculateDelay`) | `retryAfterSeconds` **replaces** the backoff | none |
 | posthog-js (#4726) | floor | a single 5 min constant across all three queues |
 
-Five of the six floor; posthog-android is the lone outlier. On clamping, the two SDKs that do it
-share a rule rather than a number — *clamp the header to the ceiling the caller already configured
-for its own backoff* — which posthog-rs states outright: "a hostile/buggy server header can't push
-a single wait past the ceiling the caller already configured."
+Every SDK but posthog-android floors; posthog-android is the lone outlier. On clamping, the SDKs
+that do it share a rule rather than a number — *clamp the header to the ceiling the SDK already
+applies to its own backoff* — which posthog-rs states outright: "a hostile/buggy server header
+can't push a single wait past the ceiling the caller already configured." The number is not shared
+either: posthog-rs exposes its ceiling as `retry_max_backoff_ms`, while posthog-python and
+posthog-go hard-code 30s.
 
 Replacement is the weaker rule: a `Retry-After: 1` on a queue that has already backed off to 30s
-turns it into a hot loop, which is the opposite of what the header is for. HTTP semantics are "not
-before this", which a floor satisfies in both directions.
+pulls it back to an aggressive one-second retry cadence, which is the opposite of what the header
+is for. (posthog-android's defaults keep this bounded — `maxRetries = 3` and delays of 1/2/4s, so
+its 30s ceiling is only reachable with a larger configured retry budget — but the rule is still
+backwards.) HTTP semantics are "not before this", which a floor satisfies in both directions.
 
-**2. Three of the six SDKs place no bound on the header at all**, so a misconfigured proxy — the
-realistic source of a `429`, since PostHog capture does not emit one — can strand a queue for
-hours. The two that do bound it agree on the rule and on the value; posthog-js bounds it too, but
-at ten times that value, because its three signals have three different backoff ceilings and it
-uses one constant for all of them.
+**2. Two SDKs place no bound on the header at all, and a third bounds only one of its two send
+paths**, so a misconfigured proxy — the realistic source of a `429`, since PostHog capture does not
+emit one — can strand a queue for hours. posthog-ios and posthog-android have no bound anywhere;
+posthog-go clamps on its opt-in capture-v1 path but not on the legacy `/batch/` path that
+`CaptureModeLegacy` still makes the default. The SDKs that do bound it agree on the rule and, among
+the fixed ones, on the value; posthog-js bounds it too, but at ten times that value, because its
+three signals have three different backoff ceilings and it uses one constant for all of them.
 
 **3. The `traces` spec forbids the overflow mechanism a reviewer has since asked for.**
 *Batch assembly and concurrency* names "the reactive 413 path (**not proactive byte measurement**)
@@ -63,9 +70,10 @@ as stale in August 2026 without merging, and nothing has replaced it.
 ## What Changes
 
 - **`Retry-After` becomes a floor, explicitly, in both specs.** The SDK SHALL wait the longer of its
-  own backoff and the header. This aligns the `logs` wording with the `traces` wording and with the
-  five SDKs that already floor; posthog-android's replacement rule becomes a documented deviation
-  to migrate.
+  own backoff and the header, clamping the header first:
+  `max(ownBackoff, min(parsedRetryAfter, documentedMaximum))`. This aligns the `logs` wording with
+  the `traces` wording and with every SDK that already floors; posthog-android's replacement rule
+  becomes a documented deviation to migrate.
 - **The header gets a bound.** The SDK SHALL clamp the parsed value to a documented maximum. The
   spec fixes the *requirement* to clamp and leaves the value to the SDK. The recommended default is
   the rule posthog-rs and posthog-python already share — clamp to the ceiling the SDK configured for
@@ -100,20 +108,30 @@ _None._
 
 **This is not a breaking change to shipped SDKs; it moves the canonical target ahead of the
 implementations.** On merge, three SDKs stop conforming: posthog-android (replaces the backoff
-rather than flooring it, and applies no clamp), and posthog-ios and posthog-go (floor correctly but
-apply no clamp). None of them changes behavior because this merges, and none needs to land first —
-each migrates in its own change, tracked in `tasks.md` §4. Stating the winner where SDKs diverge is
-what this repo is for.
+rather than flooring it, applies no clamp, and parses only delta-seconds), posthog-ios (floors and
+parses both wire forms, but applies no clamp), and posthog-go (clamps on its capture-v1 path since
+[#255](https://github.com/PostHog/posthog-go/pull/255), but not on the legacy `/batch/` path that
+is still the default `CaptureMode`). None of them changes behavior because this merges, and none
+needs to land first — each migrates in its own change, tracked in `tasks.md` §4. Stating the winner
+where SDKs diverge is what this repo is for.
 
 - `openspec/specs/traces/spec.md` and `openspec/specs/logs/spec.md` — source of truth, updated via
   this change's delta on archive.
-- `metrics` has no spec of its own and stays that way for now: posthog-js is the only SDK that
-  ships a metrics queue, and it applies the `logs` policy to it unchanged. Worth revisiting only if
-  a second SDK ships metrics, or if its retry policy has to diverge from `logs` — at which point the
-  "the two SHALL NOT diverge" clause above would need a third capability named in it.
+- `metrics` has no spec of its own and stays that way for now, but two SDKs now ship a metrics
+  queue: posthog-js, which applies the `logs` policy to it unchanged, and posthog-python's
+  public-alpha `client.metrics`
+  ([#739](https://github.com/PostHog/posthog-python/pull/739)), which retries `429`/`5xx`/network
+  failures on its own exponential backoff and never reads `Retry-After`. With no canonical
+  `metrics` capability that is not a conformance failure, but it is exactly the divergence a spec
+  would prevent, so writing one is now worth doing rather than deferring — tracked in `tasks.md`
+  §4.4.
 - **posthog-android** is the one shipped SDK that contradicts the clarified rule (replacement, no
-  clamp). Migrating it is a behavior change to its retry timing and belongs in its own change.
-- **posthog-ios** and **posthog-go** already floor but apply no clamp; both need one.
+  clamp). Migrating it is a behavior change to its retry timing and belongs in its own change; it
+  also needs HTTP-date parsing, since `response.header("Retry-After")?.toIntOrNull()` accepts only
+  delta-seconds.
+- **posthog-ios** already floors and parses both wire forms but applies no clamp; it needs one.
+- **posthog-go** clamps on the capture-v1 path only; the legacy `/batch/` path, still the default,
+  needs the same clamp.
 - **posthog-rs** and **posthog-python** already implement both halves and need no change.
 - **posthog-js** #4726 implements the clarified rule for logs, metrics and traces, and is the origin
   of this proposal. Its 2 MB pre-send check is the proactive measurement this change permits. It

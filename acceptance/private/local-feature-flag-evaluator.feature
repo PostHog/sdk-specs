@@ -303,8 +303,9 @@ Feature: Local Feature Flag Evaluator
       | "gt"              | "not-a-number" | property value 10 present                            | inconclusive |
 
   @server
-  Scenario Outline: Exact and is_not use the canonical equality algorithm
+  Scenario Outline: Exact and is_not preserve legacy equality when version is missing
     Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And the loaded definitions response omits top-level "property_matching_version"
     And local feature flag "exact-criterion" has a person property condition with operator <operator> and condition value <condition>
     When local feature flag "exact-criterion" is evaluated with supplied property value <property>
     Then the criterion match result should be <matches>
@@ -327,18 +328,287 @@ Feature: Local Feature Flag Evaluator
       | "exact"  | []           | "us"     | false   |
       | "is_not" | []           | "us"     | true    |
 
+  # Version cells are JSON numbers; omitted means the top-level field is absent.
+  # Every property value below is present, including JSON null and empty arrays.
+  @server
+  Scenario Outline: Versioned equality covers the six service regression rows and is_not complements
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And the loaded definitions response has top-level "property_matching_version" <version>
+    And local feature flag "versioned-exact" has a person property condition with operator "exact" and condition value <condition>
+    And local feature flag "versioned-is-not" has the same condition with operator "is_not"
+    When local feature flag "versioned-exact" is evaluated with supplied property value <property>
+    Then the criterion match result should be <exact>
+    When local feature flag "versioned-is-not" is evaluated with supplied property value <property>
+    Then the criterion match result should be <is_not>
+    And no remote feature flag evaluation request should have been sent
+
+    Examples:
+      | version | condition        | property | exact | is_not |
+      | omitted | false            | "banana" | true  | false  |
+      | omitted | false            | 0        | true  | false  |
+      | omitted | ["true","false"] | "true"   | false | true   |
+      | omitted | ["true","false"] | "pro"    | true  | false  |
+      | omitted | []               | true     | true  | false  |
+      | omitted | []               | []       | true  | false  |
+      | 1       | false            | "banana" | true  | false  |
+      | 1       | false            | 0        | true  | false  |
+      | 1       | ["true","false"] | "true"   | false | true   |
+      | 1       | ["true","false"] | "pro"    | true  | false  |
+      | 1       | []               | true     | true  | false  |
+      | 1       | []               | []       | true  | false  |
+      | 2       | false            | "banana" | false | true   |
+      | 2       | false            | 0        | false | true   |
+      | 2       | ["true","false"] | "true"   | true  | false  |
+      | 2       | ["true","false"] | "pro"    | false | true   |
+      | 2       | []               | true     | true  | false  |
+      | 2       | []               | []       | true  | false  |
+
+  @server
+  Scenario Outline: Versioned equality preserves known null whole arrays empty-filter truthiness and normalization
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And the loaded definitions response has top-level "property_matching_version" <version>
+    And local feature flag "versioned-exact" has a person property condition with operator "exact" and condition value <condition>
+    And local feature flag "versioned-is-not" has the same condition with operator "is_not"
+    When local feature flag "versioned-exact" is evaluated with supplied property value <property>
+    Then the criterion match result should be <exact>
+    When local feature flag "versioned-is-not" is evaluated with supplied property value <property>
+    Then the criterion match result should be <is_not>
+    And no remote feature flag evaluation request should have been sent
+
+    Examples:
+      | version | condition             | property           | exact | is_not |
+      | omitted | true                  | [true]             | true  | false  |
+      | omitted | false                 | "FALSE"            | true  | false  |
+      | omitted | false                 | null               | true  | false  |
+      | omitted | false                 | ""                 | true  | false  |
+      | omitted | false                 | {}                 | true  | false  |
+      | omitted | []                    | "TRUE"             | true  | false  |
+      | omitted | []                    | [true,["TRUE",[]]] | true  | false  |
+      | omitted | []                    | [true,[false]]     | false | true   |
+      | omitted | []                    | false              | false | true   |
+      | omitted | []                    | 0                  | false | true   |
+      | omitted | []                    | 1                  | false | true   |
+      | omitted | []                    | "banana"           | false | true   |
+      | omitted | []                    | null               | false | true   |
+      | omitted | ["TrUe","FALSE"]      | true               | false | true   |
+      | omitted | ["TrUe","FALSE"]      | false              | true  | false  |
+      | omitted | [false,"PRO"]         | "pro"              | true  | false  |
+      | omitted | [false,"PRO"]         | "banana"           | false | true   |
+      | omitted | ["FREE","PRO"]        | "pro"              | true  | false  |
+      | omitted | [[true],"PRO"]        | [true]             | true  | false  |
+      | omitted | [[true]]              | true               | true  | false  |
+      | omitted | ["null","PRO"]        | null               | true  | false  |
+      | omitted | [{"a":2,"b":1},"PRO"] | {"b":1,"a":2}      | true  | false  |
+      | omitted | ["Ä","PRO"]           | "ä"                | true  | false  |
+      | 1       | true                  | [true]             | true  | false  |
+      | 1       | false                 | "FALSE"            | true  | false  |
+      | 1       | false                 | null               | true  | false  |
+      | 1       | false                 | ""                 | true  | false  |
+      | 1       | false                 | {}                 | true  | false  |
+      | 1       | []                    | "TRUE"             | true  | false  |
+      | 1       | []                    | [true,["TRUE",[]]] | true  | false  |
+      | 1       | []                    | [true,[false]]     | false | true   |
+      | 1       | []                    | false              | false | true   |
+      | 1       | []                    | 0                  | false | true   |
+      | 1       | []                    | 1                  | false | true   |
+      | 1       | []                    | "banana"           | false | true   |
+      | 1       | []                    | null               | false | true   |
+      | 1       | ["TrUe","FALSE"]      | true               | false | true   |
+      | 1       | ["TrUe","FALSE"]      | false              | true  | false  |
+      | 1       | [false,"PRO"]         | "pro"              | true  | false  |
+      | 1       | [false,"PRO"]         | "banana"           | false | true   |
+      | 1       | ["FREE","PRO"]        | "pro"              | true  | false  |
+      | 1       | [[true],"PRO"]        | [true]             | true  | false  |
+      | 1       | [[true]]              | true               | true  | false  |
+      | 1       | ["null","PRO"]        | null               | true  | false  |
+      | 1       | [{"a":2,"b":1},"PRO"] | {"b":1,"a":2}      | true  | false  |
+      | 1       | ["Ä","PRO"]           | "ä"                | true  | false  |
+      | 2       | true                  | [true]             | false | true   |
+      | 2       | false                 | "FALSE"            | true  | false  |
+      | 2       | false                 | null               | false | true   |
+      | 2       | false                 | ""                 | false | true   |
+      | 2       | false                 | {}                 | false | true   |
+      | 2       | []                    | "TRUE"             | true  | false  |
+      | 2       | []                    | [true,["TRUE",[]]] | true  | false  |
+      | 2       | []                    | [true,[false]]     | false | true   |
+      | 2       | []                    | false              | false | true   |
+      | 2       | []                    | 0                  | false | true   |
+      | 2       | []                    | 1                  | false | true   |
+      | 2       | []                    | "banana"           | false | true   |
+      | 2       | []                    | null               | false | true   |
+      | 2       | ["TrUe","FALSE"]      | true               | true  | false  |
+      | 2       | ["TrUe","FALSE"]      | false              | true  | false  |
+      | 2       | [false,"PRO"]         | "pro"              | true  | false  |
+      | 2       | [false,"PRO"]         | "banana"           | false | true   |
+      | 2       | ["FREE","PRO"]        | "pro"              | true  | false  |
+      | 2       | [[true],"PRO"]        | [true]             | true  | false  |
+      | 2       | [[true]]              | true               | false | true   |
+      | 2       | ["null","PRO"]        | null               | true  | false  |
+      | 2       | [{"a":2,"b":1},"PRO"] | {"b":1,"a":2}      | true  | false  |
+      | 2       | ["Ä","PRO"]           | "ä"                | true  | false  |
+
+  @server
+  Scenario Outline: Missing equality context remains inconclusive in every matching version
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And remote feature flag evaluation is enabled
+    And the loaded definitions response has top-level "property_matching_version" <version>
+    And local feature flag "missing-versioned" has a person property condition for key "plan" with operator <operator> and condition value false
+    When local feature flag "missing-versioned" is evaluated without a "plan" entry in the supplied person properties
+    Then local evaluation should be inconclusive
+    And remote evaluation should remain eligible
+
+    Examples:
+      | version | operator |
+      | omitted | "exact"  |
+      | omitted | "is_not" |
+      | 1       | "exact"  |
+      | 1       | "is_not" |
+      | 2       | "exact"  |
+      | 2       | "is_not" |
+
+  @server
+  Scenario Outline: Unknown matching versions never activate explicit matching
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And the loaded definitions response has top-level "property_matching_version" <version>
+    And local feature flag "unknown-version" has a person property condition with operator "exact" and condition value false
+    When local feature flag "unknown-version" is evaluated with supplied property value "banana"
+    Then the criterion should match using legacy semantics unless an existing unsupported-version policy returns inconclusive
+    And it should not return the explicit matching no-match result
+    And evaluation should not throw
+
+    Examples:
+      | version |
+      | 0       |
+      | 3       |
+
+  @server
+  Scenario Outline: Person group and recursive cohort equality share the snapshot version
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And the loaded definitions response has top-level "property_matching_version" <version>
+    And local feature flag "person-versioned" has a person property condition for key "plan" with operator <operator> and condition value false
+    And the snapshot group type mapping maps index 0 to "company"
+    And local feature flag "group-versioned" has a company group condition for key "plan" with operator <operator> and condition value false
+    And local feature flag "cohort-versioned" requires membership in dynamic cohort "42"
+    And cohort "42" is an AND group referencing cohort "43"
+    And cohort "43" is an OR group containing one person property leaf for key "plan" with operator <operator> and condition value false
+    When all three flags are evaluated locally for distinct id "user-123" with person property "plan" equal to "banana" and company "acme" with group property "plan" equal to "banana"
+    Then each local evaluation result should be <matches>
+    And no remote feature flag evaluation request should have been sent
+
+    Examples:
+      | version | operator | matches |
+      | omitted | "exact"  | true    |
+      | omitted | "is_not" | false   |
+      | 1       | "exact"  | true    |
+      | 1       | "is_not" | false   |
+      | 2       | "exact"  | false   |
+      | 2       | "is_not" | true    |
+
+  @server
+  Scenario Outline: Recursive cohort leaf negation applies after versioned equality
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And the loaded definitions response has top-level "property_matching_version" <version>
+    And local feature flag "cohort-versioned" requires membership in dynamic cohort "42"
+    And cohort "42" is an AND group referencing cohort "43"
+    And cohort "43" is an OR group containing one person property leaf with operator <operator> and condition value false
+    And the leaf sets negation to true
+    When local feature flag "cohort-versioned" is evaluated with supplied person property value "banana"
+    Then the local evaluation result should be <matches>
+    And no remote feature flag evaluation request should have been sent
+
+    Examples:
+      | version | operator | matches |
+      | omitted | "exact"  | false   |
+      | omitted | "is_not" | true    |
+      | 1       | "exact"  | false   |
+      | 1       | "is_not" | true    |
+      | 2       | "exact"  | true    |
+      | 2       | "is_not" | false   |
+
+  @server
+  Scenario Outline: Referenced flag property rules inherit matching without changing flag_evaluates_to
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And the loaded definitions response has top-level "property_matching_version" <version>
+    And local feature flag "source" has a person property condition with operator "exact" and condition value false
+    And local feature flag "dependent" has a "flag_evaluates_to" condition requiring flag "source" to evaluate to true
+    And local feature flag "variant" evaluates locally to variant "test"
+    And local feature flag "variant-dependent" has a "flag_evaluates_to" condition requiring flag "variant" to evaluate to true
+    When those flags are evaluated locally with supplied person property value "banana"
+    Then local feature flags "source" and "dependent" should both evaluate to <matches>
+    And local feature flag "variant-dependent" should evaluate to true
+    And no remote feature flag evaluation request should have been sent
+
+    Examples:
+      | version | matches |
+      | omitted | true    |
+      | 1       | true    |
+      | 2       | false   |
+
+  @server
+  Scenario Outline: Supported evaluation surfaces use the same matching snapshot
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And the SDK supports <surface>
+    And the loaded definitions response has top-level "property_matching_version" <version>
+    And local feature flag "surface-versioned" has a person property condition with operator "exact" and condition value false
+    When that flag is evaluated locally through <surface> with supplied property value "banana"
+    Then its evaluated flag value should be <matches>
+    And no remote feature flag evaluation request should have been sent
+
+    Examples:
+      | surface                    | version | matches |
+      | the simple single-flag API | omitted | true    |
+      | the simple single-flag API | 1       | true    |
+      | the simple single-flag API | 2       | false   |
+      | the full-result API        | omitted | true    |
+      | the full-result API        | 1       | true    |
+      | the full-result API        | 2       | false   |
+      | the bulk evaluation API    | omitted | true    |
+      | the bulk evaluation API    | 1       | true    |
+      | the bulk evaluation API    | 2       | false   |
+      | the asynchronous wrapper   | omitted | true    |
+      | the asynchronous wrapper   | 1       | true    |
+      | the asynchronous wrapper   | 2       | false   |
+      | the blocking wrapper       | omitted | true    |
+      | the blocking wrapper       | 1       | true    |
+      | the blocking wrapper       | 2       | false   |
+
+  @server
+  Scenario: Concurrent refresh cannot change an in-flight matching snapshot
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And the loaded definitions response has top-level "property_matching_version" 1
+    And a bulk evaluation uses person group recursive-cohort and dependency property conditions comparing false with "banana"
+    And the evaluation is paused after capturing its definition snapshot but before evaluating the recursive cohort and dependency
+    When otherwise identical definitions with top-level "property_matching_version" 2 are loaded
+    And the paused evaluation resumes
+    Then every property comparison in that pass should still use legacy matching
+    And the next bulk evaluation should use explicit matching without reusing legacy evaluation results
+    And no remote feature flag evaluation request should have been sent
+
+  @server
+  Scenario: Backward-compatible property matching helpers default to legacy
+    Given the SDK exposes a backward-compatible property matching helper without a required version argument
+    When the helper compares condition false with present property "banana" using operator "exact" and no version argument
+    Then the criterion match result should be true
+
   @server
   Scenario Outline: Exact compares compact composite JSON representations
     Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And the loaded definitions response has top-level "property_matching_version" <version>
     And local feature flag "exact-composite" has an exact person property condition with value <condition>
     When local feature flag "exact-composite" is evaluated with supplied property value <property>
     Then the criterion match result should be <matches>
 
     Examples:
-      | condition         | property          | matches |
-      | "[1,2]"           | [1,2]             | true    |
-      | [[1,2]]           | [1,2]             | true    |
-      | {"a":2,"b":1}     | {"b":1,"a":2}     | true    |
+      | version | condition     | property      | matches |
+      | omitted | "[1,2]"       | [1,2]         | true    |
+      | omitted | [[1,2]]       | [1,2]         | true    |
+      | omitted | {"a":2,"b":1} | {"b":1,"a":2} | true    |
+      | 1       | "[1,2]"       | [1,2]         | true    |
+      | 1       | [[1,2]]       | [1,2]         | true    |
+      | 1       | {"a":2,"b":1} | {"b":1,"a":2} | true    |
+      | 2       | "[1,2]"       | [1,2]         | true    |
+      | 2       | [[1,2]]       | [1,2]         | true    |
+      | 2       | {"a":2,"b":1} | {"b":1,"a":2} | true    |
 
   @server
   Scenario Outline: Exact preserves canonical numeric spellings when the JSON kind survives
@@ -360,20 +630,37 @@ Feature: Local Feature Flag Evaluator
   @server
   Scenario Outline: Exact uses Unicode lowercase without case folding or normalization
     Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And the loaded definitions response has top-level "property_matching_version" <version>
     And local feature flag "exact-unicode" has an exact person property condition with value <condition>
     When local feature flag "exact-unicode" is evaluated with supplied property value <property>
     Then the criterion match result should be <matches>
 
     Examples:
-      | condition | property | matches |
-      | "ä"       | "Ä"      | true    |
-      | "ss"      | "ß"      | false   |
-      | "ς"       | "Σ"      | false   |
-      | "οδος"    | "ΟΔΟΣ"   | true    |
-      | "οδοσ"    | "ΟΔΟΣ"   | false   |
-      | "i̇"       | "İ"      | true    |
-      | "i"       | "İ"      | false   |
-      | "é"       | "É"      | false   |
+      | version | condition | property | matches |
+      | omitted | "ä"       | "Ä"      | true    |
+      | omitted | "ss"      | "ß"      | false   |
+      | omitted | "ς"       | "Σ"      | false   |
+      | omitted | "οδος"    | "ΟΔΟΣ"   | true    |
+      | omitted | "οδοσ"    | "ΟΔΟΣ"   | false   |
+      | omitted | "i̇"      | "İ"      | true    |
+      | omitted | "i"       | "İ"      | false   |
+      | omitted | "é"       | "É"     | false   |
+      | 1       | "ä"       | "Ä"      | true    |
+      | 1       | "ss"      | "ß"      | false   |
+      | 1       | "ς"       | "Σ"      | false   |
+      | 1       | "οδος"    | "ΟΔΟΣ"   | true    |
+      | 1       | "οδοσ"    | "ΟΔΟΣ"   | false   |
+      | 1       | "i̇"      | "İ"      | true    |
+      | 1       | "i"       | "İ"      | false   |
+      | 1       | "é"       | "É"     | false   |
+      | 2       | "ä"       | "Ä"      | true    |
+      | 2       | "ss"      | "ß"      | false   |
+      | 2       | "ς"       | "Σ"      | false   |
+      | 2       | "οδος"    | "ΟΔΟΣ"   | true    |
+      | 2       | "οδοσ"    | "ΟΔΟΣ"   | false   |
+      | 2       | "i̇"      | "İ"      | true    |
+      | 2       | "i"       | "İ"      | false   |
+      | 2       | "é"       | "É"     | false   |
 
   @server
   Scenario Outline: String criteria use compact stringification and ASCII lowercase
@@ -708,3 +995,19 @@ Feature: Local Feature Flag Evaluator
       | malformation                               |
       | a known leaf type missing its required key |
       | unknown group type "XOR"                   |
+
+  @server
+  Scenario Outline: V2 preserves safe numeric ambiguity fallback
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And the loaded definitions response has top-level "property_matching_version" 2
+    And the SDK runtime represents source JSON 323 and 323.0 as the same host value
+    And the evaluator supports a safe inconclusive result for numeric ambiguity
+    And local feature flag "ambiguous-versioned" has a person property condition with operator <operator> and condition value "323.0"
+    When that flag is evaluated locally against the collapsed host number
+    Then local evaluation should be inconclusive
+    And remote evaluation should remain eligible
+
+    Examples:
+      | operator |
+      | "exact"  |
+      | "is_not" |

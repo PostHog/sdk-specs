@@ -43,41 +43,84 @@ Feature: Capture
     And the enqueued event should include an event uuid
 
   @both
-  Scenario: Queued capture preserves nulls on the wire
+  Scenario: Queued capture drops null-valued properties and preserves array positions
     Given the SDK is initialized with token "test-token"
     And capture has a valid distinct id and no property-changing hooks or filters
     When capture is called with event "Nullable Properties" and custom properties represented by JSON:
       """json
-      {"optional":null,"nested":{"value":null},"items":["first",null,"last"],"empty":"","zero":0,"enabled":false}
+      {"test":null,"nested":{"drop":null},"items":["1",null,2,{"drop":null},[null]],"empty":"","zero":0,"enabled":false,"literal":"null","emptyArray":[]}
       """
     And the SDK is flushed
-    Then the received event should contain every supplied custom property with the same JSON value
-    And "optional" and "nested.value" should be present with JSON null values, not the string "null"
-    And "items" should contain three elements with JSON null at index 1
+    Then one event named "Nullable Properties" should be received
+    And its custom properties should equal JSON:
+      """json
+      {"nested":{},"items":["1",null,2,{},[null]],"empty":"","zero":0,"enabled":false,"literal":"null","emptyArray":[]}
+      """
     And the absent custom property "missing" should remain absent
 
   @both
-  Scenario: Immediate capture preserves nulls on the wire
+  Scenario: Immediate capture drops null-valued properties and preserves array positions
     Given the SDK is initialized with token "test-token"
     And the SDK supports immediate delivery
     And capture has a valid distinct id and no property-changing hooks or filters
     And capture is configured for immediate delivery
     When capture is called with event "Nullable Properties" and custom properties represented by JSON:
       """json
-      {"optional":null,"nested":{"value":null},"items":["first",null,"last"]}
+      {"test":null,"nested":{"drop":null},"items":["1",null,2,{"drop":null},[null]]}
       """
     And the immediate send completes
-    Then the received event should contain every supplied custom property with the same JSON value
-    And "items" should contain three elements with JSON null at index 1
+    Then one event named "Nullable Properties" should be received
+    And its custom properties should equal JSON:
+      """json
+      {"nested":{},"items":["1",null,2,{},[null]]}
+      """
 
   @both
-  Scenario: JavaScript object undefined remains distinct from null
+  Scenario: All-null custom properties do not drop the event
+    Given the SDK is initialized with token "test-token"
+    And capture has a valid distinct id and no property-changing hooks or filters
+    When capture is called with event "Only Null Properties" and custom properties represented by JSON:
+      """json
+      {"test":null}
+      """
+    And the SDK is flushed
+    Then one event named "Only Null Properties" should be received
+    And its custom properties should equal JSON:
+      """json
+      {}
+      """
+    And it should retain its normal SDK metadata
+
+  @both
+  Scenario: Null object properties introduced by before-send are omitted
+    Given the SDK is initialized with token "test-token"
+    And the SDK supports before-send with a valid distinct id
+    And before-send adds custom properties represented by JSON:
+      """json
+      {"hookNull":null,"hookItems":[null,{"drop":null}]}
+      """
+    When capture is called with event "Hook Properties" and no custom properties
+    And the SDK is flushed
+    Then one event named "Hook Properties" should be received
+    And its custom properties should equal JSON:
+      """json
+      {"hookItems":[null,{}]}
+      """
+
+  @both
+  Scenario: JavaScript null and undefined object properties are omitted
     Given a JavaScript SDK is initialized with token "test-token"
     And capture has a valid distinct id and no property-changing hooks or filters
-    When capture is called with event "Absent Versus Null" and JavaScript properties "{ optional: null, missing: undefined }"
+    When capture is called with event "Null And Undefined" and JavaScript properties:
+      """javascript
+      { test: null, missing: undefined, items: ["1", null, 2] }
+      """
     And the SDK is flushed
-    Then the received event property "optional" should be present with JSON null
-    And the received event properties should not contain "missing"
+    Then one event named "Null And Undefined" should be received
+    And its custom properties should equal JSON:
+      """json
+      {"items":["1",null,2]}
+      """
 
   @both
   Scenario: Capture honors opt-out state

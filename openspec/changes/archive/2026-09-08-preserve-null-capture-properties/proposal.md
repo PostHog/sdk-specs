@@ -1,3 +1,5 @@
+> Superseded on this PR by `drop-null-capture-properties`: omit null-valued object properties, but preserve null array elements. This archive records the earlier decision only.
+
 ## Why
 
 JSON `null` is valid event data, and an explicitly present null-valued property is not the same as an absent key. Python PR [#926](https://github.com/PostHog/posthog-python/pull/926) proposes dropping those properties, exposing a gap in the capture contract despite existing SDKs preserving them.

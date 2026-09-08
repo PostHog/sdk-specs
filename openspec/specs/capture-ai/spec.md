@@ -203,15 +203,15 @@ SDK's AI wrapper libraries capture. It SHALL NOT alter payloads passed to
 - **AND** the client has privacy mode enabled and the flag set to true
 - **THEN** the captured event should carry no input or output content
 
-### Requirement: AI capture preserves explicit null properties
+### Requirement: AI capture drops null-valued object properties
 
-`capture_ai` and its immediate/awaitable variants SHALL follow capture's "Explicit null capture properties are valid JSON data" requirement for caller-supplied custom properties, including nested object values and array elements. Using the AI route MUST NOT introduce null stripping.
+`capture_ai` and its immediate/awaitable variants SHALL follow capture's "Capture drops null-valued object properties" requirement for caller-supplied custom properties, including nested objects and objects inside arrays. Null array elements SHALL retain their positions. This is a specific normalization exception to manual AI capture's payload pass-through promise, not permission to add redaction, truncation, or media processing.
 
-#### Scenario: AI capture preserves null properties on its delivery route (@server)
+#### Scenario: AI capture drops null-valued properties on its delivery route (@server)
 - **GIVEN** an initialized SDK supporting AI capture with no property-changing hooks or filters
-- **WHEN** capture_ai is called with distinct id "user-123", event "$ai_generation", and custom properties represented by JSON `{"optional":null,"nested":{"value":null},"items":["first",null,"last"]}`
+- **WHEN** capture_ai is called with distinct id "user-123", event "$ai_generation", and custom properties represented by JSON `{"test":null,"nested":{"drop":null},"items":["1",null,2]}`
 - **AND** the SDK is flushed
-- **THEN** the event received on the AI batch endpoint should contain every supplied custom property with the same JSON value
-- **AND** "items" should contain three elements with JSON null at index 1
+- **THEN** one event named "$ai_generation" should be received on the AI batch endpoint
+- **AND** its custom properties should equal JSON `{"nested":{},"items":["1",null,2]}`
 - **AND** the analytics batch endpoint should receive no events
 

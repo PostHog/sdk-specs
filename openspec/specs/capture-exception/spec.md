@@ -84,9 +84,7 @@ captureException(
 - **Error-tracking processors/builders** — these convert raw errors/exceptions into the structured PostHog exception property format.
 - **Event batcher / retry queue** — `$exception` events are delivered through the same batching/retry infrastructure as other events.
 - **Autocaptured exception systems** — this is the manual companion to automatic exception capture; both typically produce the same event family.
-
 ## Requirements
-
 ### Requirement: Canonical capture-exception behavior
 
 The SDK SHALL implement the canonical `capture-exception` behavior described by this spec. Implementations MAY adapt method names, parameter casing, type syntax, and lifecycle hooks to platform idioms where this spec explicitly allows variation, but MUST preserve the observable outcomes in the scenarios below.
@@ -256,3 +254,16 @@ When the supplied error-like input already carries stack trace information (for 
 - **THEN** one event named "$exception" should be enqueued
 - **AND** the enqueued exception's stacktrace frames should reflect the pre-existing stack
   trace, not a synthesized single-frame stack
+
+### Requirement: Exception capture drops null-valued custom object properties
+
+`capture_exception` / `captureException` SHALL follow capture's "Capture drops null-valued object properties" requirement for caller-supplied additional custom event properties, including nested objects and objects inside arrays. Null array elements SHALL retain their positions. This MUST NOT change exception-input validation or field-specific rules for SDK-owned exception metadata.
+
+#### Scenario: Exception capture drops null-valued custom properties on the wire (@both)
+- **GIVEN** an initialized SDK with a valid distinct id and no property-changing hooks or filters
+- **AND** a valid handled exception
+- **WHEN** capture exception is called for the exception with additional custom properties represented by JSON `{"test":null,"nested":{"drop":null},"items":["1",null,2]}`
+- **AND** the SDK is flushed
+- **THEN** one "$exception" event should be received
+- **AND** its custom properties should equal JSON `{"nested":{},"items":["1",null,2]}`
+- **AND** the event should still include its SDK-generated exception data

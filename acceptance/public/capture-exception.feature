@@ -34,6 +34,23 @@ Feature: Capture Exception
       | area     | checkout |
 
   @both
+  Scenario: Exception capture drops null-valued custom properties on the wire
+    Given the SDK is initialized with token "test-token"
+    And capture has a valid distinct id and no property-changing hooks or filters
+    And a valid handled exception
+    When capture exception is called for the exception with additional custom properties represented by JSON:
+      """json
+      {"test":null,"nested":{"drop":null},"items":["1",null,2]}
+      """
+    And the SDK is flushed
+    Then one "$exception" event should be received
+    And its custom properties should equal JSON:
+      """json
+      {"nested":{},"items":["1",null,2]}
+      """
+    And the event should still include its SDK-generated exception data
+
+  @both
   Scenario: Exception capture normalizes non-standard thrown values
     Given the SDK is initialized with token "test-token"
     When capture exception is called with a non-standard thrown value

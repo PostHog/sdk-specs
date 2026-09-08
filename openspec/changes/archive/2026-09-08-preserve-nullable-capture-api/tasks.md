@@ -1,11 +1,12 @@
 ## 1. Contract and acceptance
 
-- [x] 1.1 Clarify existing public API compatibility and event serialization for wire and disk in the shared capture requirement.
-- [x] 1.2 Add acceptance scenarios for existing nullable inputs and persisted null/undefined values without changing earlier array-position coverage.
+- [x] 1.1 Define recursive null/undefined object-member omission during event serialization while preserving array positions and existing public APIs.
+- [x] 1.2 Apply the shared contract to AI and exception capture.
+- [x] 1.3 Add ten acceptance scenarios for wire delivery, nullable input compatibility, and disk persistence/restore.
 
-## 2. Validation
+## 2. Validation and archive
 
-- [x] 2.1 Validate the delta, Gherkin syntax, scenario coverage, and serialized JSON examples.
-- [x] 2.2 Review the clarification against the existing AI/exception references and disk-storage scope before sync/archive.
+- [x] 2.1 Validate OpenSpec and Gherkin syntax, scenario coverage, and JSON input/output examples.
+- [x] 2.2 Sync canonical specs and consolidate the final contract into one archive relative to the PR base.
 
-Strict delta validation passed. Ten current null-policy scenarios across capture, AI, and exception capture match the Gherkin files. JSON input/output examples, including disk and restored-event payloads, match reference normalization without array compaction. API compatibility wording was inspected statically; no SDK compilation, runtime, or persistence conformance tests were run.
+Validation covers specification consistency and serialized JSON fixtures, not SDK/backend conformance. API compatibility was inspected statically; no SDK compilation, runtime, or persistence tests were run.

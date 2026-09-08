@@ -1,10 +1,3 @@
-## REMOVED Requirements
-
-### Requirement: AI capture preserves explicit null properties
-
-**Reason**: AI capture follows the revised shared null-property contract.
-**Migration**: Omit null-valued object members while preserving null array elements on the AI route.
-
 ## ADDED Requirements
 
 ### Requirement: AI capture drops null-valued object properties

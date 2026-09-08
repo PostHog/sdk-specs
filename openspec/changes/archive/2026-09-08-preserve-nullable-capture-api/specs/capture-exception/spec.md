@@ -1,10 +1,3 @@
-## REMOVED Requirements
-
-### Requirement: Exception capture preserves explicit null custom properties
-
-**Reason**: Exception capture follows the revised shared null-property contract.
-**Migration**: Omit null-valued custom object members while preserving null array elements without changing SDK-owned exception metadata rules.
-
 ## ADDED Requirements
 
 ### Requirement: Exception capture drops null-valued custom object properties

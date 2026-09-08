@@ -43,6 +43,43 @@ Feature: Capture
     And the enqueued event should include an event uuid
 
   @both
+  Scenario: Queued capture preserves nulls on the wire
+    Given the SDK is initialized with token "test-token"
+    And capture has a valid distinct id and no property-changing hooks or filters
+    When capture is called with event "Nullable Properties" and custom properties represented by JSON:
+      """json
+      {"optional":null,"nested":{"value":null},"items":["first",null,"last"],"empty":"","zero":0,"enabled":false}
+      """
+    And the SDK is flushed
+    Then the received event should contain every supplied custom property with the same JSON value
+    And "optional" and "nested.value" should be present with JSON null values, not the string "null"
+    And "items" should contain three elements with JSON null at index 1
+    And the absent custom property "missing" should remain absent
+
+  @both
+  Scenario: Immediate capture preserves nulls on the wire
+    Given the SDK is initialized with token "test-token"
+    And the SDK supports immediate delivery
+    And capture has a valid distinct id and no property-changing hooks or filters
+    And capture is configured for immediate delivery
+    When capture is called with event "Nullable Properties" and custom properties represented by JSON:
+      """json
+      {"optional":null,"nested":{"value":null},"items":["first",null,"last"]}
+      """
+    And the immediate send completes
+    Then the received event should contain every supplied custom property with the same JSON value
+    And "items" should contain three elements with JSON null at index 1
+
+  @both
+  Scenario: JavaScript object undefined remains distinct from null
+    Given a JavaScript SDK is initialized with token "test-token"
+    And capture has a valid distinct id and no property-changing hooks or filters
+    When capture is called with event "Absent Versus Null" and JavaScript properties "{ optional: null, missing: undefined }"
+    And the SDK is flushed
+    Then the received event property "optional" should be present with JSON null
+    And the received event properties should not contain "missing"
+
+  @both
   Scenario: Capture honors opt-out state
     Given the SDK is initialized with token "test-token"
     And analytics capture is opted out

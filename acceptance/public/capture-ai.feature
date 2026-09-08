@@ -19,6 +19,19 @@ Feature: Capture AI
     And the enqueued event should include a timestamp and uuid
 
   @server
+  Scenario: AI capture preserves null properties on its delivery route
+    Given the SDK is initialized with token "test-token"
+    And the SDK supports AI capture with no property-changing hooks or filters
+    When capture_ai is called with distinct id "user-123", event "$ai_generation", and custom properties represented by JSON:
+      """json
+      {"optional":null,"nested":{"value":null},"items":["first",null,"last"]}
+      """
+    And the SDK is flushed
+    Then the event received on the AI endpoint should contain every supplied custom property with the same JSON value
+    And "items" should contain three elements with JSON null at index 1
+    And the analytics endpoint should receive no events
+
+  @server
   Scenario: capture and capture_ai ride separate routes
     Given the SDK is initialized with token "test-token"
     When capture is called with distinct id "user-123", event "button_clicked"

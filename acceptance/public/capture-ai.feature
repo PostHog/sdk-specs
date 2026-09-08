@@ -27,9 +27,9 @@ Feature: Capture AI
       {"optional":null,"nested":{"value":null},"items":["first",null,"last"]}
       """
     And the SDK is flushed
-    Then the event received on the AI endpoint should contain every supplied custom property with the same JSON value
+    Then the event received on the AI batch endpoint should contain every supplied custom property with the same JSON value
     And "items" should contain three elements with JSON null at index 1
-    And the analytics endpoint should receive no events
+    And the analytics batch endpoint should receive no events
 
   @server
   Scenario: capture and capture_ai ride separate routes

@@ -211,7 +211,7 @@ SDK's AI wrapper libraries capture. It SHALL NOT alter payloads passed to
 - **GIVEN** an initialized SDK supporting AI capture with no property-changing hooks or filters
 - **WHEN** capture_ai is called with distinct id "user-123", event "$ai_generation", and custom properties represented by JSON `{"optional":null,"nested":{"value":null},"items":["first",null,"last"]}`
 - **AND** the SDK is flushed
-- **THEN** the event received on the AI endpoint should contain every supplied custom property with the same JSON value
+- **THEN** the event received on the AI batch endpoint should contain every supplied custom property with the same JSON value
 - **AND** "items" should contain three elements with JSON null at index 1
-- **AND** the analytics endpoint should receive no events
+- **AND** the analytics batch endpoint should receive no events
 

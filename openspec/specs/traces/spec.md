@@ -98,7 +98,7 @@ code SHOULD use the handle it receives rather than re-reading the ambient contex
 A **pass-through handle** is returned when the caller supplied a valid `traceparent` as
 `parent`. It SHALL echo that inbound context: `traceparent()` returns the inbound header
 value — preserving its version and flags byte exactly as received — and `tracestate()` returns
-the accompanying `tracestate` when one was supplied and valid. Scoped helpers SHALL activate a
+the accompanying `tracestate` when one was supplied and accepted. Scoped helpers SHALL activate a
 pass-through handle for the duration of the callback, so `getActiveSpan()?.traceparent()`
 inside it propagates the trace onward. A child started with a pass-through handle as `parent`
 SHALL itself be inert. This propagates only ids the upstream caller recorded; the SDK SHALL
@@ -311,17 +311,28 @@ under it reuse the remote trace id and parent the remote span id, including when
 flags are `00`. An accompanying `tracestate` value, passed via the `tracestate` option, SHALL
 be preserved opaquely: emitted as the continued spans' `traceState` wire field, inherited by
 their children, and returned by `span.tracestate()` for onward propagation next to the produced
-`traceparent`. An invalid `traceparent` SHALL be ignored (fresh root context); an invalid `tracestate` SHALL be discarded without invalidating the `traceparent`.
+`traceparent`. An invalid `traceparent` SHALL be ignored (fresh root context); a `tracestate` the SDK does not accept (below) SHALL be discarded without invalidating the `traceparent`.
 
 Validity follows W3C Trace Context. Surrounding whitespace aside, every `traceparent` field is
 lowercase hex: a header with uppercase ids or flags is invalid rather than folded, because a
 conformant peer restarts the trace on it. Version `ff` is invalid. Version `00` is exactly
 `version-traceid-parentid-flags`, so a version `00` header with anything appended is invalid, while
-a higher version MAY carry further fields after a `-`. An all-zero trace id or span id is invalid. A
-`tracestate` is valid when it is printable ASCII (plus HTAB), has at most 32 list members, and every
-non-empty member contains a `=`. A valid `tracestate` longer than 512 characters SHALL be trimmed by
-whole members rather than discarded — members over 128 characters first, then from the right — so
-the entries nearest the caller survive. An SDK MAY also accept, as `parent`, the platform's
+a higher version MAY carry further fields after a `-`. An all-zero trace id or span id is invalid.
+
+`tracestate` is checked for acceptance, not for W3C validity. The SDK SHALL accept a `tracestate`
+that is printable ASCII (plus HTAB), has at most 32 list members, and in which every non-empty
+member contains a `=`, and SHALL discard any other. This check is deliberately narrower than
+[W3C's `tracestate` grammar](https://www.w3.org/TR/trace-context/#tracestate-header-field-values):
+it rejects only what would break the caller's own header write (a CR or LF), the OTLP request (a
+lone surrogate), or the list itself (a 33rd member, a member that is not a key/value pair). A
+header outside the rest of the grammar — an uppercase key (`Vendor=abc`), a `=` inside a value
+(`vendor=a=b`), a repeated key (`vendor=one,vendor=two`), an over-long key or value — is accepted
+and forwarded as received. The SDK never reads a member, so each one stays its owning vendor's to
+judge; a downstream parser that rejects the header loses only the vendor state, never the trace,
+because W3C forbids a `tracestate` failure from affecting `traceparent`. An SDK MAY apply the full
+W3C grammar instead and discard a header that fails it. An accepted `tracestate` longer than 512
+characters SHALL be trimmed by whole members rather than discarded — members over 128 characters
+first, then from the right — so the entries nearest the caller survive. An SDK MAY also accept, as `parent`, the platform's
 multi-value header form when it holds exactly one value (Node's `headersDistinct`). Automatic header
 injection/extraction is out of scope for this capability and arrives with per-platform
 instrumentation. This capability is distinct from the `tracing-headers` capability (`X-POSTHOG-*`

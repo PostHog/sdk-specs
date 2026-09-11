@@ -6,7 +6,7 @@
 - [x] 1.4 Verify `logs` and `traces` carry the shared retry-policy paragraphs in identical words, including the budget-does-not-end-the-window rule and jitter
 - [x] 1.5 Verify the traces-only retry rules sit in the paragraphs that already differ from `logs`: automatic sends pause during backoff, the budget counts backoff windows and belongs to the failing batch, and a dropped batch does not send the next one inside an open window
 - [x] 1.6 Verify the body limit reads as deployment configuration — 2 MiB default, 10 MiB hosted — everywhere `traces` and `logs` mentioned 2 MB, including the oversize-body scenarios
-- [x] 1.7 Verify the `traceparent` and `tracestate` rules match W3C Trace Context: lowercase-only, `ff` invalid, version `00` exact, higher versions may extend; `tracestate` 32 members as validity and 512 characters as a trim target
+- [x] 1.7 Verify the `traceparent` and `tracestate` rules match W3C Trace Context: lowercase-only, `ff` invalid, version `00` exact, higher versions may extend; `tracestate` acceptance stated as narrower than W3C validity, with 32 members discarded and 512 characters as a trim target
 - [x] 1.8 Verify the shared clock basis is a SHOULD, scoped to local non-backdated parents, per local trace rather than per process
 
 ## 2. Validation

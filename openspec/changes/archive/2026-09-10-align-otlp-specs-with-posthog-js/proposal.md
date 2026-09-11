@@ -125,8 +125,10 @@ Stated in the same words in `logs` and `traces`, as the surrounding policy alrea
   known deployment limit, not the default; batch-size defaults stay sized for the default.
 - **String well-formedness** added to client-side validity: unpaired surrogates become U+FFFD in
   every wire string.
-- **`traceparent` and `tracestate` validity** spelled out per W3C, with `tracestate` trimmed by
-  whole members past 512 characters rather than discarded. An SDK MAY accept a single-value
+- **`traceparent` validity** spelled out per W3C. **`tracestate` acceptance** spelled out as a
+  deliberately narrower check than W3C's grammar — the SDK forwards the header opaquely and leaves
+  each member to its vendor — with `tracestate` trimmed by whole members past 512 characters
+  rather than discarded. An SDK MAY accept a single-value
   multi-value header as `parent`.
 - **Empty attribute keys** dropped with a debug warning, in `traces` and `logs` — `posthog-js`
   already drops them for both through the shared encoder.

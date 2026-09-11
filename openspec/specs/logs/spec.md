@@ -120,12 +120,14 @@ millisecond (e.g. a monotonic +1ns bump) so intra-millisecond ordering is retain
 
 ### Requirement: Attribute value encoding
 
-Every attribute value and the `body` SHALL be encoded as an OTLP `AnyValue` by runtime type:
-string → `stringValue`; boolean → `boolValue`; integer → `intValue` as a **stringified int64**;
+Every attribute value and the `body` SHALL be encoded as an OTLP `AnyValue` by runtime type: string
+→ `stringValue`; boolean → `boolValue`; integer → `intValue` as a **stringified int64**;
 float/double → `doubleValue`; non-finite float (`NaN`/`±Inf`) → `stringValue` ("NaN"/"Infinity"/
-"-Infinity"); array → `arrayValue` (recursive); map/object → `kvlistValue` (recursive). A `null`
-or `undefined` value SHALL cause the entire key to be omitted. The canonical integer encoding is
-the stringified form even though the server also accepts a JSON number.
+"-Infinity"); array → `arrayValue` (recursive); map/object → `kvlistValue` (recursive). A `null` or
+`undefined` value SHALL cause the entire key to be omitted. So SHALL an empty key, with a debug
+warning — OTLP requires a non-empty key, and the service stores one verbatim as a nameless attribute
+nothing can filter on. The canonical integer encoding is the stringified form even though the server
+also accepts a JSON number.
 
 #### Scenario: integer encoded as string
 - **WHEN** an attribute value is the integer 4999
@@ -142,6 +144,10 @@ the stringified form even though the server also accepts a JSON number.
 #### Scenario: null value drops the key
 - **WHEN** an attribute value is `null`
 - **THEN** that attribute key does not appear in the record
+
+#### Scenario: empty key dropped
+- **WHEN** an attribute has the key `""`
+- **THEN** that key does not appear in the record and the log is still sent
 
 ### Requirement: Auto-captured context attributes
 
@@ -173,7 +179,10 @@ The OTLP envelope SHALL carry **resource** attributes describing the producing s
 `resourceAttributes`, and a **scope** of `{ name, version }` identifying the SDK. On key collision,
 SDK-managed identity keys (`service.*`, `telemetry.sdk.*`) SHALL win over user `resourceAttributes`
 so users cannot clobber identity keys. The SDK SHALL emit `telemetry.sdk.name` and
-`telemetry.sdk.version`.
+`telemetry.sdk.version`, and SHALL always emit `service.name` — even when a `resourceAttributes`
+value is too large to encode in full: the SDK-set identity keys are encoded on a budget of their
+own, after the user's attributes, so a user value that exhausts the encoder's traversal budget
+cannot cost the resource its `service.name`.
 
 #### Scenario: SDK identity keys protected
 - **WHEN** a user sets `resourceAttributes: { "service.name": "evil" }` and the SDK resolves `service.name` to "checkout"
@@ -182,6 +191,11 @@ so users cannot clobber identity keys. The SDK SHALL emit `telemetry.sdk.name` a
 #### Scenario: scope identifies the SDK
 - **WHEN** an iOS SDK at version 3.58.0 builds a payload
 - **THEN** the scope is `{ "name": "posthog-ios", "version": "3.58.0" }`
+
+#### Scenario: an oversized resource attribute does not cost service.name
+- **GIVEN** `resourceAttributes` holding a value too large for the encoder to walk in full
+- **WHEN** the envelope is built
+- **THEN** it still carries `service.name` and `telemetry.sdk.*`
 
 ### Requirement: HTTP transport
 
@@ -303,13 +317,14 @@ in-flight records are not lost when a process terminates.
 
 ### Requirement: Batch assembly and concurrency
 
-For a persistent queue the SDK SHALL take up to **max records per POST** from the head of the
-queue, build one OTLP payload, POST it, and on success remove those records, repeating until the
-queue is drained or a send fails. The per-POST cap SHALL keep each body comfortably under the 2 MB
-server limit. The SDK SHALL allow only **one flush in flight** at a time (joining or no-opping a
-concurrent flush rather than double-sending), run logs on a worker/queue separate from the
-analytics-events pipeline, and bound the drain loop by the queue length captured at flush start.
-`captureLog` SHALL be safe to call from any thread.
+For a persistent queue the SDK SHALL take up to **max records per POST** from the head of the queue,
+build one OTLP payload, POST it, and on success remove those records, repeating until the queue is
+drained or a send fails. The per-POST cap SHALL keep each body comfortably under the service's 2 MiB
+default limit, which a self-hosted deployment may keep; PostHog's hosted ingestion runs 10 MiB. The
+SDK SHALL allow only **one flush in flight** at a time (joining or no-opping a concurrent flush
+rather than double-sending), run logs on a worker/queue separate from the analytics-events pipeline,
+and bound the drain loop by the queue length captured at flush start. `captureLog` SHALL be safe to
+call from any thread.
 
 #### Scenario: single flight
 - **GIVEN** a flush already in progress
@@ -422,10 +437,52 @@ keep-alive drain that has no later attempt — it SHALL NOT charge the resulting
 batch's retry budget, so honoring the endpoint costs a request rather than the batch.
 
 A reconnect signal SHALL NOT end an open `Retry-After` window. Connectivity returning says nothing
-about the rate limit the endpoint set, and platforms fire it on every network handover.
+about the rate limit the endpoint set, and platforms fire it on every network handover. Nor SHALL
+the retry budget running out: that is a verdict on the batch, not on the endpoint's rate limit.
+
+The SDK SHOULD jitter each backoff delay, so clients refused together do not return together. The
+`Retry-After` floor applies to the jittered delay.
+
+A refusal arriving while a window is still open SHALL extend the deadline when it names a later
+one, and SHALL NOT pull it in — a shorter header cannot cut a wait the endpoint has already asked
+for. The extension SHALL be bounded by the documented maximum measured from the moment the window
+was **first installed**, so repeated refusals cannot hold a window open indefinitely. On reaching
+that ceiling the window closes, the next attempt goes out, and a further refusal installs a new
+window. Without the bound, a host refused faster than the window is long refreshes the deadline
+forever, and every path gated on the window being closed — the `logs` size and reconnect triggers,
+the `metrics` timer re-arm — stays suppressed for as long as that host keeps flushing.
+
+This bound is a deliberate divergence from OTLP, which asks for the header to be honored and names
+no ceiling: a wait longer than the documented maximum is served short, so the SDK may retry before
+a newer `Retry-After` has expired. It is the choice that fails toward keeping records rather than
+toward an idle queue. Should the ingestion service begin issuing `Retry-After` itself — no signal
+does today, so every header an SDK sees comes from a proxy, CDN or load balancer in front of it —
+this SHOULD be revisited in favour of honoring the header literally.
+
+The `408`/`5xx` half of that retriable set is a deliberate divergence from OTLP, which permits
+retries only for `429`, `502`, `503` and `504` and forbids retrying other `4xx`/`5xx`. PostHog
+ingestion returns transient `500`s that are worth retrying, and in SDKs where this predicate is
+shared with the analytics-events transport, narrowing it would drop events on a path that is
+working. Narrowing the set SHALL NOT happen before the ingestion team states which `5xx` responses
+are transient.
 
 This policy is stated in the same words in the `logs` and `traces` capabilities, for the same
 reasons; the two SHALL NOT diverge.
+
+#### Scenario: a longer Retry-After mid-window extends the deadline
+- **GIVEN** an open window with 40s remaining and a documented maximum of five minutes
+- **WHEN** a further refusal arrives naming `Retry-After: 120`
+- **THEN** the SDK waits 120s from that refusal, not the 40s that remained
+
+#### Scenario: a shorter Retry-After mid-window does not cut the wait
+- **GIVEN** an open window with 110s remaining
+- **WHEN** a further refusal arrives naming `Retry-After: 5`
+- **THEN** the SDK still waits the 110s already asked for
+
+#### Scenario: repeated refusals cannot hold the window open past the ceiling
+- **GIVEN** a window installed five minutes ago against a documented maximum of five minutes
+- **WHEN** a further refusal arrives naming `Retry-After: 240`
+- **THEN** the window is closed, the next attempt goes out, and that refusal installs a new window
 
 #### Scenario: 413 shrinks the batch
 - **GIVEN** a batch of 50 records returns 413
@@ -504,17 +561,18 @@ capturing.
 
 ### Requirement: Server-side contract
 
-The SDK SHALL design to the ingestion service's observed contract: a 2 MB request body cap (exceed
-→ 413) with **no** separate per-record size cap; success is 200 with body `{}`; the service emits
-only 200/400/401/500 and **never** `429`, `Retry-After`, or `quota_limited` (any 429 a client sees
-comes from shared infra); the server may re-derive severity, clamp timestamps to ±24h of receive
-time (replacing out-of-range values with now and preserving the original in `$originalTimestamp`),
-overwrite `observedTimeUnixNano`, zero `traceId`/`spanId` that are not exactly 16/8 bytes, and
-flatten scope to `"{name}@{version}"`. The service accepts JSON or protobuf, content-sniffed; SDKs
-SHALL send JSON.
+The SDK SHALL design to the ingestion service's observed contract: a request body limit set per
+deployment — 2 MiB by default (`MAX_REQUEST_BODY_SIZE_BYTES`), 10 MiB on PostHog's hosted US and EU
+ingestion (verified 2026-09-10) — (exceed → 413) with **no** separate per-record size cap; success
+is 200 with body `{}`; the service emits only 200/400/401/500 and **never** `429`, `Retry-After`, or
+`quota_limited` (any 429 a client sees comes from shared infra); the server may re-derive severity,
+clamp timestamps to ±24h of receive time (replacing out-of-range values with now and preserving the
+original in `$originalTimestamp`), overwrite `observedTimeUnixNano`, zero `traceId`/`spanId` that
+are not exactly 16/8 bytes, and flatten scope to `"{name}@{version}"`. The service accepts JSON or
+protobuf, content-sniffed; SDKs SHALL send JSON.
 
 #### Scenario: oversize body
-- **WHEN** a request body exceeds 2 MB
+- **WHEN** a request body exceeds the deployment's limit (10 MiB on PostHog's hosted ingestion)
 - **THEN** the server responds 413 and the SDK applies the 413 batch-shrink path
 
 #### Scenario: no quota signal from logs service

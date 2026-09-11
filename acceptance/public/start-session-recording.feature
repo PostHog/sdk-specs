@@ -31,3 +31,29 @@ Feature: Start Session Recording
     And analytics capture is opted out
     When start session recording is called
     Then session recording should remain inactive
+
+  Scenario: Start session recording does not crash the host app when replay configuration is invalid
+    Given the SDK is initialized with token "test-token"
+    And session replay is configured with an invalid replay configuration
+    And session recording is inactive
+    When start session recording is called
+    Then the call should not throw
+    And session recording should remain inactive
+
+  Scenario: Start session recording does not crash the host app when the replay integration is unavailable
+    Given the SDK is initialized with token "test-token"
+    And the session replay integration is unavailable
+    And session recording is inactive
+    When start session recording is called
+    Then the call should not throw
+    And session recording should remain inactive
+
+  Scenario: Start session recording does not crash the host app when the replay integration fails to initialize
+    Given the SDK is initialized with token "test-token"
+    And session replay is configured and eligible to start
+    And the session replay integration fails to initialize
+    And session recording is inactive
+    When start session recording is called
+    Then the call should not throw
+    And promise-returning start variants should resolve rather than reject
+    And session recording should remain inactive

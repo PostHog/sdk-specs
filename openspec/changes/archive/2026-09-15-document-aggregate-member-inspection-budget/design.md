@@ -21,8 +21,8 @@ A per-aggregate budget would multiply work in nested graphs. An output-only budg
 
 ## Migration Plan
 
-Request approval of this proposal, then archive it on the same branch to sync the canonical spec. SDK ports can use the JavaScript tests as reference cases. No SDK deployment is part of this documentation PR.
+Archive this change on the same branch to sync the canonical spec. SDK ports can use the JavaScript tests as reference cases. No SDK deployment is part of this documentation PR.
 
 ## Open Questions
 
-Reviewers must confirm the 1,000-inspection value as the shared target before this proposal is archived.
+None. The maintainer approved finalizing the 1,000-inspection budget as the shared target.

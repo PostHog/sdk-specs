@@ -20,4 +20,4 @@ None.
 
 ## Impact
 
-This proposal records the behavior implemented in https://github.com/PostHog/posthog-js/pull/4941 for agreement across SDK ports. It does not change SDK code, public APIs, or backend fields. Canonical specs will be synced by archiving on this branch after review approves the proposal.
+This change records the behavior implemented in https://github.com/PostHog/posthog-js/pull/4941 as the shared target for SDK ports. It does not change SDK code, public APIs, or backend fields. Archiving syncs the requirement into the canonical spec on this branch.

@@ -1,4 +1,4 @@
-@public @acceptance @both @capture @api_capture_v1
+@public @acceptance @both @capture @api_capture_v1 @requires:capture_v1
 Feature: Analytics-v1 retries and mock response YAML parity
   Request observations and mock-authored response checks are distinct evidence layers.
 
@@ -7,6 +7,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     And the mock PostHog server is reset
 
   # Source: yaml:029a94a:capture_v1:deduplication:preserves_uuid_on_retry
+  @case:migration:yaml-parity-v1:capture_analytics_v1:preserves_uuid_on_retry
   Scenario: Present UUID lists match across the first retry
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -22,6 +23,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     Then the present event "uuid" lists in requests zero and one should be identical
 
   # Source: yaml:029a94a:capture_v1:deduplication:preserves_timestamp_on_retry
+  @case:migration:yaml-parity-v1:capture_analytics_v1:preserves_timestamp_on_retry
   Scenario: Present timestamp lists match across the first retry
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -37,6 +39,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     Then the present event "timestamp" lists in requests zero and one should be identical
 
   # Source: yaml:029a94a:capture_v1:deduplication:preserves_uuid_and_timestamp_on_batch_retry
+  @case:migration:yaml-parity-v1:capture_analytics_v1:preserves_uuid_and_timestamp_on_batch_retry
   Scenario: A retried batch preserves its first two identity lists without duplicate UUIDs
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -55,6 +58,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     And every received batch should have no duplicate nonempty UUIDs
 
   # Source: yaml:029a94a:capture_v1:deduplication:no_duplicate_events_in_batch
+  @case:migration:yaml-parity-v1:capture_analytics_v1:no_duplicate_events_in_batch
   Scenario: Each received batch has no duplicate nonempty UUIDs
     Given the SDK is initialized with token "phc_test_key" and flush threshold 10
     When capture is called sequentially 5 times with zero-based top-level index substitution:
@@ -66,6 +70,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     And every received batch should have no duplicate nonempty UUIDs
 
   # Source: yaml:029a94a:capture_v1:header_behavior_on_retry:attempt_header_starts_at_one
+  @case:migration:yaml-parity-v1:capture_analytics_v1:attempt_header_starts_at_one
   Scenario: The initial attempt header is one
     Given the SDK is initialized with token "phc_test_key" and flush threshold 1
     When capture is called with JSON arguments:
@@ -76,6 +81,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     Then the first request header "PostHog-Attempt" should be integer 1
 
   # Source: yaml:029a94a:capture_v1:header_behavior_on_retry:attempt_header_increments_on_retry
+  @case:migration:yaml-parity-v1:capture_analytics_v1:attempt_header_increments_on_retry
   Scenario: Attempt headers increase across all recorded requests
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -93,6 +99,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     And all recorded request attempts should be consecutive integers starting at one
 
   # Source: yaml:029a94a:capture_v1:header_behavior_on_retry:request_id_preserved_on_retry
+  @case:migration:yaml-parity-v1:capture_analytics_v1:request_id_preserved_on_retry
   Scenario: Retries preserve the first nonempty request ID
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -109,6 +116,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     And all recorded request IDs should equal the nonempty first request ID
 
   # Source: yaml:029a94a:capture_v1:header_behavior_on_retry:different_requests_have_different_request_ids
+  @case:migration:yaml-parity-v1:capture_analytics_v1:different_requests_have_different_request_ids
   Scenario: Independent flushes have different request IDs
     Given the SDK is initialized with token "phc_test_key" and flush threshold 1
     When capture is called with JSON arguments:
@@ -127,6 +135,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     And the first two request headers "posthog-request-id" should be nonempty and different
 
   # Source: yaml:029a94a:capture_v1:header_behavior_on_retry:request_timestamp_changes_on_retry
+  @case:migration:yaml-parity-v1:capture_analytics_v1:request_timestamp_changes_on_retry
   Scenario: The first retry has a different request timestamp
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -143,6 +152,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     And the first two request headers "posthog-request-timestamp" should be nonempty and different
 
   # Source: yaml:029a94a:capture_v1:response_format_validation:success_response_has_uuid_keyed_results
+  @case:migration:yaml-parity-v1:capture_analytics_v1:success_response_has_uuid_keyed_results
   Scenario: The mock success response has a results object
     Given the SDK is initialized with token "phc_test_key" and flush threshold 1
     When capture is called with JSON arguments:
@@ -154,6 +164,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     And the first mock-authored response should contain a results object
 
   # Source: yaml:029a94a:capture_v1:response_format_validation:success_response_has_ok_for_each_event
+  @case:migration:yaml-parity-v1:capture_analytics_v1:success_response_has_ok_for_each_event
   Scenario: The mock success response has three ok results
     Given the SDK is initialized with token "phc_test_key" and flush threshold 10
     When capture is called sequentially 3 times with zero-based top-level index substitution:
@@ -166,6 +177,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     And the first mock-authored response should contain exactly 3 results
 
   # Source: yaml:029a94a:capture_v1:response_format_validation:success_no_retry_after_when_all_ok
+  @case:migration:yaml-parity-v1:capture_analytics_v1:success_no_retry_after_when_all_ok
   Scenario: The mock all-ok response omits Retry-After
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -179,6 +191,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     Then the first mock-authored response Retry-After should be absent
 
   # Source: yaml:029a94a:capture_v1:response_format_validation:success_retry_after_present_when_retry_events
+  @case:migration:yaml-parity-v1:capture_analytics_v1:success_retry_after_present_when_retry_events
   Scenario: The mock response with a retry result includes Retry-After
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -192,6 +205,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     Then the first mock-authored response Retry-After should be present
 
   # Source: yaml:029a94a:capture_v1:response_format_validation:success_no_retry_after_when_drop_only
+  @case:migration:yaml-parity-v1:capture_analytics_v1:success_no_retry_after_when_drop_only
   Scenario: The mock ok and drop response omits Retry-After
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -205,6 +219,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     Then the first mock-authored response Retry-After should be absent
 
   # Source: yaml:029a94a:capture_v1:response_format_validation:response_echoes_request_id
+  @case:migration:yaml-parity-v1:capture_analytics_v1:response_echoes_request_id
   Scenario: The mock response echoes the sent request ID
     Given the SDK is initialized with token "phc_test_key" and flush threshold 1
     When capture is called with JSON arguments:
@@ -215,6 +230,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     Then the first mock-authored response should echo the nonempty sent request ID
 
   # Source: yaml:029a94a:capture_v1:retry_behavior:retries_on_408
+  @case:migration:yaml-parity-v1:capture_analytics_v1:retries_on_408
   Scenario: HTTP 408 is retried and a 200 is observed
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -231,6 +247,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     And at least one recorded response should have status 200
 
   # Source: yaml:029a94a:capture_v1:retry_behavior:retries_on_500
+  @case:migration:yaml-parity-v1:capture_analytics_v1:retries_on_500
   Scenario: HTTP 500 is retried and a 200 is observed
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -247,6 +264,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     And at least one recorded response should have status 200
 
   # Source: yaml:029a94a:capture_v1:retry_behavior:retries_on_503
+  @case:migration:yaml-parity-v1:capture_analytics_v1:retries_on_503
   Scenario: Two HTTP 503 responses are retried and a 200 is observed
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -264,6 +282,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     And at least one recorded response should have status 200
 
   # Source: yaml:029a94a:capture_v1:retry_behavior:retries_on_504
+  @case:migration:yaml-parity-v1:capture_analytics_v1:retries_on_504
   Scenario: HTTP 504 is retried and a 200 is observed
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -280,6 +299,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     And at least one recorded response should have status 200
 
   # Source: yaml:029a94a:capture_v1:retry_behavior:retryable_errors_have_retry_after
+  @case:migration:yaml-parity-v1:capture_analytics_v1:retryable_errors_have_retry_after
   Scenario: The mock HTTP 503 response includes Retry-After
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -294,6 +314,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     Then the first mock-authored response Retry-After should be present
 
   # Source: yaml:029a94a:capture_v1:retry_behavior:respects_retry_after_on_retryable_error
+  @case:migration:yaml-parity-v1:capture_analytics_v1:respects_retry_after_on_retryable_error
   Scenario: Retry-After three seconds yields a first delay of at least 2500 milliseconds
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -310,6 +331,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     And the first inter-request delay should be at least 2500 milliseconds
 
   # Source: yaml:029a94a:capture_v1:retry_behavior:does_not_retry_on_400
+  @case:migration:yaml-parity-v1:capture_analytics_v1:does_not_retry_on_400
   Scenario: HTTP 400 produces only one non-flags request after two seconds
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -324,6 +346,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     Then exactly one recorded request excluding paths containing /flags should have been received
 
   # Source: yaml:029a94a:capture_v1:retry_behavior:does_not_retry_on_401
+  @case:migration:yaml-parity-v1:capture_analytics_v1:does_not_retry_on_401
   Scenario: HTTP 401 produces only one non-flags request after two seconds
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -338,6 +361,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     Then exactly one recorded request excluding paths containing /flags should have been received
 
   # Source: yaml:029a94a:capture_v1:retry_behavior:does_not_retry_on_402
+  @case:migration:yaml-parity-v1:capture_analytics_v1:does_not_retry_on_402
   Scenario: HTTP 402 produces only one non-flags request after two seconds
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -352,6 +376,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     Then exactly one recorded request excluding paths containing /flags should have been received
 
   # Source: yaml:029a94a:capture_v1:retry_behavior:does_not_retry_on_413
+  @case:migration:yaml-parity-v1:capture_analytics_v1:does_not_retry_on_413
   Scenario: HTTP 413 produces only one non-flags request after two seconds
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -366,6 +391,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     Then exactly one recorded request excluding paths containing /flags should have been received
 
   # Source: yaml:029a94a:capture_v1:retry_behavior:does_not_retry_on_415
+  @case:migration:yaml-parity-v1:capture_analytics_v1:does_not_retry_on_415
   Scenario: HTTP 415 produces only one non-flags request after two seconds
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -380,6 +406,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     Then exactly one recorded request excluding paths containing /flags should have been received
 
   # Source: yaml:029a94a:capture_v1:retry_behavior:non_retryable_errors_have_no_retry_after
+  @case:migration:yaml-parity-v1:capture_analytics_v1:non_retryable_errors_have_no_retry_after
   Scenario: The mock HTTP 401 response omits Retry-After
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -394,6 +421,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     Then the first mock-authored response Retry-After should be absent
 
   # Source: yaml:029a94a:capture_v1:retry_behavior:implements_backoff
+  @case:migration:yaml-parity-v1:capture_analytics_v1:implements_backoff
   Scenario: The first retry delay is at least 100 milliseconds
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -412,6 +440,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     And the first inter-request delay should be at least 100 milliseconds
 
   # Source: yaml:029a94a:capture_v1:retry_behavior:max_retries_respected
+  @case:migration:yaml-parity-v1:capture_analytics_v1:max_retries_respected
   Scenario: Three configured retries produce exactly four requests after fifteen seconds
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |

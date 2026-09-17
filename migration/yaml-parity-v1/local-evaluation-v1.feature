@@ -1,4 +1,4 @@
-@migration @yaml_parity_v1 @both
+@migration @yaml_parity_v1 @both @requires:feature_flags_local_evaluation_v1
 Feature: Native local equality across definitions reloads
   Typed service definitions flow through authenticated HTTP and the native loader.
   Each public getter is conclusively local; initialization and reloads never evaluate remotely.
@@ -7,6 +7,7 @@ Feature: Native local equality across definitions reloads
     Given an isolated SDK with empty persistent storage
     And the mock PostHog server is reset
 
+  @case:migration:yaml-parity-v1:feature_flags_local_evaluation:matching_version_missing
   Scenario: matching_version_missing
     And the definitions service serves this typed document:
       """application/json
@@ -560,6 +561,7 @@ Feature: Native local equality across definitions reloads
     Then exactly 0 requests containing /flags should have been received
     And no remote flag evaluation path should have been requested
 
+  @case:migration:yaml-parity-v1:feature_flags_local_evaluation:matching_version_1
   Scenario: matching_version_1
     And the definitions service serves this typed document:
       """application/json
@@ -1114,6 +1116,7 @@ Feature: Native local equality across definitions reloads
     Then exactly 0 requests containing /flags should have been received
     And no remote flag evaluation path should have been requested
 
+  @case:migration:yaml-parity-v1:feature_flags_local_evaluation:matching_version_2
   Scenario: matching_version_2
     And the definitions service serves this typed document:
       """application/json
@@ -1668,6 +1671,7 @@ Feature: Native local equality across definitions reloads
     Then exactly 0 requests containing /flags should have been received
     And no remote flag evaluation path should have been requested
 
+  @case:migration:yaml-parity-v1:feature_flags_local_evaluation:version_only_reload_1_2_1_2_missing
   Scenario: version_only_reload_1_2_1_2_missing
     And the definitions service serves this typed document:
       """application/json

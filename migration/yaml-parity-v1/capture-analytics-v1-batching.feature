@@ -1,4 +1,4 @@
-@public @acceptance @both @capture @api_capture_v1
+@public @acceptance @both @capture @api_capture_v1 @requires:capture_v1
 Feature: Analytics-v1 properties and batching YAML parity
   The SDK API declaration is independent of runtime and identity model.
 
@@ -6,6 +6,7 @@ Feature: Analytics-v1 properties and batching YAML parity
     Given an isolated SDK with empty persistent storage
     And the mock PostHog server is reset
 
+  @case:migration:yaml-parity-v1:capture_analytics_v1:custom_properties_preserved
   Scenario: Custom scalar properties retain their values
     Given the SDK is initialized with token "phc_test_key" and flush threshold 1
     When capture is called with JSON arguments:
@@ -17,6 +18,7 @@ Feature: Analytics-v1 properties and batching YAML parity
     And the first received event property "custom_number" should equal JSON 42
     And the first received event property "custom_bool" should equal JSON true
 
+  @case:migration:yaml-parity-v1:capture_analytics_v1:set_properties_preserved
   Scenario: The captured $set property is an object
     Given the SDK is initialized with token "phc_test_key" and flush threshold 1
     When capture is called with JSON arguments:
@@ -26,6 +28,7 @@ Feature: Analytics-v1 properties and batching YAML parity
     And pending captures are flushed
     Then the first received event property "$set" should be an object
 
+  @case:migration:yaml-parity-v1:capture_analytics_v1:set_once_properties_preserved
   Scenario: The captured $set_once property is an object
     Given the SDK is initialized with token "phc_test_key" and flush threshold 1
     When capture is called with JSON arguments:
@@ -35,6 +38,7 @@ Feature: Analytics-v1 properties and batching YAML parity
     And pending captures are flushed
     Then the first received event property "$set_once" should be an object
 
+  @case:migration:yaml-parity-v1:capture_analytics_v1:groups_properties_preserved
   Scenario: The captured $groups property is an object
     Given the SDK is initialized with token "phc_test_key" and flush threshold 1
     When capture is called with JSON arguments:
@@ -44,6 +48,7 @@ Feature: Analytics-v1 properties and batching YAML parity
     And pending captures are flushed
     Then the first received event property "$groups" should be an object
 
+  @case:migration:yaml-parity-v1:capture_analytics_v1:sdk_generates_uuid_if_not_provided
   Scenario: An omitted UUID produces a present valid first-event UUID
     Given the SDK is initialized with token "phc_test_key" and flush threshold 1
     When capture is called with JSON arguments:
@@ -54,6 +59,7 @@ Feature: Analytics-v1 properties and batching YAML parity
     Then the first received event should contain root field "uuid"
     And the first received event UUID should be valid
 
+  @case:migration:yaml-parity-v1:capture_analytics_v1:event_has_required_root_fields_batch
   Scenario: Three batched events all have required root fields
     Given the SDK is initialized with token "phc_test_key" and flush threshold 3
     When capture is called sequentially 3 times with zero-based top-level index substitution:
@@ -70,6 +76,7 @@ Feature: Analytics-v1 properties and batching YAML parity
       | distinct_id |
       | timestamp |
 
+  @case:migration:yaml-parity-v1:capture_analytics_v1:event_uuid_is_valid_batch
   Scenario: The first batched event UUID is valid
     Given the SDK is initialized with token "phc_test_key" and flush threshold 3
     When capture is called sequentially 3 times with zero-based top-level index substitution:
@@ -79,6 +86,7 @@ Feature: Analytics-v1 properties and batching YAML parity
     And pending captures are flushed
     Then the first received event UUID should be valid
 
+  @case:migration:yaml-parity-v1:capture_analytics_v1:event_timestamp_is_rfc3339_batch
   Scenario: Every first-request event timestamp is canonical UTC
     Given the SDK is initialized with token "phc_test_key" and flush threshold 3
     When capture is called sequentially 3 times with zero-based top-level index substitution:
@@ -88,6 +96,7 @@ Feature: Analytics-v1 properties and batching YAML parity
     And pending captures are flushed
     Then every event in the first capture request should have a canonical UTC timestamp
 
+  @case:migration:yaml-parity-v1:capture_analytics_v1:distinct_id_is_string_batch
   Scenario: The first batched distinct_id is a string
     Given the SDK is initialized with token "phc_test_key" and flush threshold 3
     When capture is called sequentially 3 times with zero-based top-level index substitution:
@@ -97,6 +106,7 @@ Feature: Analytics-v1 properties and batching YAML parity
     And pending captures are flushed
     Then the first received event field "distinct_id" should be a string
 
+  @case:migration:yaml-parity-v1:capture_analytics_v1:distinct_id_at_root_not_properties_batch
   Scenario: The first batched distinct_id is at root and not in properties
     Given the SDK is initialized with token "phc_test_key" and flush threshold 3
     When capture is called sequentially 3 times with zero-based top-level index substitution:
@@ -106,6 +116,7 @@ Feature: Analytics-v1 properties and batching YAML parity
     And pending captures are flushed
     Then the first received event should contain "distinct_id" at root and not in properties
 
+  @case:migration:yaml-parity-v1:capture_analytics_v1:custom_properties_preserved_batch
   Scenario: The first batched custom scalar properties retain their values
     Given the SDK is initialized with token "phc_test_key" and flush threshold 3
     When capture is called sequentially 3 times with zero-based top-level index substitution:
@@ -117,6 +128,7 @@ Feature: Analytics-v1 properties and batching YAML parity
     And the first received event property "custom_number" should equal JSON 42
     And the first received event property "custom_bool" should equal JSON true
 
+  @case:migration:yaml-parity-v1:capture_analytics_v1:set_properties_preserved_batch
   Scenario: The first batched $set property is an object
     Given the SDK is initialized with token "phc_test_key" and flush threshold 3
     When capture is called sequentially 3 times with zero-based top-level index substitution:
@@ -126,6 +138,7 @@ Feature: Analytics-v1 properties and batching YAML parity
     And pending captures are flushed
     Then the first received event property "$set" should be an object
 
+  @case:migration:yaml-parity-v1:capture_analytics_v1:set_once_properties_preserved_batch
   Scenario: The first batched $set_once property is an object
     Given the SDK is initialized with token "phc_test_key" and flush threshold 3
     When capture is called sequentially 3 times with zero-based top-level index substitution:
@@ -135,6 +148,7 @@ Feature: Analytics-v1 properties and batching YAML parity
     And pending captures are flushed
     Then the first received event property "$set_once" should be an object
 
+  @case:migration:yaml-parity-v1:capture_analytics_v1:groups_properties_preserved_batch
   Scenario: The first batched $groups property is an object
     Given the SDK is initialized with token "phc_test_key" and flush threshold 3
     When capture is called sequentially 3 times with zero-based top-level index substitution:
@@ -144,6 +158,7 @@ Feature: Analytics-v1 properties and batching YAML parity
     And pending captures are flushed
     Then the first received event property "$groups" should be an object
 
+  @case:migration:yaml-parity-v1:capture_analytics_v1:sdk_generates_uuid_if_not_provided_batch
   Scenario: The first batched UUID is present and valid and collected UUIDs are unique
     Given the SDK is initialized with token "phc_test_key" and flush threshold 3
     When capture is called sequentially 3 times with zero-based top-level index substitution:
@@ -155,6 +170,7 @@ Feature: Analytics-v1 properties and batching YAML parity
     And the first received event UUID should be valid
     And all present UUIDs across received requests should be unique
 
+  @case:migration:yaml-parity-v1:capture_analytics_v1:multiple_events_in_single_batch
   Scenario: Five captures are delivered in one request
     Given the SDK is initialized with token "phc_test_key" and flush threshold 10
     When capture is called sequentially 5 times with zero-based top-level index substitution:
@@ -165,6 +181,7 @@ Feature: Analytics-v1 properties and batching YAML parity
     Then exactly 1 capture request should have been received
     And the first request should contain exactly 5 parsed events
 
+  @case:migration:yaml-parity-v1:capture_analytics_v1:batch_envelope_smoke
   Scenario: A four-event batch retains the authentication and body envelope
     Given the SDK is initialized with token "phc_test_key" and flush threshold 4
     When capture is called sequentially 4 times with zero-based top-level index substitution:
@@ -177,11 +194,13 @@ Feature: Analytics-v1 properties and batching YAML parity
     And the first request should authenticate with bearer token "phc_test_key"
     And the first request body should have a canonical UTC created_at and a nonempty batch array
 
+  @case:migration:yaml-parity-v1:capture_analytics_v1:flush_with_no_events_sends_nothing
   Scenario: Empty flush leaves the accumulated request collection empty
     Given the SDK is initialized with token "phc_test_key" and no additional configuration
     And pending captures are flushed
     Then exactly 0 capture request should have been received
 
+  @case:migration:yaml-parity-v1:capture_analytics_v1:flush_at_triggers_batch
   Scenario: Reaching the threshold delivers a request without an explicit flush
     Given the SDK is initialized with token "phc_test_key" and flush threshold 3
     When capture is called sequentially 3 times with zero-based top-level index substitution:
@@ -191,6 +210,7 @@ Feature: Analytics-v1 properties and batching YAML parity
     And 1000 milliseconds elapse without a public SDK call
     Then at least 1 capture request should have been received
 
+  @case:migration:yaml-parity-v1:capture_analytics_v1:created_at_reflects_batch_creation_time
   Scenario: Batch created_at is within five seconds of the real wall clock
     Given the SDK is initialized with token "phc_test_key" and flush threshold 1
     When capture is called with JSON arguments:
@@ -200,6 +220,7 @@ Feature: Analytics-v1 properties and batching YAML parity
     And pending captures are flushed
     Then the first request created_at should be within 5 seconds of the current wall clock
 
+  @case:migration:yaml-parity-v1:capture_analytics_v1:generates_unique_uuids
   Scenario: Present UUIDs are unique across five captures
     Given the SDK is initialized with token "phc_test_key" and no additional configuration
     When capture is called sequentially 5 times with zero-based top-level index substitution:
@@ -209,6 +230,7 @@ Feature: Analytics-v1 properties and batching YAML parity
     And pending captures are flushed
     Then all present UUIDs across received requests should be unique
 
+  @case:migration:yaml-parity-v1:capture_analytics_v1:different_events_same_content_different_uuids
   Scenario: Two identical captures produce different collected UUIDs
     Given the SDK is initialized with token "phc_test_key" and no additional configuration
     When capture is called with JSON arguments:

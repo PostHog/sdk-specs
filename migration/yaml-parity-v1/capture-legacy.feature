@@ -1,4 +1,4 @@
-@public @acceptance @both @capture @api_capture_v0
+@public @acceptance @both @capture @api_capture_v0 @requires:capture_v0
 Feature: Legacy capture wire and retry YAML parity
   Legacy batch and event API contracts are declared independently of runtime.
 
@@ -8,6 +8,7 @@ Feature: Legacy capture wire and retry YAML parity
 
   # Source: yaml:029a94a:capture:format_validation:event_has_required_fields
   @api_capture_v0_batch
+  @case:migration:yaml-parity-v1:capture:event_has_required_fields @requires:capture_v0_batch
   Scenario: First event has the supplied event name and root identity
     Given the SDK is initialized with token "phc_test_key" and flush threshold 1
     When capture is called with JSON arguments:
@@ -21,6 +22,7 @@ Feature: Legacy capture wire and retry YAML parity
 
   # Source: yaml:029a94a:capture:format_validation:event_has_required_fields_client
   @api_capture_v0_event
+  @case:migration:yaml-parity-v1:capture:event_has_required_fields_client @requires:capture_v0_event
   Scenario: First event has the supplied event name and properties identity
     Given the SDK is initialized with token "phc_test_key" and flush threshold 1
     When capture is called with JSON arguments:
@@ -33,6 +35,7 @@ Feature: Legacy capture wire and retry YAML parity
     And the first received event property "distinct_id" should equal JSON "test_user"
 
   # Source: yaml:029a94a:capture:format_validation:event_has_uuid
+  @case:migration:yaml-parity-v1:capture:event_has_uuid
   Scenario: First event contains a parseable UUID
     Given the SDK is initialized with token "phc_test_key" and no additional configuration
     When capture is called with JSON arguments:
@@ -44,6 +47,7 @@ Feature: Legacy capture wire and retry YAML parity
     And the first received event UUID should be valid
 
   # Source: yaml:029a94a:capture:format_validation:event_has_lib_properties
+  @case:migration:yaml-parity-v1:capture:event_has_lib_properties
   Scenario: First event contains the library property
     Given the SDK is initialized with token "phc_test_key" and no additional configuration
     When capture is called with JSON arguments:
@@ -55,6 +59,7 @@ Feature: Legacy capture wire and retry YAML parity
 
   # Source: yaml:029a94a:capture:format_validation:distinct_id_is_string
   @api_capture_v0_batch
+  @case:migration:yaml-parity-v1:capture:distinct_id_is_string @requires:capture_v0_batch
   Scenario: First event root identity equals the supplied string
     Given the SDK is initialized with token "phc_test_key" and no additional configuration
     When capture is called with JSON arguments:
@@ -66,6 +71,7 @@ Feature: Legacy capture wire and retry YAML parity
 
   # Source: yaml:029a94a:capture:format_validation:distinct_id_is_string_client
   @api_capture_v0_event
+  @case:migration:yaml-parity-v1:capture:distinct_id_is_string_client @requires:capture_v0_event
   Scenario: First event properties identity equals the supplied string
     Given the SDK is initialized with token "phc_test_key" and no additional configuration
     When capture is called with JSON arguments:
@@ -77,6 +83,7 @@ Feature: Legacy capture wire and retry YAML parity
 
   # Source: yaml:029a94a:capture:format_validation:token_is_present
   @api_capture_v0_batch
+  @case:migration:yaml-parity-v1:capture:token_is_present @requires:capture_v0_batch
   Scenario: First request contains the token at event token or body api_key or token
     Given the SDK is initialized with token "phc_test_key" and no additional configuration
     When capture is called with JSON arguments:
@@ -88,6 +95,7 @@ Feature: Legacy capture wire and retry YAML parity
 
   # Source: yaml:029a94a:capture:format_validation:token_is_present_client
   @api_capture_v0_event
+  @case:migration:yaml-parity-v1:capture:token_is_present_client @requires:capture_v0_event
   Scenario: First request contains an event with token or api_key
     Given the SDK is initialized with token "phc_test_key" and no additional configuration
     When capture is called with JSON arguments:
@@ -98,6 +106,7 @@ Feature: Legacy capture wire and retry YAML parity
     Then an event in the first request should resolve token "phc_test_key" from event then property token or api_key
 
   # Source: yaml:029a94a:capture:format_validation:custom_properties_preserved
+  @case:migration:yaml-parity-v1:capture:custom_properties_preserved
   Scenario: Custom string number and boolean properties are preserved
     Given the SDK is initialized with token "phc_test_key" and no additional configuration
     When capture is called with JSON arguments:
@@ -110,6 +119,7 @@ Feature: Legacy capture wire and retry YAML parity
     And the first received event property "custom_bool" should equal JSON true
 
   # Source: yaml:029a94a:capture:format_validation:event_has_timestamp
+  @case:migration:yaml-parity-v1:capture:event_has_timestamp
   Scenario: First event contains a timestamp field
     Given the SDK is initialized with token "phc_test_key" and no additional configuration
     When capture is called with JSON arguments:
@@ -120,6 +130,7 @@ Feature: Legacy capture wire and retry YAML parity
     Then the first received event should contain root field "timestamp"
 
   # Source: yaml:029a94a:capture:format_validation:non_utc_event_timestamp_is_converted_to_utc
+  @case:migration:yaml-parity-v1:capture:non_utc_event_timestamp_is_converted_to_utc
   Scenario: Timestamp offset is normalized but the timestamp-like property is unchanged
     Given the SDK is initialized with token "phc_test_key" and flush threshold 1
     When capture is called with JSON arguments:
@@ -131,6 +142,7 @@ Feature: Legacy capture wire and retry YAML parity
     And the first received event property "timestamp_like" should equal JSON "2025-01-02T08:34:05+05:30"
 
   # Source: yaml:029a94a:capture:retry_behavior:retries_on_503
+  @case:migration:yaml-parity-v1:capture:retries_on_503
   Scenario: Two HTTP 503 responses are retried to an observed success
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -148,6 +160,7 @@ Feature: Legacy capture wire and retry YAML parity
     And at least one recorded response should have status 200
 
   # Source: yaml:029a94a:capture:retry_behavior:does_not_retry_on_400
+  @case:migration:yaml-parity-v1:capture:does_not_retry_on_400
   Scenario: HTTP 400 produces one request after two seconds
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -162,6 +175,7 @@ Feature: Legacy capture wire and retry YAML parity
     Then exactly 1 capture request should have been received
 
   # Source: yaml:029a94a:capture:retry_behavior:does_not_retry_on_401
+  @case:migration:yaml-parity-v1:capture:does_not_retry_on_401
   Scenario: HTTP 401 produces one request after two seconds
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -176,6 +190,7 @@ Feature: Legacy capture wire and retry YAML parity
     Then exactly 1 capture request should have been received
 
   # Source: yaml:029a94a:capture:retry_behavior:respects_retry_after_header
+  @case:migration:yaml-parity-v1:capture:respects_retry_after_header
   Scenario: HTTP 429 respects the first Retry-After delay
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -192,6 +207,7 @@ Feature: Legacy capture wire and retry YAML parity
     And the first inter-request delay should be at least 2500 milliseconds
 
   # Source: yaml:029a94a:capture:retry_behavior:implements_backoff
+  @case:migration:yaml-parity-v1:capture:implements_backoff
   Scenario: Backoff meets the first-delay floor of 100 milliseconds
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -210,6 +226,7 @@ Feature: Legacy capture wire and retry YAML parity
     And the first inter-request delay should be at least 100 milliseconds
 
   # Source: yaml:029a94a:capture:retry_behavior:retries_on_500
+  @case:migration:yaml-parity-v1:capture:retries_on_500
   Scenario: HTTP 500 is retried to an observed success
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -226,6 +243,7 @@ Feature: Legacy capture wire and retry YAML parity
     And at least one recorded response should have status 200
 
   # Source: yaml:029a94a:capture:retry_behavior:retries_on_502
+  @case:migration:yaml-parity-v1:capture:retries_on_502
   Scenario: HTTP 502 is retried to an observed success
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -242,6 +260,7 @@ Feature: Legacy capture wire and retry YAML parity
     And at least one recorded response should have status 200
 
   # Source: yaml:029a94a:capture:retry_behavior:retries_on_504
+  @case:migration:yaml-parity-v1:capture:retries_on_504
   Scenario: HTTP 504 is retried to an observed success
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -258,6 +277,7 @@ Feature: Legacy capture wire and retry YAML parity
     And at least one recorded response should have status 200
 
   # Source: yaml:029a94a:capture:retry_behavior:max_retries_respected
+  @case:migration:yaml-parity-v1:capture:max_retries_respected
   Scenario: Three configured retries produce exactly four requests
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -276,6 +296,7 @@ Feature: Legacy capture wire and retry YAML parity
     Then exactly 4 capture request should have been received
 
   # Source: yaml:029a94a:capture:deduplication:generates_unique_uuids
+  @case:migration:yaml-parity-v1:capture:generates_unique_uuids
   Scenario: All collected UUIDs are unique
     Given the SDK is initialized with token "phc_test_key" and no additional configuration
     When capture is called sequentially 5 times with zero-based top-level index substitution:
@@ -286,6 +307,7 @@ Feature: Legacy capture wire and retry YAML parity
     Then all present UUIDs across received requests should be unique
 
   # Source: yaml:029a94a:capture:deduplication:preserves_uuid_on_retry
+  @case:migration:yaml-parity-v1:capture:preserves_uuid_on_retry
   Scenario: Present UUID lists match across the first retry
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -301,6 +323,7 @@ Feature: Legacy capture wire and retry YAML parity
     Then the present event "uuid" lists in requests zero and one should be identical
 
   # Source: yaml:029a94a:capture:deduplication:preserves_uuid_and_timestamp_on_retry
+  @case:migration:yaml-parity-v1:capture:preserves_uuid_and_timestamp_on_retry
   Scenario: Present UUID and timestamp lists match across the first retry
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -319,6 +342,7 @@ Feature: Legacy capture wire and retry YAML parity
     And the present event "timestamp" lists in requests zero and one should be identical
 
   # Source: yaml:029a94a:capture:deduplication:preserves_uuid_and_timestamp_on_batch_retry
+  @case:migration:yaml-parity-v1:capture:preserves_uuid_and_timestamp_on_batch_retry
   Scenario: Batched UUID and timestamp lists match across the first retry
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -337,6 +361,7 @@ Feature: Legacy capture wire and retry YAML parity
     And every received batch should have no duplicate nonempty UUIDs
 
   # Source: yaml:029a94a:capture:deduplication:no_duplicate_events_in_batch
+  @case:migration:yaml-parity-v1:capture:no_duplicate_events_in_batch
   Scenario: Every received batch has no duplicate nonempty UUIDs
     Given the SDK is initialized with token "phc_test_key" and flush threshold 10
     When capture is called sequentially 5 times with zero-based top-level index substitution:
@@ -348,6 +373,7 @@ Feature: Legacy capture wire and retry YAML parity
     And every received batch should have no duplicate nonempty UUIDs
 
   # Source: yaml:029a94a:capture:deduplication:different_events_have_different_uuids
+  @case:migration:yaml-parity-v1:capture:different_events_have_different_uuids
   Scenario: The first two collected UUIDs of identical captures differ
     Given the SDK is initialized with token "phc_test_key" and no additional configuration
     When capture is called with JSON arguments:
@@ -363,6 +389,7 @@ Feature: Legacy capture wire and retry YAML parity
 
   # Source: yaml:029a94a:capture:batch_format:uses_proper_batch_structure
   @api_capture_v0_batch
+  @case:migration:yaml-parity-v1:capture:uses_proper_batch_structure @requires:capture_v0_batch
   Scenario: First body contains api_key and a batch array
     Given the SDK is initialized with token "phc_test_key" and no additional configuration
     When capture is called with JSON arguments:
@@ -373,6 +400,7 @@ Feature: Legacy capture wire and retry YAML parity
     Then the first request body should contain a batch array and an api_key field
 
   # Source: yaml:029a94a:capture:batch_format:flush_with_no_events_sends_nothing
+  @case:migration:yaml-parity-v1:capture:flush_with_no_events_sends_nothing
   Scenario: Empty flush sends no accumulated requests
     Given the SDK is initialized with token "phc_test_key" and no additional configuration
     And pending captures are flushed
@@ -380,6 +408,7 @@ Feature: Legacy capture wire and retry YAML parity
 
   # Source: yaml:029a94a:capture:batch_format:multiple_events_batched_together
   @api_capture_v0_batch
+  @case:migration:yaml-parity-v1:capture:multiple_events_batched_together @requires:capture_v0_batch
   Scenario: Five captures produce one request with a batch array
     Given the SDK is initialized with token "phc_test_key" and flush threshold 10
     When capture is called sequentially 5 times with zero-based top-level index substitution:
@@ -391,6 +420,7 @@ Feature: Legacy capture wire and retry YAML parity
     And the first request body should contain a batch array
 
   # Source: yaml:029a94a:capture:error_handling:does_not_retry_on_403
+  @case:migration:yaml-parity-v1:capture:does_not_retry_on_403
   Scenario: HTTP 403 produces one request after two seconds
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -405,6 +435,7 @@ Feature: Legacy capture wire and retry YAML parity
     Then exactly 1 capture request should have been received
 
   # Source: yaml:029a94a:capture:error_handling:does_not_retry_on_413
+  @case:migration:yaml-parity-v1:capture:does_not_retry_on_413
   Scenario: HTTP 413 produces one request after two seconds
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -419,6 +450,7 @@ Feature: Legacy capture wire and retry YAML parity
     Then exactly 1 capture request should have been received
 
   # Source: yaml:029a94a:capture:error_handling:retries_on_408
+  @case:migration:yaml-parity-v1:capture:retries_on_408
   Scenario: HTTP 408 is retried to an observed success
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |

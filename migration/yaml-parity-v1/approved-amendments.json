@@ -1,0 +1,471 @@
+{
+  "id": "capture-amendment-v1",
+  "contract_amendment": "contracts/v2/inputs/capture-amendment-v1.ts",
+  "historical_blockers": "blocked-cases.json",
+  "resolutions": [
+    {
+      "id": "migration:yaml-parity-v1:capture_analytics_v1:sends_gzip_content_encoding",
+      "legacy_id": "yaml:029a94a:capture_v1:compression:sends_gzip_content_encoding",
+      "status": "translated",
+      "argument_translations": [
+        {
+          "source": "init.enable_compression",
+          "value": true,
+          "target": "/setup.config.compression",
+          "target_value": "gzip",
+          "amendment": "capture-amendment-v1",
+          "rationale": "Approved explicit algorithm selection replaces SDK algorithm choice; original wire assertion is unchanged."
+        }
+      ]
+    },
+    {
+      "id": "migration:yaml-parity-v1:capture_analytics_v1:sends_deflate_content_encoding",
+      "legacy_id": "yaml:029a94a:capture_v1:compression:sends_deflate_content_encoding",
+      "status": "translated",
+      "argument_translations": [
+        {
+          "source": "init.enable_compression",
+          "value": true,
+          "target": "/setup.config.compression",
+          "target_value": "deflate",
+          "amendment": "capture-amendment-v1",
+          "rationale": "Approved explicit algorithm selection replaces SDK algorithm choice; original wire assertion is unchanged."
+        }
+      ]
+    },
+    {
+      "id": "migration:yaml-parity-v1:capture_analytics_v1:sends_br_content_encoding",
+      "legacy_id": "yaml:029a94a:capture_v1:compression:sends_br_content_encoding",
+      "status": "translated",
+      "argument_translations": [
+        {
+          "source": "init.enable_compression",
+          "value": true,
+          "target": "/setup.config.compression",
+          "target_value": "br",
+          "amendment": "capture-amendment-v1",
+          "rationale": "Approved explicit algorithm selection replaces SDK algorithm choice; original wire assertion is unchanged."
+        }
+      ]
+    },
+    {
+      "id": "migration:yaml-parity-v1:capture_analytics_v1:sends_zstd_content_encoding",
+      "legacy_id": "yaml:029a94a:capture_v1:compression:sends_zstd_content_encoding",
+      "status": "translated",
+      "argument_translations": [
+        {
+          "source": "init.enable_compression",
+          "value": true,
+          "target": "/setup.config.compression",
+          "target_value": "zstd",
+          "amendment": "capture-amendment-v1",
+          "rationale": "Approved explicit algorithm selection replaces SDK algorithm choice; original wire assertion is unchanged."
+        }
+      ]
+    },
+    {
+      "id": "migration:yaml-parity-v1:capture_analytics_v1:compressed_body_is_decompressible",
+      "legacy_id": "yaml:029a94a:capture_v1:compression:compressed_body_is_decompressible",
+      "status": "translated",
+      "argument_translations": [
+        {
+          "source": "init.enable_compression",
+          "value": true,
+          "target": "/setup.config.compression",
+          "target_value": "gzip",
+          "amendment": "capture-amendment-v1",
+          "rationale": "Approved explicit algorithm selection replaces SDK algorithm choice; original wire assertion is unchanged."
+        }
+      ]
+    },
+    {
+      "id": "migration:yaml-parity-v1:capture_analytics_v1:cookieless_mode_override",
+      "legacy_id": "yaml:029a94a:capture_v1:event_options:cookieless_mode_override",
+      "status": "translated",
+      "argument_translations": []
+    },
+    {
+      "id": "migration:yaml-parity-v1:capture_analytics_v1:disable_skew_correction_override",
+      "legacy_id": "yaml:029a94a:capture_v1:event_options:disable_skew_correction_override",
+      "status": "translated",
+      "argument_translations": []
+    },
+    {
+      "id": "migration:yaml-parity-v1:capture_analytics_v1:process_person_profile_override",
+      "legacy_id": "yaml:029a94a:capture_v1:event_options:process_person_profile_override",
+      "status": "translated",
+      "argument_translations": []
+    },
+    {
+      "id": "migration:yaml-parity-v1:capture_analytics_v1:product_tour_id_override",
+      "legacy_id": "yaml:029a94a:capture_v1:event_options:product_tour_id_override",
+      "status": "translated",
+      "argument_translations": []
+    },
+    {
+      "id": "migration:yaml-parity-v1:capture_analytics_v1:options_override_in_batch",
+      "legacy_id": "yaml:029a94a:capture_v1:event_options:options_override_in_batch",
+      "status": "translated",
+      "argument_translations": []
+    },
+    {
+      "id": "migration:yaml-parity-v1:capture_analytics_v1:geoip_disable_injected_into_properties",
+      "legacy_id": "yaml:029a94a:capture_v1:geoip_and_historical_migration:geoip_disable_injected_into_properties",
+      "status": "translated",
+      "argument_translations": []
+    },
+    {
+      "id": "migration:yaml-parity-v1:capture:sends_gzip_when_enabled",
+      "legacy_id": "yaml:029a94a:capture:compression:sends_gzip_when_enabled",
+      "status": "translated",
+      "argument_translations": [
+        {
+          "source": "init.enable_compression",
+          "value": true,
+          "target": "/setup.config.compression",
+          "target_value": "gzip",
+          "amendment": "capture-amendment-v1",
+          "rationale": "Approved explicit algorithm selection replaces SDK algorithm choice; original wire assertion is unchanged."
+        }
+      ]
+    }
+  ],
+  "remaining": {
+    "remote_flags": {
+      "count": 0,
+      "status": "translated_with_approved_setup_amendment"
+    },
+    "local_flags": {
+      "count": 0,
+      "status": "translated_with_approved_local_evaluation_amendment"
+    }
+  },
+  "flag_semantics_v1": {
+    "id": "flag-semantics-v1",
+    "contract_amendment": "contracts/v2/inputs/flag-semantics-v1.ts",
+    "historical_blockers": "remote-flag-blocked-cases.json",
+    "resolutions": [
+      {
+        "id": "migration:yaml-parity-v1:feature_flags:request_with_person_properties_device_id",
+        "legacy_id": "yaml:029a94a:feature_flags:request_payload:request_with_person_properties_device_id",
+        "status": "translated",
+        "argument_translations": [
+          {
+            "source_step_index": 1,
+            "source": "get_feature_flag.force_remote",
+            "value": true,
+            "target": "removed",
+            "amendment": "flag-semantics-v1",
+            "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+          }
+        ]
+      },
+      {
+        "id": "migration:yaml-parity-v1:feature_flags:flags_request_uses_v2_query_param",
+        "legacy_id": "yaml:029a94a:feature_flags:request_payload:flags_request_uses_v2_query_param",
+        "status": "translated",
+        "argument_translations": [
+          {
+            "source_step_index": 1,
+            "source": "get_feature_flag.force_remote",
+            "value": true,
+            "target": "removed",
+            "amendment": "flag-semantics-v1",
+            "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+          }
+        ]
+      },
+      {
+        "id": "migration:yaml-parity-v1:feature_flags:flags_request_hits_flags_path_not_decide",
+        "legacy_id": "yaml:029a94a:feature_flags:request_payload:flags_request_hits_flags_path_not_decide",
+        "status": "translated",
+        "argument_translations": [
+          {
+            "source_step_index": 1,
+            "source": "get_feature_flag.force_remote",
+            "value": true,
+            "target": "removed",
+            "amendment": "flag-semantics-v1",
+            "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+          }
+        ]
+      },
+      {
+        "id": "migration:yaml-parity-v1:feature_flags:flags_request_omits_authorization_header",
+        "legacy_id": "yaml:029a94a:feature_flags:request_payload:flags_request_omits_authorization_header",
+        "status": "translated",
+        "argument_translations": [
+          {
+            "source_step_index": 1,
+            "source": "get_feature_flag.force_remote",
+            "value": true,
+            "target": "removed",
+            "amendment": "flag-semantics-v1",
+            "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+          }
+        ]
+      },
+      {
+        "id": "migration:yaml-parity-v1:feature_flags:token_in_flags_body_matches_init",
+        "legacy_id": "yaml:029a94a:feature_flags:request_payload:token_in_flags_body_matches_init",
+        "status": "translated",
+        "argument_translations": [
+          {
+            "source_step_index": 1,
+            "source": "get_feature_flag.force_remote",
+            "value": true,
+            "target": "removed",
+            "amendment": "flag-semantics-v1",
+            "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+          }
+        ]
+      },
+      {
+        "id": "migration:yaml-parity-v1:feature_flags:groups_round_trip",
+        "legacy_id": "yaml:029a94a:feature_flags:request_payload:groups_round_trip",
+        "status": "translated",
+        "argument_translations": [
+          {
+            "source_step_index": 1,
+            "source": "get_feature_flag.force_remote",
+            "value": true,
+            "target": "removed",
+            "amendment": "flag-semantics-v1",
+            "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+          }
+        ]
+      },
+      {
+        "id": "migration:yaml-parity-v1:feature_flags:groups_default_to_empty_object",
+        "legacy_id": "yaml:029a94a:feature_flags:request_payload:groups_default_to_empty_object",
+        "status": "translated",
+        "argument_translations": [
+          {
+            "source_step_index": 1,
+            "source": "get_feature_flag.force_remote",
+            "value": true,
+            "target": "removed",
+            "amendment": "flag-semantics-v1",
+            "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+          }
+        ]
+      },
+      {
+        "id": "migration:yaml-parity-v1:feature_flags:disable_geoip_false_propagates_as_geoip_disable_false",
+        "legacy_id": "yaml:029a94a:feature_flags:request_payload:disable_geoip_false_propagates_as_geoip_disable_false",
+        "status": "translated",
+        "argument_translations": [
+          {
+            "source_step_index": 1,
+            "source": "get_feature_flag.force_remote",
+            "value": true,
+            "target": "removed",
+            "amendment": "flag-semantics-v1",
+            "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+          }
+        ]
+      },
+      {
+        "id": "migration:yaml-parity-v1:feature_flags:disable_geoip_omitted_defaults_to_false",
+        "legacy_id": "yaml:029a94a:feature_flags:request_payload:disable_geoip_omitted_defaults_to_false",
+        "status": "translated",
+        "argument_translations": [
+          {
+            "source_step_index": 1,
+            "source": "get_feature_flag.force_remote",
+            "value": true,
+            "target": "removed",
+            "amendment": "flag-semantics-v1",
+            "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+          }
+        ]
+      },
+      {
+        "id": "migration:yaml-parity-v1:feature_flags:flag_keys_to_evaluate_contains_only_requested_key",
+        "legacy_id": "yaml:029a94a:feature_flags:request_payload:flag_keys_to_evaluate_contains_only_requested_key",
+        "status": "translated",
+        "argument_translations": [
+          {
+            "source_step_index": 1,
+            "source": "get_feature_flag.force_remote",
+            "value": true,
+            "target": "removed",
+            "amendment": "flag-semantics-v1",
+            "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+          }
+        ]
+      },
+      {
+        "id": "migration:yaml-parity-v1:feature_flags:no_flags_request_on_init_alone",
+        "legacy_id": "yaml:029a94a:feature_flags:request_lifecycle:no_flags_request_on_init_alone",
+        "status": "translated",
+        "argument_translations": []
+      },
+      {
+        "id": "migration:yaml-parity-v1:feature_flags:no_flags_request_on_normal_capture",
+        "legacy_id": "yaml:029a94a:feature_flags:request_lifecycle:no_flags_request_on_normal_capture",
+        "status": "translated",
+        "argument_translations": []
+      },
+      {
+        "id": "migration:yaml-parity-v1:feature_flags:two_flag_calls_produce_two_remote_requests",
+        "legacy_id": "yaml:029a94a:feature_flags:request_lifecycle:two_flag_calls_produce_two_remote_requests",
+        "status": "translated",
+        "argument_translations": [
+          {
+            "source_step_index": 1,
+            "source": "get_feature_flag.force_remote",
+            "value": true,
+            "target": "removed",
+            "amendment": "flag-semantics-v1",
+            "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+          },
+          {
+            "source_step_index": 2,
+            "source": "get_feature_flag.force_remote",
+            "value": true,
+            "target": "removed",
+            "amendment": "flag-semantics-v1",
+            "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+          }
+        ]
+      },
+      {
+        "id": "migration:yaml-parity-v1:feature_flags:mock_response_value_is_returned_to_caller",
+        "legacy_id": "yaml:029a94a:feature_flags:request_lifecycle:mock_response_value_is_returned_to_caller",
+        "status": "translated",
+        "argument_translations": [
+          {
+            "source_step_index": 2,
+            "source": "get_feature_flag.force_remote",
+            "value": true,
+            "target": "removed",
+            "amendment": "flag-semantics-v1",
+            "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+          }
+        ]
+      },
+      {
+        "id": "migration:yaml-parity-v1:feature_flags:retries_flags_on_502",
+        "legacy_id": "yaml:029a94a:feature_flags:retry_behavior:retries_flags_on_502",
+        "status": "translated",
+        "argument_translations": [
+          {
+            "source_step_index": 2,
+            "source": "get_feature_flag.force_remote",
+            "value": true,
+            "target": "removed",
+            "amendment": "flag-semantics-v1",
+            "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+          }
+        ]
+      },
+      {
+        "id": "migration:yaml-parity-v1:feature_flags:retries_flags_on_504",
+        "legacy_id": "yaml:029a94a:feature_flags:retry_behavior:retries_flags_on_504",
+        "status": "translated",
+        "argument_translations": [
+          {
+            "source_step_index": 2,
+            "source": "get_feature_flag.force_remote",
+            "value": true,
+            "target": "removed",
+            "amendment": "flag-semantics-v1",
+            "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+          }
+        ]
+      },
+      {
+        "id": "migration:yaml-parity-v1:feature_flags:get_feature_flag_captures_feature_flag_called_event",
+        "legacy_id": "yaml:029a94a:feature_flags:side_effect_events:get_feature_flag_captures_feature_flag_called_event",
+        "status": "translated",
+        "argument_translations": [
+          {
+            "source_step_index": 2,
+            "source": "get_feature_flag.force_remote",
+            "value": true,
+            "target": "removed",
+            "amendment": "flag-semantics-v1",
+            "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+          }
+        ]
+      }
+    ]
+  },
+  "local_evaluation_v1": {
+    "id": "local-evaluation-v1",
+    "contract_amendment": "contracts/v2/inputs/local-evaluation-v1.ts",
+    "historical_assessment": "remote-flags-contract-gap.md",
+    "resolutions": [
+      {
+        "id": "migration:yaml-parity-v1:feature_flags_local_evaluation:matching_version_missing",
+        "legacy_id": "yaml:029a94a:feature_flags_local_evaluation:versioned_boolean_matching:matching_version_missing",
+        "status": "translated",
+        "argument_translations": [
+          {
+            "source": "init.personal_api_key",
+            "target": "setup.config.secret_key",
+            "semantics": "lossless alias; omitted inputs remain omitted"
+          },
+          {
+            "source": "reload_feature_flag_definitions",
+            "target": "/reload_feature_flags + /wait_for_local_evaluation_ready",
+            "semantics": "native public refresh plus fresh authenticated HTTP 200 under one 5000ms deadline"
+          }
+        ]
+      },
+      {
+        "id": "migration:yaml-parity-v1:feature_flags_local_evaluation:matching_version_1",
+        "legacy_id": "yaml:029a94a:feature_flags_local_evaluation:versioned_boolean_matching:matching_version_1",
+        "status": "translated",
+        "argument_translations": [
+          {
+            "source": "init.personal_api_key",
+            "target": "setup.config.secret_key",
+            "semantics": "lossless alias; omitted inputs remain omitted"
+          },
+          {
+            "source": "reload_feature_flag_definitions",
+            "target": "/reload_feature_flags + /wait_for_local_evaluation_ready",
+            "semantics": "native public refresh plus fresh authenticated HTTP 200 under one 5000ms deadline"
+          }
+        ]
+      },
+      {
+        "id": "migration:yaml-parity-v1:feature_flags_local_evaluation:matching_version_2",
+        "legacy_id": "yaml:029a94a:feature_flags_local_evaluation:versioned_boolean_matching:matching_version_2",
+        "status": "translated",
+        "argument_translations": [
+          {
+            "source": "init.personal_api_key",
+            "target": "setup.config.secret_key",
+            "semantics": "lossless alias; omitted inputs remain omitted"
+          },
+          {
+            "source": "reload_feature_flag_definitions",
+            "target": "/reload_feature_flags + /wait_for_local_evaluation_ready",
+            "semantics": "native public refresh plus fresh authenticated HTTP 200 under one 5000ms deadline"
+          }
+        ]
+      },
+      {
+        "id": "migration:yaml-parity-v1:feature_flags_local_evaluation:version_only_reload_1_2_1_2_missing",
+        "legacy_id": "yaml:029a94a:feature_flags_local_evaluation:versioned_boolean_matching:version_only_reload_1_2_1_2_missing",
+        "status": "translated",
+        "argument_translations": [
+          {
+            "source": "init.personal_api_key",
+            "target": "setup.config.secret_key",
+            "semantics": "lossless alias; omitted inputs remain omitted"
+          },
+          {
+            "source": "reload_feature_flag_definitions",
+            "target": "/reload_feature_flags + /wait_for_local_evaluation_ready",
+            "semantics": "native public refresh plus fresh authenticated HTTP 200 under one 5000ms deadline"
+          }
+        ]
+      }
+    ],
+    "native_sdk_evidence": []
+  }
+}

@@ -1,0 +1,8124 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "Json": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Json"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/Json"
+          }
+        }
+      ]
+    },
+    "Properties": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/Json"
+      }
+    },
+    "integer": {
+      "type": "integer"
+    },
+    "Identity": {
+      "type": "string"
+    },
+    "GroupKey": {
+      "type": "string"
+    },
+    "Groups": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/GroupKey"
+      }
+    },
+    "GroupProperties": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/Properties"
+      }
+    },
+    "Timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?(Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "DurationMs": {
+      "type": "number"
+    },
+    "FlagValue": {
+      "type": [
+        "boolean",
+        "string"
+      ]
+    },
+    "FlagValues": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/FlagValue"
+      }
+    },
+    "Payloads": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/Json"
+      }
+    },
+    "HeaderValue": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    "MetricAttributes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "boolean"
+        ]
+      }
+    },
+    "SpanValue": {
+      "$ref": "#/definitions/Json"
+    },
+    "LogLevel": {
+      "type": "string",
+      "enum": [
+        "trace",
+        "debug",
+        "info",
+        "warn",
+        "error",
+        "fatal"
+      ]
+    },
+    "Transport": {
+      "type": "string",
+      "enum": [
+        "XHR",
+        "fetch",
+        "sendBeacon"
+      ]
+    },
+    "RefKind": {
+      "type": "string",
+      "enum": [
+        "instance",
+        "exception",
+        "stack",
+        "callback",
+        "snapshot",
+        "flag_result",
+        "span",
+        "subscription",
+        "context",
+        "cancellation",
+        "type",
+        "runtime",
+        "definition",
+        "cache_provider",
+        "storage",
+        "logger",
+        "metrics",
+        "diagnostic_logger",
+        "surveys_delegate",
+        "subject",
+        "batch_summary",
+        "value"
+      ]
+    },
+    "SpecialValueFixture": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string",
+              "enum": [
+                "undefined",
+                "nan",
+                "positive_infinity",
+                "negative_infinity"
+              ]
+            }
+          },
+          "required": [
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string",
+              "const": "bigint"
+            },
+            "decimal": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "value",
+            "decimal"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Instance": {
+      "$ref": "#/definitions/Ref%3C%22instance%22%3E"
+    },
+    "Ref<\"instance\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "instance"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "ErrorRef": {
+      "$ref": "#/definitions/Ref%3C%22exception%22%3E"
+    },
+    "Ref<\"exception\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "exception"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "Stack": {
+      "$ref": "#/definitions/Ref%3C%22stack%22%3E"
+    },
+    "Ref<\"stack\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "stack"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "Callback": {
+      "$ref": "#/definitions/Ref%3C%22callback%22%3E"
+    },
+    "Ref<\"callback\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "callback"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "Snapshot": {
+      "$ref": "#/definitions/Ref%3C%22snapshot%22%3E"
+    },
+    "Ref<\"snapshot\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "snapshot"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "FlagResultRef": {
+      "$ref": "#/definitions/Ref%3C%22flag_result%22%3E"
+    },
+    "Ref<\"flag_result\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "flag_result"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "Span": {
+      "$ref": "#/definitions/Ref%3C%22span%22%3E"
+    },
+    "Ref<\"span\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "span"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "Subscription": {
+      "$ref": "#/definitions/Ref%3C%22subscription%22%3E"
+    },
+    "Ref<\"subscription\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "subscription"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "Context": {
+      "$ref": "#/definitions/Ref%3C%22context%22%3E"
+    },
+    "Ref<\"context\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "context"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "Cancellation": {
+      "$ref": "#/definitions/Ref%3C%22cancellation%22%3E"
+    },
+    "Ref<\"cancellation\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "cancellation"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "Type": {
+      "$ref": "#/definitions/Ref%3C%22type%22%3E"
+    },
+    "Ref<\"type\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "type"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "ExceptionInput": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ErrorRef"
+        },
+        {
+          "$ref": "#/definitions/Json"
+        }
+      ]
+    },
+    "FlagResult": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "variant": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "payload": {
+          "$ref": "#/definitions/Json"
+        }
+      },
+      "required": [
+        "key",
+        "enabled",
+        "variant",
+        "payload"
+      ],
+      "additionalProperties": false
+    },
+    "FlagsAndPayloads": {
+      "type": "object",
+      "properties": {
+        "flags": {
+          "$ref": "#/definitions/FlagValues"
+        },
+        "payloads": {
+          "$ref": "#/definitions/Payloads"
+        }
+      },
+      "required": [
+        "flags",
+        "payloads"
+      ],
+      "additionalProperties": false
+    },
+    "EventArgs": {
+      "type": "object",
+      "properties": {
+        "event": {
+          "type": "string"
+        },
+        "distinct_id": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Identity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Properties"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "groups": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Groups"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "timestamp": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "uuid": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "set": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Properties"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "set_once": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Properties"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unset": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "disable_geoip": {
+          "type": "boolean"
+        },
+        "flags": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Snapshot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "send_feature_flags": {
+          "$ref": "#/definitions/SendFlags"
+        },
+        "send_instantly": {
+          "type": "boolean"
+        },
+        "skip_client_rate_limiting": {
+          "type": "boolean"
+        },
+        "transport": {
+          "$ref": "#/definitions/Transport"
+        }
+      },
+      "required": [
+        "event"
+      ],
+      "additionalProperties": false
+    },
+    "SendFlags": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "only_evaluate_locally": {
+              "type": "boolean"
+            },
+            "person_properties": {
+              "$ref": "#/definitions/Properties"
+            },
+            "group_properties": {
+              "$ref": "#/definitions/GroupProperties"
+            },
+            "flag_keys": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "device_id": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "IdentifyArgs": {
+      "type": "object",
+      "properties": {
+        "distinct_id": {
+          "$ref": "#/definitions/Identity"
+        },
+        "set": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Properties"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "set_once": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Properties"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "timestamp": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "uuid": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "disable_geoip": {
+          "type": "boolean"
+        },
+        "cancellation": {
+          "$ref": "#/definitions/Cancellation"
+        }
+      },
+      "required": [
+        "distinct_id"
+      ],
+      "additionalProperties": false
+    },
+    "PersonArgs": {
+      "type": "object",
+      "properties": {
+        "distinct_id": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Identity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "set": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Properties"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "set_once": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Properties"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "reload_feature_flags": {
+          "type": "boolean"
+        },
+        "timestamp": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "uuid": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "disable_geoip": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "GroupArgs": {
+      "type": "object",
+      "properties": {
+        "group_type": {
+          "type": "string"
+        },
+        "group_key": {
+          "$ref": "#/definitions/GroupKey"
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Properties"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "distinct_id": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Identity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "timestamp": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "uuid": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "disable_geoip": {
+          "type": "boolean"
+        },
+        "cancellation": {
+          "$ref": "#/definitions/Cancellation"
+        }
+      },
+      "required": [
+        "group_type",
+        "group_key"
+      ],
+      "additionalProperties": false
+    },
+    "AliasArgs": {
+      "type": "object",
+      "properties": {
+        "alias": {
+          "$ref": "#/definitions/Identity"
+        },
+        "distinct_id": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Identity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Properties"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "timestamp": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "uuid": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "disable_geoip": {
+          "type": "boolean"
+        },
+        "cancellation": {
+          "$ref": "#/definitions/Cancellation"
+        }
+      },
+      "required": [
+        "alias"
+      ],
+      "additionalProperties": false
+    },
+    "ExceptionHint": {
+      "type": "object",
+      "properties": {
+        "mechanism": {
+          "type": "object",
+          "properties": {
+            "handled": {
+              "type": "boolean"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "generic",
+                "onunhandledrejection",
+                "onuncaughtexception",
+                "onconsole",
+                "middleware"
+              ]
+            },
+            "source": {
+              "type": "string"
+            },
+            "synthetic": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "synthetic_exception": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ErrorRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "skip_first_lines": {
+          "$ref": "#/definitions/integer"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ExceptionArgs": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "$ref": "#/definitions/ExceptionInput"
+        },
+        "distinct_id": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Identity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Properties"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stack": {
+          "$ref": "#/definitions/Stack"
+        },
+        "timestamp": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "uuid": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "groups": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Groups"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flags": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Snapshot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "send_feature_flags": {
+          "$ref": "#/definitions/SendFlags"
+        },
+        "disable_geoip": {
+          "type": "boolean"
+        },
+        "hint": {
+          "$ref": "#/definitions/ExceptionHint"
+        },
+        "trace_context": {
+          "type": "object",
+          "properties": {
+            "trace_id": {
+              "type": "string"
+            },
+            "span_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "trace_id",
+            "span_id"
+          ],
+          "additionalProperties": false
+        },
+        "fingerprint": {
+          "type": "string"
+        },
+        "level": {
+          "$ref": "#/definitions/LogLevel"
+        }
+      },
+      "required": [
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    "Evaluation": {
+      "type": "object",
+      "properties": {
+        "distinct_id": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Identity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "groups": {
+          "$ref": "#/definitions/Groups"
+        },
+        "person_properties": {
+          "$ref": "#/definitions/Properties"
+        },
+        "group_properties": {
+          "$ref": "#/definitions/GroupProperties"
+        },
+        "only_evaluate_locally": {
+          "type": "boolean"
+        },
+        "disable_geoip": {
+          "type": "boolean"
+        },
+        "device_id": {
+          "type": "string"
+        },
+        "flag_keys": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cancellation": {
+          "$ref": "#/definitions/Cancellation"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FlagRead": {
+      "type": "object",
+      "properties": {
+        "distinct_id": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Identity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "groups": {
+          "$ref": "#/definitions/Groups"
+        },
+        "person_properties": {
+          "$ref": "#/definitions/Properties"
+        },
+        "group_properties": {
+          "$ref": "#/definitions/GroupProperties"
+        },
+        "only_evaluate_locally": {
+          "type": "boolean"
+        },
+        "disable_geoip": {
+          "type": "boolean"
+        },
+        "device_id": {
+          "type": "string"
+        },
+        "cancellation": {
+          "$ref": "#/definitions/Cancellation"
+        },
+        "key": {
+          "type": "string"
+        },
+        "send_event": {
+          "type": "boolean"
+        },
+        "fresh": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "ValueRead": {
+      "type": "object",
+      "properties": {
+        "distinct_id": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Identity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "groups": {
+          "$ref": "#/definitions/Groups"
+        },
+        "person_properties": {
+          "$ref": "#/definitions/Properties"
+        },
+        "group_properties": {
+          "$ref": "#/definitions/GroupProperties"
+        },
+        "only_evaluate_locally": {
+          "type": "boolean"
+        },
+        "disable_geoip": {
+          "type": "boolean"
+        },
+        "device_id": {
+          "type": "string"
+        },
+        "cancellation": {
+          "$ref": "#/definitions/Cancellation"
+        },
+        "key": {
+          "type": "string"
+        },
+        "send_event": {
+          "type": "boolean"
+        },
+        "fresh": {
+          "type": "boolean"
+        },
+        "default_value": {
+          "$ref": "#/definitions/Json"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "key"
+      ]
+    },
+    "EnabledRead": {
+      "type": "object",
+      "properties": {
+        "distinct_id": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Identity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "groups": {
+          "$ref": "#/definitions/Groups"
+        },
+        "person_properties": {
+          "$ref": "#/definitions/Properties"
+        },
+        "group_properties": {
+          "$ref": "#/definitions/GroupProperties"
+        },
+        "only_evaluate_locally": {
+          "type": "boolean"
+        },
+        "disable_geoip": {
+          "type": "boolean"
+        },
+        "device_id": {
+          "type": "string"
+        },
+        "cancellation": {
+          "$ref": "#/definitions/Cancellation"
+        },
+        "key": {
+          "type": "string"
+        },
+        "send_event": {
+          "type": "boolean"
+        },
+        "fresh": {
+          "type": "boolean"
+        },
+        "default_value": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "key"
+      ]
+    },
+    "PayloadRead": {
+      "type": "object",
+      "properties": {
+        "distinct_id": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Identity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "groups": {
+          "$ref": "#/definitions/Groups"
+        },
+        "person_properties": {
+          "$ref": "#/definitions/Properties"
+        },
+        "group_properties": {
+          "$ref": "#/definitions/GroupProperties"
+        },
+        "only_evaluate_locally": {
+          "type": "boolean"
+        },
+        "disable_geoip": {
+          "type": "boolean"
+        },
+        "device_id": {
+          "type": "string"
+        },
+        "cancellation": {
+          "$ref": "#/definitions/Cancellation"
+        },
+        "key": {
+          "type": "string"
+        },
+        "match_value": {
+          "$ref": "#/definitions/FlagValue"
+        },
+        "default_value": {
+          "$ref": "#/definitions/Json"
+        },
+        "send_event": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "ContextData": {
+      "type": "object",
+      "properties": {
+        "distinct_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "session_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "device_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "properties": {
+          "$ref": "#/definitions/Properties"
+        }
+      },
+      "additionalProperties": false
+    },
+    "StartSpan": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "internal",
+            "server",
+            "client",
+            "producer",
+            "consumer"
+          ]
+        },
+        "attributes": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/SpanValue"
+          }
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Span"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tracestate": {
+          "type": "string"
+        },
+        "start_time": {
+          "$ref": "#/definitions/Timestamp"
+        }
+      },
+      "additionalProperties": false
+    },
+    "LogArgs": {
+      "type": "object",
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "level": {
+          "$ref": "#/definitions/LogLevel"
+        },
+        "attributes": {
+          "$ref": "#/definitions/Properties"
+        },
+        "trace_id": {
+          "type": "string"
+        },
+        "span_id": {
+          "type": "string"
+        },
+        "trace_flags": {
+          "$ref": "#/definitions/integer"
+        }
+      },
+      "required": [
+        "body"
+      ],
+      "additionalProperties": false
+    },
+    "MetricArgs": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "attributes": {
+          "$ref": "#/definitions/MetricAttributes"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "BatchArgs": {
+      "type": "object",
+      "properties": {
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EventArgs"
+          }
+        },
+        "historical_migration": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "events"
+      ],
+      "additionalProperties": false
+    },
+    "OptOutArgs": {
+      "type": "object",
+      "properties": {
+        "clear_persistence": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OptInArgs": {
+      "type": "object",
+      "properties": {
+        "capture_event_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "capture_properties": {
+          "$ref": "#/definitions/Properties"
+        }
+      },
+      "additionalProperties": false
+    },
+    "RegisterArgs": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/definitions/Json"
+        },
+        "days": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "key",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "GroupFlagArgs": {
+      "type": "object",
+      "properties": {
+        "group_type": {
+          "type": "string"
+        },
+        "properties": {
+          "$ref": "#/definitions/Properties"
+        },
+        "reload_feature_flags": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "group_type",
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "ReplayStart": {
+      "type": "object",
+      "properties": {
+        "resume_current": {
+          "type": "boolean"
+        },
+        "override": {
+          "type": "object",
+          "properties": {
+            "sampling": {
+              "type": "boolean"
+            },
+            "linked_flag": {
+              "type": "boolean"
+            },
+            "url_trigger": {
+              "type": "boolean"
+            },
+            "event_trigger": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "SetupArgs": {
+      "type": "object",
+      "properties": {
+        "project_token": {
+          "type": "string"
+        },
+        "config": {
+          "$ref": "#/definitions/SetupConfig"
+        },
+        "name": {
+          "type": "string"
+        },
+        "runtime_context": {
+          "$ref": "#/definitions/Ref%3C%22runtime%22%3E"
+        }
+      },
+      "required": [
+        "project_token"
+      ],
+      "additionalProperties": false
+    },
+    "SetupConfig": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "flags_host": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "assets_host": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ui_host": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "secret_key": {
+          "type": "string"
+        },
+        "flush_at": {
+          "$ref": "#/definitions/integer"
+        },
+        "flush_interval_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "max_batch_size": {
+          "$ref": "#/definitions/integer"
+        },
+        "max_queue_size": {
+          "$ref": "#/definitions/integer"
+        },
+        "shutdown_timeout_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "request_timeout_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "max_retries": {
+          "$ref": "#/definitions/integer"
+        },
+        "retry_delay_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "max_retry_delay_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "compression": {
+          "$ref": "#/definitions/Compression"
+        },
+        "capture_mode": {
+          "$ref": "#/definitions/CaptureMode"
+        },
+        "request_headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "historical_migration": {
+          "type": "boolean"
+        },
+        "enable_full_ai_capture": {
+          "type": "boolean"
+        },
+        "preload_feature_flags": {
+          "type": "boolean"
+        },
+        "send_feature_flag_events": {
+          "type": "boolean"
+        },
+        "disable_remote_feature_flags": {
+          "type": "boolean"
+        },
+        "enable_local_evaluation": {
+          "type": "boolean"
+        },
+        "only_evaluate_locally": {
+          "type": "boolean"
+        },
+        "feature_flags_poll_interval_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "feature_flag_request_timeout_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "feature_flag_request_max_retries": {
+          "$ref": "#/definitions/integer"
+        },
+        "evaluation_contexts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "flag_keys": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "feature_flag_cache_ttl_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "flag_definition_cache_provider": {
+          "$ref": "#/definitions/Ref%3C%22cache_provider%22%3E"
+        },
+        "person_profiles": {
+          "$ref": "#/definitions/PersonProfiles"
+        },
+        "opt_out_by_default": {
+          "type": "boolean"
+        },
+        "disabled": {
+          "type": "boolean"
+        },
+        "is_server": {
+          "type": "boolean"
+        },
+        "reuse_anonymous_id": {
+          "type": "boolean"
+        },
+        "bootstrap": {
+          "$ref": "#/definitions/Bootstrap"
+        },
+        "super_properties": {
+          "$ref": "#/definitions/Properties"
+        },
+        "anonymous_id_provider": {
+          "$ref": "#/definitions/Callback"
+        },
+        "persistence": {
+          "$ref": "#/definitions/Persistence"
+        },
+        "persistence_name": {
+          "type": "string"
+        },
+        "disable_persistence": {
+          "type": "boolean"
+        },
+        "storage": {
+          "$ref": "#/definitions/Ref%3C%22storage%22%3E"
+        },
+        "session_idle_timeout_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "persist_session_id_across_restart": {
+          "type": "boolean"
+        },
+        "autocapture": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "$ref": "#/definitions/AutocaptureConfig"
+            }
+          ]
+        },
+        "capture_pageview": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string",
+              "const": "history_change"
+            },
+            {
+              "$ref": "#/definitions/PageviewConfig"
+            }
+          ]
+        },
+        "capture_pageleave": {
+          "type": "boolean"
+        },
+        "capture_application_lifecycle_events": {
+          "type": "boolean"
+        },
+        "capture_screen_views": {
+          "type": "boolean"
+        },
+        "capture_element_interactions": {
+          "type": "boolean"
+        },
+        "set_default_person_properties": {
+          "type": "boolean"
+        },
+        "session_replay": {
+          "type": "boolean"
+        },
+        "replay": {
+          "$ref": "#/definitions/ReplayConfig"
+        },
+        "error_tracking": {
+          "$ref": "#/definitions/ErrorTrackingConfig"
+        },
+        "logs": {
+          "$ref": "#/definitions/LogsConfig"
+        },
+        "metrics": {
+          "$ref": "#/definitions/MetricsConfig"
+        },
+        "traces": {
+          "$ref": "#/definitions/TracesConfig"
+        },
+        "tracing_headers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "surveys": {
+          "type": "boolean"
+        },
+        "survey_config": {
+          "$ref": "#/definitions/SurveysConfig"
+        },
+        "capture_push_notification_subscriptions": {
+          "type": "boolean"
+        },
+        "capture_push_notification_opened": {
+          "type": "boolean"
+        },
+        "push_identity_provider": {
+          "$ref": "#/definitions/Callback"
+        },
+        "debug": {
+          "type": "boolean"
+        },
+        "before_send": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Callback"
+          }
+        },
+        "loaded": {
+          "$ref": "#/definitions/Callback"
+        },
+        "on_feature_flags": {
+          "$ref": "#/definitions/Callback"
+        },
+        "on_error": {
+          "$ref": "#/definitions/Callback"
+        },
+        "logger": {
+          "$ref": "#/definitions/Ref%3C%22diagnostic_logger%22%3E"
+        },
+        "disable_geoip": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Approved capture-amendment-v1: initialization-wide GeoIP and analytics-v1 event controls. Omitted fields retain native defaults; false is an explicitly supplied value."
+    },
+    "Compression": {
+      "type": "string",
+      "enum": [
+        "none",
+        "gzip",
+        "zstd",
+        "deflate",
+        "br"
+      ]
+    },
+    "CaptureMode": {
+      "type": "string",
+      "enum": [
+        "legacy",
+        "analytics_v1"
+      ]
+    },
+    "Ref<\"cache_provider\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "cache_provider"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "PersonProfiles": {
+      "type": "string",
+      "enum": [
+        "always",
+        "identified_only",
+        "never"
+      ]
+    },
+    "Bootstrap": {
+      "type": "object",
+      "properties": {
+        "distinct_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "is_identified_id": {
+          "type": "boolean"
+        },
+        "feature_flags": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/FlagValues"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "feature_flag_payloads": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Payloads"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "session_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Persistence": {
+      "type": "string",
+      "enum": [
+        "memory",
+        "persistent"
+      ]
+    },
+    "Ref<\"storage\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "storage"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "AutocaptureConfig": {
+      "type": "object",
+      "properties": {
+        "dom_event_allowlist": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "element_allowlist": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "css_selector_allowlist": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "url_allowlist": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "url_ignorelist": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "capture_copied_text": {
+          "type": "boolean"
+        },
+        "capture_synthetic_events": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PageviewConfig": {
+      "type": "object",
+      "properties": {
+        "capture_history_changes": {
+          "type": "boolean"
+        },
+        "capture_hash_changes": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ReplayConfig": {
+      "type": "object",
+      "properties": {
+        "mask_all_text_inputs": {
+          "type": "boolean"
+        },
+        "mask_all_text": {
+          "type": "boolean"
+        },
+        "mask_all_images": {
+          "type": "boolean"
+        },
+        "mask_all_platform_views": {
+          "type": "boolean"
+        },
+        "mask_custom_paint": {
+          "type": "boolean"
+        },
+        "capture_touches": {
+          "type": "boolean"
+        },
+        "capture_network_telemetry": {
+          "type": "boolean"
+        },
+        "capture_logs": {
+          "type": "boolean"
+        },
+        "capture_native_screens": {
+          "type": "boolean"
+        },
+        "screenshot_mode": {
+          "type": "boolean"
+        },
+        "throttle_delay_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "sample_rate": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ErrorTrackingConfig": {
+      "type": "object",
+      "properties": {
+        "auto_capture": {
+          "type": "boolean"
+        },
+        "in_app_includes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "in_app_excludes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "in_app_by_default": {
+          "type": "boolean"
+        },
+        "ignored_exception_types": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exception_steps": {
+          "$ref": "#/definitions/ExceptionStepsConfig"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ExceptionStepsConfig": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "max_bytes": {
+          "$ref": "#/definitions/integer"
+        }
+      },
+      "additionalProperties": false
+    },
+    "LogsConfig": {
+      "type": "object",
+      "properties": {
+        "service_name": {
+          "type": "string"
+        },
+        "service_version": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "resource_attributes": {
+          "$ref": "#/definitions/Properties"
+        },
+        "flush_interval_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "flush_at": {
+          "$ref": "#/definitions/integer"
+        },
+        "max_queue_size": {
+          "$ref": "#/definitions/integer"
+        },
+        "max_batch_records_per_post": {
+          "$ref": "#/definitions/integer"
+        },
+        "rate_cap": {
+          "$ref": "#/definitions/LogRateCap"
+        },
+        "before_send": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Callback"
+          }
+        },
+        "capture_console_logs": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "LogRateCap": {
+      "type": "object",
+      "properties": {
+        "max_logs": {
+          "$ref": "#/definitions/integer"
+        },
+        "window_ms": {
+          "$ref": "#/definitions/DurationMs"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MetricsConfig": {
+      "type": "object",
+      "properties": {
+        "service_name": {
+          "type": "string"
+        },
+        "service_version": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "resource_attributes": {
+          "$ref": "#/definitions/MetricAttributes"
+        },
+        "flush_interval_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "max_series_per_flush": {
+          "$ref": "#/definitions/integer"
+        },
+        "before_send": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Callback"
+          }
+        },
+        "network": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "$ref": "#/definitions/NetworkMetricsConfig"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "NetworkMetricsConfig": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/Callback"
+            }
+          ]
+        },
+        "attributes": {
+          "$ref": "#/definitions/Callback"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TracesConfig": {
+      "type": "object",
+      "properties": {
+        "service_name": {
+          "type": "string"
+        },
+        "service_version": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "resource_attributes": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/SpanValue"
+          }
+        },
+        "flush_interval_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "max_export_batch_size": {
+          "$ref": "#/definitions/integer"
+        },
+        "max_queue_size": {
+          "$ref": "#/definitions/integer"
+        },
+        "max_attributes_per_span": {
+          "$ref": "#/definitions/integer"
+        },
+        "max_events_per_span": {
+          "$ref": "#/definitions/integer"
+        },
+        "max_attribute_value_length": {
+          "$ref": "#/definitions/integer"
+        },
+        "max_live_spans": {
+          "$ref": "#/definitions/integer"
+        },
+        "max_span_age_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "before_span_send": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Callback"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "SurveysConfig": {
+      "type": "object",
+      "properties": {
+        "prefill_from_url": {
+          "type": "boolean"
+        },
+        "delegate": {
+          "$ref": "#/definitions/Ref%3C%22surveys_delegate%22%3E"
+        },
+        "override_display_language": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Ref<\"surveys_delegate\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "surveys_delegate"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "Ref<\"diagnostic_logger\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "diagnostic_logger"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "Ref<\"runtime\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "runtime"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "ResetArgs": {
+      "type": "object",
+      "properties": {
+        "reset_device_id": {
+          "type": "boolean"
+        },
+        "bootstrap": {
+          "$ref": "#/definitions/Bootstrap"
+        },
+        "keep_properties": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "BaseSetupConfig": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "flags_host": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "assets_host": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ui_host": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "secret_key": {
+          "type": "string"
+        },
+        "flush_at": {
+          "$ref": "#/definitions/integer"
+        },
+        "flush_interval_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "max_batch_size": {
+          "$ref": "#/definitions/integer"
+        },
+        "max_queue_size": {
+          "$ref": "#/definitions/integer"
+        },
+        "shutdown_timeout_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "request_timeout_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "max_retries": {
+          "$ref": "#/definitions/integer"
+        },
+        "retry_delay_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "max_retry_delay_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "compression": {
+          "$ref": "#/definitions/Compression"
+        },
+        "capture_mode": {
+          "$ref": "#/definitions/CaptureMode"
+        },
+        "request_headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "historical_migration": {
+          "type": "boolean"
+        },
+        "enable_full_ai_capture": {
+          "type": "boolean"
+        },
+        "preload_feature_flags": {
+          "type": "boolean"
+        },
+        "send_feature_flag_events": {
+          "type": "boolean"
+        },
+        "disable_remote_feature_flags": {
+          "type": "boolean"
+        },
+        "enable_local_evaluation": {
+          "type": "boolean"
+        },
+        "only_evaluate_locally": {
+          "type": "boolean"
+        },
+        "feature_flags_poll_interval_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "feature_flag_request_timeout_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "feature_flag_request_max_retries": {
+          "$ref": "#/definitions/integer"
+        },
+        "evaluation_contexts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "flag_keys": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "feature_flag_cache_ttl_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "flag_definition_cache_provider": {
+          "$ref": "#/definitions/Ref%3C%22cache_provider%22%3E"
+        },
+        "person_profiles": {
+          "$ref": "#/definitions/PersonProfiles"
+        },
+        "opt_out_by_default": {
+          "type": "boolean"
+        },
+        "disabled": {
+          "type": "boolean"
+        },
+        "is_server": {
+          "type": "boolean"
+        },
+        "reuse_anonymous_id": {
+          "type": "boolean"
+        },
+        "bootstrap": {
+          "$ref": "#/definitions/Bootstrap"
+        },
+        "super_properties": {
+          "$ref": "#/definitions/Properties"
+        },
+        "anonymous_id_provider": {
+          "$ref": "#/definitions/Callback"
+        },
+        "persistence": {
+          "$ref": "#/definitions/Persistence"
+        },
+        "persistence_name": {
+          "type": "string"
+        },
+        "disable_persistence": {
+          "type": "boolean"
+        },
+        "storage": {
+          "$ref": "#/definitions/Ref%3C%22storage%22%3E"
+        },
+        "session_idle_timeout_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "persist_session_id_across_restart": {
+          "type": "boolean"
+        },
+        "autocapture": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "$ref": "#/definitions/AutocaptureConfig"
+            }
+          ]
+        },
+        "capture_pageview": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string",
+              "const": "history_change"
+            },
+            {
+              "$ref": "#/definitions/PageviewConfig"
+            }
+          ]
+        },
+        "capture_pageleave": {
+          "type": "boolean"
+        },
+        "capture_application_lifecycle_events": {
+          "type": "boolean"
+        },
+        "capture_screen_views": {
+          "type": "boolean"
+        },
+        "capture_element_interactions": {
+          "type": "boolean"
+        },
+        "set_default_person_properties": {
+          "type": "boolean"
+        },
+        "session_replay": {
+          "type": "boolean"
+        },
+        "replay": {
+          "$ref": "#/definitions/ReplayConfig"
+        },
+        "error_tracking": {
+          "$ref": "#/definitions/ErrorTrackingConfig"
+        },
+        "logs": {
+          "$ref": "#/definitions/LogsConfig"
+        },
+        "metrics": {
+          "$ref": "#/definitions/MetricsConfig"
+        },
+        "traces": {
+          "$ref": "#/definitions/TracesConfig"
+        },
+        "tracing_headers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "surveys": {
+          "type": "boolean"
+        },
+        "survey_config": {
+          "$ref": "#/definitions/SurveysConfig"
+        },
+        "capture_push_notification_subscriptions": {
+          "type": "boolean"
+        },
+        "capture_push_notification_opened": {
+          "type": "boolean"
+        },
+        "push_identity_provider": {
+          "$ref": "#/definitions/Callback"
+        },
+        "debug": {
+          "type": "boolean"
+        },
+        "before_send": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Callback"
+          }
+        },
+        "loaded": {
+          "$ref": "#/definitions/Callback"
+        },
+        "on_feature_flags": {
+          "$ref": "#/definitions/Callback"
+        },
+        "on_error": {
+          "$ref": "#/definitions/Callback"
+        },
+        "logger": {
+          "$ref": "#/definitions/Ref%3C%22diagnostic_logger%22%3E"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ExceptionAutoCaptureConfig": {
+      "type": "object",
+      "properties": {
+        "capture_unhandled_errors": {
+          "type": "boolean"
+        },
+        "capture_unhandled_rejections": {
+          "type": "boolean"
+        },
+        "capture_console_errors": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SetConfig": {
+      "type": "object",
+      "properties": {
+        "host": {
+          "type": "string"
+        },
+        "flags_host": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "assets_host": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ui_host": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "flush_at": {
+          "$ref": "#/definitions/integer"
+        },
+        "flush_interval_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "max_batch_size": {
+          "$ref": "#/definitions/integer"
+        },
+        "max_queue_size": {
+          "$ref": "#/definitions/integer"
+        },
+        "shutdown_timeout_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "request_timeout_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "max_retries": {
+          "$ref": "#/definitions/integer"
+        },
+        "retry_delay_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "max_retry_delay_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "compression": {
+          "$ref": "#/definitions/Compression"
+        },
+        "request_headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "historical_migration": {
+          "type": "boolean"
+        },
+        "enable_full_ai_capture": {
+          "type": "boolean"
+        },
+        "preload_feature_flags": {
+          "type": "boolean"
+        },
+        "send_feature_flag_events": {
+          "type": "boolean"
+        },
+        "disable_remote_feature_flags": {
+          "type": "boolean"
+        },
+        "enable_local_evaluation": {
+          "type": "boolean"
+        },
+        "only_evaluate_locally": {
+          "type": "boolean"
+        },
+        "feature_flags_poll_interval_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "feature_flag_request_timeout_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "feature_flag_request_max_retries": {
+          "$ref": "#/definitions/integer"
+        },
+        "evaluation_contexts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "flag_keys": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "feature_flag_cache_ttl_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "flag_definition_cache_provider": {
+          "$ref": "#/definitions/Ref%3C%22cache_provider%22%3E"
+        },
+        "person_profiles": {
+          "$ref": "#/definitions/PersonProfiles"
+        },
+        "opt_out_by_default": {
+          "type": "boolean"
+        },
+        "disabled": {
+          "type": "boolean"
+        },
+        "disable_persistence": {
+          "type": "boolean"
+        },
+        "session_idle_timeout_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "autocapture": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "$ref": "#/definitions/AutocaptureConfig"
+            }
+          ]
+        },
+        "capture_pageview": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string",
+              "const": "history_change"
+            },
+            {
+              "$ref": "#/definitions/PageviewConfig"
+            }
+          ]
+        },
+        "capture_pageleave": {
+          "type": "boolean"
+        },
+        "capture_application_lifecycle_events": {
+          "type": "boolean"
+        },
+        "capture_screen_views": {
+          "type": "boolean"
+        },
+        "capture_element_interactions": {
+          "type": "boolean"
+        },
+        "set_default_person_properties": {
+          "type": "boolean"
+        },
+        "session_replay": {
+          "type": "boolean"
+        },
+        "replay": {
+          "$ref": "#/definitions/ReplayConfig"
+        },
+        "error_tracking": {
+          "$ref": "#/definitions/ErrorTrackingConfig"
+        },
+        "logs": {
+          "$ref": "#/definitions/LogsConfig"
+        },
+        "metrics": {
+          "$ref": "#/definitions/MetricsConfig"
+        },
+        "traces": {
+          "$ref": "#/definitions/TracesConfig"
+        },
+        "tracing_headers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "surveys": {
+          "type": "boolean"
+        },
+        "survey_config": {
+          "$ref": "#/definitions/SurveysConfig"
+        },
+        "capture_push_notification_subscriptions": {
+          "type": "boolean"
+        },
+        "capture_push_notification_opened": {
+          "type": "boolean"
+        },
+        "push_identity_provider": {
+          "$ref": "#/definitions/Callback"
+        },
+        "debug": {
+          "type": "boolean"
+        },
+        "before_send": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Callback"
+          }
+        },
+        "loaded": {
+          "$ref": "#/definitions/Callback"
+        },
+        "on_feature_flags": {
+          "$ref": "#/definitions/Callback"
+        },
+        "on_error": {
+          "$ref": "#/definitions/Callback"
+        },
+        "logger": {
+          "$ref": "#/definitions/Ref%3C%22diagnostic_logger%22%3E"
+        }
+      },
+      "additionalProperties": false
+    },
+    "EarlyAccessStage": {
+      "type": "string",
+      "enum": [
+        "concept",
+        "alpha",
+        "beta",
+        "general-availability"
+      ]
+    },
+    "SurveyPosition": {
+      "type": "string",
+      "enum": [
+        "top_left",
+        "top_center",
+        "top_right",
+        "middle_left",
+        "middle_center",
+        "middle_right",
+        "left",
+        "center",
+        "right",
+        "next_to_trigger"
+      ]
+    },
+    "SurveyResponse": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "DisplaySurveyBase": {
+      "type": "object",
+      "properties": {
+        "ignore_conditions": {
+          "type": "boolean"
+        },
+        "ignore_delay": {
+          "type": "boolean"
+        },
+        "properties": {
+          "$ref": "#/definitions/Properties"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DisplaySurvey": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "display_type": {
+              "type": "string",
+              "const": "popover"
+            },
+            "position": {
+              "$ref": "#/definitions/SurveyPosition"
+            },
+            "selector": {
+              "type": "string"
+            },
+            "initial_responses": {
+              "type": "object",
+              "additionalProperties": {
+                "$ref": "#/definitions/SurveyResponse"
+              },
+              "propertyNames": {
+                "pattern": "^(0|[1-9][0-9]*)$"
+              }
+            },
+            "skip_shown_event": {
+              "type": "boolean"
+            },
+            "ignore_conditions": {
+              "type": "boolean"
+            },
+            "ignore_delay": {
+              "type": "boolean"
+            },
+            "properties": {
+              "$ref": "#/definitions/Properties"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "display_type": {
+              "type": "string",
+              "const": "inline"
+            },
+            "selector": {
+              "type": "string"
+            },
+            "ignore_conditions": {
+              "type": "boolean"
+            },
+            "ignore_delay": {
+              "type": "boolean"
+            },
+            "properties": {
+              "$ref": "#/definitions/Properties"
+            }
+          },
+          "required": [
+            "display_type",
+            "selector"
+          ]
+        }
+      ]
+    },
+    "Survey": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Properties"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "questions"
+      ],
+      "additionalProperties": {
+        "$ref": "#/definitions/Json"
+      }
+    },
+    "BatchSummary": {
+      "$ref": "#/definitions/Ref%3C%22batch_summary%22%3E"
+    },
+    "Ref<\"batch_summary\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "batch_summary"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "SessionTransfer": {
+      "type": "object",
+      "properties": {
+        "__posthog": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "startTime": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "id",
+            "startTime"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "SurveyRenderReason": {
+      "type": "object",
+      "properties": {
+        "visible": {
+          "type": "boolean"
+        },
+        "disabled_reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "visible"
+      ],
+      "additionalProperties": false
+    },
+    "DeepLinkArgs": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "referrer": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "PushOpenedArgs": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "subtitle": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "body": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "payload": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Properties"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "action": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "FlagOverrides": {
+      "type": "object",
+      "properties": {
+        "flags": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/FlagValues"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payloads": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Payloads"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "QuestionIndex": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)$"
+    },
+    "CaptureOptions": {
+      "type": "object",
+      "properties": {
+        "cookieless_mode": {
+          "type": "boolean"
+        },
+        "disable_skew_correction": {
+          "type": "boolean"
+        },
+        "process_person_profile": {
+          "type": "boolean"
+        },
+        "product_tour_id": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Analytics-v1 event-root options, separate from ordinary event properties."
+    },
+    "CaptureArgs": {
+      "type": "object",
+      "properties": {
+        "event": {
+          "type": "string"
+        },
+        "distinct_id": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Identity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Properties"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "groups": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Groups"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "timestamp": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "uuid": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "set": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Properties"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "set_once": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Properties"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unset": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "disable_geoip": {
+          "type": "boolean"
+        },
+        "flags": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Snapshot"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "send_feature_flags": {
+          "$ref": "#/definitions/SendFlags"
+        },
+        "send_instantly": {
+          "type": "boolean"
+        },
+        "skip_client_rate_limiting": {
+          "type": "boolean"
+        },
+        "transport": {
+          "$ref": "#/definitions/Transport"
+        },
+        "options": {
+          "$ref": "#/definitions/CaptureOptions"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "event"
+      ],
+      "description": "Applies to /capture only; shared EventArgs consumers retain the base signature."
+    },
+    "FeatureFlagsCallbackContext": {
+      "type": "object",
+      "properties": {
+        "errorsLoading": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Approved flag-semantics-v1 policy overlay. /on_feature_flags delivers the native enabled keys, values/variants and optional loading context, immediately when already loaded and on subsequent native notifications (including changes/errors). It returns actual deregistration. A notification is not evidence of a new successful HTTP response. Missing arguments and undefined outcomes remain distinct from false. Undefined context properties project to absent JSON properties; no getter fabricates arguments. No-argument flush/reload completion callbacks retain the readiness signature.\n\nNative startup, getter and evaluated-result cache behavior supersedes the base universal preload=true and TTL=300000 policy for ordinary flag operations. Omitted settings retain native behavior; supported explicit native settings, only_evaluate_locally and send_event retain their meaning. No adapter imposes startup/cache defaults. Unavailable behavior is unsupported, not emulated. Server lifecycle scenarios observe native initialization/capture silence. Remote getter scenarios start with empty storage and no installed local definitions/results; repeated remote getters require a native uncached getter. Client scenarios explicitly load flags or prepare cached state before reading. ExecutionProfile.sdk_type optionally declares client/server SDK type explicitly, independently of runtime family, identity and wire API. Selected type-specific cases with no declaration are blocked_contract; an opposite type is not applicable. flags_v2 declares the wire API independently of SDK type/platform; flags_getter_remote_uncached declares only a native remote getter without local evaluation or evaluated-result caching, not startup/capture behavior."
+    },
+    "FeatureFlagsCallbackArguments": {
+      "anyOf": [
+        {
+          "type": "array",
+          "minItems": 2,
+          "items": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "$ref": "#/definitions/FlagValues"
+            }
+          ],
+          "maxItems": 2
+        },
+        {
+          "type": "array",
+          "minItems": 3,
+          "items": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "$ref": "#/definitions/FlagValues"
+            },
+            {
+              "$ref": "#/definitions/FeatureFlagsCallbackContext"
+            }
+          ],
+          "maxItems": 3
+        }
+      ]
+    },
+    "SDKType": {
+      "type": "string",
+      "enum": [
+        "client",
+        "server"
+      ]
+    },
+    "EvaluationObservationId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "EvaluationProvenanceCommand": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "evaluation_provenance"
+        },
+        "call_id": {
+          "$ref": "#/definitions/EvaluationObservationId"
+        }
+      },
+      "required": [
+        "kind",
+        "call_id"
+      ],
+      "additionalProperties": false
+    },
+    "EvaluationProvenance": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "resolution": {
+              "type": "string",
+              "enum": [
+                "local",
+                "remote"
+              ]
+            },
+            "value": {
+              "type": [
+                "boolean",
+                "string"
+              ]
+            },
+            "layer": {
+              "type": "string",
+              "const": "native_component"
+            },
+            "implementation": {
+              "$ref": "#/definitions/EvaluationObservationId"
+            },
+            "call_id": {
+              "$ref": "#/definitions/EvaluationObservationId"
+            },
+            "key": {
+              "$ref": "#/definitions/EvaluationObservationId"
+            }
+          },
+          "required": [
+            "call_id",
+            "implementation",
+            "key",
+            "layer",
+            "resolution",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "resolution": {
+              "type": "string",
+              "enum": [
+                "fallback",
+                "not_evaluated"
+              ]
+            },
+            "layer": {
+              "type": "string",
+              "const": "native_component"
+            },
+            "implementation": {
+              "$ref": "#/definitions/EvaluationObservationId"
+            },
+            "call_id": {
+              "$ref": "#/definitions/EvaluationObservationId"
+            },
+            "key": {
+              "$ref": "#/definitions/EvaluationObservationId"
+            }
+          },
+          "required": [
+            "call_id",
+            "implementation",
+            "key",
+            "layer",
+            "resolution"
+          ]
+        }
+      ]
+    },
+    "CatalogHash": {
+      "type": "string",
+      "const": "c52ae7fac46f0395a78276bbc6c3b97ea83538005bcee11b60b2dc33879adfaa"
+    },
+    "OpSetupArgs": {
+      "$ref": "#/definitions/SetupArgs"
+    },
+    "OpSetupResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpShutdownArgs": {
+      "type": "object",
+      "properties": {
+        "timeout_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "cancellation": {
+          "$ref": "#/definitions/Cancellation"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OpShutdownResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpFlushArgs": {
+      "type": "object",
+      "properties": {
+        "timeout_ms": {
+          "$ref": "#/definitions/DurationMs"
+        },
+        "callback": {
+          "$ref": "#/definitions/Callback"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OpFlushResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpDebugArgs": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OpDebugResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpOptInArgs": {
+      "$ref": "#/definitions/OptInArgs"
+    },
+    "OpOptInResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpOptOutArgs": {
+      "$ref": "#/definitions/OptOutArgs"
+    },
+    "OpOptOutResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpIsOptOutArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpIsOptOutResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpResetArgs": {
+      "$ref": "#/definitions/ResetArgs"
+    },
+    "OpResetResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetDistinctIdArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpGetDistinctIdResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetAnonymousIdArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpGetAnonymousIdResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetSessionIdArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpGetSessionIdResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpCaptureArgs": {
+      "$ref": "#/definitions/CaptureArgs"
+    },
+    "OpCaptureResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpCaptureImmediateArgs": {
+      "$ref": "#/definitions/EventArgs"
+    },
+    "OpCaptureImmediateResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpCaptureAiArgs": {
+      "$ref": "#/definitions/EventArgs"
+    },
+    "OpCaptureAiResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpCaptureExceptionArgs": {
+      "$ref": "#/definitions/ExceptionArgs"
+    },
+    "OpCaptureExceptionResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpAddExceptionStepArgs": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "properties": {
+          "$ref": "#/definitions/Properties"
+        }
+      },
+      "required": [
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "OpAddExceptionStepResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpScreenArgs": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "properties": {
+          "$ref": "#/definitions/Properties"
+        },
+        "distinct_id": {
+          "$ref": "#/definitions/Identity"
+        },
+        "timestamp": {
+          "$ref": "#/definitions/Timestamp"
+        },
+        "uuid": {
+          "type": "string"
+        },
+        "disable_geoip": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "OpScreenResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpIdentifyArgs": {
+      "$ref": "#/definitions/IdentifyArgs"
+    },
+    "OpIdentifyResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpAliasArgs": {
+      "$ref": "#/definitions/AliasArgs"
+    },
+    "OpAliasResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpSetPersonPropertiesArgs": {
+      "$ref": "#/definitions/PersonArgs"
+    },
+    "OpSetPersonPropertiesResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpCreatePersonProfileArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpCreatePersonProfileResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpGroupArgs": {
+      "$ref": "#/definitions/GroupArgs"
+    },
+    "OpGroupResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpGroupIdentifyArgs": {
+      "$ref": "#/definitions/GroupArgs"
+    },
+    "OpGroupIdentifyResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpRegisterArgs": {
+      "$ref": "#/definitions/RegisterArgs"
+    },
+    "OpRegisterResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpUnregisterArgs": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "OpUnregisterResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetFeatureFlagArgs": {
+      "$ref": "#/definitions/ValueRead"
+    },
+    "OpGetFeatureFlagResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Json"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpIsFeatureEnabledArgs": {
+      "$ref": "#/definitions/EnabledRead"
+    },
+    "OpIsFeatureEnabledResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetFeatureFlagPayloadArgs": {
+      "$ref": "#/definitions/PayloadRead"
+    },
+    "OpGetFeatureFlagPayloadResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Json"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetFeatureFlagResultArgs": {
+      "$ref": "#/definitions/FlagRead"
+    },
+    "OpGetFeatureFlagResultResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/FlagResult"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetFeatureFlagsArgs": {
+      "$ref": "#/definitions/Evaluation"
+    },
+    "OpGetFeatureFlagsResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/FlagValues"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetFeatureFlagsAndPayloadsArgs": {
+      "$ref": "#/definitions/Evaluation"
+    },
+    "OpGetFeatureFlagsAndPayloadsResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/FlagsAndPayloads"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpEvaluateFlagsArgs": {
+      "$ref": "#/definitions/Evaluation"
+    },
+    "OpEvaluateFlagsResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Snapshot"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpSnapshotIsEnabledArgs": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "default_value": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "OpSnapshotIsEnabledResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpSnapshotGetFlagArgs": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "OpSnapshotGetFlagResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/FlagValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpSnapshotGetFlagPayloadArgs": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "OpSnapshotGetFlagPayloadResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Json"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpSnapshotKeysArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpSnapshotKeysResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpSnapshotOnlyArgs": {
+      "type": "object",
+      "properties": {
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "keys"
+      ],
+      "additionalProperties": false
+    },
+    "OpSnapshotOnlyResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Snapshot"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpSnapshotOnlyAccessedArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpSnapshotOnlyAccessedResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Snapshot"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpReloadFeatureFlagsArgs": {
+      "type": "object",
+      "properties": {
+        "callback": {
+          "$ref": "#/definitions/Callback"
+        },
+        "distinct_id": {
+          "$ref": "#/definitions/Identity"
+        },
+        "send_anonymous_distinct_id": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OpReloadFeatureFlagsResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpOnFeatureFlagsArgs": {
+      "type": "object",
+      "properties": {
+        "callback": {
+          "$ref": "#/definitions/Callback"
+        }
+      },
+      "required": [
+        "callback"
+      ],
+      "additionalProperties": false
+    },
+    "OpOnFeatureFlagsResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Subscription"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpSubscriptionUnsubscribeArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpSubscriptionUnsubscribeResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpSetPersonPropertiesForFlagsArgs": {
+      "type": "object",
+      "properties": {
+        "properties": {
+          "$ref": "#/definitions/Properties"
+        },
+        "reload_feature_flags": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "OpSetPersonPropertiesForFlagsResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpResetPersonPropertiesForFlagsArgs": {
+      "type": "object",
+      "properties": {
+        "reload_feature_flags": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OpResetPersonPropertiesForFlagsResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpSetGroupPropertiesForFlagsArgs": {
+      "$ref": "#/definitions/GroupFlagArgs"
+    },
+    "OpSetGroupPropertiesForFlagsResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpResetGroupPropertiesForFlagsArgs": {
+      "type": "object",
+      "properties": {
+        "group_type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reload_feature_flags": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OpResetGroupPropertiesForFlagsResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpStartSessionRecordingArgs": {
+      "$ref": "#/definitions/ReplayStart"
+    },
+    "OpStartSessionRecordingResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpStopSessionRecordingArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpStopSessionRecordingResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpIsSessionReplayActiveArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpIsSessionReplayActiveResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpCaptureAiImmediateArgs": {
+      "$ref": "#/definitions/EventArgs"
+    },
+    "OpCaptureAiImmediateResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpIdentifyImmediateArgs": {
+      "$ref": "#/definitions/IdentifyArgs"
+    },
+    "OpIdentifyImmediateResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpAliasImmediateArgs": {
+      "$ref": "#/definitions/AliasArgs"
+    },
+    "OpAliasImmediateResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpGroupIdentifyImmediateArgs": {
+      "$ref": "#/definitions/GroupArgs"
+    },
+    "OpGroupIdentifyImmediateResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpCaptureExceptionImmediateArgs": {
+      "$ref": "#/definitions/ExceptionArgs"
+    },
+    "OpCaptureExceptionImmediateResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpCaptureBatchArgs": {
+      "$ref": "#/definitions/BatchArgs"
+    },
+    "OpCaptureBatchResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpCaptureBatchImmediateArgs": {
+      "$ref": "#/definitions/BatchArgs"
+    },
+    "OpCaptureBatchImmediateResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/BatchSummary"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpSetPersonPropertiesOnceArgs": {
+      "type": "object",
+      "properties": {
+        "distinct_id": {
+          "$ref": "#/definitions/Identity"
+        },
+        "properties": {
+          "$ref": "#/definitions/Properties"
+        },
+        "timestamp": {
+          "$ref": "#/definitions/Timestamp"
+        },
+        "uuid": {
+          "type": "string"
+        },
+        "disable_geoip": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OpSetPersonPropertiesOnceResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpUnsetPersonPropertiesArgs": {
+      "type": "object",
+      "properties": {
+        "keys": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "distinct_id": {
+          "$ref": "#/definitions/Identity"
+        },
+        "reload_feature_flags": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "keys"
+      ],
+      "additionalProperties": false
+    },
+    "OpUnsetPersonPropertiesResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpRegisterOnceArgs": {
+      "type": "object",
+      "properties": {
+        "properties": {
+          "$ref": "#/definitions/Properties"
+        },
+        "default_value": {
+          "$ref": "#/definitions/Json"
+        },
+        "days": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "OpRegisterOnceResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpRegisterForSessionArgs": {
+      "type": "object",
+      "properties": {
+        "properties": {
+          "$ref": "#/definitions/Properties"
+        }
+      },
+      "required": [
+        "properties"
+      ],
+      "additionalProperties": false
+    },
+    "OpRegisterForSessionResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpUnregisterForSessionArgs": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "OpUnregisterForSessionResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetPropertyArgs": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetPropertyResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Json"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetSessionPropertyArgs": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetSessionPropertyResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Json"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpSetGroupsArgs": {
+      "type": "object",
+      "properties": {
+        "groups": {
+          "$ref": "#/definitions/Groups"
+        }
+      },
+      "required": [
+        "groups"
+      ],
+      "additionalProperties": false
+    },
+    "OpSetGroupsResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetGroupsArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpGetGroupsResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Groups"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpResetGroupsArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpResetGroupsResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetDeviceIdArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpGetDeviceIdResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpResetSessionIdArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpResetSessionIdResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpStartSessionArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpStartSessionResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpEndSessionArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpEndSessionResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpIsSessionActiveArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpIsSessionActiveResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetSessionReplayUrlArgs": {
+      "type": "object",
+      "properties": {
+        "with_timestamp": {
+          "type": "boolean"
+        },
+        "timestamp_look_back": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OpGetSessionReplayUrlResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpSetConfigArgs": {
+      "type": "object",
+      "properties": {
+        "config": {
+          "$ref": "#/definitions/SetConfig"
+        }
+      },
+      "required": [
+        "config"
+      ],
+      "additionalProperties": false
+    },
+    "OpSetConfigResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpIsInitializedArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpIsInitializedResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpIsShutdownArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpIsShutdownResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpPendingEventsArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpPendingEventsResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/integer"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpJoinArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpJoinResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpEnableArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpEnableResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpDisableArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpDisableResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpHasOptedInArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpHasOptedInResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetExplicitConsentStatusArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpGetExplicitConsentStatusResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": "string",
+          "enum": [
+            "granted",
+            "denied",
+            "pending"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpIsCapturingArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpIsCapturingResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpClearConsentArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpClearConsentResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpSetIdentityArgs": {
+      "type": "object",
+      "properties": {
+        "distinct_id": {
+          "type": "string"
+        },
+        "hash": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "distinct_id",
+        "hash"
+      ],
+      "additionalProperties": false
+    },
+    "OpSetIdentityResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpClearIdentityArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpClearIdentityResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpSetInternalOrTestUserArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpSetInternalOrTestUserResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpDisableGlobalArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpDisableGlobalResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpGlobalIsDisabledArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpGlobalIsDisabledResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpCaptureRawArgs": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "$ref": "#/definitions/Properties"
+        }
+      },
+      "required": [
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "OpCaptureRawResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetAllFeatureFlagResultsArgs": {
+      "$ref": "#/definitions/Evaluation"
+    },
+    "OpGetAllFeatureFlagResultsResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FlagResult"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetFeatureFlagPayloadsArgs": {
+      "$ref": "#/definitions/Evaluation"
+    },
+    "OpGetFeatureFlagPayloadsResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Payloads"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetFeatureFlagDetailsArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpGetFeatureFlagDetailsResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Properties"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetFlagsDecisionArgs": {
+      "$ref": "#/definitions/Evaluation"
+    },
+    "OpGetFlagsDecisionResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Properties"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetRemoteConfigPayloadArgs": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "cancellation": {
+          "$ref": "#/definitions/Cancellation"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetRemoteConfigPayloadResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Json"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetRemoteConfigArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpGetRemoteConfigResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Properties"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpReloadRemoteConfigArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpReloadRemoteConfigResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Properties"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpUpdateFlagsArgs": {
+      "type": "object",
+      "properties": {
+        "flags": {
+          "$ref": "#/definitions/FlagValues"
+        },
+        "payloads": {
+          "$ref": "#/definitions/Payloads"
+        },
+        "merge": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "flags"
+      ],
+      "additionalProperties": false
+    },
+    "OpUpdateFlagsResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpOverrideFeatureFlagsArgs": {
+      "type": "object",
+      "properties": {
+        "overrides": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/FlagOverrides"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "overrides"
+      ],
+      "additionalProperties": false
+    },
+    "OpOverrideFeatureFlagsResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpClearLocalFlagsCacheArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpClearLocalFlagsCacheResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpIsLocalEvaluationReadyArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpIsLocalEvaluationReadyResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpWaitForLocalEvaluationReadyArgs": {
+      "type": "object",
+      "properties": {
+        "timeout_ms": {
+          "$ref": "#/definitions/DurationMs"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OpWaitForLocalEvaluationReadyResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpEvaluateFeatureFlagLocallyArgs": {
+      "type": "object",
+      "properties": {
+        "flag": {
+          "$ref": "#/definitions/Ref%3C%22definition%22%3E"
+        },
+        "distinct_id": {
+          "type": "string"
+        },
+        "person_properties": {
+          "$ref": "#/definitions/Properties"
+        },
+        "groups": {
+          "$ref": "#/definitions/Groups"
+        },
+        "group_properties": {
+          "$ref": "#/definitions/GroupProperties"
+        }
+      },
+      "required": [
+        "flag",
+        "distinct_id",
+        "person_properties",
+        "groups",
+        "group_properties"
+      ],
+      "additionalProperties": false
+    },
+    "Ref<\"definition\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "definition"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "OpEvaluateFeatureFlagLocallyResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/FlagValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpSnapshotAccessedArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpSnapshotAccessedResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpSnapshotEventPropertiesArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpSnapshotEventPropertiesResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Properties"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpFlagResultValueArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpFlagResultValueResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/FlagValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpFlagResultGetVariantArgs": {
+      "type": "object",
+      "properties": {
+        "default_value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "OpFlagResultGetVariantResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpFlagResultGetPayloadArgs": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "$ref": "#/definitions/Type"
+        },
+        "default_value": {
+          "$ref": "#/definitions/Json"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "additionalProperties": false
+    },
+    "OpFlagResultGetPayloadResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Json"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpOnArgs": {
+      "type": "object",
+      "properties": {
+        "event": {
+          "type": "string"
+        },
+        "callback": {
+          "$ref": "#/definitions/Callback"
+        }
+      },
+      "required": [
+        "event",
+        "callback"
+      ],
+      "additionalProperties": false
+    },
+    "OpOnResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Subscription"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpOnFeatureFlagArgs": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "callback": {
+          "$ref": "#/definitions/Callback"
+        }
+      },
+      "required": [
+        "key",
+        "callback"
+      ],
+      "additionalProperties": false
+    },
+    "OpOnFeatureFlagResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Subscription"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpOnSessionIdArgs": {
+      "type": "object",
+      "properties": {
+        "callback": {
+          "$ref": "#/definitions/Callback"
+        }
+      },
+      "required": [
+        "callback"
+      ],
+      "additionalProperties": false
+    },
+    "OpOnSessionIdResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Subscription"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpOnSurveysLoadedArgs": {
+      "type": "object",
+      "properties": {
+        "callback": {
+          "$ref": "#/definitions/Callback"
+        }
+      },
+      "required": [
+        "callback"
+      ],
+      "additionalProperties": false
+    },
+    "OpOnSurveysLoadedResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Subscription"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetSurveysArgs": {
+      "type": "object",
+      "properties": {
+        "callback": {
+          "$ref": "#/definitions/Callback"
+        },
+        "force_reload": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "callback"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetSurveysResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetActiveMatchingSurveysArgs": {
+      "type": "object",
+      "properties": {
+        "callback": {
+          "$ref": "#/definitions/Callback"
+        },
+        "force_reload": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "callback"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetActiveMatchingSurveysResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpRenderSurveyArgs": {
+      "type": "object",
+      "properties": {
+        "survey_id": {
+          "type": "string"
+        },
+        "selector": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "survey_id",
+        "selector"
+      ],
+      "additionalProperties": false
+    },
+    "OpRenderSurveyResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpDisplaySurveyArgs": {
+      "type": "object",
+      "properties": {
+        "survey_id": {
+          "type": "string"
+        },
+        "options": {
+          "$ref": "#/definitions/DisplaySurvey"
+        }
+      },
+      "required": [
+        "survey_id"
+      ],
+      "additionalProperties": false
+    },
+    "OpDisplaySurveyResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpCancelPendingSurveyArgs": {
+      "type": "object",
+      "properties": {
+        "survey_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "survey_id"
+      ],
+      "additionalProperties": false
+    },
+    "OpCancelPendingSurveyResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpCanRenderSurveyArgs": {
+      "type": "object",
+      "properties": {
+        "survey_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "survey_id"
+      ],
+      "additionalProperties": false
+    },
+    "OpCanRenderSurveyResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SurveyRenderReason"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpCanRenderSurveyAsyncArgs": {
+      "type": "object",
+      "properties": {
+        "survey_id": {
+          "type": "string"
+        },
+        "force_reload": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "survey_id"
+      ],
+      "additionalProperties": false
+    },
+    "OpCanRenderSurveyAsyncResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/SurveyRenderReason"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetEarlyAccessFeaturesArgs": {
+      "type": "object",
+      "properties": {
+        "callback": {
+          "$ref": "#/definitions/Callback"
+        },
+        "force_reload": {
+          "type": "boolean"
+        },
+        "stages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EarlyAccessStage"
+          }
+        }
+      },
+      "required": [
+        "callback"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetEarlyAccessFeaturesResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpUpdateEarlyAccessFeatureEnrollmentArgs": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "is_enrolled": {
+          "type": "boolean"
+        },
+        "stage": {
+          "$ref": "#/definitions/EarlyAccessStage"
+        }
+      },
+      "required": [
+        "key",
+        "is_enrolled"
+      ],
+      "additionalProperties": false
+    },
+    "OpUpdateEarlyAccessFeatureEnrollmentResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpCaptureFeatureViewArgs": {
+      "type": "object",
+      "properties": {
+        "flag": {
+          "type": "string"
+        },
+        "variant": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "flag"
+      ],
+      "additionalProperties": false
+    },
+    "OpCaptureFeatureViewResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpCaptureFeatureInteractionArgs": {
+      "type": "object",
+      "properties": {
+        "flag": {
+          "type": "string"
+        },
+        "variant": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "flag"
+      ],
+      "additionalProperties": false
+    },
+    "OpCaptureFeatureInteractionResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpStartExceptionAutocaptureArgs": {
+      "type": "object",
+      "properties": {
+        "config": {
+          "$ref": "#/definitions/ExceptionAutoCaptureConfig"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OpStartExceptionAutocaptureResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpStopExceptionAutocaptureArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpStopExceptionAutocaptureResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpCaptureRunZonedGuardedErrorArgs": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "$ref": "#/definitions/ExceptionInput"
+        },
+        "stack": {
+          "$ref": "#/definitions/Stack"
+        },
+        "properties": {
+          "$ref": "#/definitions/Properties"
+        }
+      },
+      "required": [
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    "OpCaptureRunZonedGuardedErrorResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpIsAutocaptureActiveArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpIsAutocaptureActiveResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpIsRageClickActiveArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpIsRageClickActiveResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpWithContextArgs": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "$ref": "#/definitions/ContextData"
+        },
+        "callback": {
+          "$ref": "#/definitions/Callback"
+        },
+        "fresh": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "context",
+        "callback"
+      ],
+      "additionalProperties": false
+    },
+    "OpWithContextResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Json"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpEnterContextArgs": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "$ref": "#/definitions/ContextData"
+        },
+        "fresh": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "context"
+      ],
+      "additionalProperties": false
+    },
+    "OpEnterContextResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetContextArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpGetContextResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ContextData"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpNewContextArgs": {
+      "type": "object",
+      "properties": {
+        "fresh": {
+          "type": "boolean"
+        },
+        "capture_exceptions": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OpNewContextResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Context"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpIdentifyContextArgs": {
+      "type": "object",
+      "properties": {
+        "distinct_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "distinct_id"
+      ],
+      "additionalProperties": false
+    },
+    "OpIdentifyContextResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpSetContextSessionArgs": {
+      "type": "object",
+      "properties": {
+        "session_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "session_id"
+      ],
+      "additionalProperties": false
+    },
+    "OpSetContextSessionResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpSetContextDeviceIdArgs": {
+      "type": "object",
+      "properties": {
+        "device_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "device_id"
+      ],
+      "additionalProperties": false
+    },
+    "OpSetContextDeviceIdResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpTagArgs": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/definitions/Json"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpTagResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetTagsArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpGetTagsResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Properties"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpContextFromHeadersArgs": {
+      "type": "object",
+      "properties": {
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/HeaderValue"
+          }
+        }
+      },
+      "required": [
+        "headers"
+      ],
+      "additionalProperties": false
+    },
+    "OpContextFromHeadersResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/ContextData"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpSetContextArgs": {
+      "type": "object",
+      "properties": {
+        "context": {
+          "$ref": "#/definitions/ContextData"
+        }
+      },
+      "required": [
+        "context"
+      ],
+      "additionalProperties": false
+    },
+    "OpSetContextResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpSetEventContextArgs": {
+      "type": "object",
+      "properties": {
+        "event": {
+          "type": "string"
+        },
+        "context": {
+          "$ref": "#/definitions/Properties"
+        }
+      },
+      "required": [
+        "event",
+        "context"
+      ],
+      "additionalProperties": false
+    },
+    "OpSetEventContextResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetEventContextArgs": {
+      "type": "object",
+      "properties": {
+        "event": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "event"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetEventContextResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Properties"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpSetFlagsInContextArgs": {
+      "type": "object",
+      "properties": {
+        "flags": {
+          "$ref": "#/definitions/Snapshot"
+        }
+      },
+      "required": [
+        "flags"
+      ],
+      "additionalProperties": false
+    },
+    "OpSetFlagsInContextResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpBareCaptureArgs": {
+      "type": "object",
+      "properties": {
+        "event": {
+          "type": "string"
+        },
+        "distinct_id": {
+          "$ref": "#/definitions/Identity"
+        },
+        "properties": {
+          "$ref": "#/definitions/Properties"
+        }
+      },
+      "required": [
+        "event",
+        "distinct_id"
+      ],
+      "additionalProperties": false
+    },
+    "OpBareCaptureResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetLoggerArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpGetLoggerResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Ref%3C%22logger%22%3E"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "Ref<\"logger\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "logger"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetMetricsArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpGetMetricsResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Ref%3C%22metrics%22%3E"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "Ref<\"metrics\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "metrics"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "OpCaptureLogArgs": {
+      "$ref": "#/definitions/LogArgs"
+    },
+    "OpCaptureLogResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpLoggerTraceArgs": {
+      "type": "object",
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "attributes": {
+          "$ref": "#/definitions/Properties"
+        }
+      },
+      "required": [
+        "body"
+      ],
+      "additionalProperties": false
+    },
+    "OpLoggerTraceResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpLoggerDebugArgs": {
+      "type": "object",
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "attributes": {
+          "$ref": "#/definitions/Properties"
+        }
+      },
+      "required": [
+        "body"
+      ],
+      "additionalProperties": false
+    },
+    "OpLoggerDebugResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpLoggerInfoArgs": {
+      "type": "object",
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "attributes": {
+          "$ref": "#/definitions/Properties"
+        }
+      },
+      "required": [
+        "body"
+      ],
+      "additionalProperties": false
+    },
+    "OpLoggerInfoResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpLoggerWarnArgs": {
+      "type": "object",
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "attributes": {
+          "$ref": "#/definitions/Properties"
+        }
+      },
+      "required": [
+        "body"
+      ],
+      "additionalProperties": false
+    },
+    "OpLoggerWarnResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpLoggerErrorArgs": {
+      "type": "object",
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "attributes": {
+          "$ref": "#/definitions/Properties"
+        }
+      },
+      "required": [
+        "body"
+      ],
+      "additionalProperties": false
+    },
+    "OpLoggerErrorResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpLoggerFatalArgs": {
+      "type": "object",
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "attributes": {
+          "$ref": "#/definitions/Properties"
+        }
+      },
+      "required": [
+        "body"
+      ],
+      "additionalProperties": false
+    },
+    "OpLoggerFatalResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpFlushLogsArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpFlushLogsResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpMetricsCountArgs": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "attributes": {
+          "$ref": "#/definitions/MetricAttributes"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "OpMetricsCountResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpMetricsGaugeArgs": {
+      "$ref": "#/definitions/MetricArgs"
+    },
+    "OpMetricsGaugeResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpMetricsHistogramArgs": {
+      "$ref": "#/definitions/MetricArgs"
+    },
+    "OpMetricsHistogramResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpMetricsFlushArgs": {
+      "type": "object",
+      "properties": {
+        "transport": {
+          "$ref": "#/definitions/Transport"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OpMetricsFlushResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpStartSpanArgs": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "options": {
+          "$ref": "#/definitions/StartSpan"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "OpStartSpanResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Span"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpWithSpanArgs": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "options": {
+          "$ref": "#/definitions/StartSpan"
+        },
+        "callback": {
+          "$ref": "#/definitions/Callback"
+        }
+      },
+      "required": [
+        "name",
+        "callback"
+      ],
+      "additionalProperties": false
+    },
+    "OpWithSpanResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Json"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetActiveSpanArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpGetActiveSpanResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Span"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpSpanSetAttributeArgs": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/definitions/SpanValue"
+        }
+      },
+      "required": [
+        "key",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpSpanSetAttributeResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Span"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpSpanSetAttributesArgs": {
+      "type": "object",
+      "properties": {
+        "attributes": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/SpanValue"
+          }
+        }
+      },
+      "required": [
+        "attributes"
+      ],
+      "additionalProperties": false
+    },
+    "OpSpanSetAttributesResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Span"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpSpanAddEventArgs": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "attributes": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/SpanValue"
+          }
+        },
+        "timestamp": {
+          "$ref": "#/definitions/Timestamp"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "OpSpanAddEventResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Span"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpSpanSetStatusArgs": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "error"
+          ]
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "additionalProperties": false
+    },
+    "OpSpanSetStatusResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Span"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpSpanRecordExceptionArgs": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "$ref": "#/definitions/ExceptionInput"
+        }
+      },
+      "required": [
+        "error"
+      ],
+      "additionalProperties": false
+    },
+    "OpSpanRecordExceptionResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Span"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpSpanUpdateNameArgs": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "OpSpanUpdateNameResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/Span"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpSpanTraceparentArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpSpanTraceparentResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpSpanTracestateArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpSpanTracestateResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpSpanEndArgs": {
+      "type": "object",
+      "properties": {
+        "end_time": {
+          "$ref": "#/definitions/Timestamp"
+        }
+      },
+      "additionalProperties": false
+    },
+    "OpSpanEndResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpCaptureTraceFeedbackArgs": {
+      "type": "object",
+      "properties": {
+        "trace_id": {
+          "type": "string"
+        },
+        "feedback": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "trace_id",
+        "feedback"
+      ],
+      "additionalProperties": false
+    },
+    "OpCaptureTraceFeedbackResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpCaptureTraceMetricArgs": {
+      "type": "object",
+      "properties": {
+        "trace_id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "value": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ]
+        }
+      },
+      "required": [
+        "trace_id",
+        "name",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpCaptureTraceMetricResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpRegisterPushNotificationTokenArgs": {
+      "type": "object",
+      "properties": {
+        "device_token": {
+          "type": "string"
+        },
+        "app_id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "device_token"
+      ],
+      "additionalProperties": false
+    },
+    "OpRegisterPushNotificationTokenResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpUnregisterPushNotificationTokenArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpUnregisterPushNotificationTokenResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpCapturePushNotificationOpenedArgs": {
+      "$ref": "#/definitions/PushOpenedArgs"
+    },
+    "OpCapturePushNotificationOpenedResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpPrewarmPushNotificationOpenCaptureArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpPrewarmPushNotificationOpenCaptureResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpCaptureDeepLinkArgs": {
+      "$ref": "#/definitions/DeepLinkArgs"
+    },
+    "OpCaptureDeepLinkResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpRecordNetworkRequestArgs": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "status_code": {
+          "$ref": "#/definitions/integer"
+        },
+        "duration_ms": {
+          "$ref": "#/definitions/integer"
+        },
+        "response_size": {
+          "$ref": "#/definitions/integer"
+        }
+      },
+      "required": [
+        "method",
+        "url",
+        "status_code",
+        "duration_ms"
+      ],
+      "additionalProperties": false
+    },
+    "OpRecordNetworkRequestResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "void"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetSessionTeleportDataArgs": {
+      "type": "object",
+      "properties": {
+        "subject": {
+          "$ref": "#/definitions/Ref%3C%22subject%22%3E"
+        }
+      },
+      "required": [
+        "subject"
+      ],
+      "additionalProperties": false
+    },
+    "Ref<\"subject\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "subject"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "OpGetSessionTeleportDataResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/SessionTransfer"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpBatchSummarySubmittedArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpBatchSummarySubmittedResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/integer"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpBatchSummaryNotPersistedArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpBatchSummaryNotPersistedResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "$ref": "#/definitions/integer"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpBatchSummaryAllPersistedArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpBatchSummaryAllPersistedResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OpBatchSummaryEventResultsArgs": {
+      "type": "object",
+      "additionalProperties": {
+        "not": {}
+      }
+    },
+    "OpBatchSummaryEventResultsResult": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "value"
+        },
+        "value": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/Properties"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "OperationRoute": {
+      "type": "string",
+      "enum": [
+        "/setup",
+        "/shutdown",
+        "/flush",
+        "/debug",
+        "/opt_in",
+        "/opt_out",
+        "/is_opt_out",
+        "/reset",
+        "/get_distinct_id",
+        "/get_anonymous_id",
+        "/get_session_id",
+        "/capture",
+        "/capture_immediate",
+        "/capture_ai",
+        "/capture_exception",
+        "/add_exception_step",
+        "/screen",
+        "/identify",
+        "/alias",
+        "/set_person_properties",
+        "/create_person_profile",
+        "/group",
+        "/group_identify",
+        "/register",
+        "/unregister",
+        "/get_feature_flag",
+        "/is_feature_enabled",
+        "/get_feature_flag_payload",
+        "/get_feature_flag_result",
+        "/get_feature_flags",
+        "/get_feature_flags_and_payloads",
+        "/evaluate_flags",
+        "/snapshot/is_enabled",
+        "/snapshot/get_flag",
+        "/snapshot/get_flag_payload",
+        "/snapshot/keys",
+        "/snapshot/only",
+        "/snapshot/only_accessed",
+        "/reload_feature_flags",
+        "/on_feature_flags",
+        "/subscription/unsubscribe",
+        "/set_person_properties_for_flags",
+        "/reset_person_properties_for_flags",
+        "/set_group_properties_for_flags",
+        "/reset_group_properties_for_flags",
+        "/start_session_recording",
+        "/stop_session_recording",
+        "/is_session_replay_active",
+        "/capture_ai_immediate",
+        "/identify_immediate",
+        "/alias_immediate",
+        "/group_identify_immediate",
+        "/capture_exception_immediate",
+        "/capture_batch",
+        "/capture_batch_immediate",
+        "/set_person_properties_once",
+        "/unset_person_properties",
+        "/register_once",
+        "/register_for_session",
+        "/unregister_for_session",
+        "/get_property",
+        "/get_session_property",
+        "/set_groups",
+        "/get_groups",
+        "/reset_groups",
+        "/get_device_id",
+        "/reset_session_id",
+        "/start_session",
+        "/end_session",
+        "/is_session_active",
+        "/get_session_replay_url",
+        "/set_config",
+        "/is_initialized",
+        "/is_shutdown",
+        "/pending_events",
+        "/join",
+        "/enable",
+        "/disable",
+        "/has_opted_in",
+        "/get_explicit_consent_status",
+        "/is_capturing",
+        "/clear_consent",
+        "/set_identity",
+        "/clear_identity",
+        "/set_internal_or_test_user",
+        "/disable_global",
+        "/global_is_disabled",
+        "/capture_raw",
+        "/get_all_feature_flag_results",
+        "/get_feature_flag_payloads",
+        "/get_feature_flag_details",
+        "/get_flags_decision",
+        "/get_remote_config_payload",
+        "/get_remote_config",
+        "/reload_remote_config",
+        "/update_flags",
+        "/override_feature_flags",
+        "/clear_local_flags_cache",
+        "/is_local_evaluation_ready",
+        "/wait_for_local_evaluation_ready",
+        "/evaluate_feature_flag_locally",
+        "/snapshot/accessed",
+        "/snapshot/event_properties",
+        "/flag_result/value",
+        "/flag_result/get_variant",
+        "/flag_result/get_payload",
+        "/on",
+        "/on_feature_flag",
+        "/on_session_id",
+        "/on_surveys_loaded",
+        "/get_surveys",
+        "/get_active_matching_surveys",
+        "/render_survey",
+        "/display_survey",
+        "/cancel_pending_survey",
+        "/can_render_survey",
+        "/can_render_survey_async",
+        "/get_early_access_features",
+        "/update_early_access_feature_enrollment",
+        "/capture_feature_view",
+        "/capture_feature_interaction",
+        "/start_exception_autocapture",
+        "/stop_exception_autocapture",
+        "/capture_run_zoned_guarded_error",
+        "/is_autocapture_active",
+        "/is_rage_click_active",
+        "/with_context",
+        "/enter_context",
+        "/get_context",
+        "/new_context",
+        "/identify_context",
+        "/set_context_session",
+        "/set_context_device_id",
+        "/tag",
+        "/get_tags",
+        "/context_from_headers",
+        "/set_context",
+        "/set_event_context",
+        "/get_event_context",
+        "/set_flags_in_context",
+        "/bare_capture",
+        "/get_logger",
+        "/get_metrics",
+        "/capture_log",
+        "/logger/trace",
+        "/logger/debug",
+        "/logger/info",
+        "/logger/warn",
+        "/logger/error",
+        "/logger/fatal",
+        "/flush_logs",
+        "/metrics/count",
+        "/metrics/gauge",
+        "/metrics/histogram",
+        "/metrics/flush",
+        "/start_span",
+        "/with_span",
+        "/get_active_span",
+        "/span/set_attribute",
+        "/span/set_attributes",
+        "/span/add_event",
+        "/span/set_status",
+        "/span/record_exception",
+        "/span/update_name",
+        "/span/traceparent",
+        "/span/tracestate",
+        "/span/end",
+        "/capture_trace_feedback",
+        "/capture_trace_metric",
+        "/register_push_notification_token",
+        "/unregister_push_notification_token",
+        "/capture_push_notification_opened",
+        "/prewarm_push_notification_open_capture",
+        "/capture_deep_link",
+        "/record_network_request",
+        "/get_session_teleport_data",
+        "/batch_summary/submitted",
+        "/batch_summary/not_persisted",
+        "/batch_summary/all_persisted",
+        "/batch_summary/event_results"
+      ]
+    }
+  },
+  "$id": "https://posthog.com/sdk-contracts/2.0.0/catalog.schema.json"
+}

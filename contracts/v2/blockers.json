@@ -1,0 +1,29 @@
+{
+  "contract_version": "2.0.0",
+  "blockers": [
+    {
+      "id": "nullable-override-submaps",
+      "routes": ["/override_feature_flags"],
+      "condition": "overrides is a map with flags:null and/or payloads:null",
+      "blocks": "Assertions about the effect of those individual null submaps; the input remains representable.",
+      "does_not_block": "Top-level overrides:null clears all; omitted submaps stay unchanged; false flag values remain values.",
+      "decision_needed": "Define the effect of each individually null submap."
+    },
+    {
+      "id": "worker-held-pending-records",
+      "routes": ["/pending_events"],
+      "condition": "Unsent records have moved from the public queue into a worker-held batch",
+      "blocks": "Assertions whose expected count depends on inclusion of those records.",
+      "does_not_block": "Unambiguous public queue observations and unrelated capture/flush behavior.",
+      "decision_needed": "Define whether the public pending count includes worker-held unsent records."
+    },
+    {
+      "id": "native-non-json-result",
+      "routes": [],
+      "condition": "A returned native value cannot be represented losslessly by the operation's JSON/typed reference result or void/undefined outcome",
+      "blocks": "Only the affected result assertion/profile; report blocked_contract with the concrete call ID and native type evidence.",
+      "does_not_block": "Native Unit/void, actual undefined, JSON values, declared retained references, or actual thrown exceptions.",
+      "decision_needed": "Select lossless observation for the encountered native result alternative. A returned error is not a thrown error."
+    }
+  ]
+}

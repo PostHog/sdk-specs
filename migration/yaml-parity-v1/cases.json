@@ -1,0 +1,5049 @@
+[
+  {
+    "id": "migration:yaml-parity-v1:capture_ai:capture_ai_posts_to_ai_endpoint",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-ai.feature",
+      "line": 10
+    },
+    "legacy_id": "yaml:029a94a:capture_ai:routing:capture_ai_posts_to_ai_endpoint",
+    "legacy_source": {
+      "line": 7,
+      "path": "contracts/capture_ai_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": "capture_ai_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture_ai"
+    ],
+    "sdk_capabilities": [
+      "capture_ai_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_ai:capture_does_not_reroute_ai_named_events",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-ai.feature",
+      "line": 22
+    },
+    "legacy_id": "yaml:029a94a:capture_ai:routing:capture_does_not_reroute_ai_named_events",
+    "legacy_source": {
+      "line": 30,
+      "path": "contracts/capture_ai_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": "capture_ai_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_ai_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_ai:capture_ai_event_has_uuid",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-ai.feature",
+      "line": 35
+    },
+    "legacy_id": "yaml:029a94a:capture_ai:identity:capture_ai_event_has_uuid",
+    "legacy_source": {
+      "line": 58,
+      "path": "contracts/capture_ai_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": "capture_ai_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture_ai"
+    ],
+    "sdk_capabilities": [
+      "capture_ai_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_ai:capture_ai_keeps_supplied_uuid",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-ai.feature",
+      "line": 45
+    },
+    "legacy_id": "yaml:029a94a:capture_ai:identity:capture_ai_keeps_supplied_uuid",
+    "legacy_source": {
+      "line": 82,
+      "path": "contracts/capture_ai_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": "capture_ai_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture_ai"
+    ],
+    "sdk_capabilities": [
+      "capture_ai_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_ai:non_utc_event_timestamp_is_converted_to_utc",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-ai.feature",
+      "line": 56
+    },
+    "legacy_id": "yaml:029a94a:capture_ai:timestamp_format:non_utc_event_timestamp_is_converted_to_utc",
+    "legacy_source": {
+      "line": 112,
+      "path": "contracts/capture_ai_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": "capture_ai_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture_ai"
+    ],
+    "sdk_capabilities": [
+      "capture_ai_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:targets_v1_endpoint",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1.feature",
+      "line": 10
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:endpoint_and_method:targets_v1_endpoint",
+    "legacy_source": {
+      "line": 7,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:does_not_use_legacy_endpoints",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1.feature",
+      "line": 21
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:endpoint_and_method:does_not_use_legacy_endpoints",
+    "legacy_source": {
+      "line": 25,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:has_authorization_bearer_header",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1.feature",
+      "line": 34
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:required_headers:has_authorization_bearer_header",
+    "legacy_source": {
+      "line": 51,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:has_content_type_json",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1.feature",
+      "line": 42
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:required_headers:has_content_type_json",
+    "legacy_source": {
+      "line": 67,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:has_posthog_sdk_info_format",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1.feature",
+      "line": 50
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:required_headers:has_posthog_sdk_info_format",
+    "legacy_source": {
+      "line": 83,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:has_posthog_attempt_header",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1.feature",
+      "line": 58
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:required_headers:has_posthog_attempt_header",
+    "legacy_source": {
+      "line": 99,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:has_posthog_request_id",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1.feature",
+      "line": 66
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:required_headers:has_posthog_request_id",
+    "legacy_source": {
+      "line": 115,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:has_posthog_request_timestamp",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1.feature",
+      "line": 74
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:required_headers:has_posthog_request_timestamp",
+    "legacy_source": {
+      "line": 130,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:has_user_agent",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1.feature",
+      "line": 82
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:required_headers:has_user_agent",
+    "legacy_source": {
+      "line": 145,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:body_has_created_at_and_batch",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1.feature",
+      "line": 90
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:body_format:body_has_created_at_and_batch",
+    "legacy_source": {
+      "line": 164,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:no_api_key_in_body",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1.feature",
+      "line": 98
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:body_format:no_api_key_in_body",
+    "legacy_source": {
+      "line": 177,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:no_sent_at_in_body",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1.feature",
+      "line": 109
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:body_format:no_sent_at_in_body",
+    "legacy_source": {
+      "line": 195,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:event_has_required_root_fields",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1.feature",
+      "line": 119
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:event_format:event_has_required_root_fields",
+    "legacy_source": {
+      "line": 214,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:event_uuid_is_valid",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1.feature",
+      "line": 132
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:event_format:event_uuid_is_valid",
+    "legacy_source": {
+      "line": 227,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:event_timestamp_is_rfc3339",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1.feature",
+      "line": 140
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:event_format:event_timestamp_is_rfc3339",
+    "legacy_source": {
+      "line": 242,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:non_utc_event_timestamp_is_converted_to_utc",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1.feature",
+      "line": 148
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:event_format:non_utc_event_timestamp_is_converted_to_utc",
+    "legacy_source": {
+      "line": 257,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:distinct_id_is_string",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1.feature",
+      "line": 157
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:event_format:distinct_id_is_string",
+    "legacy_source": {
+      "line": 280,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:distinct_id_at_root_not_properties",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1.feature",
+      "line": 165
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:event_format:distinct_id_at_root_not_properties",
+    "legacy_source": {
+      "line": 295,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:custom_properties_preserved",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-batching.feature",
+      "line": 9
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:event_format:custom_properties_preserved",
+    "legacy_source": {
+      "line": 310,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:set_properties_preserved",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-batching.feature",
+      "line": 20
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:event_format:set_properties_preserved",
+    "legacy_source": {
+      "line": 338,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:set_once_properties_preserved",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-batching.feature",
+      "line": 29
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:event_format:set_once_properties_preserved",
+    "legacy_source": {
+      "line": 357,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:groups_properties_preserved",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-batching.feature",
+      "line": 38
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:event_format:groups_properties_preserved",
+    "legacy_source": {
+      "line": 375,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:sdk_generates_uuid_if_not_provided",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-batching.feature",
+      "line": 47
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:event_format:sdk_generates_uuid_if_not_provided",
+    "legacy_source": {
+      "line": 393,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:event_has_required_root_fields_batch",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-batching.feature",
+      "line": 57
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:event_format:event_has_required_root_fields_batch",
+    "legacy_source": {
+      "line": 415,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:event_uuid_is_valid_batch",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-batching.feature",
+      "line": 73
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:event_format:event_uuid_is_valid_batch",
+    "legacy_source": {
+      "line": 436,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:event_timestamp_is_rfc3339_batch",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-batching.feature",
+      "line": 82
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:event_format:event_timestamp_is_rfc3339_batch",
+    "legacy_source": {
+      "line": 453,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:distinct_id_is_string_batch",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-batching.feature",
+      "line": 91
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:event_format:distinct_id_is_string_batch",
+    "legacy_source": {
+      "line": 470,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:distinct_id_at_root_not_properties_batch",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-batching.feature",
+      "line": 100
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:event_format:distinct_id_at_root_not_properties_batch",
+    "legacy_source": {
+      "line": 487,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:custom_properties_preserved_batch",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-batching.feature",
+      "line": 109
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:event_format:custom_properties_preserved_batch",
+    "legacy_source": {
+      "line": 504,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:set_properties_preserved_batch",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-batching.feature",
+      "line": 120
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:event_format:set_properties_preserved_batch",
+    "legacy_source": {
+      "line": 534,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:set_once_properties_preserved_batch",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-batching.feature",
+      "line": 129
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:event_format:set_once_properties_preserved_batch",
+    "legacy_source": {
+      "line": 555,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:groups_properties_preserved_batch",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-batching.feature",
+      "line": 138
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:event_format:groups_properties_preserved_batch",
+    "legacy_source": {
+      "line": 575,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:sdk_generates_uuid_if_not_provided_batch",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-batching.feature",
+      "line": 147
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:event_format:sdk_generates_uuid_if_not_provided_batch",
+    "legacy_source": {
+      "line": 595,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:multiple_events_in_single_batch",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-batching.feature",
+      "line": 158
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:batch_behavior:multiple_events_in_single_batch",
+    "legacy_source": {
+      "line": 619,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:batch_envelope_smoke",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-batching.feature",
+      "line": 168
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:batch_behavior:batch_envelope_smoke",
+    "legacy_source": {
+      "line": 639,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:flush_with_no_events_sends_nothing",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-batching.feature",
+      "line": 180
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:batch_behavior:flush_with_no_events_sends_nothing",
+    "legacy_source": {
+      "line": 661,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:flush_at_triggers_batch",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-batching.feature",
+      "line": 185
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:batch_behavior:flush_at_triggers_batch",
+    "legacy_source": {
+      "line": 670,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:created_at_reflects_batch_creation_time",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-batching.feature",
+      "line": 194
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:batch_behavior:created_at_reflects_batch_creation_time",
+    "legacy_source": {
+      "line": 689,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:generates_unique_uuids",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-batching.feature",
+      "line": 203
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:deduplication:generates_unique_uuids",
+    "legacy_source": {
+      "line": 707,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:different_events_same_content_different_uuids",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-batching.feature",
+      "line": 212
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:deduplication:different_events_same_content_different_uuids",
+    "legacy_source": {
+      "line": 720,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:preserves_uuid_on_retry",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 10
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:deduplication:preserves_uuid_on_retry",
+    "legacy_source": {
+      "line": 739,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:preserves_timestamp_on_retry",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 25
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:deduplication:preserves_timestamp_on_retry",
+    "legacy_source": {
+      "line": 758,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:preserves_uuid_and_timestamp_on_batch_retry",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 40
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:deduplication:preserves_uuid_and_timestamp_on_batch_retry",
+    "legacy_source": {
+      "line": 777,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:no_duplicate_events_in_batch",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 58
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:deduplication:no_duplicate_events_in_batch",
+    "legacy_source": {
+      "line": 805,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:attempt_header_starts_at_one",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 69
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:header_behavior_on_retry:attempt_header_starts_at_one",
+    "legacy_source": {
+      "line": 826,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:attempt_header_increments_on_retry",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 79
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:header_behavior_on_retry:attempt_header_increments_on_retry",
+    "legacy_source": {
+      "line": 842,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:request_id_preserved_on_retry",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 96
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:header_behavior_on_retry:request_id_preserved_on_retry",
+    "legacy_source": {
+      "line": 865,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:different_requests_have_different_request_ids",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 112
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:header_behavior_on_retry:different_requests_have_different_request_ids",
+    "legacy_source": {
+      "line": 887,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:request_timestamp_changes_on_retry",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 130
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:header_behavior_on_retry:request_timestamp_changes_on_retry",
+    "legacy_source": {
+      "line": 914,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:success_response_has_uuid_keyed_results",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 146
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:response_format_validation:success_response_has_uuid_keyed_results",
+    "legacy_source": {
+      "line": 939,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests",
+      "mock_authored_response"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:success_response_has_ok_for_each_event",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 157
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:response_format_validation:success_response_has_ok_for_each_event",
+    "legacy_source": {
+      "line": 955,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests",
+      "mock_authored_response"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:success_no_retry_after_when_all_ok",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 169
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:response_format_validation:success_no_retry_after_when_all_ok",
+    "legacy_source": {
+      "line": 976,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests",
+      "mock_authored_response"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:success_retry_after_present_when_retry_events",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 182
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:response_format_validation:success_retry_after_present_when_retry_events",
+    "legacy_source": {
+      "line": 995,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests",
+      "mock_authored_response"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:success_no_retry_after_when_drop_only",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 195
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:response_format_validation:success_no_retry_after_when_drop_only",
+    "legacy_source": {
+      "line": 1014,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests",
+      "mock_authored_response"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:response_echoes_request_id",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 208
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:response_format_validation:response_echoes_request_id",
+    "legacy_source": {
+      "line": 1033,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests",
+      "mock_authored_response"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:retries_on_408",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 218
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:retry_behavior:retries_on_408",
+    "legacy_source": {
+      "line": 1049,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:retries_on_500",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 234
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:retry_behavior:retries_on_500",
+    "legacy_source": {
+      "line": 1074,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:retries_on_503",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 250
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:retry_behavior:retries_on_503",
+    "legacy_source": {
+      "line": 1099,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:retries_on_504",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 267
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:retry_behavior:retries_on_504",
+    "legacy_source": {
+      "line": 1125,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:retryable_errors_have_retry_after",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 283
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:retry_behavior:retryable_errors_have_retry_after",
+    "legacy_source": {
+      "line": 1150,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests",
+      "mock_authored_response"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:respects_retry_after_on_retryable_error",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 297
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:retry_behavior:respects_retry_after_on_retryable_error",
+    "legacy_source": {
+      "line": 1168,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:does_not_retry_on_400",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 313
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:retry_behavior:does_not_retry_on_400",
+    "legacy_source": {
+      "line": 1194,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:does_not_retry_on_401",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 327
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:retry_behavior:does_not_retry_on_401",
+    "legacy_source": {
+      "line": 1213,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:does_not_retry_on_402",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 341
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:retry_behavior:does_not_retry_on_402",
+    "legacy_source": {
+      "line": 1232,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:does_not_retry_on_413",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 355
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:retry_behavior:does_not_retry_on_413",
+    "legacy_source": {
+      "line": 1251,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:does_not_retry_on_415",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 369
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:retry_behavior:does_not_retry_on_415",
+    "legacy_source": {
+      "line": 1270,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:non_retryable_errors_have_no_retry_after",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 383
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:retry_behavior:non_retryable_errors_have_no_retry_after",
+    "legacy_source": {
+      "line": 1289,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests",
+      "mock_authored_response"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:implements_backoff",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 397
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:retry_behavior:implements_backoff",
+    "legacy_source": {
+      "line": 1308,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:max_retries_respected",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "line": 415
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:retry_behavior:max_retries_respected",
+    "legacy_source": {
+      "line": 1334,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "evidence_layers": [
+      "public_sdk_calls",
+      "received_requests"
+    ],
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:handles_200_full_success",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-outcomes.feature",
+      "line": 10
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:partial_batch_handling:handles_200_full_success",
+    "legacy_source": {
+      "line": 1363,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "evidence_layers": [
+      "received_wire",
+      "sdk_response_handling"
+    ]
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:handles_200_with_all_ok",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-outcomes.feature",
+      "line": 21
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:partial_batch_handling:handles_200_with_all_ok",
+    "legacy_source": {
+      "line": 1381,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "evidence_layers": [
+      "received_wire",
+      "sdk_response_handling"
+    ]
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:does_not_retry_dropped_events",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-outcomes.feature",
+      "line": 35
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:partial_batch_handling:does_not_retry_dropped_events",
+    "legacy_source": {
+      "line": 1405,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "evidence_layers": [
+      "received_wire",
+      "sdk_response_handling"
+    ]
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:does_not_retry_limited_events",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-outcomes.feature",
+      "line": 49
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:partial_batch_handling:does_not_retry_limited_events",
+    "legacy_source": {
+      "line": 1429,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "evidence_layers": [
+      "received_wire",
+      "sdk_response_handling"
+    ]
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:prunes_ok_events_on_partial_retry",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-outcomes.feature",
+      "line": 63
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:partial_batch_handling:prunes_ok_events_on_partial_retry",
+    "legacy_source": {
+      "line": 1453,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "evidence_layers": [
+      "received_wire",
+      "sdk_response_handling"
+    ]
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:prunes_dropped_events_on_partial_retry",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-outcomes.feature",
+      "line": 79
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:partial_batch_handling:prunes_dropped_events_on_partial_retry",
+    "legacy_source": {
+      "line": 1479,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "evidence_layers": [
+      "received_wire",
+      "sdk_response_handling"
+    ]
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:retries_only_retry_events_from_partial",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-outcomes.feature",
+      "line": 95
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:partial_batch_handling:retries_only_retry_events_from_partial",
+    "legacy_source": {
+      "line": 1505,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "evidence_layers": [
+      "received_wire",
+      "sdk_response_handling"
+    ]
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:partial_retry_preserves_uuids",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-outcomes.feature",
+      "line": 112
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:partial_batch_handling:partial_retry_preserves_uuids",
+    "legacy_source": {
+      "line": 1535,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "evidence_layers": [
+      "received_wire",
+      "sdk_response_handling"
+    ]
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:partial_retry_attempt_header_increments",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-outcomes.feature",
+      "line": 128
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:partial_batch_handling:partial_retry_attempt_header_increments",
+    "legacy_source": {
+      "line": 1561,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "evidence_layers": [
+      "received_wire",
+      "sdk_response_handling"
+    ]
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:partial_retry_request_id_preserved",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-outcomes.feature",
+      "line": 144
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:partial_batch_handling:partial_retry_request_id_preserved",
+    "legacy_source": {
+      "line": 1587,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "evidence_layers": [
+      "received_wire",
+      "sdk_response_handling"
+    ]
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:respects_retry_after_on_partial",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-outcomes.feature",
+      "line": 160
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:partial_batch_handling:respects_retry_after_on_partial",
+    "legacy_source": {
+      "line": 1613,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "evidence_layers": [
+      "received_wire",
+      "sdk_response_handling"
+    ]
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:unknown_result_treated_as_terminal",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-outcomes.feature",
+      "line": 176
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:partial_batch_handling:unknown_result_treated_as_terminal",
+    "legacy_source": {
+      "line": 1643,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "evidence_layers": [
+      "received_wire",
+      "sdk_response_handling"
+    ]
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:mixed_ok_drop_limited_no_retry",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-outcomes.feature",
+      "line": 190
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:partial_batch_handling:mixed_ok_drop_limited_no_retry",
+    "legacy_source": {
+      "line": 1669,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "evidence_layers": [
+      "received_wire",
+      "sdk_response_handling"
+    ]
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:no_content_encoding_when_disabled",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-outcomes.feature",
+      "line": 204
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:compression:no_content_encoding_when_disabled",
+    "legacy_source": {
+      "line": 1768,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "evidence_layers": [
+      "received_wire"
+    ],
+    "argument_translations": [
+      {
+        "source": "init.enable_compression",
+        "value": false,
+        "target": "/setup.config.compression",
+        "target_value": "none",
+        "rationale": "Both explicitly disable compression without selecting an enabled algorithm."
+      }
+    ]
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:does_not_retry_on_unknown_4xx",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-outcomes.feature",
+      "line": 214
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:error_handling:does_not_retry_on_unknown_4xx",
+    "legacy_source": {
+      "line": 1802,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "evidence_layers": [
+      "received_wire",
+      "sdk_response_handling"
+    ]
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:unset_options_omitted",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-outcomes.feature",
+      "line": 228
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:event_options:unset_options_omitted",
+    "legacy_source": {
+      "line": 1896,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "evidence_layers": [
+      "received_wire"
+    ]
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:historical_migration_set_in_body",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-outcomes.feature",
+      "line": 241
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:geoip_and_historical_migration:historical_migration_set_in_body",
+    "legacy_source": {
+      "line": 1970,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "evidence_layers": [
+      "received_wire"
+    ]
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:historical_migration_absent_by_default",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-outcomes.feature",
+      "line": 251
+    },
+    "legacy_id": "yaml:029a94a:capture_v1:geoip_and_historical_migration:historical_migration_absent_by_default",
+    "legacy_source": {
+      "line": 1987,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "evidence_layers": [
+      "received_wire"
+    ]
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:event_has_required_fields",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 11
+    },
+    "legacy_id": "yaml:029a94a:capture:format_validation:event_has_required_fields",
+    "legacy_source": {
+      "line": 7,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0",
+      "capture_v0_batch"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:event_has_required_fields_client",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 24
+    },
+    "legacy_id": "yaml:029a94a:capture:format_validation:event_has_required_fields_client",
+    "legacy_source": {
+      "line": 31,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0",
+      "capture_v0_event"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:event_has_uuid",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 36
+    },
+    "legacy_id": "yaml:029a94a:capture:format_validation:event_has_uuid",
+    "legacy_source": {
+      "line": 55,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client",
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:event_has_lib_properties",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 47
+    },
+    "legacy_id": "yaml:029a94a:capture:format_validation:event_has_lib_properties",
+    "legacy_source": {
+      "line": 72,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client",
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:distinct_id_is_string",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 58
+    },
+    "legacy_id": "yaml:029a94a:capture:format_validation:distinct_id_is_string",
+    "legacy_source": {
+      "line": 87,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0",
+      "capture_v0_batch"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:distinct_id_is_string_client",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 69
+    },
+    "legacy_id": "yaml:029a94a:capture:format_validation:distinct_id_is_string_client",
+    "legacy_source": {
+      "line": 102,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0",
+      "capture_v0_event"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:token_is_present",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 80
+    },
+    "legacy_id": "yaml:029a94a:capture:format_validation:token_is_present",
+    "legacy_source": {
+      "line": 117,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0",
+      "capture_v0_batch"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:token_is_present_client",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 91
+    },
+    "legacy_id": "yaml:029a94a:capture:format_validation:token_is_present_client",
+    "legacy_source": {
+      "line": 133,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0",
+      "capture_v0_event"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:custom_properties_preserved",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 101
+    },
+    "legacy_id": "yaml:029a94a:capture:format_validation:custom_properties_preserved",
+    "legacy_source": {
+      "line": 149,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client",
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:event_has_timestamp",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 113
+    },
+    "legacy_id": "yaml:029a94a:capture:format_validation:event_has_timestamp",
+    "legacy_source": {
+      "line": 176,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client",
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:non_utc_event_timestamp_is_converted_to_utc",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 123
+    },
+    "legacy_id": "yaml:029a94a:capture:format_validation:non_utc_event_timestamp_is_converted_to_utc",
+    "legacy_source": {
+      "line": 190,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client",
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:retries_on_503",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 134
+    },
+    "legacy_id": "yaml:029a94a:capture:retry_behavior:retries_on_503",
+    "legacy_source": {
+      "line": 217,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client",
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:does_not_retry_on_400",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 151
+    },
+    "legacy_id": "yaml:029a94a:capture:retry_behavior:does_not_retry_on_400",
+    "legacy_source": {
+      "line": 242,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client",
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:does_not_retry_on_401",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 165
+    },
+    "legacy_id": "yaml:029a94a:capture:retry_behavior:does_not_retry_on_401",
+    "legacy_source": {
+      "line": 264,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client",
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:respects_retry_after_header",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 179
+    },
+    "legacy_id": "yaml:029a94a:capture:retry_behavior:respects_retry_after_header",
+    "legacy_source": {
+      "line": 286,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client",
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:implements_backoff",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 195
+    },
+    "legacy_id": "yaml:029a94a:capture:retry_behavior:implements_backoff",
+    "legacy_source": {
+      "line": 314,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client",
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:retries_on_500",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 213
+    },
+    "legacy_id": "yaml:029a94a:capture:retry_behavior:retries_on_500",
+    "legacy_source": {
+      "line": 341,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client",
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:retries_on_502",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 229
+    },
+    "legacy_id": "yaml:029a94a:capture:retry_behavior:retries_on_502",
+    "legacy_source": {
+      "line": 365,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client",
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:retries_on_504",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 245
+    },
+    "legacy_id": "yaml:029a94a:capture:retry_behavior:retries_on_504",
+    "legacy_source": {
+      "line": 389,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client",
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:max_retries_respected",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 261
+    },
+    "legacy_id": "yaml:029a94a:capture:retry_behavior:max_retries_respected",
+    "legacy_source": {
+      "line": 413,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client",
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:generates_unique_uuids",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 279
+    },
+    "legacy_id": "yaml:029a94a:capture:deduplication:generates_unique_uuids",
+    "legacy_source": {
+      "line": 443,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client",
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:preserves_uuid_on_retry",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 289
+    },
+    "legacy_id": "yaml:029a94a:capture:deduplication:preserves_uuid_on_retry",
+    "legacy_source": {
+      "line": 457,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client",
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:preserves_uuid_and_timestamp_on_retry",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 304
+    },
+    "legacy_id": "yaml:029a94a:capture:deduplication:preserves_uuid_and_timestamp_on_retry",
+    "legacy_source": {
+      "line": 477,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client",
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:preserves_uuid_and_timestamp_on_batch_retry",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 322
+    },
+    "legacy_id": "yaml:029a94a:capture:deduplication:preserves_uuid_and_timestamp_on_batch_retry",
+    "legacy_source": {
+      "line": 502,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client",
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:no_duplicate_events_in_batch",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 340
+    },
+    "legacy_id": "yaml:029a94a:capture:deduplication:no_duplicate_events_in_batch",
+    "legacy_source": {
+      "line": 531,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client",
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:different_events_have_different_uuids",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 351
+    },
+    "legacy_id": "yaml:029a94a:capture:deduplication:different_events_have_different_uuids",
+    "legacy_source": {
+      "line": 550,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client",
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:uses_proper_batch_structure",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 366
+    },
+    "legacy_id": "yaml:029a94a:capture:batch_format:uses_proper_batch_structure",
+    "legacy_source": {
+      "line": 593,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0",
+      "capture_v0_batch"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:flush_with_no_events_sends_nothing",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 376
+    },
+    "legacy_id": "yaml:029a94a:capture:batch_format:flush_with_no_events_sends_nothing",
+    "legacy_source": {
+      "line": 608,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client",
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:multiple_events_batched_together",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 383
+    },
+    "legacy_id": "yaml:029a94a:capture:batch_format:multiple_events_batched_together",
+    "legacy_source": {
+      "line": 618,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0",
+      "capture_v0_batch"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:does_not_retry_on_403",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 394
+    },
+    "legacy_id": "yaml:029a94a:capture:error_handling:does_not_retry_on_403",
+    "legacy_source": {
+      "line": 642,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client",
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:does_not_retry_on_413",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 408
+    },
+    "legacy_id": "yaml:029a94a:capture:error_handling:does_not_retry_on_413",
+    "legacy_source": {
+      "line": 664,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client",
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:retries_on_408",
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "line": 422
+    },
+    "legacy_id": "yaml:029a94a:capture:error_handling:retries_on_408",
+    "legacy_source": {
+      "line": 686,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "client",
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0"
+    ],
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:sends_gzip_content_encoding",
+    "legacy_id": "yaml:029a94a:capture_v1:compression:sends_gzip_content_encoding",
+    "legacy_source": {
+      "line": 1696,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": "encoding_gzip"
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1",
+      "encoding_gzip"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-amendment-v1.feature",
+      "line": 11
+    },
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "amendment": "capture-amendment-v1",
+    "argument_translations": [
+      {
+        "source": "init.enable_compression",
+        "value": true,
+        "target": "/setup.config.compression",
+        "target_value": "gzip",
+        "amendment": "capture-amendment-v1",
+        "rationale": "Approved explicit algorithm selection replaces SDK algorithm choice; original wire assertion is unchanged."
+      }
+    ]
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:sends_deflate_content_encoding",
+    "legacy_id": "yaml:029a94a:capture_v1:compression:sends_deflate_content_encoding",
+    "legacy_source": {
+      "line": 1714,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": "encoding_deflate"
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1",
+      "encoding_deflate"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-amendment-v1.feature",
+      "line": 22
+    },
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "amendment": "capture-amendment-v1",
+    "argument_translations": [
+      {
+        "source": "init.enable_compression",
+        "value": true,
+        "target": "/setup.config.compression",
+        "target_value": "deflate",
+        "amendment": "capture-amendment-v1",
+        "rationale": "Approved explicit algorithm selection replaces SDK algorithm choice; original wire assertion is unchanged."
+      }
+    ]
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:sends_br_content_encoding",
+    "legacy_id": "yaml:029a94a:capture_v1:compression:sends_br_content_encoding",
+    "legacy_source": {
+      "line": 1732,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": "encoding_br"
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1",
+      "encoding_br"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-amendment-v1.feature",
+      "line": 33
+    },
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "amendment": "capture-amendment-v1",
+    "argument_translations": [
+      {
+        "source": "init.enable_compression",
+        "value": true,
+        "target": "/setup.config.compression",
+        "target_value": "br",
+        "amendment": "capture-amendment-v1",
+        "rationale": "Approved explicit algorithm selection replaces SDK algorithm choice; original wire assertion is unchanged."
+      }
+    ]
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:sends_zstd_content_encoding",
+    "legacy_id": "yaml:029a94a:capture_v1:compression:sends_zstd_content_encoding",
+    "legacy_source": {
+      "line": 1750,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": "encoding_zstd"
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1",
+      "encoding_zstd"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-amendment-v1.feature",
+      "line": 44
+    },
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "amendment": "capture-amendment-v1",
+    "argument_translations": [
+      {
+        "source": "init.enable_compression",
+        "value": true,
+        "target": "/setup.config.compression",
+        "target_value": "zstd",
+        "amendment": "capture-amendment-v1",
+        "rationale": "Approved explicit algorithm selection replaces SDK algorithm choice; original wire assertion is unchanged."
+      }
+    ]
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:compressed_body_is_decompressible",
+    "legacy_id": "yaml:029a94a:capture_v1:compression:compressed_body_is_decompressible",
+    "legacy_source": {
+      "line": 1784,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": "encoding_gzip"
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1",
+      "encoding_gzip"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-amendment-v1.feature",
+      "line": 55
+    },
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "amendment": "capture-amendment-v1",
+    "argument_translations": [
+      {
+        "source": "init.enable_compression",
+        "value": true,
+        "target": "/setup.config.compression",
+        "target_value": "gzip",
+        "amendment": "capture-amendment-v1",
+        "rationale": "Approved explicit algorithm selection replaces SDK algorithm choice; original wire assertion is unchanged."
+      }
+    ]
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:cookieless_mode_override",
+    "legacy_id": "yaml:029a94a:capture_v1:event_options:cookieless_mode_override",
+    "legacy_source": {
+      "line": 1824,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-amendment-v1.feature",
+      "line": 66
+    },
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "amendment": "capture-amendment-v1"
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:disable_skew_correction_override",
+    "legacy_id": "yaml:029a94a:capture_v1:event_options:disable_skew_correction_override",
+    "legacy_source": {
+      "line": 1842,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-amendment-v1.feature",
+      "line": 77
+    },
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "amendment": "capture-amendment-v1"
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:process_person_profile_override",
+    "legacy_id": "yaml:029a94a:capture_v1:event_options:process_person_profile_override",
+    "legacy_source": {
+      "line": 1860,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-amendment-v1.feature",
+      "line": 88
+    },
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "amendment": "capture-amendment-v1"
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:product_tour_id_override",
+    "legacy_id": "yaml:029a94a:capture_v1:event_options:product_tour_id_override",
+    "legacy_source": {
+      "line": 1878,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-amendment-v1.feature",
+      "line": 99
+    },
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "amendment": "capture-amendment-v1"
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:options_override_in_batch",
+    "legacy_id": "yaml:029a94a:capture_v1:event_options:options_override_in_batch",
+    "legacy_source": {
+      "line": 1924,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-amendment-v1.feature",
+      "line": 110
+    },
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "amendment": "capture-amendment-v1"
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture_analytics_v1:geoip_disable_injected_into_properties",
+    "legacy_id": "yaml:029a94a:capture_v1:geoip_and_historical_migration:geoip_disable_injected_into_properties",
+    "legacy_source": {
+      "line": 1953,
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "capture_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v1"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-amendment-v1.feature",
+      "line": 123
+    },
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "amendment": "capture-amendment-v1"
+  },
+  {
+    "id": "migration:yaml-parity-v1:capture:sends_gzip_when_enabled",
+    "legacy_id": "yaml:029a94a:capture:compression:sends_gzip_when_enabled",
+    "legacy_source": {
+      "line": 573,
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": "capture_v0",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/capture"
+    ],
+    "sdk_capabilities": [
+      "capture_v0",
+      "encoding_gzip"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-amendment-v1.feature",
+      "line": 134
+    },
+    "translation": "complete",
+    "execution_evidence": "harness:docs/harness-v2-yaml-parity-evidence.md",
+    "native_sdk_evidence": [],
+    "amendment": "capture-amendment-v1",
+    "argument_translations": [
+      {
+        "source": "init.enable_compression",
+        "value": true,
+        "target": "/setup.config.compression",
+        "target_value": "gzip",
+        "amendment": "capture-amendment-v1",
+        "rationale": "Approved explicit algorithm selection replaces SDK algorithm choice; original wire assertion is unchanged."
+      }
+    ]
+  },
+  {
+    "id": "migration:yaml-parity-v1:feature_flags:request_with_person_properties_device_id",
+    "legacy_id": "yaml:029a94a:feature_flags:request_payload:request_with_person_properties_device_id",
+    "legacy_source": {
+      "line": 9,
+      "path": "contracts/feature_flags_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": null,
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/get_feature_flag"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/remote-flags-v1.feature",
+      "line": 10
+    },
+    "sdk_capabilities": [
+      "flags_v2"
+    ],
+    "amendment": "flag-semantics-v1",
+    "argument_translations": [
+      {
+        "source_step_index": 1,
+        "source": "get_feature_flag.force_remote",
+        "value": true,
+        "target": "removed",
+        "amendment": "flag-semantics-v1",
+        "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+      }
+    ],
+    "translation": "complete_with_approved_setup_amendment",
+    "execution_evidence": "harness:docs/harness-v2-remote-flags-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:feature_flags:flags_request_uses_v2_query_param",
+    "legacy_id": "yaml:029a94a:feature_flags:request_payload:flags_request_uses_v2_query_param",
+    "legacy_source": {
+      "line": 71,
+      "path": "contracts/feature_flags_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": null,
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/get_feature_flag"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/remote-flags-v1.feature",
+      "line": 34
+    },
+    "sdk_capabilities": [
+      "flags_v2"
+    ],
+    "amendment": "flag-semantics-v1",
+    "argument_translations": [
+      {
+        "source_step_index": 1,
+        "source": "get_feature_flag.force_remote",
+        "value": true,
+        "target": "removed",
+        "amendment": "flag-semantics-v1",
+        "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+      }
+    ],
+    "translation": "complete_with_approved_setup_amendment",
+    "execution_evidence": "harness:docs/harness-v2-remote-flags-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:feature_flags:flags_request_hits_flags_path_not_decide",
+    "legacy_id": "yaml:029a94a:feature_flags:request_payload:flags_request_hits_flags_path_not_decide",
+    "legacy_source": {
+      "line": 91,
+      "path": "contracts/feature_flags_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": null,
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/get_feature_flag"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/remote-flags-v1.feature",
+      "line": 46
+    },
+    "sdk_capabilities": [
+      "flags_v2"
+    ],
+    "amendment": "flag-semantics-v1",
+    "argument_translations": [
+      {
+        "source_step_index": 1,
+        "source": "get_feature_flag.force_remote",
+        "value": true,
+        "target": "removed",
+        "amendment": "flag-semantics-v1",
+        "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+      }
+    ],
+    "translation": "complete_with_approved_setup_amendment",
+    "execution_evidence": "harness:docs/harness-v2-remote-flags-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:feature_flags:flags_request_omits_authorization_header",
+    "legacy_id": "yaml:029a94a:feature_flags:request_payload:flags_request_omits_authorization_header",
+    "legacy_source": {
+      "line": 112,
+      "path": "contracts/feature_flags_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": null,
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/get_feature_flag"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/remote-flags-v1.feature",
+      "line": 58
+    },
+    "sdk_capabilities": [
+      "flags_v2"
+    ],
+    "amendment": "flag-semantics-v1",
+    "argument_translations": [
+      {
+        "source_step_index": 1,
+        "source": "get_feature_flag.force_remote",
+        "value": true,
+        "target": "removed",
+        "amendment": "flag-semantics-v1",
+        "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+      }
+    ],
+    "translation": "complete_with_approved_setup_amendment",
+    "execution_evidence": "harness:docs/harness-v2-remote-flags-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:feature_flags:token_in_flags_body_matches_init",
+    "legacy_id": "yaml:029a94a:feature_flags:request_payload:token_in_flags_body_matches_init",
+    "legacy_source": {
+      "line": 132,
+      "path": "contracts/feature_flags_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": null,
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/get_feature_flag"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/remote-flags-v1.feature",
+      "line": 70
+    },
+    "sdk_capabilities": [
+      "flags_v2"
+    ],
+    "amendment": "flag-semantics-v1",
+    "argument_translations": [
+      {
+        "source_step_index": 1,
+        "source": "get_feature_flag.force_remote",
+        "value": true,
+        "target": "removed",
+        "amendment": "flag-semantics-v1",
+        "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+      }
+    ],
+    "translation": "complete_with_approved_setup_amendment",
+    "execution_evidence": "harness:docs/harness-v2-remote-flags-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:feature_flags:groups_round_trip",
+    "legacy_id": "yaml:029a94a:feature_flags:request_payload:groups_round_trip",
+    "legacy_source": {
+      "line": 151,
+      "path": "contracts/feature_flags_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": null,
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/get_feature_flag"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/remote-flags-v1.feature",
+      "line": 81
+    },
+    "sdk_capabilities": [
+      "flags_v2"
+    ],
+    "amendment": "flag-semantics-v1",
+    "argument_translations": [
+      {
+        "source_step_index": 1,
+        "source": "get_feature_flag.force_remote",
+        "value": true,
+        "target": "removed",
+        "amendment": "flag-semantics-v1",
+        "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+      }
+    ],
+    "translation": "complete_with_approved_setup_amendment",
+    "execution_evidence": "harness:docs/harness-v2-remote-flags-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:feature_flags:groups_default_to_empty_object",
+    "legacy_id": "yaml:029a94a:feature_flags:request_payload:groups_default_to_empty_object",
+    "legacy_source": {
+      "line": 177,
+      "path": "contracts/feature_flags_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": null,
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/get_feature_flag"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/remote-flags-v1.feature",
+      "line": 101
+    },
+    "sdk_capabilities": [
+      "flags_v2"
+    ],
+    "amendment": "flag-semantics-v1",
+    "argument_translations": [
+      {
+        "source_step_index": 1,
+        "source": "get_feature_flag.force_remote",
+        "value": true,
+        "target": "removed",
+        "amendment": "flag-semantics-v1",
+        "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+      }
+    ],
+    "translation": "complete_with_approved_setup_amendment",
+    "execution_evidence": "harness:docs/harness-v2-remote-flags-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:feature_flags:disable_geoip_false_propagates_as_geoip_disable_false",
+    "legacy_id": "yaml:029a94a:feature_flags:request_payload:disable_geoip_false_propagates_as_geoip_disable_false",
+    "legacy_source": {
+      "line": 198,
+      "path": "contracts/feature_flags_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": null,
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/get_feature_flag"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/remote-flags-v1.feature",
+      "line": 113
+    },
+    "sdk_capabilities": [
+      "flags_v2"
+    ],
+    "amendment": "flag-semantics-v1",
+    "argument_translations": [
+      {
+        "source_step_index": 1,
+        "source": "get_feature_flag.force_remote",
+        "value": true,
+        "target": "removed",
+        "amendment": "flag-semantics-v1",
+        "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+      }
+    ],
+    "translation": "complete_with_approved_setup_amendment",
+    "execution_evidence": "harness:docs/harness-v2-remote-flags-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:feature_flags:disable_geoip_omitted_defaults_to_false",
+    "legacy_id": "yaml:029a94a:feature_flags:request_payload:disable_geoip_omitted_defaults_to_false",
+    "legacy_source": {
+      "line": 216,
+      "path": "contracts/feature_flags_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": null,
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/get_feature_flag"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/remote-flags-v1.feature",
+      "line": 125
+    },
+    "sdk_capabilities": [
+      "flags_v2"
+    ],
+    "amendment": "flag-semantics-v1",
+    "argument_translations": [
+      {
+        "source_step_index": 1,
+        "source": "get_feature_flag.force_remote",
+        "value": true,
+        "target": "removed",
+        "amendment": "flag-semantics-v1",
+        "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+      }
+    ],
+    "translation": "complete_with_approved_setup_amendment",
+    "execution_evidence": "harness:docs/harness-v2-remote-flags-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:feature_flags:flag_keys_to_evaluate_contains_only_requested_key",
+    "legacy_id": "yaml:029a94a:feature_flags:request_payload:flag_keys_to_evaluate_contains_only_requested_key",
+    "legacy_source": {
+      "line": 233,
+      "path": "contracts/feature_flags_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": null,
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/get_feature_flag"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/remote-flags-v1.feature",
+      "line": 136
+    },
+    "sdk_capabilities": [
+      "flags_v2"
+    ],
+    "amendment": "flag-semantics-v1",
+    "argument_translations": [
+      {
+        "source_step_index": 1,
+        "source": "get_feature_flag.force_remote",
+        "value": true,
+        "target": "removed",
+        "amendment": "flag-semantics-v1",
+        "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+      }
+    ],
+    "translation": "complete_with_approved_setup_amendment",
+    "execution_evidence": "harness:docs/harness-v2-remote-flags-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:feature_flags:no_flags_request_on_init_alone",
+    "legacy_id": "yaml:029a94a:feature_flags:request_lifecycle:no_flags_request_on_init_alone",
+    "legacy_source": {
+      "line": 254,
+      "path": "contracts/feature_flags_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": null,
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/get_feature_flag"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/remote-flags-v1.feature",
+      "line": 147
+    },
+    "sdk_capabilities": [
+      "flags_v2"
+    ],
+    "amendment": "flag-semantics-v1",
+    "argument_translations": [],
+    "translation": "complete_with_approved_setup_amendment",
+    "execution_evidence": "harness:docs/harness-v2-remote-flags-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:feature_flags:no_flags_request_on_normal_capture",
+    "legacy_id": "yaml:029a94a:feature_flags:request_lifecycle:no_flags_request_on_normal_capture",
+    "legacy_source": {
+      "line": 265,
+      "path": "contracts/feature_flags_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": null,
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/get_feature_flag"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/remote-flags-v1.feature",
+      "line": 151
+    },
+    "sdk_capabilities": [
+      "flags_v2"
+    ],
+    "amendment": "flag-semantics-v1",
+    "argument_translations": [],
+    "translation": "complete_with_approved_setup_amendment",
+    "execution_evidence": "harness:docs/harness-v2-remote-flags-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:feature_flags:two_flag_calls_produce_two_remote_requests",
+    "legacy_id": "yaml:029a94a:feature_flags:request_lifecycle:two_flag_calls_produce_two_remote_requests",
+    "legacy_source": {
+      "line": 283,
+      "path": "contracts/feature_flags_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": null,
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/get_feature_flag"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/remote-flags-v1.feature",
+      "line": 163
+    },
+    "sdk_capabilities": [
+      "flags_v2",
+      "flags_getter_remote_uncached"
+    ],
+    "amendment": "flag-semantics-v1",
+    "argument_translations": [
+      {
+        "source_step_index": 1,
+        "source": "get_feature_flag.force_remote",
+        "value": true,
+        "target": "removed",
+        "amendment": "flag-semantics-v1",
+        "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+      },
+      {
+        "source_step_index": 2,
+        "source": "get_feature_flag.force_remote",
+        "value": true,
+        "target": "removed",
+        "amendment": "flag-semantics-v1",
+        "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+      }
+    ],
+    "translation": "complete_with_approved_setup_amendment",
+    "execution_evidence": "harness:docs/harness-v2-remote-flags-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:feature_flags:mock_response_value_is_returned_to_caller",
+    "legacy_id": "yaml:029a94a:feature_flags:request_lifecycle:mock_response_value_is_returned_to_caller",
+    "legacy_source": {
+      "line": 305,
+      "path": "contracts/feature_flags_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": null,
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/get_feature_flag"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/remote-flags-v1.feature",
+      "line": 181
+    },
+    "sdk_capabilities": [
+      "flags_v2"
+    ],
+    "amendment": "flag-semantics-v1",
+    "argument_translations": [
+      {
+        "source_step_index": 2,
+        "source": "get_feature_flag.force_remote",
+        "value": true,
+        "target": "removed",
+        "amendment": "flag-semantics-v1",
+        "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+      }
+    ],
+    "translation": "complete_with_approved_setup_amendment",
+    "execution_evidence": "harness:docs/harness-v2-remote-flags-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:feature_flags:retries_flags_on_502",
+    "legacy_id": "yaml:029a94a:feature_flags:retry_behavior:retries_flags_on_502",
+    "legacy_source": {
+      "line": 331,
+      "path": "contracts/feature_flags_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": null,
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/get_feature_flag"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/remote-flags-v1.feature",
+      "line": 203
+    },
+    "sdk_capabilities": [
+      "flags_v2"
+    ],
+    "amendment": "flag-semantics-v1",
+    "argument_translations": [
+      {
+        "source_step_index": 2,
+        "source": "get_feature_flag.force_remote",
+        "value": true,
+        "target": "removed",
+        "amendment": "flag-semantics-v1",
+        "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+      }
+    ],
+    "translation": "complete_with_approved_setup_amendment",
+    "execution_evidence": "harness:docs/harness-v2-remote-flags-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:feature_flags:retries_flags_on_504",
+    "legacy_id": "yaml:029a94a:feature_flags:retry_behavior:retries_flags_on_504",
+    "legacy_source": {
+      "line": 357,
+      "path": "contracts/feature_flags_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": null,
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/get_feature_flag"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/remote-flags-v1.feature",
+      "line": 229
+    },
+    "sdk_capabilities": [
+      "flags_v2"
+    ],
+    "amendment": "flag-semantics-v1",
+    "argument_translations": [
+      {
+        "source_step_index": 2,
+        "source": "get_feature_flag.force_remote",
+        "value": true,
+        "target": "removed",
+        "amendment": "flag-semantics-v1",
+        "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+      }
+    ],
+    "translation": "complete_with_approved_setup_amendment",
+    "execution_evidence": "harness:docs/harness-v2-remote-flags-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:feature_flags:get_feature_flag_captures_feature_flag_called_event",
+    "legacy_id": "yaml:029a94a:feature_flags:side_effect_events:get_feature_flag_captures_feature_flag_called_event",
+    "legacy_source": {
+      "line": 389,
+      "path": "contracts/feature_flags_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [
+        "server"
+      ],
+      "suite_requires": null,
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/get_feature_flag"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/remote-flags-v1.feature",
+      "line": 255
+    },
+    "sdk_capabilities": [
+      "flags_v2"
+    ],
+    "amendment": "flag-semantics-v1",
+    "argument_translations": [
+      {
+        "source_step_index": 2,
+        "source": "get_feature_flag.force_remote",
+        "value": true,
+        "target": "removed",
+        "amendment": "flag-semantics-v1",
+        "rationale": "Ordinary native getter; source harness forcing is not an SDK operation."
+      }
+    ],
+    "translation": "complete_with_approved_setup_amendment",
+    "execution_evidence": "harness:docs/harness-v2-remote-flags-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:feature_flags_local_evaluation:matching_version_missing",
+    "legacy_id": "yaml:029a94a:feature_flags_local_evaluation:versioned_boolean_matching:matching_version_missing",
+    "legacy_source": {
+      "line": 8,
+      "path": "contracts/feature_flags_local_evaluation_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "feature_flags_local_evaluation_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/get_feature_flag"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/local-evaluation-v1.feature",
+      "line": 10
+    },
+    "sdk_capabilities": [
+      "feature_flags_local_evaluation_v1"
+    ],
+    "amendment": "local-evaluation-v1",
+    "argument_translations": [
+      {
+        "source": "init.personal_api_key",
+        "target": "setup.config.secret_key",
+        "semantics": "lossless alias; omitted inputs remain omitted"
+      },
+      {
+        "source": "reload_feature_flag_definitions",
+        "target": "/reload_feature_flags + /wait_for_local_evaluation_ready",
+        "semantics": "native public refresh plus fresh authenticated HTTP 200 under one 5000ms deadline"
+      }
+    ],
+    "translation": "complete_with_approved_local_evaluation_amendment",
+    "execution_evidence": "harness:docs/harness-v2-local-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:feature_flags_local_evaluation:matching_version_1",
+    "legacy_id": "yaml:029a94a:feature_flags_local_evaluation:versioned_boolean_matching:matching_version_1",
+    "legacy_source": {
+      "line": 995,
+      "path": "contracts/feature_flags_local_evaluation_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "feature_flags_local_evaluation_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/get_feature_flag"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/local-evaluation-v1.feature",
+      "line": 563
+    },
+    "sdk_capabilities": [
+      "feature_flags_local_evaluation_v1"
+    ],
+    "amendment": "local-evaluation-v1",
+    "argument_translations": [
+      {
+        "source": "init.personal_api_key",
+        "target": "setup.config.secret_key",
+        "semantics": "lossless alias; omitted inputs remain omitted"
+      },
+      {
+        "source": "reload_feature_flag_definitions",
+        "target": "/reload_feature_flags + /wait_for_local_evaluation_ready",
+        "semantics": "native public refresh plus fresh authenticated HTTP 200 under one 5000ms deadline"
+      }
+    ],
+    "translation": "complete_with_approved_local_evaluation_amendment",
+    "execution_evidence": "harness:docs/harness-v2-local-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:feature_flags_local_evaluation:matching_version_2",
+    "legacy_id": "yaml:029a94a:feature_flags_local_evaluation:versioned_boolean_matching:matching_version_2",
+    "legacy_source": {
+      "line": 1433,
+      "path": "contracts/feature_flags_local_evaluation_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "feature_flags_local_evaluation_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/get_feature_flag"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/local-evaluation-v1.feature",
+      "line": 1117
+    },
+    "sdk_capabilities": [
+      "feature_flags_local_evaluation_v1"
+    ],
+    "amendment": "local-evaluation-v1",
+    "argument_translations": [
+      {
+        "source": "init.personal_api_key",
+        "target": "setup.config.secret_key",
+        "semantics": "lossless alias; omitted inputs remain omitted"
+      },
+      {
+        "source": "reload_feature_flag_definitions",
+        "target": "/reload_feature_flags + /wait_for_local_evaluation_ready",
+        "semantics": "native public refresh plus fresh authenticated HTTP 200 under one 5000ms deadline"
+      }
+    ],
+    "translation": "complete_with_approved_local_evaluation_amendment",
+    "execution_evidence": "harness:docs/harness-v2-local-parity-evidence.md",
+    "native_sdk_evidence": []
+  },
+  {
+    "id": "migration:yaml-parity-v1:feature_flags_local_evaluation:version_only_reload_1_2_1_2_missing",
+    "legacy_id": "yaml:029a94a:feature_flags_local_evaluation:versioned_boolean_matching:version_only_reload_1_2_1_2_missing",
+    "legacy_source": {
+      "line": 1871,
+      "path": "contracts/feature_flags_local_evaluation_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e"
+    },
+    "legacy_filters": {
+      "sdk_types": [],
+      "suite_requires": "feature_flags_local_evaluation_v1",
+      "test_requires": null
+    },
+    "candidate_routes": [
+      "/get_feature_flag"
+    ],
+    "source": {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/local-evaluation-v1.feature",
+      "line": 1671
+    },
+    "sdk_capabilities": [
+      "feature_flags_local_evaluation_v1"
+    ],
+    "amendment": "local-evaluation-v1",
+    "argument_translations": [
+      {
+        "source": "init.personal_api_key",
+        "target": "setup.config.secret_key",
+        "semantics": "lossless alias; omitted inputs remain omitted"
+      },
+      {
+        "source": "reload_feature_flag_definitions",
+        "target": "/reload_feature_flags + /wait_for_local_evaluation_ready",
+        "semantics": "native public refresh plus fresh authenticated HTTP 200 under one 5000ms deadline"
+      }
+    ],
+    "translation": "complete_with_approved_local_evaluation_amendment",
+    "execution_evidence": "harness:docs/harness-v2-local-parity-evidence.md",
+    "native_sdk_evidence": []
+  }
+]

@@ -1,0 +1,2968 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "Id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "Natural": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "DeadlineMs": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 300000
+    },
+    "Version": {
+      "type": "string",
+      "const": "2.0.0"
+    },
+    "CatalogHash": {
+      "type": "string",
+      "const": "c52ae7fac46f0395a78276bbc6c3b97ea83538005bcee11b60b2dc33879adfaa"
+    },
+    "Reference": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/RefKind"
+        },
+        "id": {
+          "$ref": "#/definitions/Id"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "RefKind": {
+      "type": "string",
+      "enum": [
+        "instance",
+        "exception",
+        "stack",
+        "callback",
+        "snapshot",
+        "flag_result",
+        "span",
+        "subscription",
+        "context",
+        "cancellation",
+        "type",
+        "runtime",
+        "definition",
+        "cache_provider",
+        "storage",
+        "logger",
+        "metrics",
+        "diagnostic_logger",
+        "surveys_delegate",
+        "subject",
+        "batch_summary",
+        "value"
+      ]
+    },
+    "InstanceReference": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "instance"
+        },
+        "id": {
+          "$ref": "#/definitions/Id"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "ExceptionReference": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "exception"
+        },
+        "id": {
+          "$ref": "#/definitions/Id"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "ArgumentReferences": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/Reference"
+      },
+      "description": "Non-root RFC 6901 pointer. Array slots follow README's absent-slot rules."
+    },
+    "Invoke": {
+      "type": "object",
+      "properties": {
+        "call_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "route": {
+          "$ref": "#/definitions/OperationRoute"
+        },
+        "receiver": {
+          "$ref": "#/definitions/Reference"
+        },
+        "args": {
+          "$ref": "#/definitions/Properties"
+        },
+        "references": {
+          "$ref": "#/definitions/ArgumentReferences"
+        }
+      },
+      "required": [
+        "call_id",
+        "route",
+        "receiver",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    "OperationRoute": {
+      "type": "string",
+      "enum": [
+        "/setup",
+        "/shutdown",
+        "/flush",
+        "/debug",
+        "/opt_in",
+        "/opt_out",
+        "/is_opt_out",
+        "/reset",
+        "/get_distinct_id",
+        "/get_anonymous_id",
+        "/get_session_id",
+        "/capture",
+        "/capture_immediate",
+        "/capture_ai",
+        "/capture_exception",
+        "/add_exception_step",
+        "/screen",
+        "/identify",
+        "/alias",
+        "/set_person_properties",
+        "/create_person_profile",
+        "/group",
+        "/group_identify",
+        "/register",
+        "/unregister",
+        "/get_feature_flag",
+        "/is_feature_enabled",
+        "/get_feature_flag_payload",
+        "/get_feature_flag_result",
+        "/get_feature_flags",
+        "/get_feature_flags_and_payloads",
+        "/evaluate_flags",
+        "/snapshot/is_enabled",
+        "/snapshot/get_flag",
+        "/snapshot/get_flag_payload",
+        "/snapshot/keys",
+        "/snapshot/only",
+        "/snapshot/only_accessed",
+        "/reload_feature_flags",
+        "/on_feature_flags",
+        "/subscription/unsubscribe",
+        "/set_person_properties_for_flags",
+        "/reset_person_properties_for_flags",
+        "/set_group_properties_for_flags",
+        "/reset_group_properties_for_flags",
+        "/start_session_recording",
+        "/stop_session_recording",
+        "/is_session_replay_active",
+        "/capture_ai_immediate",
+        "/identify_immediate",
+        "/alias_immediate",
+        "/group_identify_immediate",
+        "/capture_exception_immediate",
+        "/capture_batch",
+        "/capture_batch_immediate",
+        "/set_person_properties_once",
+        "/unset_person_properties",
+        "/register_once",
+        "/register_for_session",
+        "/unregister_for_session",
+        "/get_property",
+        "/get_session_property",
+        "/set_groups",
+        "/get_groups",
+        "/reset_groups",
+        "/get_device_id",
+        "/reset_session_id",
+        "/start_session",
+        "/end_session",
+        "/is_session_active",
+        "/get_session_replay_url",
+        "/set_config",
+        "/is_initialized",
+        "/is_shutdown",
+        "/pending_events",
+        "/join",
+        "/enable",
+        "/disable",
+        "/has_opted_in",
+        "/get_explicit_consent_status",
+        "/is_capturing",
+        "/clear_consent",
+        "/set_identity",
+        "/clear_identity",
+        "/set_internal_or_test_user",
+        "/disable_global",
+        "/global_is_disabled",
+        "/capture_raw",
+        "/get_all_feature_flag_results",
+        "/get_feature_flag_payloads",
+        "/get_feature_flag_details",
+        "/get_flags_decision",
+        "/get_remote_config_payload",
+        "/get_remote_config",
+        "/reload_remote_config",
+        "/update_flags",
+        "/override_feature_flags",
+        "/clear_local_flags_cache",
+        "/is_local_evaluation_ready",
+        "/wait_for_local_evaluation_ready",
+        "/evaluate_feature_flag_locally",
+        "/snapshot/accessed",
+        "/snapshot/event_properties",
+        "/flag_result/value",
+        "/flag_result/get_variant",
+        "/flag_result/get_payload",
+        "/on",
+        "/on_feature_flag",
+        "/on_session_id",
+        "/on_surveys_loaded",
+        "/get_surveys",
+        "/get_active_matching_surveys",
+        "/render_survey",
+        "/display_survey",
+        "/cancel_pending_survey",
+        "/can_render_survey",
+        "/can_render_survey_async",
+        "/get_early_access_features",
+        "/update_early_access_feature_enrollment",
+        "/capture_feature_view",
+        "/capture_feature_interaction",
+        "/start_exception_autocapture",
+        "/stop_exception_autocapture",
+        "/capture_run_zoned_guarded_error",
+        "/is_autocapture_active",
+        "/is_rage_click_active",
+        "/with_context",
+        "/enter_context",
+        "/get_context",
+        "/new_context",
+        "/identify_context",
+        "/set_context_session",
+        "/set_context_device_id",
+        "/tag",
+        "/get_tags",
+        "/context_from_headers",
+        "/set_context",
+        "/set_event_context",
+        "/get_event_context",
+        "/set_flags_in_context",
+        "/bare_capture",
+        "/get_logger",
+        "/get_metrics",
+        "/capture_log",
+        "/logger/trace",
+        "/logger/debug",
+        "/logger/info",
+        "/logger/warn",
+        "/logger/error",
+        "/logger/fatal",
+        "/flush_logs",
+        "/metrics/count",
+        "/metrics/gauge",
+        "/metrics/histogram",
+        "/metrics/flush",
+        "/start_span",
+        "/with_span",
+        "/get_active_span",
+        "/span/set_attribute",
+        "/span/set_attributes",
+        "/span/add_event",
+        "/span/set_status",
+        "/span/record_exception",
+        "/span/update_name",
+        "/span/traceparent",
+        "/span/tracestate",
+        "/span/end",
+        "/capture_trace_feedback",
+        "/capture_trace_metric",
+        "/register_push_notification_token",
+        "/unregister_push_notification_token",
+        "/capture_push_notification_opened",
+        "/prewarm_push_notification_open_capture",
+        "/capture_deep_link",
+        "/record_network_request",
+        "/get_session_teleport_data",
+        "/batch_summary/submitted",
+        "/batch_summary/not_persisted",
+        "/batch_summary/all_persisted",
+        "/batch_summary/event_results"
+      ]
+    },
+    "Properties": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/Json"
+      }
+    },
+    "Json": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Json"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/Json"
+          }
+        }
+      ]
+    },
+    "Outcome": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "void"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "undefined"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "value"
+            },
+            "value": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Json"
+                },
+                {
+                  "$ref": "#/definitions/Reference"
+                }
+              ]
+            },
+            "retained": {
+              "$ref": "#/definitions/Reference"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "thrown"
+            },
+            "error": {
+              "$ref": "#/definitions/ExceptionReference"
+            }
+          },
+          "required": [
+            "kind",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "FailureKind": {
+      "type": "string",
+      "enum": [
+        "unsupported_binding",
+        "blocked_fixture",
+        "blocked_contract",
+        "timeout",
+        "cancelled",
+        "harness_error"
+      ]
+    },
+    "HarnessFailure": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/FailureKind"
+        },
+        "code": {
+          "$ref": "#/definitions/Id"
+        },
+        "message": {
+          "$ref": "#/definitions/Id"
+        }
+      },
+      "required": [
+        "kind",
+        "code",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "Completion": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "sdk"
+            },
+            "outcome": {
+              "$ref": "#/definitions/Outcome"
+            }
+          },
+          "required": [
+            "kind",
+            "outcome"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "harness"
+            },
+            "failure": {
+              "$ref": "#/definitions/HarnessFailure"
+            }
+          },
+          "required": [
+            "kind",
+            "failure"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "CallReceipt": {
+      "type": "object",
+      "properties": {
+        "fixture_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "call_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "parent_call_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "callback_invocation_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "route": {
+          "$ref": "#/definitions/OperationRoute"
+        },
+        "completion": {
+          "$ref": "#/definitions/Completion"
+        }
+      },
+      "required": [
+        "fixture_id",
+        "call_id",
+        "route",
+        "completion"
+      ],
+      "additionalProperties": false
+    },
+    "InvokeRequest": {
+      "type": "object",
+      "properties": {
+        "fixture_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "timeout_ms": {
+          "$ref": "#/definitions/DeadlineMs"
+        },
+        "invoke": {
+          "$ref": "#/definitions/Invoke"
+        }
+      },
+      "required": [
+        "fixture_id",
+        "timeout_ms",
+        "invoke"
+      ],
+      "additionalProperties": false
+    },
+    "InvokeResponse": {
+      "type": "object",
+      "properties": {
+        "receipt": {
+          "$ref": "#/definitions/CallReceipt"
+        }
+      },
+      "required": [
+        "receipt"
+      ],
+      "additionalProperties": false
+    },
+    "ConcurrentInvokeRequest": {
+      "type": "object",
+      "properties": {
+        "fixture_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "timeout_ms": {
+          "$ref": "#/definitions/DeadlineMs"
+        },
+        "invokes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Invoke"
+          },
+          "minItems": 2,
+          "maxItems": 32
+        }
+      },
+      "required": [
+        "fixture_id",
+        "timeout_ms",
+        "invokes"
+      ],
+      "additionalProperties": false,
+      "description": "Optional concurrent-invocation-v1 fixture; ordinary Invoke remains serial."
+    },
+    "ConcurrentInvokeResponse": {
+      "type": "object",
+      "properties": {
+        "fixture_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "calls": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CallReceipt"
+          },
+          "description": "One terminal receipt per requested call, in request order.",
+          "minItems": 2,
+          "maxItems": 32
+        }
+      },
+      "required": [
+        "fixture_id",
+        "calls"
+      ],
+      "additionalProperties": false
+    },
+    "ExecutionProfile": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/Id"
+        },
+        "sdk_type": {
+          "$ref": "#/definitions/SDKType",
+          "description": "Native SDK client/server type, independent of runtime and wire API."
+        },
+        "runtime": {
+          "type": "object",
+          "properties": {
+            "family": {
+              "type": "string",
+              "enum": [
+                "server",
+                "browser",
+                "mobile",
+                "desktop",
+                "edge",
+                "game"
+              ]
+            },
+            "name": {
+              "$ref": "#/definitions/Id"
+            },
+            "version": {
+              "$ref": "#/definitions/Id"
+            },
+            "execution_context": {
+              "type": "string",
+              "enum": [
+                "synchronous",
+                "async_local",
+                "thread_local",
+                "host_managed"
+              ]
+            }
+          },
+          "required": [
+            "family",
+            "name",
+            "version",
+            "execution_context"
+          ],
+          "additionalProperties": false
+        },
+        "identity": {
+          "type": "string",
+          "enum": [
+            "stateful_installation",
+            "request_scoped"
+          ]
+        },
+        "protocol": {
+          "type": "string",
+          "enum": [
+            "legacy",
+            "analytics_v1"
+          ]
+        },
+        "products": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "analytics",
+              "ai",
+              "flags",
+              "replay",
+              "logs",
+              "metrics",
+              "traces",
+              "surveys",
+              "errors",
+              "push"
+            ]
+          }
+        },
+        "module": {
+          "type": "object",
+          "properties": {
+            "entry": {
+              "$ref": "#/definitions/Id"
+            },
+            "format": {
+              "type": "string",
+              "enum": [
+                "esm",
+                "commonjs",
+                "native"
+              ]
+            },
+            "package": {
+              "$ref": "#/definitions/Id"
+            },
+            "version": {
+              "$ref": "#/definitions/Id"
+            }
+          },
+          "required": [
+            "entry",
+            "format",
+            "package",
+            "version"
+          ],
+          "additionalProperties": false
+        },
+        "fixture_capabilities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Id"
+          }
+        },
+        "sdk_capabilities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Id"
+          },
+          "description": "Optional SDK feature/API declarations, independent of runtime and host fixtures."
+        }
+      },
+      "required": [
+        "id",
+        "runtime",
+        "identity",
+        "protocol",
+        "products",
+        "module",
+        "fixture_capabilities"
+      ],
+      "additionalProperties": false
+    },
+    "SDKType": {
+      "type": "string",
+      "enum": [
+        "client",
+        "server"
+      ]
+    },
+    "NegotiateRequest": {
+      "type": "object",
+      "properties": {
+        "contract_version": {
+          "type": "string"
+        },
+        "catalog_sha256": {
+          "type": "string"
+        },
+        "transport": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "contract_version",
+        "catalog_sha256",
+        "transport"
+      ],
+      "additionalProperties": false
+    },
+    "NegotiateResponse": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "accepted"
+            },
+            "contract_version": {
+              "$ref": "#/definitions/Version"
+            },
+            "catalog_sha256": {
+              "$ref": "#/definitions/CatalogHash"
+            },
+            "transport": {
+              "type": "string",
+              "const": "http-json-v2"
+            },
+            "session_id": {
+              "$ref": "#/definitions/Id"
+            },
+            "adapter": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "$ref": "#/definitions/Id"
+                },
+                "version": {
+                  "$ref": "#/definitions/Id"
+                }
+              },
+              "required": [
+                "name",
+                "version"
+              ],
+              "additionalProperties": false
+            },
+            "profiles": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/ExecutionProfile"
+              }
+            },
+            "supported_routes": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/OperationRoute"
+              }
+            },
+            "max_timeout_ms": {
+              "$ref": "#/definitions/DeadlineMs"
+            }
+          },
+          "required": [
+            "kind",
+            "contract_version",
+            "catalog_sha256",
+            "transport",
+            "session_id",
+            "adapter",
+            "profiles",
+            "supported_routes",
+            "max_timeout_ms"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "rejected"
+            },
+            "code": {
+              "type": "string",
+              "enum": [
+                "incompatible_version",
+                "catalog_mismatch",
+                "unsupported_transport"
+              ]
+            },
+            "message": {
+              "$ref": "#/definitions/Id"
+            }
+          },
+          "required": [
+            "kind",
+            "code",
+            "message"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "AllocateRequest": {
+      "type": "object",
+      "properties": {
+        "fixture_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "case_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "profile_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "timeout_ms": {
+          "$ref": "#/definitions/DeadlineMs"
+        }
+      },
+      "required": [
+        "fixture_id",
+        "case_id",
+        "profile_id",
+        "timeout_ms"
+      ],
+      "additionalProperties": false
+    },
+    "AllocateResponse": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "allocated"
+            },
+            "fixture_id": {
+              "$ref": "#/definitions/Id"
+            },
+            "receiver": {
+              "$ref": "#/definitions/InstanceReference"
+            }
+          },
+          "required": [
+            "kind",
+            "fixture_id",
+            "receiver"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "failed"
+            },
+            "fixture_id": {
+              "$ref": "#/definitions/Id"
+            },
+            "failure": {
+              "$ref": "#/definitions/HarnessFailure"
+            }
+          },
+          "required": [
+            "kind",
+            "fixture_id",
+            "failure"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "CloseRequest": {
+      "type": "object",
+      "properties": {
+        "fixture_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "timeout_ms": {
+          "$ref": "#/definitions/DeadlineMs"
+        }
+      },
+      "required": [
+        "fixture_id",
+        "timeout_ms"
+      ],
+      "additionalProperties": false
+    },
+    "CloseResponse": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "closed"
+            },
+            "fixture_id": {
+              "$ref": "#/definitions/Id"
+            }
+          },
+          "required": [
+            "kind",
+            "fixture_id"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "failed"
+            },
+            "fixture_id": {
+              "$ref": "#/definitions/Id"
+            },
+            "failure": {
+              "$ref": "#/definitions/HarnessFailure"
+            }
+          },
+          "required": [
+            "kind",
+            "fixture_id",
+            "failure"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "CancelRequest": {
+      "type": "object",
+      "properties": {
+        "fixture_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "call_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "reason": {
+          "$ref": "#/definitions/Id"
+        }
+      },
+      "required": [
+        "fixture_id",
+        "call_id",
+        "reason"
+      ],
+      "additionalProperties": false
+    },
+    "CancelResponse": {
+      "type": "object",
+      "properties": {
+        "fixture_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "call_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "cancelled",
+            "already_completed"
+          ]
+        }
+      },
+      "required": [
+        "fixture_id",
+        "call_id",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "ReferenceSource": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "const": "reference"
+            },
+            "reference": {
+              "$ref": "#/definitions/Reference"
+            }
+          },
+          "required": [
+            "source",
+            "reference"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "const": "callback_argument"
+            },
+            "index": {
+              "$ref": "#/definitions/Natural"
+            }
+          },
+          "required": [
+            "source",
+            "index"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "const": "call_retained"
+            },
+            "step_id": {
+              "$ref": "#/definitions/Id"
+            }
+          },
+          "required": [
+            "source",
+            "step_id"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "PlanCall": {
+      "type": "object",
+      "properties": {
+        "step_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "route": {
+          "$ref": "#/definitions/OperationRoute"
+        },
+        "receiver": {
+          "$ref": "#/definitions/ReferenceSource"
+        },
+        "args": {
+          "$ref": "#/definitions/Properties"
+        },
+        "references": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/ReferenceSource"
+          }
+        }
+      },
+      "required": [
+        "step_id",
+        "route",
+        "receiver",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    "CallbackReturn": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "const": "literal"
+            },
+            "outcome": {
+              "$ref": "#/definitions/Outcome"
+            }
+          },
+          "required": [
+            "source",
+            "outcome"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "const": "callback_argument"
+            },
+            "index": {
+              "$ref": "#/definitions/Natural"
+            }
+          },
+          "required": [
+            "source",
+            "index"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "source": {
+              "type": "string",
+              "const": "call_outcome"
+            },
+            "step_id": {
+              "$ref": "#/definitions/Id"
+            }
+          },
+          "required": [
+            "source",
+            "step_id"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "CallbackSignature": {
+      "type": "string",
+      "enum": [
+        "loaded",
+        "on_error",
+        "before_send",
+        "log_hook",
+        "span_hook",
+        "readiness",
+        "on_feature_flags",
+        "on_feature_flag",
+        "on_session_id",
+        "on_surveys_loaded",
+        "on_event",
+        "with_context",
+        "with_span",
+        "push_identity_provider",
+        "anonymous_id_provider",
+        "early_access"
+      ]
+    },
+    "CallbackArguments": {
+      "type": "object",
+      "properties": {
+        "loaded": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Ref%3C%22instance%22%3E"
+          },
+          "minItems": 1,
+          "maxItems": 1
+        },
+        "on_error": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Ref%3C%22exception%22%3E"
+          },
+          "minItems": 1,
+          "maxItems": 1
+        },
+        "before_send": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Properties"
+          },
+          "minItems": 1,
+          "maxItems": 1
+        },
+        "log_hook": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Properties"
+          },
+          "minItems": 1,
+          "maxItems": 1
+        },
+        "span_hook": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Properties"
+          },
+          "minItems": 1,
+          "maxItems": 1
+        },
+        "readiness": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 0
+        },
+        "on_feature_flags": {
+          "$ref": "#/definitions/FeatureFlagsCallbackArguments"
+        },
+        "on_feature_flag": {
+          "type": "array",
+          "items": {
+            "type": [
+              "boolean",
+              "string",
+              "null"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 1
+        },
+        "on_session_id": {
+          "type": "array",
+          "items": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "minItems": 1,
+          "maxItems": 1
+        },
+        "on_surveys_loaded": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/Survey"
+            }
+          },
+          "minItems": 1,
+          "maxItems": 1
+        },
+        "on_event": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Json"
+          },
+          "minItems": 1,
+          "maxItems": 1
+        },
+        "with_context": {
+          "type": "array",
+          "minItems": 0,
+          "maxItems": 0
+        },
+        "with_span": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Ref%3C%22span%22%3E"
+          },
+          "minItems": 1,
+          "maxItems": 1
+        },
+        "push_identity_provider": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "anonymous_id_provider": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "maxItems": 1
+        },
+        "early_access": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/Properties"
+            }
+          },
+          "minItems": 1,
+          "maxItems": 1
+        }
+      },
+      "required": [
+        "loaded",
+        "on_error",
+        "before_send",
+        "log_hook",
+        "span_hook",
+        "readiness",
+        "on_feature_flags",
+        "on_feature_flag",
+        "on_session_id",
+        "on_surveys_loaded",
+        "on_event",
+        "with_context",
+        "with_span",
+        "push_identity_provider",
+        "anonymous_id_provider",
+        "early_access"
+      ],
+      "additionalProperties": false
+    },
+    "Ref<\"instance\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "instance"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "Ref<\"exception\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "exception"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "FeatureFlagsCallbackArguments": {
+      "anyOf": [
+        {
+          "type": "array",
+          "minItems": 2,
+          "items": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "$ref": "#/definitions/FlagValues"
+            }
+          ],
+          "maxItems": 2
+        },
+        {
+          "type": "array",
+          "minItems": 3,
+          "items": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "$ref": "#/definitions/FlagValues"
+            },
+            {
+              "$ref": "#/definitions/FeatureFlagsCallbackContext"
+            }
+          ],
+          "maxItems": 3
+        }
+      ]
+    },
+    "FlagValues": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/FlagValue"
+      }
+    },
+    "FlagValue": {
+      "type": [
+        "boolean",
+        "string"
+      ]
+    },
+    "FeatureFlagsCallbackContext": {
+      "type": "object",
+      "properties": {
+        "errorsLoading": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Approved flag-semantics-v1 policy overlay. /on_feature_flags delivers the native enabled keys, values/variants and optional loading context, immediately when already loaded and on subsequent native notifications (including changes/errors). It returns actual deregistration. A notification is not evidence of a new successful HTTP response. Missing arguments and undefined outcomes remain distinct from false. Undefined context properties project to absent JSON properties; no getter fabricates arguments. No-argument flush/reload completion callbacks retain the readiness signature.\n\nNative startup, getter and evaluated-result cache behavior supersedes the base universal preload=true and TTL=300000 policy for ordinary flag operations. Omitted settings retain native behavior; supported explicit native settings, only_evaluate_locally and send_event retain their meaning. No adapter imposes startup/cache defaults. Unavailable behavior is unsupported, not emulated. Server lifecycle scenarios observe native initialization/capture silence. Remote getter scenarios start with empty storage and no installed local definitions/results; repeated remote getters require a native uncached getter. Client scenarios explicitly load flags or prepare cached state before reading. ExecutionProfile.sdk_type optionally declares client/server SDK type explicitly, independently of runtime family, identity and wire API. Selected type-specific cases with no declaration are blocked_contract; an opposite type is not applicable. flags_v2 declares the wire API independently of SDK type/platform; flags_getter_remote_uncached declares only a native remote getter without local evaluation or evaluated-result caching, not startup/capture behavior."
+    },
+    "Survey": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Properties"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "questions"
+      ],
+      "additionalProperties": {
+        "$ref": "#/definitions/Json"
+      }
+    },
+    "Ref<\"span\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "span"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "CallbackPlan": {
+      "type": "object",
+      "properties": {
+        "signature": {
+          "$ref": "#/definitions/CallbackSignature"
+        },
+        "max_invocations": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "calls": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PlanCall"
+          }
+        },
+        "returns": {
+          "$ref": "#/definitions/CallbackReturn"
+        }
+      },
+      "required": [
+        "signature",
+        "max_invocations",
+        "calls",
+        "returns"
+      ],
+      "additionalProperties": false
+    },
+    "BigIntDecimal": {
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]*)$"
+    },
+    "ValueFixture": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string",
+              "enum": [
+                "undefined",
+                "nan",
+                "positive_infinity",
+                "negative_infinity"
+              ]
+            }
+          },
+          "required": [
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string",
+              "const": "bigint"
+            },
+            "decimal": {
+              "$ref": "#/definitions/BigIntDecimal"
+            }
+          },
+          "required": [
+            "value",
+            "decimal"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ReferenceFixture": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "value"
+            },
+            "value": {
+              "$ref": "#/definitions/ValueFixture"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "exception"
+            },
+            "name": {
+              "$ref": "#/definitions/Id"
+            },
+            "message": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "name",
+            "message"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "callback"
+            },
+            "plan": {
+              "$ref": "#/definitions/CallbackPlan"
+            }
+          },
+          "required": [
+            "kind",
+            "plan"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ReferenceRequest": {
+      "type": "object",
+      "properties": {
+        "fixture_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "reference_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "fixture": {
+          "$ref": "#/definitions/ReferenceFixture"
+        }
+      },
+      "required": [
+        "fixture_id",
+        "reference_id",
+        "fixture"
+      ],
+      "additionalProperties": false
+    },
+    "ReferenceResponse": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "created"
+            },
+            "fixture_id": {
+              "$ref": "#/definitions/Id"
+            },
+            "reference": {
+              "$ref": "#/definitions/Reference"
+            }
+          },
+          "required": [
+            "kind",
+            "fixture_id",
+            "reference"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "failed"
+            },
+            "fixture_id": {
+              "$ref": "#/definitions/Id"
+            },
+            "failure": {
+              "$ref": "#/definitions/HarnessFailure"
+            }
+          },
+          "required": [
+            "kind",
+            "fixture_id",
+            "failure"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "CallbackObservation": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "callback"
+        },
+        "sequence": {
+          "$ref": "#/definitions/Natural"
+        },
+        "fixture_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "callback": {
+          "$ref": "#/definitions/Ref%3C%22callback%22%3E"
+        },
+        "invocation_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "invocation_index": {
+          "$ref": "#/definitions/Natural"
+        },
+        "owner_call_id": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Outcome"
+          }
+        },
+        "completion": {
+          "$ref": "#/definitions/Completion"
+        },
+        "call_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Id"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "sequence",
+        "fixture_id",
+        "callback",
+        "invocation_id",
+        "invocation_index",
+        "owner_call_id",
+        "args",
+        "completion",
+        "call_ids"
+      ],
+      "additionalProperties": false
+    },
+    "Ref<\"callback\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "callback"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "CallObservation": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "call"
+        },
+        "sequence": {
+          "$ref": "#/definitions/Natural"
+        },
+        "receipt": {
+          "$ref": "#/definitions/CallReceipt"
+        }
+      },
+      "required": [
+        "kind",
+        "sequence",
+        "receipt"
+      ],
+      "additionalProperties": false
+    },
+    "Observation": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/CallbackObservation"
+        },
+        {
+          "$ref": "#/definitions/CallObservation"
+        }
+      ]
+    },
+    "ObservationsRequest": {
+      "type": "object",
+      "properties": {
+        "fixture_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "after_sequence": {
+          "$ref": "#/definitions/Natural"
+        }
+      },
+      "required": [
+        "fixture_id",
+        "after_sequence"
+      ],
+      "additionalProperties": false
+    },
+    "ObservationsResponse": {
+      "type": "object",
+      "properties": {
+        "fixture_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "cursor": {
+          "$ref": "#/definitions/Natural"
+        },
+        "observations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Observation"
+          }
+        }
+      },
+      "required": [
+        "fixture_id",
+        "cursor",
+        "observations"
+      ],
+      "additionalProperties": false
+    },
+    "ContextScopeRequest": {
+      "type": "object",
+      "properties": {
+        "fixture_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "scope_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "context": {
+          "$ref": "#/definitions/Ref%3C%22context%22%3E"
+        },
+        "timeout_ms": {
+          "$ref": "#/definitions/DeadlineMs"
+        },
+        "calls": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Invoke"
+          }
+        }
+      },
+      "required": [
+        "fixture_id",
+        "scope_id",
+        "context",
+        "timeout_ms",
+        "calls"
+      ],
+      "additionalProperties": false
+    },
+    "Ref<\"context\">": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "context"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "ContextScopeResponse": {
+      "type": "object",
+      "properties": {
+        "fixture_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "scope_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "calls": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CallReceipt"
+          }
+        },
+        "result": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "completed"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "failed"
+                },
+                "failure": {
+                  "$ref": "#/definitions/HarnessFailure"
+                }
+              },
+              "required": [
+                "kind",
+                "failure"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "fixture_id",
+        "scope_id",
+        "calls",
+        "result"
+      ],
+      "additionalProperties": false
+    },
+    "ProtocolError": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "protocol_error"
+        },
+        "code": {
+          "type": "string",
+          "enum": [
+            "invalid_json",
+            "invalid_envelope",
+            "invalid_reference",
+            "unknown_session",
+            "unknown_fixture",
+            "duplicate_id",
+            "invalid_state"
+          ]
+        },
+        "message": {
+          "$ref": "#/definitions/Id"
+        }
+      },
+      "required": [
+        "kind",
+        "code",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "LineNumber": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "SourceLocation": {
+      "type": "object",
+      "properties": {
+        "revision": {
+          "$ref": "#/definitions/Id"
+        },
+        "path": {
+          "$ref": "#/definitions/Id"
+        },
+        "line": {
+          "$ref": "#/definitions/LineNumber"
+        }
+      },
+      "required": [
+        "revision",
+        "path",
+        "line"
+      ],
+      "additionalProperties": false
+    },
+    "CaseIdentity": {
+      "type": "object",
+      "properties": {
+        "case_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "source": {
+          "$ref": "#/definitions/SourceLocation"
+        },
+        "profile_id": {
+          "$ref": "#/definitions/Id"
+        }
+      },
+      "required": [
+        "case_id",
+        "source",
+        "profile_id"
+      ],
+      "additionalProperties": false
+    },
+    "SelectedCase": {
+      "type": "object",
+      "properties": {
+        "case_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "source": {
+          "$ref": "#/definitions/SourceLocation"
+        },
+        "profile_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "selected": {
+          "type": "boolean"
+        },
+        "applicability": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "applicable"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "not_applicable"
+                },
+                "rule": {
+                  "$ref": "#/definitions/Id"
+                },
+                "reason": {
+                  "$ref": "#/definitions/Id"
+                }
+              },
+              "required": [
+                "kind",
+                "rule",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "applicability",
+        "case_id",
+        "profile_id",
+        "selected",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "FixtureAttribution": {
+      "type": "object",
+      "properties": {
+        "fixture_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "case_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "profile_id": {
+          "$ref": "#/definitions/Id"
+        }
+      },
+      "required": [
+        "fixture_id",
+        "case_id",
+        "profile_id"
+      ],
+      "additionalProperties": false
+    },
+    "FailureAttribution": {
+      "type": "object",
+      "properties": {
+        "failed_step": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "index": {
+                  "$ref": "#/definitions/Natural"
+                },
+                "source": {
+                  "$ref": "#/definitions/SourceLocation"
+                }
+              },
+              "required": [
+                "index",
+                "source"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "call_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Id"
+          }
+        },
+        "code": {
+          "$ref": "#/definitions/Id"
+        },
+        "message": {
+          "$ref": "#/definitions/Id"
+        }
+      },
+      "required": [
+        "failed_step",
+        "call_ids",
+        "code",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "CaseDisposition": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "const": "passed"
+            },
+            "executed": {
+              "type": "boolean",
+              "const": true
+            },
+            "call_ids": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Id"
+              }
+            }
+          },
+          "required": [
+            "status",
+            "executed",
+            "call_ids"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "failed_assertion",
+                "unsupported_binding",
+                "blocked_fixture",
+                "blocked_contract",
+                "harness_error"
+              ]
+            },
+            "executed": {
+              "type": "boolean"
+            },
+            "failure": {
+              "$ref": "#/definitions/FailureAttribution"
+            }
+          },
+          "required": [
+            "status",
+            "executed",
+            "failure"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "const": "not_applicable"
+            },
+            "executed": {
+              "type": "boolean",
+              "const": false
+            },
+            "reason": {
+              "$ref": "#/definitions/Id"
+            },
+            "applicability_rule": {
+              "$ref": "#/definitions/Id"
+            }
+          },
+          "required": [
+            "status",
+            "executed",
+            "reason",
+            "applicability_rule"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "const": "not_selected"
+            },
+            "executed": {
+              "type": "boolean",
+              "const": false
+            },
+            "reason": {
+              "$ref": "#/definitions/Id"
+            }
+          },
+          "required": [
+            "status",
+            "executed",
+            "reason"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "CaseResult": {
+      "type": "object",
+      "properties": {
+        "case_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "source": {
+          "$ref": "#/definitions/SourceLocation"
+        },
+        "profile_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "result": {
+          "$ref": "#/definitions/CaseDisposition"
+        }
+      },
+      "required": [
+        "case_id",
+        "profile_id",
+        "result",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "RunError": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "$ref": "#/definitions/Id"
+        },
+        "message": {
+          "$ref": "#/definitions/Id"
+        },
+        "case_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "call_id": {
+          "$ref": "#/definitions/Id"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "additionalProperties": false
+    },
+    "Report": {
+      "type": "object",
+      "properties": {
+        "contract_version": {
+          "$ref": "#/definitions/Version"
+        },
+        "catalog_sha256": {
+          "$ref": "#/definitions/CatalogHash"
+        },
+        "run_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "scope_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "profiles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExecutionProfile"
+          }
+        },
+        "inventory": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SelectedCase"
+          }
+        },
+        "results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CaseResult"
+          }
+        },
+        "fixtures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FixtureAttribution"
+          }
+        },
+        "calls": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CallReceipt"
+          }
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RunError"
+          }
+        }
+      },
+      "required": [
+        "contract_version",
+        "catalog_sha256",
+        "run_id",
+        "scope_id",
+        "profiles",
+        "inventory",
+        "results",
+        "fixtures",
+        "calls",
+        "errors"
+      ],
+      "additionalProperties": false
+    },
+    "FlushFixtureCommand": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "clock_fixed"
+            },
+            "timestamp": {
+              "$ref": "#/definitions/Timestamp"
+            }
+          },
+          "required": [
+            "kind",
+            "timestamp"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "storage_empty"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "scheduler_manual"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "queue_snapshot"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?(Z|[+-][0-9]{2}:[0-9]{2})$"
+    },
+    "FlushFixtureRequest": {
+      "type": "object",
+      "properties": {
+        "fixture_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "timeout_ms": {
+          "$ref": "#/definitions/DeadlineMs"
+        },
+        "command": {
+          "$ref": "#/definitions/FlushFixtureCommand"
+        }
+      },
+      "required": [
+        "fixture_id",
+        "timeout_ms",
+        "command"
+      ],
+      "additionalProperties": false
+    },
+    "QueueRecord": {
+      "type": "object",
+      "properties": {
+        "record_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "event": {
+          "$ref": "#/definitions/Properties"
+        }
+      },
+      "required": [
+        "record_id",
+        "event"
+      ],
+      "additionalProperties": false
+    },
+    "QueueSnapshot": {
+      "type": "object",
+      "properties": {
+        "layer": {
+          "type": "string",
+          "const": "native_component"
+        },
+        "implementation": {
+          "$ref": "#/definitions/Id"
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/QueueRecord"
+          }
+        }
+      },
+      "required": [
+        "layer",
+        "implementation",
+        "records"
+      ],
+      "additionalProperties": false
+    },
+    "FlushFixtureResponse": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "applied"
+            },
+            "fixture_id": {
+              "$ref": "#/definitions/Id"
+            },
+            "command": {
+              "type": "string",
+              "enum": [
+                "clock_fixed",
+                "storage_empty",
+                "scheduler_manual"
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "fixture_id",
+            "command"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "queue"
+            },
+            "fixture_id": {
+              "$ref": "#/definitions/Id"
+            },
+            "command": {
+              "type": "string",
+              "const": "queue_snapshot"
+            },
+            "observation": {
+              "$ref": "#/definitions/QueueSnapshot"
+            }
+          },
+          "required": [
+            "kind",
+            "fixture_id",
+            "command",
+            "observation"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "failed"
+            },
+            "fixture_id": {
+              "$ref": "#/definitions/Id"
+            },
+            "command": {
+              "type": "string",
+              "enum": [
+                "clock_fixed",
+                "storage_empty",
+                "scheduler_manual",
+                "queue_snapshot"
+              ]
+            },
+            "failure": {
+              "$ref": "#/definitions/HarnessFailure"
+            }
+          },
+          "required": [
+            "kind",
+            "fixture_id",
+            "command",
+            "failure"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "FlagStateCommand": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "definitions_install"
+            },
+            "definitions": {
+              "$ref": "#/definitions/Properties"
+            }
+          },
+          "required": [
+            "kind",
+            "definitions"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "evaluation_cache_put"
+            },
+            "distinct_id": {
+              "$ref": "#/definitions/Id"
+            },
+            "flags": {
+              "$ref": "#/definitions/FlagValues"
+            },
+            "payloads": {
+              "$ref": "#/definitions/Payloads"
+            }
+          },
+          "required": [
+            "kind",
+            "distinct_id",
+            "flags",
+            "payloads"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "evaluation_activity"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "$ref": "#/definitions/EvaluationProvenanceCommand"
+        }
+      ]
+    },
+    "Payloads": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/Json"
+      }
+    },
+    "EvaluationProvenanceCommand": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "evaluation_provenance"
+        },
+        "call_id": {
+          "$ref": "#/definitions/EvaluationObservationId"
+        }
+      },
+      "required": [
+        "kind",
+        "call_id"
+      ],
+      "additionalProperties": false
+    },
+    "EvaluationObservationId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "FlagStateRequest": {
+      "type": "object",
+      "properties": {
+        "fixture_id": {
+          "$ref": "#/definitions/Id"
+        },
+        "timeout_ms": {
+          "$ref": "#/definitions/DeadlineMs"
+        },
+        "command": {
+          "$ref": "#/definitions/FlagStateCommand"
+        }
+      },
+      "required": [
+        "fixture_id",
+        "timeout_ms",
+        "command"
+      ],
+      "additionalProperties": false
+    },
+    "ComponentSite": {
+      "type": "object",
+      "properties": {
+        "layer": {
+          "type": "string",
+          "const": "native_component"
+        },
+        "implementation": {
+          "$ref": "#/definitions/Id"
+        }
+      },
+      "required": [
+        "layer",
+        "implementation"
+      ],
+      "additionalProperties": false
+    },
+    "EvaluationActivity": {
+      "type": "object",
+      "properties": {
+        "layer": {
+          "type": "string",
+          "const": "native_component"
+        },
+        "implementation": {
+          "$ref": "#/definitions/Id"
+        },
+        "cache_lookups": {
+          "$ref": "#/definitions/Natural"
+        },
+        "local_evaluations": {
+          "$ref": "#/definitions/Natural"
+        }
+      },
+      "required": [
+        "cache_lookups",
+        "implementation",
+        "layer",
+        "local_evaluations"
+      ],
+      "additionalProperties": false
+    },
+    "FlagStateResponse": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "applied"
+            },
+            "fixture_id": {
+              "$ref": "#/definitions/Id"
+            },
+            "command": {
+              "type": "string",
+              "enum": [
+                "definitions_install",
+                "evaluation_cache_put"
+              ]
+            },
+            "observation": {
+              "$ref": "#/definitions/ComponentSite"
+            }
+          },
+          "required": [
+            "kind",
+            "fixture_id",
+            "command",
+            "observation"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "activity"
+            },
+            "fixture_id": {
+              "$ref": "#/definitions/Id"
+            },
+            "command": {
+              "type": "string",
+              "const": "evaluation_activity"
+            },
+            "observation": {
+              "$ref": "#/definitions/EvaluationActivity"
+            }
+          },
+          "required": [
+            "kind",
+            "fixture_id",
+            "command",
+            "observation"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "provenance"
+            },
+            "fixture_id": {
+              "$ref": "#/definitions/Id"
+            },
+            "command": {
+              "type": "string",
+              "const": "evaluation_provenance"
+            },
+            "observation": {
+              "$ref": "#/definitions/EvaluationProvenance"
+            }
+          },
+          "required": [
+            "kind",
+            "fixture_id",
+            "command",
+            "observation"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "failed"
+            },
+            "fixture_id": {
+              "$ref": "#/definitions/Id"
+            },
+            "command": {
+              "type": "string",
+              "enum": [
+                "definitions_install",
+                "evaluation_cache_put",
+                "evaluation_activity",
+                "evaluation_provenance"
+              ]
+            },
+            "failure": {
+              "$ref": "#/definitions/HarnessFailure"
+            }
+          },
+          "required": [
+            "kind",
+            "fixture_id",
+            "command",
+            "failure"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "EvaluationProvenance": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "resolution": {
+              "type": "string",
+              "enum": [
+                "local",
+                "remote"
+              ]
+            },
+            "value": {
+              "type": [
+                "boolean",
+                "string"
+              ]
+            },
+            "layer": {
+              "type": "string",
+              "const": "native_component"
+            },
+            "implementation": {
+              "$ref": "#/definitions/EvaluationObservationId"
+            },
+            "call_id": {
+              "$ref": "#/definitions/EvaluationObservationId"
+            },
+            "key": {
+              "$ref": "#/definitions/EvaluationObservationId"
+            }
+          },
+          "required": [
+            "call_id",
+            "implementation",
+            "key",
+            "layer",
+            "resolution",
+            "value"
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "resolution": {
+              "type": "string",
+              "enum": [
+                "fallback",
+                "not_evaluated"
+              ]
+            },
+            "layer": {
+              "type": "string",
+              "const": "native_component"
+            },
+            "implementation": {
+              "$ref": "#/definitions/EvaluationObservationId"
+            },
+            "call_id": {
+              "$ref": "#/definitions/EvaluationObservationId"
+            },
+            "key": {
+              "$ref": "#/definitions/EvaluationObservationId"
+            }
+          },
+          "required": [
+            "call_id",
+            "implementation",
+            "key",
+            "layer",
+            "resolution"
+          ]
+        }
+      ]
+    },
+    "TypedCell": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "omitted"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "json"
+            },
+            "value": {
+              "$ref": "#/definitions/Json"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "reference"
+            },
+            "reference": {
+              "$ref": "#/definitions/Reference"
+            }
+          },
+          "required": [
+            "kind",
+            "reference"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "$id": "https://posthog.com/sdk-contracts/2.0.0/protocol.schema.json"
+}

@@ -1,0 +1,37 @@
+{
+  "contract_version": "2.0.0",
+  "specs_inventory_revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+  "catalog": {
+    "path": "public-rpc-catalog.md",
+    "sha256": "ac8165c607ea0d15e924d3984e4da49d68cdcb77d1d2fe8de18da142603870e3",
+    "original": "sdk-specs/notes/public-rpc-catalog.md",
+    "copied_from": "coverage/harness-v2/inputs/public-rpc-catalog.txt",
+    "policy": "byte-identical selected phase-1 input"
+  },
+  "decisions": {
+    "path": "public-rpc-decisions.md",
+    "sha256": "b5a5874cab020155827f7e1ed741b2aacbd041f5c3d828b81f0f0ab4fc706a58",
+    "original": "sdk-specs/notes/public-rpc-decisions.md",
+    "policy": "byte-identical local selection evidence; not an applied canonical OpenSpec change"
+  },
+  "amendments": [
+    {
+      "id": "capture-amendment-v1",
+      "path": "capture-amendment-v1.ts",
+      "sha256": "6e088b69f00bf07c2129a85bb2f993502dbfa701248288ca66d468e02426c0d4",
+      "policy": "approved additive capture/setup fields; frozen base inputs preserved"
+    },
+    {
+      "id": "flag-semantics-v1",
+      "path": "flag-semantics-v1.ts",
+      "sha256": "5831088033c377faaee005bfcb761a4be18b9f0d54dc8a9cd70cdaaf5384a892",
+      "policy": "approved native callback data and scoped native startup/getter/cache policy"
+    },
+    {
+      "id": "local-evaluation-v1",
+      "path": "local-evaluation-v1.ts",
+      "sha256": "0fda649d942134af6d6c80a9dcc44a0609f063e241b7113338be506f2abf3f53",
+      "policy": "approved native definitions reload and per-invocation evaluation provenance fixture"
+    }
+  ]
+}

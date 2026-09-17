@@ -1,0 +1,716 @@
+{
+  "catalog_sha256": "ac8165c607ea0d15e924d3984e4da49d68cdcb77d1d2fe8de18da142603870e3",
+  "counts": {
+    "configuration_paths": 143,
+    "crosswalk_unresolved": 518,
+    "declarations": 395,
+    "expanded_cases": 728,
+    "explicit_assertion_actions": 375,
+    "feature_files": 60,
+    "helper_assertion_actions": 143,
+    "outline_examples": 382,
+    "outlines": 49,
+    "private_files": 20,
+    "public_files": 40,
+    "routes": 180,
+    "yaml_cases": 157,
+    "yaml_steps": 1066,
+    "yaml_suites": {
+      "capture": 33,
+      "capture_ai": 5,
+      "capture_v1": 98,
+      "feature_flags": 17,
+      "feature_flags_local_evaluation": 4
+    }
+  },
+  "generated_sha256": {
+    "catalog-config.jsonl": "e9c0bf96fbf3197b21c41169ebe38afcd9f8d703118dd6d6d51fbbf345b06937",
+    "catalog-routes.jsonl": "2793f5402a7a1b3083e96ba9b17f7e59e331005f88b3899be60e505060135352",
+    "gherkin-declarations.jsonl": "2764dc98da4be9e3eabba5fb647531b17e91a419547d10c7643efe6e992380bd",
+    "legacy-actions.jsonl": "0d284abe9dc9d884d83c9edc8ae9dbfe72ce914e45f43dcf72d33afedebddce1",
+    "legacy-cases.jsonl": "aa9b22c31a93c7c58e94048583ca9e0e0e7a35a988d30bcaba6c9cc254c554fd",
+    "migration-crosswalk.jsonl": "c86cd6b774c5316a19db1c08be367d37392c23cd2a1a895e07404775ade70781",
+    "shared-cases.jsonl": "cc65270bc7630983a1295c9cf1923d92cb8d4fd31ceef1bbdc0f910ff321de0a"
+  },
+  "harness_revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+  "mapping_notes_sha256": "3dced0496798d4ef91da4ed739516e43d6cda4d2479f43a830da5c3e16cee70f",
+  "purpose": "frozen source discovery; not semantic parity or runtime conformance",
+  "schema_version": 1,
+  "sources": [
+    {
+      "path": "acceptance/private/application-lifecycle.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "a870200e96c4c44e22f8475a2c9616e4b923ba43fd54516c7bc2c8a473f938d4"
+    },
+    {
+      "path": "openspec/specs/application-lifecycle/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "27d451e6f950bcf87aa1760fae52fd86a1fbee24bc8e8d71fa395a0666cef85b"
+    },
+    {
+      "path": "acceptance/private/autocapture.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "a6cdccac9209ec78fc7e7ccbed56d2a17421bf7862395aa38b5b71c15a37b81a"
+    },
+    {
+      "path": "openspec/specs/autocapture/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "b15274bc1981cbd7b2b1b50629e2d8a4c4e30da86d0e41ee21139f95b423465d"
+    },
+    {
+      "path": "acceptance/private/before-send-hook.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "21825130ff6f95ea6b7b9f982bcd52f551b6c02b447835757f21ccf1361ec4e8"
+    },
+    {
+      "path": "openspec/specs/before-send-hook/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "f405f6c199dea1d5ee6708eadeb3322316dbb44f93edb9afd1df2c5f4750eee8"
+    },
+    {
+      "path": "acceptance/private/consent-gating.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "9ed8a5374191dd034f78de5a5492d0d31d99f378edfef4c2d918b0d9c266a041"
+    },
+    {
+      "path": "openspec/specs/consent-gating/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "0dd6528e986a929bc0e82cc659f6aef58b103737d4ba7f0f7a7bc7be5cbd6954"
+    },
+    {
+      "path": "acceptance/private/device-id-generator.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "8a7cd990b37efc5cf30d597953647bb8484bd7a9ec594e853cbfaa761b4f86fb"
+    },
+    {
+      "path": "openspec/specs/device-id-generator/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "9423e1cfb1347fdc0bd40538409b11ca2281527707a72fc4120c818a9d107530"
+    },
+    {
+      "path": "acceptance/private/event-batcher.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "5421a68bc601ec2043311435515e3876c1ed8129c194381e4245867787060a1f"
+    },
+    {
+      "path": "openspec/specs/event-batcher/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "7e2091641ca07ab1a068f087a5480bbb399843844fc9d9710510b45a876cb93d"
+    },
+    {
+      "path": "acceptance/private/exception-event-metadata.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "7dc7839710b40573030b60b911cea25f0b4251dd5ef02f173919062420781914"
+    },
+    {
+      "path": "openspec/specs/exception-event-metadata/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "30454a9c3178d8988dc21606dac7e9983caaa55a5cf9ff98747493031b4dcea2"
+    },
+    {
+      "path": "acceptance/private/feature-flag-cache.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "010f4dd51e48c4aaa52154909d3416a2019cb93b174b0bbac9b5d09d67d64d2c"
+    },
+    {
+      "path": "openspec/specs/feature-flag-cache/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "8dc2b2de8f5d95c7a49621cc9dcb47904b8921e529627a71321f335d4a93664e"
+    },
+    {
+      "path": "acceptance/private/feature-flag-called-tracker.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "4f3a43afa387dbbdd9e88dae1fc10d1810e89326781df7dc78f1796fb557a576"
+    },
+    {
+      "path": "openspec/specs/feature-flag-called-tracker/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "53cd1a459cc2bd07f087eeeb5d4841480f27e5e4a5878850e3291e7ce7af6b8e"
+    },
+    {
+      "path": "acceptance/private/flag-definition-loader.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "e3675473e72fdfdd9e213411337d54c783c8610b76d4c0a09f5340338476be8d"
+    },
+    {
+      "path": "openspec/specs/flag-definition-loader/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "2fdf71bbfc385b724c8dd51ffa57fa4735c65a7757792b065b3ac9cafd1765f2"
+    },
+    {
+      "path": "acceptance/private/http-client.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "436c1a98bbb56361e3f7d21efc6f806cc1a0edeb58a25e363c215e902bb241a7"
+    },
+    {
+      "path": "openspec/specs/http-client/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "c8cf3af9936d724d327611d4c2a6b1efe12c40f878af536ff158c172a89fbaa7"
+    },
+    {
+      "path": "acceptance/private/local-feature-flag-evaluator.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "211c5411a779a14c445e884bbe3308abdf4dfc04cdba3de833bc7112ee1d9f22"
+    },
+    {
+      "path": "openspec/specs/local-feature-flag-evaluator/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "ac3d865b7c739f21303e59f9c87ff32894f7dafea139923ac59246d0b3aa2559"
+    },
+    {
+      "path": "acceptance/private/persistent-storage.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "5bb05af5315711d45b0ae404a7aa9437e7f2b4073ba70d24bee1d48990555b8e"
+    },
+    {
+      "path": "openspec/specs/persistent-storage/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "4f43442b30ef3b12ee6ce9d327f86d22d2c9fb70b7c8988b3938f72c06e83370"
+    },
+    {
+      "path": "acceptance/private/remote-config.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "71ee9b61809941abb5d688ca2d88a433dca9a4e5d331f97d47181369b9ad9f05"
+    },
+    {
+      "path": "openspec/specs/remote-config/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "508b9ce4f3aec03e10b5ee4f25d271764bb24ba4c6f4d272ad4377e4c5a2c97a"
+    },
+    {
+      "path": "acceptance/private/retry-queue.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "af8f0eea971a1b99e49df2974358d9a19e761d17aa189d3a930501ff662f1871"
+    },
+    {
+      "path": "openspec/specs/retry-queue/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "6b96bb50272599f66c3b90eb125ed3f92531d6c398b9a5511cc1854748cfde2f"
+    },
+    {
+      "path": "acceptance/private/session-manager.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "9f76ebe1120fdc855930b938e9f6b60c90a377a93bb99b33ccff453e1424bdb7"
+    },
+    {
+      "path": "openspec/specs/session-manager/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "66b8526bff499b6f1ec52bc27949e2edc0257a5d0b14c170ea6315b43b99c14f"
+    },
+    {
+      "path": "acceptance/private/session-replay-ingestion-controls.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "4d236cf0ab0d3ffd0c1221142ff195651e75a8ead77059851eb17cc7286bd4d9"
+    },
+    {
+      "path": "openspec/specs/session-replay-ingestion-controls/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "feef263480791a0efba85bec6eebe1bcd5f74176da0b1edc0ef3ea48767b1485"
+    },
+    {
+      "path": "acceptance/private/session-replay-privacy.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "eea56ae7fe54e5cc74975d554c05d6b41bb3cfc53b851d74f22231234af1f741"
+    },
+    {
+      "path": "openspec/specs/session-replay-privacy/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "aa9fe1eb68da460f403952d3b4c0e86e8a943fbe27c36c479b0db853e2c635a4"
+    },
+    {
+      "path": "acceptance/private/surveys.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "5f7bd8339557f588e28edde54791ce493d829eaf330cf4f54762709b73aa077d"
+    },
+    {
+      "path": "openspec/specs/surveys/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "81846e32316946841aebffb7b1ed179db284cb6abbf35b0f769998e0d82d7e68"
+    },
+    {
+      "path": "acceptance/private/tracing-headers.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "76ddffa7d38a298f0d03de1e1ce7810f13e256231967df7c7b8948e93e2ba540"
+    },
+    {
+      "path": "openspec/specs/tracing-headers/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "f6289f146f936937a727ee44fc4d3d151721a4906af59f71de7d3d95eb3c4bbd"
+    },
+    {
+      "path": "acceptance/public/alias.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "ac17ae8db937b948c3d1f882e4d7a289891e1a38adb6e70882462f93c0fa5de9"
+    },
+    {
+      "path": "openspec/specs/alias/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "97c904efa2875fb948d5d87f252f47df8b9bb399b7b3d6d53b51041d1b35ee19"
+    },
+    {
+      "path": "acceptance/public/bootstrap.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "0ca280481e4dc5a3fbcd8f73e0bfdaf313a70e157036a689e2b2bbe91090ff80"
+    },
+    {
+      "path": "openspec/specs/bootstrap/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "16ba4fb31ae6fe13e20c23258c546a668356ea4d1410201f9bac6705158fffc5"
+    },
+    {
+      "path": "acceptance/public/capture-ai.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "cc3f18138e5af1e596ce7d7b879dfb3294618aa61fc0de462658e2c8600272bb"
+    },
+    {
+      "path": "openspec/specs/capture-ai/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "b3eaf63d112c200b81dc6c6ff050c21bf8038ca3ec0c79d5f9736bb1ec265e64"
+    },
+    {
+      "path": "acceptance/public/capture-exception.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "fb3f37ef40a72d288f63e293c617c31bf7dbb4d80cfa295880e36aa82c8f3f81"
+    },
+    {
+      "path": "openspec/specs/capture-exception/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "ec484a1f8a3ba8955e680b47081bd0440952a5d3b18710109a5f4764737c379e"
+    },
+    {
+      "path": "acceptance/public/capture.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "caf8a98ac48b183ffa79c054c685dd25e97a7db1c089b396d3efd8cf1f907150"
+    },
+    {
+      "path": "openspec/specs/capture/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "9d352d203be5006fd4d10a891fb9367464b708986c7b80f8c508f78381773eb4"
+    },
+    {
+      "path": "acceptance/public/create-person-profile.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "8abb86d17aeae014b2acc19541d61929c8dec6600d20354145263ac25e739c8e"
+    },
+    {
+      "path": "openspec/specs/create-person-profile/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "8394b3851c659996745563b86d8e7637e3d10079515e4f5974b17db5da86807c"
+    },
+    {
+      "path": "acceptance/public/debug.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "0fee36510c30b6957b3c3d844e481ca1ab87e5a034e6ba757e3da339818ce27c"
+    },
+    {
+      "path": "openspec/specs/debug/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "f5f6b8ef829fbd64c7b0b94edcd7edeb98aa1947121560c29e0df27949f8562b"
+    },
+    {
+      "path": "acceptance/public/evaluate-flags.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "15d3860f44960a4c161718a0f6894602e7739458febf32c153ec2694f2837971"
+    },
+    {
+      "path": "openspec/specs/evaluate-flags/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "83971d44e942b3e3d4d2cb88e75a3ebff59a7c7c8eb80b90704f5f15233b430e"
+    },
+    {
+      "path": "acceptance/public/exception-steps.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "d6e11010a765ca5a9879ec56fabc34555412fc2dc45eb2ba712e6d58fa74497b"
+    },
+    {
+      "path": "openspec/specs/exception-steps/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "2ce852ca3109b853382644040cd2132294f783a6518ea6bfb41d6880cc0043ca"
+    },
+    {
+      "path": "acceptance/public/flush.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "732015d64bda91d905ecf4d3ad84e8014071582f8cac98c711ff143788c30c41"
+    },
+    {
+      "path": "openspec/specs/flush/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "b0c01fb9e52955c7d6b80f91a2a6afffbfb6ddbb5a6ca21579d6454e9e9860d4"
+    },
+    {
+      "path": "acceptance/public/get-anonymous-id.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "5869387be22579b0adf39b23da249e3f8a1489c780a40e1e0f53e70070f1726f"
+    },
+    {
+      "path": "openspec/specs/get-anonymous-id/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "54782de379de495622de8d115693b6755cbcebc6e0f348705a366a136bdcfd0a"
+    },
+    {
+      "path": "acceptance/public/get-distinct-id.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "b3968c58390bc71be90225b440d91610e389c594a748434d4f32e538544ae4bf"
+    },
+    {
+      "path": "openspec/specs/get-distinct-id/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "de6a07f3f00314bb6075fe591cdc73de164b7776658d538c1fd71465651179fb"
+    },
+    {
+      "path": "acceptance/public/get-feature-flag-payload.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "997fec1cb4e5803b4d215c2735a307c47a5b7e739076fee1c82ae1a0ec23d0a3"
+    },
+    {
+      "path": "openspec/specs/get-feature-flag-payload/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "4b999439f8d0271ea42b2d2a33704143f71e969cdc4f807297421c2195adb158"
+    },
+    {
+      "path": "acceptance/public/get-feature-flag-result.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "cb88cff57f4a70678d569a56a4f789afc4ef5dfb09f820cebdba1051377814ac"
+    },
+    {
+      "path": "openspec/specs/get-feature-flag-result/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "2540d2ef95af1eb19893027926a62b62c173193d6151fb444d48acb455bf4595"
+    },
+    {
+      "path": "acceptance/public/get-feature-flag.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "fec7923b55e09905f0e8a149b9548939ae4164ae68f5d5fc74f02a4940344f8d"
+    },
+    {
+      "path": "openspec/specs/get-feature-flag/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "63750a838d222a306b17fa491333646b3f88699323f4a03261a5c29cf17ec796"
+    },
+    {
+      "path": "acceptance/public/get-feature-flags-and-payloads.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "c83bf6ab4d1a3fcc5c5207523d278126273058ed7566e7fb3356c83399b44af9"
+    },
+    {
+      "path": "openspec/specs/get-feature-flags-and-payloads/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "093aca7db27d01ff9efade2f1573b86cf9c05851b116d15c532b3d123c363a25"
+    },
+    {
+      "path": "acceptance/public/get-feature-flags.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "bb2db660658f60f4157729e6f16cd107daff74fe2f3cb03099e8e1673270e6d7"
+    },
+    {
+      "path": "openspec/specs/get-feature-flags/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "d1235ba3095781077fb9c4d1245d4897510b93edba21092f970676ee3bfbafc5"
+    },
+    {
+      "path": "acceptance/public/get-session-id.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "88b337732a5a94b88b00f1ede866f3c04456ca420882ad9816c57b178f67869e"
+    },
+    {
+      "path": "openspec/specs/get-session-id/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "769aa40931fdb4ad0b139b0991e7d90c3dbe947b9efa4f48802aeb310a0b698b"
+    },
+    {
+      "path": "acceptance/public/group-identify.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "4c56d683f3f721989f5bf292359c3f9dc72ffc5faf77ab06597f5b1ffeda9c22"
+    },
+    {
+      "path": "openspec/specs/group-identify/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "57b9c5fabb7d56e534aac60da111f37397eddabb7da34221deb349f8f7ca4740"
+    },
+    {
+      "path": "acceptance/public/group.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "c6b33f23aadbd26e6c9c3769a3eea6e3d1310a4d8934f562746717d3306b379a"
+    },
+    {
+      "path": "openspec/specs/group/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "6a5b4fe50624f6c9bec69696d0a1105cd8ed1482616d1cbf62b8d4c031b893bd"
+    },
+    {
+      "path": "acceptance/public/identify.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "a01f6f9a0a2469bc7b01d9eb8bdf63000dc1b4dc8cbcd24d3da1596741affef7"
+    },
+    {
+      "path": "openspec/specs/identify/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "95dadbcfe906d847cb8831e7a3bd25bdea89ebce665c02c47429d8a519acee0b"
+    },
+    {
+      "path": "acceptance/public/is-feature-enabled.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "d4518c376a141d1a7bc100b72d2eca9ab1bada0eff5167bf2a1f177dc04ffc88"
+    },
+    {
+      "path": "openspec/specs/is-feature-enabled/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "30067b1cf63b955c36934c52c0dcb0a9573cd9905a05d76898d6bc117d06a295"
+    },
+    {
+      "path": "acceptance/public/is-opt-out.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "7e970d8ec00a43fa5dba170e360500f41cd0722a7ccec5e6a10e5cd04b196a0a"
+    },
+    {
+      "path": "openspec/specs/is-opt-out/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "e187f29c684b7eca543d72c1247a5eefd68f2a5922aa691e36aa84f69399ee6e"
+    },
+    {
+      "path": "acceptance/public/is-session-replay-active.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "cd82f7edb58ff59590e958d8e013d05f0476c8ef1e3069e96d6fe48febec3df4"
+    },
+    {
+      "path": "openspec/specs/is-session-replay-active/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "ba2814acb644825d54721e946f9ed752d3e63f7b1325b7bc0f3f12f53ce1ed88"
+    },
+    {
+      "path": "acceptance/public/on-feature-flags.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "bed87d10f752bd10197d63a49b1d4998127ac791ab6a73135ec7718eaebeae3d"
+    },
+    {
+      "path": "openspec/specs/on-feature-flags/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "0a7b396da1acf1457b3b931c7e20f1f4f5ffc0713bd997ee99ea9ed84ef7eb72"
+    },
+    {
+      "path": "acceptance/public/opt-in.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "6787465d68296b8579f7a2a558d19e5c9848d2a664b69d408451c94366743ea3"
+    },
+    {
+      "path": "openspec/specs/opt-in/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "2f929af0be185d3815845406c45343f80b162334039afeaaa528a2c6ae6675b5"
+    },
+    {
+      "path": "acceptance/public/register.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "2a78eec9578a798013d6706d354415840b38353a658299725ade0de786b6e190"
+    },
+    {
+      "path": "openspec/specs/register/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "d6e4d7fd0bea5985eb8bac9463f461d40b55652e5252aa56378244faba78b559"
+    },
+    {
+      "path": "acceptance/public/reload-feature-flags.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "ae12a6e56958b6cc4800ea3077174556c0ea6243908e3eb6542b0f1085496c1d"
+    },
+    {
+      "path": "openspec/specs/reload-feature-flags/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "b7ff1af8ac16707def00a9688a80505362ce920f7e93f8e9f53e2b31b20c0952"
+    },
+    {
+      "path": "acceptance/public/reset-group-properties-for-flags.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "a2ec8ec486d19ee1987e2e90558e1fb4a1154e3545e577c9bbc583ded67fa5e7"
+    },
+    {
+      "path": "openspec/specs/reset-group-properties-for-flags/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "05a46d3814708922d554200070453bf4b0b5d0c6991e925649440c3befcbc1d3"
+    },
+    {
+      "path": "acceptance/public/reset-person-properties-for-flags.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "bea721a7e7aac991069fd2da899547d68d12de509ba4cdae84bc832b22aa33ca"
+    },
+    {
+      "path": "openspec/specs/reset-person-properties-for-flags/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "6c9985528c8831616bc9ce9d81a39a8da789db4f30a9683b23bb50f8061228fe"
+    },
+    {
+      "path": "acceptance/public/reset.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "d21394812524fe3f8f1a67516f06b91872395cdae122a2de34ebb698b70a8b32"
+    },
+    {
+      "path": "openspec/specs/reset/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "14fb7641bb8f74392cd4f578cbddd816e568eb288893e1e1f9bf433f37da44d6"
+    },
+    {
+      "path": "acceptance/public/screen.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "7409962f81d30cafcf67ec5170dd5d1b02324aa51cde28d9923ef5505310bc2a"
+    },
+    {
+      "path": "openspec/specs/screen/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "5a347f366086e2d1e747cf7314ad9cbb06813092e288151e817bde46828d0356"
+    },
+    {
+      "path": "acceptance/public/set-group-properties-for-flags.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "be75ecc7396e8310f5c9b4e6dd52e436b0843906d1a48141abce3e2d9be42528"
+    },
+    {
+      "path": "openspec/specs/set-group-properties-for-flags/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "d904e4050c119b1bf6394dd63f9154ea5bbfb27382342c321e2ca7046df515f1"
+    },
+    {
+      "path": "acceptance/public/set-person-properties-for-flags.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "b734f478e15dc82aa77fb5cb9263259156775fdcc87730eb2dcf1b962a0191b4"
+    },
+    {
+      "path": "openspec/specs/set-person-properties-for-flags/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "5b896f2b1d5d3469a7e9d9d50e4892e6f62e0e0447910a735d06f0f50d8d7ef5"
+    },
+    {
+      "path": "acceptance/public/set-person-properties.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "c5b533d599fa02a93bfecdfcff53d81dede7ece57abdd1967084d45758908c5f"
+    },
+    {
+      "path": "openspec/specs/set-person-properties/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "9e83b486a99f0c3e26f5b206db8bc413cdfc0ba6030e272b73c911492da553e0"
+    },
+    {
+      "path": "acceptance/public/setup.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "6818fe16c5102587bec977ee1e3e9616cbfd86318791cd6f275d2faddbe0277f"
+    },
+    {
+      "path": "openspec/specs/setup/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "67b44c32a8c09896e85fe7994c6744c1cd1453911a87ed69ca7fc711aaaa9ad9"
+    },
+    {
+      "path": "acceptance/public/shutdown.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "604d712e87a56e1790ba44f8fa124b622b96fc735398d8528264488d7309a95f"
+    },
+    {
+      "path": "openspec/specs/shutdown/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "9c414cf64fd973aee7ff3a89563acd90a4f0f9643049abfcba477c4d7aba92b1"
+    },
+    {
+      "path": "acceptance/public/start-session-recording.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "7fc1a750a161980c5915effddbc5ef2c4a3c031d52dd783263d3c908b903f398"
+    },
+    {
+      "path": "openspec/specs/start-session-recording/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "a5f5d493ddb30404c05964e3cd87a23eeab7f28b4d31823872563b57c797f0fc"
+    },
+    {
+      "path": "acceptance/public/stop-session-recording.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "daaa11abbf14429bcf731d543c7cbbd039c2d17630dcfebbc9303803ae3d9971"
+    },
+    {
+      "path": "openspec/specs/stop-session-recording/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "f296a07d69e370fe8e3ae18bae71f19bb290b3efb92a216fd95ca55895b77daf"
+    },
+    {
+      "path": "acceptance/public/unregister.feature",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "5be41c0c03fbf7c1fec95f56a61a309bd3ecba7f489146ead99908b1c7741cf2"
+    },
+    {
+      "path": "openspec/specs/unregister/spec.md",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "3c3c261e1ae2d6fea2cae9ebec51211d2898c6b9b70101afd704e7753b14470a"
+    },
+    {
+      "path": "src/posthog_test_harness/actions.py",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "0e09742431e4282c62030b0b2bf0dafb8b008cdb74fd61f516943fe6cf5833db"
+    },
+    {
+      "path": "CONTRACT.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "c00c6ed36df5c73a3a404e992fa9c69a9da7adf855607e5565c64dacc22cb2a7"
+    },
+    {
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "6096cec12f6c6d489d30f30de33da7f8ceef17b72cad4c831375f7cb016afcd3"
+    },
+    {
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "5f4c2bcf12cdd989d32ad0556bddd9ae54a46da3c1ca9d5bb4344a29372e741e"
+    },
+    {
+      "path": "contracts/capture_ai_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "fdf794d3b90a16129c2ee3676531e0976da8e469145a0df906bd9211f849df4b"
+    },
+    {
+      "path": "contracts/feature_flags_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "6d7193fe8e7b9e026ebdadc3d26deb5d85991e2a6df24770c8b6e7cc3a5833c7"
+    },
+    {
+      "path": "contracts/feature_flags_local_evaluation_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "e2b089778ee3d1c60d7e4ad71032619d64d840697b5cfa6ab2d18a5a94ab01ad"
+    },
+    {
+      "path": "acceptance/private/exception-event-metadata.examples.json",
+      "revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "sha256": "3e6d179bcfd069a56a2a839f54b973ee54566c623f84c1d86b1b8fde11ee4cd7"
+    },
+    {
+      "path": "contracts/adapter_actions.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "90491745ee571f3d696c655b9d2f0c1a912c5a7f946dfb113394cef8a961d4d4"
+    },
+    {
+      "path": "contracts/test_actions.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "a3ed237e3d4a1d382a11bb8150b53368c6365ffd303a90091bc765c2daa273c5"
+    },
+    {
+      "path": "src/posthog_test_harness/contract.py",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "6354c5bb4ea43b857e60a44110bdd85efa2fde66ca1386737d326380295f2787"
+    },
+    {
+      "path": "src/posthog_test_harness/tests/context.py",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "7a955a624a7deca68c7ebaca0cb4e906700324444a12d013c4a2d6eae9d7032e"
+    },
+    {
+      "path": "src/posthog_test_harness/tests/suites/contract_suite.py",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "9e7772999dbb91aa855cf00638d70cac478ca09ac5738833bae5968c03ff48c5"
+    },
+    {
+      "path": "src/posthog_test_harness/sdk_adapter/interface.py",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "c8814540e65428f296e184b7857d98255f3c1c9b52ee736b4635dc22d684e665"
+    }
+  ],
+  "specs_revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+  "tool_versions": {
+    "PyYAML": "6.0.3",
+    "gherkin-official": "39.0.0"
+  }
+}

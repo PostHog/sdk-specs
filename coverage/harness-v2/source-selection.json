@@ -1,0 +1,24 @@
+{
+  "selection": "Retain the implementation plan's frozen inputs after refreshing origin refs. Newer remote heads are not silently included in the phase-1 inventory.",
+  "repositories": {
+    "harness": {
+      "repository": "PostHog/posthog-sdk-test-harness",
+      "selected_revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "observed_origin_main": "e487249c34176c053f524d96bf0f99818dc91247"
+    },
+    "specs": {
+      "repository": "PostHog/sdk-specs",
+      "selected_revision": "9cb330e3bac8868f39cc7dd665e42817285c9493",
+      "observed_origin_main": "9cb330e3bac8868f39cc7dd665e42817285c9493"
+    },
+    "node_source_assessment": {
+      "repository": "PostHog/posthog-js",
+      "selected_revision": "09ae91965b4755d0e6fce3150a0ae2ce73ce599b",
+      "observed_origin_main": "5bd67c5ada4ea1a2b2c6933ddc721e4d129f132b",
+      "role": "Prior source assessment only; not used to establish shared expectations or runtime conformance"
+    }
+  },
+  "refresh_command": "git -C <existing checkout> fetch origin",
+  "specs_worktree_branch": "feat/harness-v2-inventory",
+  "harness_worktree_branch": "feat/harness-v2-gherkin"
+}

@@ -1,0 +1,143 @@
+{
+  "format": "yaml-parity-v1",
+  "sources": [
+    {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-ai.feature",
+      "sha256": "ac8e2b7121949312ce277ec3aa6a5c9b27d0313717548c45105a995e5ff485a6"
+    },
+    {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1.feature",
+      "sha256": "70d431ee35e3bb0fe7a7388fbcc82e9d5ea28f43f6af81334d34f0d523ba2a83"
+    },
+    {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-batching.feature",
+      "sha256": "9d3d3db86aaf5d54ee042866ed0b83269a1da7600b155b6c0d7f4cd1e41fbc98"
+    },
+    {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-retry.feature",
+      "sha256": "45d3620f3c088865c8a9b73b2e4a0e0d289d5bdf9376f7ec12415b7472eebb99"
+    },
+    {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-analytics-v1-outcomes.feature",
+      "sha256": "bb2086fd350700456e228b4734012da86d51ea5438ba76649ff0875b50f62d8b"
+    },
+    {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-legacy.feature",
+      "sha256": "7b08e6581a0e114e6840085dfb54bdc313af35f7af5edcc2623d71bc388142ff"
+    },
+    {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/capture-amendment-v1.feature",
+      "sha256": "bc4915e920d99489fa2dc7cf7c6806713e96ce8580e07a7dae49c0489a503098"
+    },
+    {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/remote-flags-v1.feature",
+      "sha256": "3c40ed4054a754d0af93ab64b62a63dd11f0a5f68ac1394e8ea1df30a0ab6e75"
+    },
+    {
+      "revision": "yaml-parity-v1",
+      "path": "migration/yaml-parity-v1/local-evaluation-v1.feature",
+      "sha256": "573d0d2519ed467b64cb6c632792520053c36e1e1c0e44ded200bcef895cfb8d"
+    }
+  ],
+  "ledger": {
+    "path": "migration/yaml-parity-v1/cases.json",
+    "sha256": "b7c33ff3524b9b882141eb4bac5f6af94305a27562a4f78b008a80b753d87a96"
+  },
+  "legacy_revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+  "legacy_sources": [
+    {
+      "path": "contracts/capture_ai_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "fdf794d3b90a16129c2ee3676531e0976da8e469145a0df906bd9211f849df4b"
+    },
+    {
+      "path": "contracts/capture_analytics_v1_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "5f4c2bcf12cdd989d32ad0556bddd9ae54a46da3c1ca9d5bb4344a29372e741e"
+    },
+    {
+      "path": "contracts/capture_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "6096cec12f6c6d489d30f30de33da7f8ceef17b72cad4c831375f7cb016afcd3"
+    }
+  ],
+  "blockers": {
+    "path": "migration/yaml-parity-v1/blocked-cases.json",
+    "sha256": "7ca056b7e3741bdb6723cdcb62895e67001c1187f4a5f770232bd64afffb1424"
+  },
+  "remote_flag_blockers": {
+    "path": "migration/yaml-parity-v1/remote-flag-blocked-cases.json",
+    "sha256": "345a1d57da0e78a6279b6062cc2b35eadab76b53f935522bfeeb8baf4fc709ed"
+  },
+  "remote_flag_blocker_sources": [
+    {
+      "path": "contracts/feature_flags_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "6d7193fe8e7b9e026ebdadc3d26deb5d85991e2a6df24770c8b6e7cc3a5833c7"
+    },
+    {
+      "path": "src/posthog_test_harness/actions.py",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "0e09742431e4282c62030b0b2bf0dafb8b008cdb74fd61f516943fe6cf5833db"
+    },
+    {
+      "path": "src/posthog_test_harness/sdk_adapter/client.py",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "0b2dac8362bafdcb0c6c8b4af8b5d566412f510ff0f74759713a209053312c5d"
+    },
+    {
+      "path": "src/posthog_test_harness/mock_server/state.py",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "6ed6c11a177d0be947056c091d86ec31513f71ed9a8760bbd395ef25f4881f70"
+    },
+    {
+      "path": "src/posthog_test_harness/mock_server/server.py",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "6c87cc2d08075faee122c836ca6a6f62255a63cfda80d1e776784580002d0c87"
+    },
+    {
+      "path": "src/posthog_test_harness/mock_server/endpoints/decide.py",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "e647f532375e2d1ad88c0573293fa7e806bba7a56a963012d351d220249ab905"
+    }
+  ],
+  "approved_amendments": {
+    "path": "migration/yaml-parity-v1/approved-amendments.json",
+    "sha256": "e5317e2af9bfb07c7a8259ba2912ea807b179b564d7dd943806dadcf2005c331"
+  },
+  "local_evaluation_sources": [
+    {
+      "path": "contracts/feature_flags_local_evaluation_tests.yaml",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "e2b089778ee3d1c60d7e4ad71032619d64d840697b5cfa6ab2d18a5a94ab01ad"
+    },
+    {
+      "path": "src/posthog_test_harness/actions.py",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "0e09742431e4282c62030b0b2bf0dafb8b008cdb74fd61f516943fe6cf5833db"
+    },
+    {
+      "path": "src/posthog_test_harness/sdk_adapter/client.py",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "0b2dac8362bafdcb0c6c8b4af8b5d566412f510ff0f74759713a209053312c5d"
+    },
+    {
+      "path": "src/posthog_test_harness/mock_server/state.py",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "6ed6c11a177d0be947056c091d86ec31513f71ed9a8760bbd395ef25f4881f70"
+    },
+    {
+      "path": "src/posthog_test_harness/mock_server/server.py",
+      "revision": "029a94a3861c79f5e99d656b03648ba903eb6e7e",
+      "sha256": "6c87cc2d08075faee122c836ca6a6f62255a63cfda80d1e776784580002d0c87"
+    }
+  ]
+}

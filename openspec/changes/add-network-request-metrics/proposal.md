@@ -2,16 +2,15 @@
 
 ## Why
 
-`posthog-js` now records outgoing network-request timing through PostHog Metrics, but
-sdk-specs has no capability that defines this behaviour or shows its status in the
-per-SDK compliance record. Teams therefore cannot distinguish shipped support from a
-platform that is a safe future candidate, and can incorrectly count Session Replay
-network recording as Metrics support.
+`posthog-js` now records outgoing network-request timing through PostHog Metrics, and
+the Metrics capability in the parent change needs a requirement for this source. Teams
+also need a support record that distinguishes shipped support from a safe future
+candidate, without counting Session Replay network recording as Metrics support.
 
 ## What Changes
 
-- Add a `network-request-metrics` capability for recording the duration and outcome of
-  outgoing application requests through the existing SDK Metrics surface.
+- Add a Network Request Timing requirement to the existing `metrics` capability for
+  recording the duration and outcome of outgoing application requests.
 - Define automatic capture as an optional platform adapter. It applies only where an SDK
   can observe the host request API without changing request behaviour; a manual adapter
   remains a valid implementation path.
@@ -26,17 +25,17 @@ network recording as Metrics support.
 
 ### New Capabilities
 
-- `network-request-metrics`: capture safe, bounded timing and outcome metrics for outgoing
-  application network requests, with automatic and manual adapter rules.
+_None._
 
 ### Modified Capabilities
 
-_None._
+- `metrics`: add optional automatic network-request timing capture as a Metrics source,
+  with privacy, cardinality, lifecycle, and failure-isolation requirements.
 
 ## Impact
 
-- `openspec/specs/network-request-metrics/spec.md` will become the canonical contract,
-  based on the `posthog-js` implementation and the existing Metrics ingestion contract.
+- `openspec/specs/metrics/spec.md` will gain the canonical requirement, based on the
+  `posthog-js` implementation and the existing Metrics ingestion contract.
 - `compliance/README.md` and each `compliance/<sdk>.md` will gain one clearly-scoped
   tracking row when the capability is implemented. Candidate status will be kept outside
   the Pass/Partial/Fail/N/A conformance score.

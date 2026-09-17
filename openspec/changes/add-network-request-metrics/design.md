@@ -2,16 +2,16 @@
 
 ## Context
 
-See `proposal.md` for motivation. `sdk-specs` has no Metrics capability, while its
-compliance matrix only reports conformance against existing canonical specs. Session
-Replay already captures network data on some platforms, but its output does not prove
-that an SDK emits PostHog Metrics.
+See `proposal.md` for motivation. The parent Metrics change defines the shared Metrics
+pipeline, while its compliance matrix only reports conformance against canonical specs.
+Session Replay already captures network data on some platforms, but its output does not
+prove that an SDK emits PostHog Metrics.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Define one small, testable contract for application network-request timing metrics.
+- Define one small, testable Metrics requirement for application network-request timing.
 - Make the first `posthog-js` implementation the reference for metric identity and
   enabled-state behaviour.
 - Give maintainers one support record that separates verified support from possible
@@ -27,13 +27,13 @@ that an SDK emits PostHog Metrics.
 
 ## Decisions
 
-### One capability, separate from Session Replay and tracing
+### One Metrics requirement, separate from Session Replay and tracing
 
-`network-request-metrics` describes an observable product outcome: outbound application
-request timing becomes Metrics data. It is separate from Session Replay because the
-capture, privacy expectations, and query surface differ, and separate from tracing
-because it does not create a span graph. Extending either existing spec would make
-their contracts unclear.
+Network request timing describes a Metrics source: outbound application request timing
+becomes Metrics data. It is separate from Session Replay because the capture, privacy
+expectations, and query surface differ, and separate from tracing because it does not
+create a span graph. It extends `metrics` because it adds histogram samples to that
+pipeline; a second top-level capability would split one product contract.
 
 ### Automatic capture is conditional; manual capture remains valid
 

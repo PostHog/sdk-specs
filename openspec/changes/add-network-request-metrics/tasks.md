@@ -5,11 +5,11 @@
 - [ ] 1.1 Inspect the merged `posthog-js` network-request metrics change and record its metric name, unit, configuration, bounded attributes, exclusion rules, release version, and tests in the support record; verify a test request produces the expected Metrics series.
 - [ ] 1.2 Check the reference implementation for opt-out, disabled-state, shutdown, observer-error, and PostHog-ingestion exclusion behaviour; verify each result against the scenarios in `network-request-metrics`.
 
-## 2. Add specification and acceptance coverage
+## 2. Extend the Metrics specification
 
-- [ ] 2.1 Archive this OpenSpec change so `openspec/specs/network-request-metrics/spec.md` becomes the canonical contract; verify `openspec validate --specs --strict` passes.
-- [ ] 2.2 Add `acceptance/private/network-request-metrics.feature` for enabled capture, disabled/opt-out capture, sensitive-data exclusion, and PostHog-ingestion exclusion; verify every scenario maps to one contract scenario.
-- [ ] 2.3 Add Network Request Metrics to the root capability list with its scope and canonical status; verify the Markdown link resolves to the archived spec.
+- [ ] 2.1 Archive this OpenSpec change so its Network Request Timing requirement is synced into `openspec/specs/metrics/spec.md`; verify `openspec validate --specs --strict` passes.
+- [ ] 2.2 Keep the requirement scenarios in the Metrics spec as the contract test cases, matching the Metrics product-pipeline precedent; verify each scenario is testable against an SDK implementation.
+- [ ] 2.3 Update the Metrics capability description only if its scope needs to name automatic network-request timing; verify the root capability list remains a single Metrics entry.
 
 ## 3. Publish the support map
 

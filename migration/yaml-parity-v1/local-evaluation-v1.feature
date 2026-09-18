@@ -65,8 +65,7 @@ Feature: Native local equality across definitions reloads
         }
       }
       """
-    When local definitions are publicly reloaded and freshly ready within 5000 milliseconds
-    And the local flag getter is called with JSON arguments:
+    When the local flag getter is called with JSON arguments:
       """application/json
       {
         "key": "false_banana_exact",
@@ -620,8 +619,7 @@ Feature: Native local equality across definitions reloads
         }
       }
       """
-    When local definitions are publicly reloaded and freshly ready within 5000 milliseconds
-    And the local flag getter is called with JSON arguments:
+    When the local flag getter is called with JSON arguments:
       """application/json
       {
         "key": "false_banana_exact",
@@ -1175,8 +1173,7 @@ Feature: Native local equality across definitions reloads
         }
       }
       """
-    When local definitions are publicly reloaded and freshly ready within 5000 milliseconds
-    And the local flag getter is called with JSON arguments:
+    When the local flag getter is called with JSON arguments:
       """application/json
       {
         "key": "false_banana_exact",
@@ -1730,8 +1727,7 @@ Feature: Native local equality across definitions reloads
         }
       }
       """
-    When local definitions are publicly reloaded and freshly ready within 5000 milliseconds
-    And the local flag getter is called with JSON arguments:
+    When the local flag getter is called with JSON arguments:
       """application/json
       {
         "key": "false_banana_exact",
@@ -1791,7 +1787,7 @@ Feature: Native local equality across definitions reloads
         "property_matching_version": 2
       }}
       """
-    When local definitions are publicly reloaded and freshly ready within 5000 milliseconds
+    When local definitions are publicly reloaded within 5000 milliseconds
     And the local flag getter is called with JSON arguments:
       """application/json
       {
@@ -1852,7 +1848,7 @@ Feature: Native local equality across definitions reloads
         "property_matching_version": 1
       }}
       """
-    When local definitions are publicly reloaded and freshly ready within 5000 milliseconds
+    When local definitions are publicly reloaded within 5000 milliseconds
     And the local flag getter is called with JSON arguments:
       """application/json
       {
@@ -1913,7 +1909,7 @@ Feature: Native local equality across definitions reloads
         "property_matching_version": 2
       }}
       """
-    When local definitions are publicly reloaded and freshly ready within 5000 milliseconds
+    When local definitions are publicly reloaded within 5000 milliseconds
     And the local flag getter is called with JSON arguments:
       """application/json
       {
@@ -1973,7 +1969,7 @@ Feature: Native local equality across definitions reloads
         "cohorts": {"1": {"type": "AND", "values": [{"key": "id", "value": 2, "type": "cohort"}]}, "2": {"type": "OR", "values": [{"key": "value", "value": false, "operator": "exact", "type": "person"}]}, "3": {"type": "AND", "values": [{"key": "id", "value": 4, "type": "cohort"}]}, "4": {"type": "OR", "values": [{"key": "value", "value": false, "operator": "is_not", "type": "person"}]}}
       }}
       """
-    When local definitions are publicly reloaded and freshly ready within 5000 milliseconds
+    When local definitions are publicly reloaded within 5000 milliseconds
     And the local flag getter is called with JSON arguments:
       """application/json
       {

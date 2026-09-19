@@ -8,9 +8,9 @@ Feature: Autocapture
     And persistent storage is empty
     And the mock PostHog server is reset
 
-  Scenario: Eligible UI interaction emits an autocapture event
+  Scenario: Eligible browser click emits an autocapture event
     Given the SDK is initialized with token "test-token" and autocapture enabled
-    When the user interacts with an element described by:
+    When the user clicks a browser element described by:
       | field      | value        |
       | tag        | button       |
       | label      | Sign up      |
@@ -19,6 +19,20 @@ Feature: Autocapture
     And the enqueued event properties should include:
       | property       | value   |
       | $event_type    | click   |
+      | $screen_name   | Home    |
+    And the enqueued event should include sanitized element hierarchy metadata
+
+  Scenario: Eligible mobile touch emits an autocapture event
+    Given the SDK is initialized with token "test-token" and autocapture enabled
+    When the user taps a mobile element handled by touch autocapture described by:
+      | field      | value        |
+      | tag        | button       |
+      | label      | Sign up      |
+      | screen     | Home         |
+    Then one event named "$autocapture" should be enqueued
+    And the enqueued event properties should include:
+      | property       | value   |
+      | $event_type    | touch   |
       | $screen_name   | Home    |
     And the enqueued event should include sanitized element hierarchy metadata
 

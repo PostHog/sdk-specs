@@ -1,4 +1,26 @@
-## ADDED Requirements
+# Session Replay Debug Properties Specification
+
+## Purpose
+
+`session-replay-debug-properties` is the per-event debug snapshot of the session replay
+subsystem: the `$recording_status` property and the `$sdk_debug_*` keys an SDK attaches
+automatically to every captured event except `$snapshot`. It exists so that an event captured
+while replay was disabled, buffering, or active says so on the event itself — an `$exception`
+or custom event can then be read against the replay state at capture time without correlating
+against a separate signal.
+
+It is distinct from `is-session-replay-active`, which is a getter the caller invokes; these
+properties are attached without any caller action. The mobile SDKs (`posthog-ios`,
+`posthog-android`) and the hybrid SDKs that inherit their event pipeline are the primary
+conformance targets; `posthog-js` is the reference implementation, with the deliberate
+divergences called out inline.
+
+## Applicability
+
+`client` — browser and UI/mobile SDKs that own session replay capture. Server SDKs do not
+observe a session timeline and attach none of these keys.
+
+## Requirements
 
 ### Requirement: Attach debug properties to every captured event except `$snapshot`
 
@@ -124,11 +146,17 @@ oversight: the two keys measure genuinely different things (a retry-only backlog
 pending-send depth), so giving them the same name across SDKs would make the property misleading
 on whichever platform lacks a true retry-only queue.
 When the replay integration is installed, `$sdk_debug_replay_internal_buffer_length` SHALL
-report the replay queue's current depth, and `$sdk_debug_replay_flush_hold_reason` SHALL be
-present exactly when `$recording_status` is `buffering`, taking one value per hold cause: mobile
-SDKs use `awaiting_remote_config` and `below_minimum_duration` (browser's interaction-hold
-values are a distinct concept and out of scope for this spec, see the out-of-scope requirement);
-the key SHALL be absent (not present-and-empty) outside a `buffering` state.
+report the replay queue's current depth. Mobile SDKs SHALL attach
+`$sdk_debug_replay_flush_hold_reason` exactly when `$recording_status` is `buffering`, taking
+one value per hold cause (`awaiting_remote_config`, `below_minimum_duration`), and SHALL omit
+the key (not present-and-empty) outside a `buffering` state. This presence rule is mobile-only
+and a deliberate divergence from posthog-js: the browser recorder emits its interaction-hold
+reason while `$recording_status` still reads `active`
+(`lazy-loaded-session-recorder.ts:2746-2749`, test "names a fresh-start hold on captured events
+while the status still reads active"), because a held browser epoch is otherwise
+indistinguishable from an uploading one. That active-with-hold reporting and its values are
+governed by `session-replay-ingestion-controls` and the out-of-scope requirement below, not by
+this rule.
 
 `$sdk_debug_replay_linked_flag_trigger_status` and `$sdk_debug_replay_event_trigger_status`
 SHALL each report one of `trigger_activated` / `trigger_pending` / `trigger_disabled` — the same
@@ -219,8 +247,8 @@ manager's start unconditionally today).
   `$sdk_debug_current_session_duration`
 - **AND** `$recording_status` is still present
 
-#### Scenario: Hold reason is present only while buffering
-- **GIVEN** the replay integration is awaiting its first remote config
+#### Scenario: Mobile hold reason is present only while buffering
+- **GIVEN** a mobile SDK whose replay integration is awaiting its first remote config
 - **WHEN** an event is captured
 - **THEN** the event's `$recording_status` is `buffering`
 - **AND** `$sdk_debug_replay_flush_hold_reason` is `awaiting_remote_config`
@@ -364,10 +392,10 @@ test (repo plan row: the native "non-iOS" and "no handler" tests, `PostHogSDKTes
 
 ### Requirement: Stop and uninstall reset the reported state and clear any stale hold reason
 
-After session replay is stopped (an explicit `stopSessionRecording()`-equivalent call) or the
-replay integration is uninstalled, the SDK SHALL report `$recording_status: disabled` and SHALL
-NOT attach `$sdk_debug_replay_flush_hold_reason` on subsequently captured events, even if a hold
-reason was present immediately before the stop/uninstall. A getter or property-attach path that
+The SDK SHALL report `$recording_status: disabled` and SHALL NOT attach
+`$sdk_debug_replay_flush_hold_reason` on events captured after session replay is stopped (an
+explicit `stopSessionRecording()`-equivalent call) or the replay integration is uninstalled, even
+if a hold reason was present immediately before the stop/uninstall. A getter or property-attach path that
 runs after teardown but still surfaces a pre-teardown hold reason is a bug this requirement
 exists to rule out.
 
@@ -408,8 +436,8 @@ with no `flush_hold_reason` after `stop()` and after `uninstall()`), not yet in 
 
 ### Requirement: Debug keys describe the SDK state when the event occurred
 
-`$recording_status` and every `$sdk_debug_*` key describe the SDK's state at the moment the event
-occurred — for an ordinary event, the moment of capture. An event captured with an explicit
+`$recording_status` and every `$sdk_debug_*` key SHALL describe the SDK's state at the moment
+the event occurred — for an ordinary event, the moment of capture. An event captured with an explicit
 timestamp that precedes the current session's start did not occur in this session; the canonical
 case is an `$exception` reported on a later launch for a crash in a previous process (Android's
 NDK tombstone path in `PostHogNativeCrashIntegration`, iOS's PLCrashReporter reports). For such
@@ -451,8 +479,8 @@ branch) covers the persisted-snapshot arm.
 
 ### Requirement: Reconciliation with `is-session-replay-active` and `session-replay-ingestion-controls`
 
-`$recording_status` is a finer-grained signal than the boolean `isSessionReplayActive()` getter
-specified by `is-session-replay-active`: a `$recording_status` of `active` SHALL imply that
+The SDK SHALL keep `$recording_status` consistent with the boolean `isSessionReplayActive()`
+getter specified by `is-session-replay-active`: a `$recording_status` of `active` SHALL imply that
 getter returns `true`, and `disabled` SHALL imply it returns `false`. While
 `$recording_status` is `buffering`, this spec makes no claim about the boolean getter's return
 value — that getter's own spec governs its `buffering`-equivalent behavior per platform.
@@ -482,8 +510,9 @@ Reference: `is-session-replay-active` spec, `openspec/specs/is-session-replay-ac
 
 This spec SHALL NOT be read as requiring: browser-only keys with no mobile analog (e.g. anything the browser
 recorder emits that mobile has no equivalent concept for, including the browser's own
-interaction-hold `flush_hold_reason` values used for the idle-rotation/fresh-start withholding
-behavior specified separately in `session-replay-ingestion-controls`); the browser-only
+interaction-hold `flush_hold_reason` values, and their presence while `$recording_status` reads
+`active`, used for the idle-rotation/fresh-start withholding behavior specified separately in
+`session-replay-ingestion-controls`); the browser-only
 `$sdk_debug_replay_url_trigger_status` key (`constants.ts:118`,
 `SDK_DEBUG_REPLAY_URL_TRIGGER_STATUS`, set via `register_for_session` at
 `triggerMatching.ts:304`) — mobile has no URL-trigger concept; the browser-only

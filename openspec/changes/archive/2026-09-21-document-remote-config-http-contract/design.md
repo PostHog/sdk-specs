@@ -1,6 +1,6 @@
 ## Context
 
-The existing spec covers client-side project configuration but leaves its transport implicit. Browser SDKs can use preloaded configuration or a script instead of requesting JSON.
+The original spec covered client-side project configuration but left its transport implicit. The contract applies to any client or server SDK that implements project remote configuration. Browser SDKs can use preloaded configuration or a script instead of requesting JSON.
 
 Implementation evidence inspected locally (HEAD identifiers; working copies may differ):
 
@@ -11,9 +11,9 @@ Implementation evidence inspected locally (HEAD identifiers; working copies may 
 
 ## Goals / Non-Goals
 
-**Goals:** Make the JSON route, method, project-token use, regional routing, response shape, and client-only scope explicit and testable.
+**Goals:** Make the JSON route, method, project-token use, regional routing, response shape, and capability-based scope explicit and testable.
 
-**Non-Goals:** Require server SDK bootstrap requests; replace product schemas; standardize retries, timeout durations, HTTP-cache policies, or every optional response field.
+**Non-Goals:** Require SDKs without project remote configuration to implement it; replace product schemas; standardize retries, timeout durations, HTTP-cache policies, or every optional response field.
 
 ## Decisions
 

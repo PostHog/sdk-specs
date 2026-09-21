@@ -1,6 +1,7 @@
-@private @canonical_behavior @acceptance @remote_config @client
+@private @canonical_behavior @acceptance @remote_config @both
 Feature: Remote Config
-  Acceptance tests for the canonical remote config behavior across PostHog SDKs.
+  Acceptance specifications for client and server SDKs that implement project remote configuration.
+  SDKs without this capability are out of scope. Feature-specific scenarios apply only where supported.
 
   Background:
     Given a fresh SDK acceptance test harness

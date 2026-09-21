@@ -1,11 +1,11 @@
 ## 1. Review the contract
 
-- [x] 1.1 Review the proposed transport, response, browser-delivery, and server-scope requirements against the implementation evidence in design.md.
+- [x] 1.1 Review the proposed transport, response, browser-delivery, and capability-based scope requirements against the implementation evidence in design.md.
 - [x] 1.2 Confirm the proposal is approved before applying and archiving it.
 
 ## 2. Acceptance coverage
 
-- [x] 2.1 Add client-only Gherkin scenarios to acceptance/private/remote-config.feature for bodyless GET, public project token, US/EU asset routing, and custom base-path preservation.
+- [x] 2.1 Add Gherkin scenarios for client and server SDKs that implement project remote configuration to acceptance/private/remote-config.feature for bodyless GET, public project token, US/EU asset routing, and custom base-path preservation.
 - [x] 2.2 Add response scenarios using real JSON wire fields, including unknown and omitted optional fields, and preserve existing behavioral scenarios.
 - [x] 2.3 Cover the browser preloaded-config exception without requiring script execution in native SDKs.
 

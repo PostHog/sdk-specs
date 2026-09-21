@@ -17,8 +17,8 @@ None.
 
 ### Modified Capabilities
 
-- `remote-config`: Add the missing HTTP transport and response contract to the existing client-only capability.
+- `remote-config`: Add the missing HTTP transport and response contract. Scope applicability to all client and server SDKs that implement project remote configuration, with feature-specific configuration applied only where supported.
 
 ## Impact
 
-Specs and acceptance scenarios only; no SDK implementation changes or new dependencies. Affects `remote-config` documentation and `acceptance/private/remote-config.feature`. Server SDKs are not newly required to fetch project configuration.
+Specs and acceptance scenarios only; no SDK implementation changes or new dependencies. Affects `remote-config` documentation and `acceptance/private/remote-config.feature`. SDKs without this capability are not newly required to implement it.

@@ -2,12 +2,12 @@
 
 ### Requirement: Project remote-config HTTP request
 
-When a client SDK fetches the JSON representation of project remote configuration, it SHALL send `GET {assetBase}/array/{projectKey}/config` with no request body. `{projectKey}` SHALL be the public project token configured at SDK initialization, not a personal API key or secret key. The endpoint SHALL NOT require a personal API key, secret key, or SDK-generated bearer Authorization header. Caller-configured headers for a reverse proxy remain permitted.
+When an SDK that implements project remote configuration fetches the JSON representation of project remote configuration, it SHALL send `GET {assetBase}/array/{projectKey}/config` with no request body. `{projectKey}` SHALL be the public project token configured at SDK initialization, not a personal API key or secret key. The endpoint SHALL NOT require a personal API key, secret key, or SDK-generated bearer Authorization header. Caller-configured headers for a reverse proxy remain permitted.
 
 The request SHALL NOT require user identity, groups, or person properties. These belong to feature-flag evaluation, not this project-level configuration fetch. This contract does not mandate a request `Content-Type` header for the bodyless GET; SDKs can retain existing JSON or platform headers.
 
 #### Scenario: Fetch project configuration without user credentials
-- **GIVEN** a client SDK initialized with project token `phc_test`
+- **GIVEN** an SDK that implements project remote configuration initialized with project token `phc_test`
 - **WHEN** it fetches the JSON project configuration
 - **THEN** it sends a GET request to `/array/phc_test/config` on the resolved asset base
 - **AND** the request has no body and requires neither a personal API key nor a secret key
@@ -65,7 +65,7 @@ This is not an exhaustive schema and does not require every SDK to implement eve
 
 ### Requirement: Project configuration delivery and scope
 
-This HTTP contract SHALL apply to the existing client-only project remote-config capability.
+This HTTP contract SHALL apply to all client and server SDKs that implement project remote configuration. It SHALL NOT require SDKs without this capability to implement it. SDKs SHALL apply configuration only for features they support.
 
 Browser SDKs SHALL remain permitted to consume project configuration embedded in a token-specific loader or delivered through `/array/{projectKey}/config.js` instead of issuing a redundant JSON GET. The script response is JavaScript, not the JSON representation specified above. These alternatives do not require non-browser SDKs to execute JavaScript.
 

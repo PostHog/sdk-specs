@@ -41,3 +41,31 @@ Feature: Get Feature Flag Result
     And cached feature flags are empty
     When get feature flag result "missing-flag" is called
     Then no feature flag result should be returned
+
+  # serialized_payload_json encodes the serialized input as a JSON string.
+  @both
+  Scenario Outline: Invalid payload does not change the evaluated flag result
+    Given the SDK is initialized with token "test-token"
+    And flag "checkout" has JSON value <value> with these serialized payload bytes:
+      | serialized_payload_json |
+      | <input>                 |
+    When get feature flag result "checkout" is called
+    Then the returned feature flag result should include:
+      | field   | value     |
+      | key     | checkout  |
+      | enabled | <enabled> |
+    And its variant should equal the JSON value <variant> or be absent when null
+    And its payload should be absent or the language's no-payload value
+    When get feature flag "checkout" is called
+    Then the returned flag value should equal the JSON value <value>
+    When is feature enabled "checkout" is called
+    Then the returned enabled state should be <enabled>
+    And no exception should be thrown by any of these calls
+
+    Examples:
+      | value  | input     | enabled | variant |
+      | "blue" | "{broken" | true    | "blue"  |
+      | "blue" | ""        | true    | "blue"  |
+      | "blue" | "   "     | true    | "blue"  |
+      | false  | "{broken" | false   | null    |
+      | false  | ""        | false   | null    |

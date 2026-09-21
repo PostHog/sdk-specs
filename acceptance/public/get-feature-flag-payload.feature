@@ -35,3 +35,48 @@ Feature: Get Feature Flag Payload
       | checkout | true  | {"enabled":1} |
     When get feature flag payload "checkout" is called
     Then no event named "$feature_flag_called" should be enqueued
+
+  # serialized_payload_json is a JSON string encoding the exact serialized input bytes.
+  @both
+  Scenario Outline: Malformed serialized payload returns no payload
+    Given the SDK is initialized with token "test-token"
+    And flag "checkout" has value "blue" with these serialized payload bytes:
+      | serialized_payload_json |
+      | <input>                 |
+    When get feature flag payload "checkout" is called without an explicit default
+    Then the returned payload should be the language's no-payload value
+    And the raw serialized string should not be returned
+    And no exception should be thrown
+
+    Examples:
+      | input       |
+      | "{broken"   |
+      | ""          |
+      | "   "       |
+
+  @both
+  Scenario Outline: Valid JSON payload values retain their decoded types
+    Given the SDK is initialized with token "test-token"
+    And flag "checkout" has value "blue" with these serialized payload bytes:
+      | serialized_payload_json |
+      | <input>                 |
+    When get feature flag payload "checkout" is called
+    Then the returned payload should equal the JSON value <expected>
+    And no exception should be thrown
+
+    Examples:
+      | input                       | expected          |
+      | "\"hello\""                 | "hello"           |
+      | "\"\""                      | ""                |
+      | "false"                     | false             |
+      | "0"                         | 0                 |
+      | "null"                      | null              |
+      | "{\"color\":\"green\"}"       | {"color":"green"} |
+      | "[1,false]"                 | [1,false]         |
+
+  @both
+  Scenario: Already-decoded string is not parsed a second time
+    Given the SDK is initialized with token "test-token"
+    And flag "checkout" has value "blue" and an already-decoded string payload "hello"
+    When get feature flag payload "checkout" is called
+    Then the returned payload should equal the JSON value "hello"

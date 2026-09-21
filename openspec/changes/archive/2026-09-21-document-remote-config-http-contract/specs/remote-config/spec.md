@@ -65,7 +65,7 @@ This is not an exhaustive schema and does not require every SDK to implement eve
 
 ### Requirement: Project configuration delivery and scope
 
-This HTTP contract SHALL apply to the existing client-only project remote-config capability. It SHALL NOT require Node or other server SDKs to fetch project configuration at initialization. The server-side per-flag `getRemoteConfigPayload` API (`/api/projects/@current/feature_flags/{flagKey}/remote_config`) and `/flags` evaluation are separate contracts, not alternative names for `/array/{projectKey}/config`.
+This HTTP contract SHALL apply to the existing client-only project remote-config capability.
 
 Browser SDKs SHALL remain permitted to consume project configuration embedded in a token-specific loader or delivered through `/array/{projectKey}/config.js` instead of issuing a redundant JSON GET. The script response is JavaScript, not the JSON representation specified above. These alternatives do not require non-browser SDKs to execute JavaScript.
 
@@ -73,8 +73,3 @@ Browser SDKs SHALL remain permitted to consume project configuration embedded in
 - **GIVEN** the browser SDK has valid preloaded project configuration from its token-specific loader
 - **WHEN** it initializes its remote-config subsystem
 - **THEN** it can apply that configuration without requesting `/array/{projectKey}/config`
-
-#### Scenario: Server-side per-flag payload retrieval is not project bootstrap
-- **WHEN** a server SDK explicitly retrieves a per-flag remote-config payload
-- **THEN** that operation is outside this client project-config HTTP contract
-- **AND** it does not imply a requirement to request `/array/{projectKey}/config`

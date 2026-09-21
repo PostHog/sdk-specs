@@ -1,13 +1,12 @@
 ## Why
 
-The remote-config spec describes fetching project settings but omits the HTTP contract. SDK implementers cannot derive the route, method, credentials, asset-host selection, or wire field names from it, and may confuse this API with server-side per-flag remote-config payloads.
+The remote-config spec describes fetching project settings but omits the HTTP contract. SDK implementers cannot derive the route, method, credentials, asset-host selection, or wire field names from it.
 
 ## What Changes
 
 - Document `GET /array/{projectKey}/config`, request-body and authentication expectations, regional asset hosts, and custom-host preservation.
 - Describe the JSON response envelope and representative wire fields without duplicating product-specific schemas.
 - Preserve browser preloaded/script configuration as a supported alternative to the JSON request.
-- Explicitly distinguish client project configuration from server SDK `getRemoteConfigPayload` and flag evaluation.
 - Add concrete HTTP acceptance scenarios after proposal review.
 
 ## Capabilities

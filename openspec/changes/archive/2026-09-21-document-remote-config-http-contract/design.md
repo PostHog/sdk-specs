@@ -1,10 +1,10 @@
 ## Context
 
-The existing spec covers client-side project configuration but leaves its transport implicit. The Node SDK's explicit per-flag `getRemoteConfigPayload` API is unrelated. Browser SDKs can use preloaded configuration or a script instead of requesting JSON.
+The existing spec covers client-side project configuration but leaves its transport implicit. Browser SDKs can use preloaded configuration or a script instead of requesting JSON.
 
 Implementation evidence inspected locally (HEAD identifiers; working copies may differ):
 
-- posthog-js `3e72e7bb7`: `packages/core/src/posthog-core-stateless.ts#getRemoteConfig`, `packages/core/src/types.ts#PostHogRemoteConfig`, `packages/browser/src/remote-config.ts`, and `packages/node/src/client.ts#_requestRemoteConfigPayload`.
+- posthog-js `3e72e7bb7`: `packages/core/src/posthog-core-stateless.ts#getRemoteConfig`, `packages/core/src/types.ts#PostHogRemoteConfig`, and `packages/browser/src/remote-config.ts`.
 - posthog-android `05bf361a`: `posthog/src/main/java/com/posthog/internal/PostHogApi.kt#remoteConfig`.
 - posthog-ios `143d8337e`: `PostHog/PostHogApi.swift#getRemoteConfigRequest`.
 - posthog backend `fbc9fc94a9e`: `posthog/models/remote_config.py` generates real camelCase config fields and invalidates both `/config` and `/config.js` CDN resources.
@@ -13,7 +13,7 @@ Implementation evidence inspected locally (HEAD identifiers; working copies may 
 
 **Goals:** Make the JSON route, method, project-token use, regional routing, response shape, and client-only scope explicit and testable.
 
-**Non-Goals:** Require server SDK bootstrap requests; specify per-flag encrypted payload retrieval; replace product schemas; standardize retries, timeout durations, HTTP-cache policies, or every optional response field.
+**Non-Goals:** Require server SDK bootstrap requests; replace product schemas; standardize retries, timeout durations, HTTP-cache policies, or every optional response field.
 
 ## Decisions
 
@@ -28,7 +28,6 @@ Implementation evidence inspected locally (HEAD identifiers; working copies may 
 
 - A full response-schema snapshot would become stale → document the envelope and common fields, allow unknown fields, and defer product detail to existing specs.
 - Host rules could bypass reverse proxies → preserve nonstandard hosts and configured base paths.
-- Calling both APIs “remote config” could imply Node support → explicitly exclude the server-side per-flag API from this client contract.
 
 ## Migration Plan
 

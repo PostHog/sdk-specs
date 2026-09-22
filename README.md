@@ -16,6 +16,14 @@ The `acceptance/` directory contains Gherkin feature files for cross-SDK accepta
 shared internal SDK behavior such as batching, storage, feature flags, sessions, and replay.
 Tags on each feature indicate whether scenarios apply to client SDKs, server SDKs, or both.
 
+`black-box/public/` adds public-operation delivery scenarios for server `identify` and
+`alias`. They call the SDK, flush, and inspect mock-server traffic using the draft2
+harness. These checks observe delivered events, not internal queue state; they do
+not replace the corresponding `acceptance/public/` scenarios. Each case has a stable
+`@case:` identity and explicit `@sdk:server` applicability. Select these feature
+paths explicitly when running the harness; they are not part of the YAML migration
+suite.
+
 ## Capabilities
 
 | Capability | Spec | Scope | Status |

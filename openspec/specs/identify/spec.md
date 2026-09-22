@@ -125,7 +125,7 @@ identify(
 2. **Build the event.** `event = '$identify'`, `distinct_id = caller-provided`, `$set = caller-provided properties` (or, depending on SDK, `$set = properties` and `$set_once` from a separate option).
 3. **Enrich.** Standard server enrichment: `$lib`, `$lib_version`, possibly `$geoip_disable`.
 4. **Run `before_send` (if configured)**, same as `capture`.
-5. **Enqueue.** Same batching queue as `capture`.
+5. **Submit for delivery.** Use the SDK's normal capture pipeline; a public flush makes the event observable at the receiver regardless of whether this SDK queues or sends immediately.
 6. **Return.** Varies by SDK (UUID / bool / void).
 
 ## State & lifecycle
@@ -208,18 +208,23 @@ The SDK SHALL implement the canonical `identify` behavior described by this spec
 - **AND** one event named "$set" should be enqueued
 - **AND** no event named "$identify" should be enqueued
 
-#### Scenario: Server identify sends a profile update for explicit distinct id (@server)
-- **GIVEN** a fresh SDK acceptance test harness
-- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
-- **AND** persistent storage is empty
-- **AND** the mock PostHog server is reset
-- **GIVEN** the SDK is initialized with token "test-token"
-- **WHEN** identify is called with distinct id "user-123" and properties:
-  | property | value          |
-  | email    | user@test.test |
-- **THEN** one event named "$identify" should be enqueued
-- **AND** the enqueued event distinct id should be "user-123"
-- **AND** the enqueued event property "$set.email" should equal "user@test.test"
+#### Scenario: Server identify delivers a profile update for explicit distinct id (@server)
+- **GIVEN** an isolated SDK instance and a fresh receiver
+- **AND** the SDK is initialized with token "test-token" and flush threshold 20
+- **WHEN** identify is called with distinct id "user-123" and properties `{ "email": "user@test.test", "active": false, "score": 0, "note": null }`
+- **AND** pending captures are flushed
+- **THEN** exactly one capture request contains exactly one `$identify` event
+- **AND** the received event's root `distinct_id` equals `user-123`
+- **AND** its `$set` equals the supplied JSON object, preserving boolean, numeric and null values
+
+#### Scenario: Server identify delivers nested user properties (@server)
+- **GIVEN** an isolated SDK instance and a fresh receiver
+- **AND** the SDK is initialized with token "test-token" and flush threshold 20
+- **WHEN** identify is called with distinct id "user-456" and properties `{ "preferences": { "theme": "dark" }, "tags": ["beta", "team"] }`
+- **AND** pending captures are flushed
+- **THEN** exactly one capture request contains exactly one `$identify` event
+- **AND** the received event's root `distinct_id` equals `user-456`
+- **AND** its `$set` equals the supplied nested JSON object
 
 #### Scenario: Identify validates distinct id (@both)
 - **GIVEN** a fresh SDK acceptance test harness

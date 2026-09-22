@@ -4,8 +4,8 @@
 SDK must satisfy so behavior stays on par across platforms (Android, iOS, React Native,
 JavaScript/Web, Flutter, …).
 
-This repo holds **specs and proposals only — no SDK code.** Implementations live in their own
-repos (`posthog-android`, `posthog-ios`, `posthog-js`, `posthog-flutter`, …). Each spec here is
+This repo holds **specs and archived change history, not proposal-only RFCs or SDK code.**
+Implementations live in their own repos (`posthog-android`, `posthog-ios`, `posthog-js`, `posthog-flutter`, …). Each spec here is
 the canonical behavior derived from the shipped implementations plus the relevant backend
 service, stating the **winner** wherever SDKs currently diverge.
 
@@ -108,7 +108,7 @@ openspec/
 ├── config.yaml                workflow schema and artifact rules
 ├── project.md                 project context + conventions
 ├── specs/<capability>/spec.md current truth (one folder per capability)
-└── changes/                   in-flight proposals; archive/ holds finished ones
+└── changes/                   in-flight changes; archive/ holds finished ones
 ```
 
 Workflow (OpenSpec CLI + `/opsx` agent commands):
@@ -120,8 +120,13 @@ Workflow (OpenSpec CLI + `/opsx` agent commands):
 3. **Archive** — `/opsx:archive` syncs the delta into `specs/<capability>/spec.md` and moves the
    change to `changes/archive/YYYY-MM-DD-<name>/`.
 
-All three steps happen on one branch: once review approves the proposal, apply and archive on
-the same PR so it merges already archived.
+All three steps happen on one branch and in the same PR. Before merging, sync the delta into
+`openspec/specs/` and archive the change. Do not merge proposal-only PRs or defer applying and
+archiving to a follow-up PR.
+
+Archived `proposal.md` files record change history, not active RFCs. Archiving means the spec
+change is complete; SDK implementations live in their own repositories and do not need to be
+complete before the spec change is archived. See [AGENTS.md](AGENTS.md) for agent instructions.
 
 Two kinds of change:
 - **New capability** → `add-<capability>` (e.g. `add-feature-flags`) creates a new spec folder.

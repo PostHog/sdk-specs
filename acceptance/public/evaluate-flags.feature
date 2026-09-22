@@ -484,3 +484,40 @@ Feature: Evaluate Flags
     When snapshot enablement is read for "beta-ui"
     Then the returned enabled value for "beta-ui" should be false
     And no event named "$feature_flag_called" should be enqueued
+
+  @evaluation_runtime_capable
+  Scenario: Runtime read is a silent lookup of the local definition
+    Given local feature flag definitions resolve "client-flag" for distinct id "user-123" as true
+    And the local feature flag definition for "client-flag" reports evaluation runtime "client"
+    And local feature flag definitions resolve "legacy-flag" for distinct id "user-123" as true
+    And the local feature flag definition for "legacy-flag" reports no evaluation runtime
+    When evaluate flags is called for distinct id "user-123"
+    And snapshot evaluation runtime is read for "client-flag"
+    And snapshot evaluation runtime is read for "legacy-flag"
+    Then the returned evaluation runtime for "client-flag" should be "client"
+    And the returned evaluation runtime for "legacy-flag" should be absent
+    And no remote feature flag evaluation request should have been sent
+    And no event named "$feature_flag_called" should be enqueued
+    And snapshot only accessed should return no flags
+
+  @evaluation_runtime_capable
+  Scenario: Remote fallback keeps the local definition's runtime
+    Given local feature flag definitions cannot resolve "gated-flag" for distinct id "user-123"
+    And the local feature flag definition for "gated-flag" reports evaluation runtime "all"
+    And remote feature flag evaluation for distinct id "user-123" returns:
+      | key        | value |
+      | gated-flag | true  |
+    When evaluate flags is called for distinct id "user-123"
+    Then the snapshot should contain "gated-flag" with value true
+    And the returned evaluation runtime for "gated-flag" should be "all"
+
+  @evaluation_runtime_capable
+  Scenario: Flag without a local definition has no runtime
+    Given no local feature flag definition is loaded for "remote-only-flag"
+    And remote feature flag evaluation for distinct id "user-123" returns:
+      | key              | value |
+      | remote-only-flag | true  |
+    When evaluate flags is called for distinct id "user-123"
+    Then the snapshot should contain "remote-only-flag" with value true
+    And the returned evaluation runtime for "remote-only-flag" should be absent
+    And the returned evaluation runtime for "missing-flag" should be absent

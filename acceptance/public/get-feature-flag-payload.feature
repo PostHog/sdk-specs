@@ -40,7 +40,7 @@ Feature: Get Feature Flag Payload
   @both
   Scenario Outline: Malformed serialized payload returns no payload
     Given the SDK is initialized with token "test-token"
-    And flag "checkout" has value "blue" with these serialized payload bytes:
+    And flag "checkout" has JSON value "blue" with these serialized payload bytes:
       | serialized_payload_json |
       | <input>                 |
     When get feature flag payload "checkout" is called without an explicit default
@@ -57,7 +57,7 @@ Feature: Get Feature Flag Payload
   @both
   Scenario Outline: Valid JSON payload values retain their decoded types
     Given the SDK is initialized with token "test-token"
-    And flag "checkout" has value "blue" with these serialized payload bytes:
+    And flag "checkout" has JSON value "blue" with these serialized payload bytes:
       | serialized_payload_json |
       | <input>                 |
     When get feature flag payload "checkout" is called
@@ -75,8 +75,31 @@ Feature: Get Feature Flag Payload
       | "[1,false]"                 | [1,false]         |
 
   @both
-  Scenario: Already-decoded string is not parsed a second time
+  Scenario Outline: Already-decoded string is not parsed a second time
     Given the SDK is initialized with token "test-token"
-    And flag "checkout" has value "blue" and an already-decoded string payload "hello"
+    And flag "checkout" has JSON value "blue" and an already-decoded string payload <payload>
     When get feature flag payload "checkout" is called
-    Then the returned payload should equal the JSON value "hello"
+    Then the returned payload should equal the JSON value <payload>
+
+    Examples:
+      | payload |
+      | "hello" |
+      | "123"   |
+      | "true"  |
+
+  @payload_default_capable
+  Scenario Outline: Malformed payload uses the caller default
+    Given the SDK is initialized with token "test-token"
+    And flag "checkout" has JSON value "blue" with these serialized payload bytes:
+      | serialized_payload_json |
+      | <input>                 |
+    When get feature flag payload "checkout" is called with default value "fallback"
+    Then the returned payload should equal the JSON value "fallback"
+    And the raw serialized string should not be returned
+    And no exception should be thrown
+
+    Examples:
+      | input     |
+      | "{broken" |
+      | ""        |
+      | "   "     |

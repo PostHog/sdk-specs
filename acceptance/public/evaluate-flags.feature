@@ -9,6 +9,32 @@ Feature: Evaluate Flags
     And the mock PostHog server is reset
     And the SDK is initialized with token "test-token"
 
+  # serialized_payload_json encodes the serialized input as a JSON string.
+  Scenario Outline: Snapshot payload reads reject malformed JSON
+    Given feature flags are supplied through <source> with these serialized payload bytes:
+      | key      | value | serialized_payload_json |
+      | checkout | blue  | <input>                 |
+      | beta-ui  | true  | "{\"color\":\"green\"}"   |
+    When evaluate flags is called for distinct id "user-123"
+    And snapshot payload is read for "checkout"
+    Then the returned payload should be the language's no-payload value
+    And the raw serialized string should not be returned
+    And no exception should be thrown
+    And reading the payload should not send a feature flag network request
+    And no event named "$feature_flag_called" should be enqueued
+    And "checkout" should not be added to the snapshot's accessed-key set
+    And the snapshot should retain flag "checkout" with value "blue"
+    And the snapshot should retain the valid payload for "beta-ui" in the platform's documented representation
+
+    Examples:
+      | source            | input     |
+      | local evaluation  | "{broken" |
+      | local evaluation  | ""        |
+      | local evaluation  | "   "     |
+      | remote evaluation | "{broken" |
+      | remote evaluation | ""        |
+      | remote evaluation | "   "     |
+
   Scenario: One evaluation snapshot powers multiple flag branches
     Given remote feature flag evaluation for distinct id "user-123" returns:
       | key      | value |

@@ -521,3 +521,27 @@ Feature: Evaluate Flags
     Then the snapshot should contain "remote-only-flag" with value true
     And the returned evaluation runtime for "remote-only-flag" should be absent
     And the returned evaluation runtime for "missing-flag" should be absent
+
+  @evaluation_runtime_capable
+  Scenario: Runtime filter keeps the requested runtimes and drops unknown ones
+    Given local feature flag definitions resolve for distinct id "user-123":
+      | key         | value |
+      | client-flag | true  |
+      | all-flag    | true  |
+      | server-flag | true  |
+      | legacy-flag | true  |
+    And the local feature flag definition for "client-flag" reports evaluation runtime "client"
+    And the local feature flag definition for "all-flag" reports evaluation runtime "all"
+    And the local feature flag definition for "server-flag" reports evaluation runtime "server"
+    And the local feature flag definition for "legacy-flag" reports no evaluation runtime
+    When evaluate flags is called for distinct id "user-123"
+    And the snapshot is filtered to evaluation runtimes "client" and "all"
+    Then the filtered snapshot should contain flags:
+      | key         | value |
+      | client-flag | true  |
+      | all-flag    | true  |
+    And the filtered snapshot should not contain "server-flag"
+    And the filtered snapshot should not contain "legacy-flag"
+    And no remote feature flag evaluation request should have been sent
+    And no event named "$feature_flag_called" should be enqueued
+    And snapshot only accessed should return no flags

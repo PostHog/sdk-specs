@@ -8,7 +8,8 @@ A server that bootstraps a client SDK cannot tell which flags are safe to forwar
 - Define when the value is present: for every flag with a loaded local definition that reports the field, whether the value resolved locally or was filled from `/flags`.
 - Define when the value is absent: an unknown key, a definition without the field, or a flag with no local definition, because `/flags` does not report the runtime. Absent means unknown; the SDK does not substitute a default.
 - Make the read silent, like the payload accessor: no evaluation request, no accessed-key tracking, no `$feature_flag_called`.
-- Add matching acceptance scenarios under an `@evaluation_runtime_capable` tag.
+- Add an optional runtime criterion to the in-memory snapshot filter, so `only(filter)` can select the flags to forward to a client. Unknown runtimes never match.
+- Add matching acceptance scenarios under an `@evaluation_runtime_capable` tag, including the filter.
 
 ## Capabilities
 

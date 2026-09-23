@@ -275,6 +275,8 @@ The accessor SHALL return the platform's nullish sentinel when the key is not in
 
 Reading the runtime SHALL use only the snapshot and SHALL NOT issue a flag-evaluation request, mark the flag as accessed for `onlyAccessed()`, or emit `$feature_flag_called`.
 
+An SDK that exposes the accessor MAY also expose a runtime criterion on its in-memory snapshot filter (for example `only(filter)` with an `evaluationRuntimes` field, alongside the explicit-key filter). The filtered snapshot SHALL keep a flag only when its runtime is one of the requested values; a flag whose runtime is unknown SHALL NOT match a runtime criterion. When the filter also carries explicit keys, a flag SHALL satisfy every criterion set. The filter follows the in-memory filtering rules: no evaluation, no network I/O, no access tracking, and no `$feature_flag_called`. Callers that want to keep flags with an unknown runtime use the accessor and filter by key.
+
 #### Scenario: Runtime read is a silent lookup of the local definition (@evaluation_runtime_capable)
 - **GIVEN** local feature flag definitions resolve "client-flag" for distinct id "user-123" as true
 - **AND** the local feature flag definition for "client-flag" reports evaluation runtime "client"
@@ -308,6 +310,15 @@ Reading the runtime SHALL use only the snapshot and SHALL NOT issue a flag-evalu
 - **THEN** the snapshot should contain "remote-only-flag" with value true
 - **AND** the returned evaluation runtime for "remote-only-flag" should be absent
 - **AND** the returned evaluation runtime for "missing-flag" should be absent
+
+#### Scenario: Runtime filter keeps the requested runtimes and drops unknown ones (@evaluation_runtime_capable)
+- **GIVEN** a snapshot contains "client-flag" with evaluation runtime "client", "all-flag" with evaluation runtime "all", "server-flag" with evaluation runtime "server", and "legacy-flag" with no evaluation runtime
+- **WHEN** the snapshot is filtered to evaluation runtimes "client" and "all"
+- **THEN** the filtered snapshot contains "client-flag" and "all-flag"
+- **AND** it does not contain "server-flag" or "legacy-flag"
+- **AND** no feature-flag evaluation request is made
+- **AND** no `$feature_flag_called` event is emitted
+- **AND** the parent snapshot's accessed-key set is unchanged
 
 ### Requirement: Lazy feature-flag access tracking
 

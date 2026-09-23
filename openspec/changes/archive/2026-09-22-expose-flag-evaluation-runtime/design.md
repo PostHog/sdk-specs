@@ -15,6 +15,7 @@ Non-goals: have the SDK filter flags by runtime, declare the runtime on `/flags`
 - **Local definition wins over remote absence.** A flag that fell back to `/flags` keeps its local definition's runtime. Otherwise a `"client"` flag whose value needed one missing person property would look unknown, and a bootstrap filter would drop it.
 - **Absent is unknown, never a default.** `null` is not `"all"`. Treating it as client-safe would forward server-only flags on an older deployment that does not report the field.
 - **Silent read.** Same rules as the payload accessor: reading the runtime is bookkeeping, not use of the flag's value.
+- **Filter on the snapshot, not on `evaluateFlags`.** The server still branches on and captures with the full snapshot, so a runtime-scoped evaluation would mean evaluating twice per request. The runtime is a definition property, not an input to `/flags`, so the SDK would evaluate everything and drop keys afterwards anyway. A criterion on the existing in-memory filter does that without a second evaluation, and composes with the key filter. It excludes unknown runtimes; the accessor remains for callers who want them.
 
 ## Risks / Trade-offs
 

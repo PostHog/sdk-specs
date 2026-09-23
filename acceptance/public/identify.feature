@@ -1,8 +1,8 @@
-@public @canonical_behavior @acceptance @identify @both
+@public @canonical_behavior @acceptance @identify
 Feature: Identify
   Acceptance tests for the canonical identify behavior across PostHog SDKs.
 
-  @server @sdk:server @case:acceptance:server:identify:<case_id>
+  @sdk:server @case:acceptance:server:identify:<case_id>
   Scenario Outline: Server identify sends a profile update for explicit distinct id
     Given an isolated SDK instance
     And the SDK is initialized with token "test-token" and flush threshold 20
@@ -41,8 +41,24 @@ Feature: Identify
       | $anon_distinct_id    | anon-123       |
       | $set.email           | user@test.test |
 
-  @both
-  Scenario: Identify validates distinct id
+  @sdk:server
+  Scenario: Server identify without explicit or contextual identity generates a personless UUID
+    Given an isolated SDK instance
+    And the SDK is initialized with token "test-token" and flush threshold 20
+    When identify is called with JSON arguments:
+      """application/json
+      {"set":{"source":"server"}}
+      """
+    And pending captures are flushed
+    Then exactly 1 capture request should have been received
+    And the first request should contain exactly 1 parsed events
+    And the first received event field "event" should equal "$identify"
+    And the first received event field "distinct_id" should be a UUID
+    And the first received event property "$set" should equal JSON {"source":"server"}
+    And the first received identify event disables person-profile processing
+
+  @client
+  Scenario: Client identify validates missing distinct id
     Given a fresh SDK acceptance test harness
     And the SDK clock is fixed at "2025-01-01T00:00:00Z"
     And persistent storage is empty

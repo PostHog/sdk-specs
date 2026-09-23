@@ -1,8 +1,8 @@
-@public @canonical_behavior @acceptance @alias @both
+@public @canonical_behavior @acceptance @alias
 Feature: Alias
   Acceptance tests for the canonical alias behavior across PostHog SDKs.
 
-  @server @sdk:server @case:acceptance:server:alias:<case_id>
+  @sdk:server @case:acceptance:server:alias:<case_id>
   Scenario Outline: Server alias links explicit previous and new identities
     Given an isolated SDK instance
     And the SDK is initialized with token "test-token" and flush threshold 20

@@ -19,10 +19,12 @@ Tags on each feature indicate whether scenarios apply to client SDKs, server SDK
 The server cases in `acceptance/public/identify.feature` and
 `acceptance/public/alias.feature` call the SDK, flush, and inspect mock-server
 traffic using the draft2 harness. They check delivery rather than private queue
-state. Each server example has a stable `@case:` identity and explicit
-`@sdk:server` applicability; select those case IDs to run the supported scope.
-Other cases in those features retain their client/validation preconditions and
-are not part of the YAML migration suite.
+state. Migrated server scenarios use `@sdk:server` for adapter-declared SDK type
+selection; the parameterized examples have per-row `@case:` labels. An ordinary
+single-case scenario needs no authored case ID. Unmigrated client and negative
+scenarios retain their preconditions and are not selected by the opt-in tags.
+The YAML-parity scenarios use the same Gherkin harness but retain their own
+capability-driven selection.
 
 ## Capabilities
 

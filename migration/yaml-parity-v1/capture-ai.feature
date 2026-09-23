@@ -1,4 +1,4 @@
-@public @acceptance @both @capture-ai @api_capture_ai_v0 @requires:capture_ai_v0
+@public @acceptance @capture-ai @api_capture_ai_v0 @requires:capture_ai_v0
 Feature: AI capture YAML parity
   AI v0 applicability is independent of runtime and the analytics protocol.
 
@@ -7,7 +7,6 @@ Feature: AI capture YAML parity
     And the mock PostHog server is reset
     And the SDK is initialized with token "phc_test_key" and flush threshold 1
 
-  @case:migration:yaml-parity-v1:capture_ai:capture_ai_posts_to_ai_endpoint
   Scenario: AI capture uses the dedicated v0 endpoint
     When capture_ai is called with JSON arguments:
       """application/json
@@ -20,7 +19,6 @@ Feature: AI capture YAML parity
       | /i/v0/ai/batch/ |
     And the first received event field "event" should equal "$ai_generation"
 
-  @case:migration:yaml-parity-v1:capture_ai:capture_does_not_reroute_ai_named_events
   Scenario: Ordinary capture does not reroute AI-named events
     When capture is called with JSON arguments:
       """application/json
@@ -34,7 +32,6 @@ Feature: AI capture YAML parity
       | /i/v1/analytics/events |
     And no capture request should use "/i/v0/ai/batch/"
 
-  @case:migration:yaml-parity-v1:capture_ai:capture_ai_event_has_uuid
   Scenario: AI capture returns the generated wire UUID
     When capture_ai is called with JSON arguments:
       """application/json
@@ -45,7 +42,6 @@ Feature: AI capture YAML parity
     Then the first received event UUID should be valid
     And the AI capture return should equal the first received event UUID
 
-  @case:migration:yaml-parity-v1:capture_ai:capture_ai_keeps_supplied_uuid
   Scenario: AI capture preserves a supplied UUID in its return and on the wire
     When capture_ai is called with JSON arguments:
       """application/json
@@ -57,7 +53,6 @@ Feature: AI capture YAML parity
     Then the first received event field "uuid" should equal "0198c0de-0000-7000-8000-000000000abc"
     And the AI capture return should equal the first received event UUID
 
-  @case:migration:yaml-parity-v1:capture_ai:non_utc_event_timestamp_is_converted_to_utc
   Scenario: AI timestamps normalize the instant without rewriting property strings
     When capture_ai is called with JSON arguments:
       """application/json

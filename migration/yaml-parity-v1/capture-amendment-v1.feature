@@ -1,6 +1,6 @@
-@public @acceptance @both @capture
-Feature: Approved capture-amendment-v1 YAML cases
-  Explicit encoding selection and typed capture controls retain original wire assertions.
+@public @acceptance @capture
+Feature: Capture compression, event options, and GeoIP
+  Explicit encoding selection and typed capture controls retain their wire assertions.
 
   Background:
     Given an isolated SDK with empty persistent storage
@@ -8,8 +8,8 @@ Feature: Approved capture-amendment-v1 YAML cases
 
   # Source: yaml:029a94a:capture_v1:compression:sends_gzip_content_encoding
   @api_capture_v1
-  @case:migration:yaml-parity-v1:capture_analytics_v1:sends_gzip_content_encoding @requires:capture_v1 @requires:encoding_gzip
-  Scenario: sends_gzip_content_encoding
+  @requires:capture_v1 @requires:encoding_gzip
+  Scenario: Gzip capture sets the Content-Encoding header
     Given the SDK is initialized with token "phc_test_key" and compression "gzip" and flush threshold 1
     When capture is called with JSON arguments:
       """application/json
@@ -20,8 +20,8 @@ Feature: Approved capture-amendment-v1 YAML cases
 
   # Source: yaml:029a94a:capture_v1:compression:sends_deflate_content_encoding
   @api_capture_v1
-  @case:migration:yaml-parity-v1:capture_analytics_v1:sends_deflate_content_encoding @requires:capture_v1 @requires:encoding_deflate
-  Scenario: sends_deflate_content_encoding
+  @requires:capture_v1 @requires:encoding_deflate
+  Scenario: Deflate capture sets the Content-Encoding header
     Given the SDK is initialized with token "phc_test_key" and compression "deflate" and flush threshold 1
     When capture is called with JSON arguments:
       """application/json
@@ -32,8 +32,8 @@ Feature: Approved capture-amendment-v1 YAML cases
 
   # Source: yaml:029a94a:capture_v1:compression:sends_br_content_encoding
   @api_capture_v1
-  @case:migration:yaml-parity-v1:capture_analytics_v1:sends_br_content_encoding @requires:capture_v1 @requires:encoding_br
-  Scenario: sends_br_content_encoding
+  @requires:capture_v1 @requires:encoding_br
+  Scenario: Brotli capture sets the Content-Encoding header
     Given the SDK is initialized with token "phc_test_key" and compression "br" and flush threshold 1
     When capture is called with JSON arguments:
       """application/json
@@ -44,8 +44,8 @@ Feature: Approved capture-amendment-v1 YAML cases
 
   # Source: yaml:029a94a:capture_v1:compression:sends_zstd_content_encoding
   @api_capture_v1
-  @case:migration:yaml-parity-v1:capture_analytics_v1:sends_zstd_content_encoding @requires:capture_v1 @requires:encoding_zstd
-  Scenario: sends_zstd_content_encoding
+  @requires:capture_v1 @requires:encoding_zstd
+  Scenario: Zstandard capture sets the Content-Encoding header
     Given the SDK is initialized with token "phc_test_key" and compression "zstd" and flush threshold 1
     When capture is called with JSON arguments:
       """application/json
@@ -56,8 +56,8 @@ Feature: Approved capture-amendment-v1 YAML cases
 
   # Source: yaml:029a94a:capture_v1:compression:compressed_body_is_decompressible
   @api_capture_v1
-  @case:migration:yaml-parity-v1:capture_analytics_v1:compressed_body_is_decompressible @requires:capture_v1 @requires:encoding_gzip
-  Scenario: compressed_body_is_decompressible
+  @requires:capture_v1 @requires:encoding_gzip
+  Scenario: Compressed capture bodies contain parseable events
     Given the SDK is initialized with token "phc_test_key" and compression "gzip" and flush threshold 1
     When capture is called with JSON arguments:
       """application/json
@@ -68,8 +68,8 @@ Feature: Approved capture-amendment-v1 YAML cases
 
   # Source: yaml:029a94a:capture_v1:event_options:cookieless_mode_override
   @api_capture_v1
-  @case:migration:yaml-parity-v1:capture_analytics_v1:cookieless_mode_override @requires:capture_v1
-  Scenario: cookieless_mode_override
+  @requires:capture_v1
+  Scenario: Capture preserves an explicit cookieless mode option
     Given the SDK is initialized with token "phc_test_key" and flush threshold 1
     When capture is called with JSON arguments:
       """application/json
@@ -80,8 +80,8 @@ Feature: Approved capture-amendment-v1 YAML cases
 
   # Source: yaml:029a94a:capture_v1:event_options:disable_skew_correction_override
   @api_capture_v1
-  @case:migration:yaml-parity-v1:capture_analytics_v1:disable_skew_correction_override @requires:capture_v1
-  Scenario: disable_skew_correction_override
+  @requires:capture_v1
+  Scenario: Capture preserves an explicit skew correction option
     Given the SDK is initialized with token "phc_test_key" and flush threshold 1
     When capture is called with JSON arguments:
       """application/json
@@ -92,8 +92,8 @@ Feature: Approved capture-amendment-v1 YAML cases
 
   # Source: yaml:029a94a:capture_v1:event_options:process_person_profile_override
   @api_capture_v1
-  @case:migration:yaml-parity-v1:capture_analytics_v1:process_person_profile_override @requires:capture_v1
-  Scenario: process_person_profile_override
+  @requires:capture_v1
+  Scenario: Capture preserves an explicit person profile option
     Given the SDK is initialized with token "phc_test_key" and flush threshold 1
     When capture is called with JSON arguments:
       """application/json
@@ -104,8 +104,8 @@ Feature: Approved capture-amendment-v1 YAML cases
 
   # Source: yaml:029a94a:capture_v1:event_options:product_tour_id_override
   @api_capture_v1
-  @case:migration:yaml-parity-v1:capture_analytics_v1:product_tour_id_override @requires:capture_v1
-  Scenario: product_tour_id_override
+  @requires:capture_v1
+  Scenario: Capture preserves an explicit product tour ID
     Given the SDK is initialized with token "phc_test_key" and flush threshold 1
     When capture is called with JSON arguments:
       """application/json
@@ -116,8 +116,8 @@ Feature: Approved capture-amendment-v1 YAML cases
 
   # Source: yaml:029a94a:capture_v1:event_options:options_override_in_batch
   @api_capture_v1
-  @case:migration:yaml-parity-v1:capture_analytics_v1:options_override_in_batch @requires:capture_v1
-  Scenario: options_override_in_batch
+  @requires:capture_v1
+  Scenario: Batched captures retain their per-event options
     Given the SDK is initialized with token "phc_test_key" and flush threshold 3
     When capture is called sequentially 3 times with zero-based top-level index substitution:
       """application/json
@@ -130,8 +130,8 @@ Feature: Approved capture-amendment-v1 YAML cases
 
   # Source: yaml:029a94a:capture_v1:geoip_and_historical_migration:geoip_disable_injected_into_properties
   @api_capture_v1
-  @case:migration:yaml-parity-v1:capture_analytics_v1:geoip_disable_injected_into_properties @requires:capture_v1
-  Scenario: geoip_disable_injected_into_properties
+  @requires:capture_v1
+  Scenario: Disabling GeoIP adds the event property
     Given the SDK is initialized with token "phc_test_key", flush threshold 1, and GeoIP disabled
     When capture is called with JSON arguments:
       """application/json
@@ -142,8 +142,8 @@ Feature: Approved capture-amendment-v1 YAML cases
 
   # Source: yaml:029a94a:capture:compression:sends_gzip_when_enabled
   @api_capture_v0
-  @case:migration:yaml-parity-v1:capture:sends_gzip_when_enabled @requires:capture_v0 @requires:encoding_gzip
-  Scenario: sends_gzip_when_enabled
+  @requires:capture_v0 @requires:encoding_gzip
+  Scenario: Legacy capture sends gzip when enabled
     Given the SDK is initialized with token "phc_test_key" and compression "gzip"
     When capture is called with JSON arguments:
       """application/json

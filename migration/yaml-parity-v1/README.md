@@ -7,10 +7,11 @@ the SDK test harness's `--migration-suite` selector, or select an individual
 
 ## Case identity and selection
 
-Each scenario has one stable `@case:migration:yaml-parity-v1:…` tag. Keep that ID
-when editing its name or moving it within a feature. For a Scenario Outline, use
-`@case:<case_id>` and a `case_id` Examples column containing a distinct complete ID
-for each row; the harness substitutes the row value in the tag.
+The harness identifies each scenario by its feature path and scenario name. Keep
+scenario names distinct within a feature and describe the behavior they verify.
+For a Scenario Outline that needs stable per-row labels, use `@case:<case_id>`
+with a `case_id` Examples column containing a distinct label for each row. The
+harness substitutes that label for each execution; rows are never deduplicated.
 
 `@requires:<capability>` tags declare necessary SDK API/feature support. All
 inherited requirements apply. Put requirements on the Feature when shared by all

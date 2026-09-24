@@ -6,6 +6,7 @@ Local evaluators can silently assign an experiment participant to a regular vari
 
 - Specify holdout precedence, synthetic variant results, exact hashing, inclusive thresholds, clamping, and flag-level bucketing identity.
 - Require holdout metadata to survive definition loading and supported caches.
+- Skip holdouts with missing/null required fields, matching Python, and cover those inputs with acceptance examples.
 - Add acceptance scenarios and apply/archive this change on the same branch.
 
 ## Capabilities
@@ -21,4 +22,4 @@ The source audit found missing holdout evaluation in .NET, Java/Kotlin server (p
 
 ## Non-goals
 
-No SDK implementation, public API, remote evaluation protocol, or early-access enrollment changes. This change does not define recovery for malformed holdout fields.
+No SDK implementation, public API, remote evaluation protocol, or early-access enrollment changes. Other than skipping missing/null required fields, this change does not define recovery for malformed holdout fields.

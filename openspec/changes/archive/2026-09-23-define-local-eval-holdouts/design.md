@@ -14,10 +14,11 @@ Canonical behavior comes from the flags service and the Python fix, not the curr
 3. Preserve fractional percentages and clamp to 0–100. Preserve the backend's inclusive comparison even at the theoretical exact-zero hash boundary; do not inaccurately claim that zero percent can never match any hash.
 4. Use flag-level identity, not a later condition's aggregation override. Full membership bypasses hashing; existing context-resolution and unsupported-feature rules are otherwise unchanged.
 5. Preserve metadata in existing definition stores and drop stale holdouts when a new snapshot removes them. Do not add a new cache mechanism.
+6. Skip holdout objects whose `id` or `exclusion_percentage` is missing or null, matching Python's `_get_holdout_variant`. Continue ordinary evaluation without constructing a holdout variant.
 
 ## Validation
 
-Acceptance scenarios cover precedence, inactive/absent holdouts, bulk/dependencies, membership vectors, boundaries, group/device identity, cache round-trips, and removal on refresh. These feature files are contracts, not a claim that SDK conformance tests have run.
+Acceptance scenarios cover precedence, inactive/absent holdouts, four missing/null field cases, bulk/dependencies, membership vectors, boundaries, group/device identity, cache round-trips, and removal on refresh. The exact-zero inclusive rule remains in the requirement text without a standalone acceptance scenario requiring an injected hash. This does not assert that a zero hash is mathematically impossible. These feature files are contracts, not a claim that SDK conformance tests have run.
 
 Independent SHA-1 calculations pin two 20% membership cases: `user-1` hashes to 0.17805599206573022 and is held out; `user-5` hashes to 0.6563813925994418 and is not. The incorrect `holdout.` prefix yields 0.455744838790653 and 0.02397893259616086 respectively, reversing both outcomes.
 
@@ -25,4 +26,4 @@ Run strict OpenSpec validation before and after archiving. SDK implementations a
 
 ## Risks
 
-Correcting local evaluation changes assignments for populations that previously bypassed holdouts. Missing serialization fields can preserve the bug despite a fixed evaluator; the loader requirement makes that boundary explicit. Malformed/non-finite input recovery is intentionally not standardized here.
+Correcting local evaluation changes assignments for populations that previously bypassed holdouts. Missing serialization fields can preserve the bug despite a fixed evaluator; the loader requirement makes that boundary explicit. Recovery for malformed/non-finite inputs other than the explicit missing/null field exception is intentionally not standardized here.

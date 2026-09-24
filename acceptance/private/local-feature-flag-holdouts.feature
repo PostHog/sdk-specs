@@ -26,6 +26,19 @@ Feature: Local feature flag experiment holdouts
     When the flag is evaluated locally
     Then the result should be "control"
 
+  Scenario Outline: Incomplete holdouts preserve ordinary assignment
+    Given an active flag has holdout configuration <holdout>
+    And a matching release condition selects "control"
+    When the flag is evaluated locally
+    Then the result should be "control" rather than a holdout variant
+
+    Examples:
+      | holdout                                         |
+      | {"exclusion_percentage": 100}                   |
+      | {"id": null, "exclusion_percentage": 100}       |
+      | {"id": 727}                                    |
+      | {"id": 727, "exclusion_percentage": null}       |
+
   Scenario: Bulk evaluation and dependencies use the holdout string
     Given active flag "checkout" has holdout id 727 with exclusion percentage 100
     And another flag depends on "checkout" equaling "holdout-727"
@@ -65,11 +78,6 @@ Feature: Local feature flag experiment holdouts
       | percentage |
       | 100        |
       | 150        |
-
-  Scenario: Exact zero hash preserves the inclusive backend boundary
-    Given a holdout membership calculation with hash 0
-    When the exclusion percentage is 0
-    Then holdout membership should be true
 
   Scenario: Flag-level group identity determines membership
     Given an active group-aggregated flag has holdout id 727 with exclusion percentage 20

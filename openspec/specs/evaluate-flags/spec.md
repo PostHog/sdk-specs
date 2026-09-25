@@ -265,17 +265,19 @@ Serialized payloads SHALL be validated as JSON before public payload access, inc
 
 ### Requirement: Snapshot evaluation runtime access
 
-A server SDK that loads local flag definitions MAY expose a runtime accessor on the snapshot (`getEvaluationRuntime(key)` / `get_evaluation_runtime(key)` or equivalent). It lets a caller choose which flags to forward to a client, for example when bootstrapping a browser SDK from a server request. An SDK that exposes the accessor SHALL follow the rules below.
+A server SDK that loads local flag definitions MAY expose the flag evaluation runtime on the snapshot. It lets a caller choose which flags to forward to a client, for example when bootstrapping a browser SDK from a server request. An SDK that exposes the evaluation runtime SHALL expose both surfaces below and SHALL follow the rules that come after them.
 
-The accessor SHALL return the flag's configured evaluation runtime exactly as `/local_evaluation` reports it in the definition's `evaluation_runtime` field (`"all"`, `"client"` or `"server"`). The SDK SHALL NOT filter, reorder or drop snapshot flags based on the runtime; which runtimes are safe to forward is the caller's decision.
+The SDK SHALL expose a runtime criterion on its in-memory snapshot filter (for example `only(filter)` with an `evaluationRuntimes` field, alongside the explicit-key filter). This is the surface for selecting the flags to forward. The filtered snapshot SHALL keep a flag only when its runtime is one of the requested values; a flag whose runtime is unknown SHALL NOT match a runtime criterion. When the filter also carries explicit keys, a flag SHALL satisfy every criterion set. The filter follows the in-memory filtering rules: no evaluation, no network I/O, no access tracking, and no `$feature_flag_called`.
+
+The SDK SHALL also expose a per-key runtime accessor on the snapshot (`getEvaluationRuntime(key)` / `get_evaluation_runtime(key)` or equivalent). The accessor is the primitive the filter is defined on, and the only way to tell an unknown runtime from a known one. Callers that want to keep flags with an unknown runtime use the accessor and filter by key.
+
+The accessor SHALL return the flag's configured evaluation runtime exactly as `/local_evaluation` reports it in the definition's `evaluation_runtime` field (`"all"`, `"client"` or `"server"`). Outside the filter criterion above, the SDK SHALL NOT filter, reorder or drop snapshot flags based on the runtime; which runtimes are safe to forward is the caller's decision.
 
 The value SHALL be available for every snapshot flag that has a loaded local definition reporting the field, whether the flag's value resolved locally or was filled from a `/flags` (or equivalent) fallback. A flag that fell back to remote evaluation keeps the runtime of its local definition; the remote value does not erase it.
 
 The accessor SHALL return the platform's nullish sentinel when the key is not in the snapshot, when the loaded definition does not report the field, or when the flag has no loaded local definition, because `/flags` does not report the runtime. A nullish result means the runtime is unknown. The SDK SHALL NOT substitute a default such as `"all"`.
 
 Reading the runtime SHALL use only the snapshot and SHALL NOT issue a flag-evaluation request, mark the flag as accessed for `onlyAccessed()`, or emit `$feature_flag_called`.
-
-An SDK that exposes the accessor MAY also expose a runtime criterion on its in-memory snapshot filter (for example `only(filter)` with an `evaluationRuntimes` field, alongside the explicit-key filter). The filtered snapshot SHALL keep a flag only when its runtime is one of the requested values; a flag whose runtime is unknown SHALL NOT match a runtime criterion. When the filter also carries explicit keys, a flag SHALL satisfy every criterion set. The filter follows the in-memory filtering rules: no evaluation, no network I/O, no access tracking, and no `$feature_flag_called`. Callers that want to keep flags with an unknown runtime use the accessor and filter by key.
 
 #### Scenario: Runtime read is a silent lookup of the local definition (@evaluation_runtime_capable)
 - **GIVEN** local feature flag definitions resolve "client-flag" for distinct id "user-123" as true

@@ -18,12 +18,12 @@ The canonical event name emitted is **`$identify`** (with a leading `$`), regard
 
 | Concern | Client-side | Server-side |
 | --- | --- | --- |
-| `distinct_id` | Optional override. Defaults to the SDK's current distinct id; if a new one is provided, the SDK **updates its persistent state** (becomes the new ambient distinct id). | Required per-call argument. Not persisted. |
+| `distinct_id` | Optional override. Defaults to the SDK's current distinct id; if a new one is provided, the SDK **updates its persistent state** (becomes the new ambient distinct id). | Optional per-call argument. Explicit id wins; when omitted, use request-scoped analytics identity or generate a fresh UUID. Not persisted. |
 | `$anon_distinct_id` | Stamped on the event (the previous distinct id, i.e. the anonymous / device id) so the server can merge profiles. | Not stamped. The server has no concept of the user's anonymous history. |
 | Ambient "identified" flag | Set to `true` on success; persisted. Consulted by `capture` (stamps `$is_identified`). | Not held. |
 | Duplicate-call suppression | If called with the same distinct id while already identified, the event is suppressed or downgraded to a `$set` event. If called with the same distinct id while still anonymous, the SDK transitions to identified and emits a `$set` instead of suppressing. | No suppression — every call emits `$identify`. |
 | Side effects | Reloads feature flags; updates cached person properties; notifies crash-reporting integrations of the context change. | None beyond enqueuing the event. |
-| Input validation | Empty distinct id → dropped with log. | Empty distinct id → dropped (client SDKs) or raises (Ruby, Go, .NET validators). |
+| Input validation | Empty distinct id → dropped with log. | An omitted distinct id uses request context or a generated UUID; the call must not throw or reject. |
 | Return | `void` / `Unit` / `Future<void>` (no meaningful result). | Varies — UUID (Python via `set()`), bool (Ruby, PHP, Go's `Enqueue`), or Unit. Python has **no `identify()` method** — see below. |
 
 Despite these differences, the outgoing wire event is the same shape:
@@ -81,7 +81,7 @@ identify({
 
 ```ts
 identify(
-  distinct_id: string,
+  distinct_id?: string,                   // explicit id, else request context, else generated UUID
   properties?: Record<string, unknown>,   // becomes $set on the wire
   options?: {
     timestamp?: Date,
@@ -121,11 +121,11 @@ identify(
 
 ### Server-side flow
 
-1. **Validate.** `distinct_id` must be present and non-empty. Server SDKs vary between dropping silently (most) and raising (Ruby, Go, .NET via their respective validators).
-2. **Build the event.** `event = '$identify'`, `distinct_id = caller-provided`, `$set = caller-provided properties` (or, depending on SDK, `$set = properties` and `$set_once` from a separate option).
-3. **Enrich.** Standard server enrichment: `$lib`, `$lib_version`, possibly `$geoip_disable`.
+1. **Resolve identity.** Use the explicit `distinct_id` if supplied. If omitted, use the request-scoped analytics distinct id when available (including one extracted from sanitized tracing headers). Otherwise generate a fresh UUID for this event; do not persist it as an ambient identity or use it for feature-flag evaluation.
+2. **Build the event.** `event = '$identify'`, root `distinct_id = resolved id`, `$set = caller-provided properties` (or, depending on SDK, `$set = properties` and `$set_once` from a separate option).
+3. **Enrich.** Standard server enrichment: `$lib`, `$lib_version`, possibly `$geoip_disable`. If the id was generated, disable person-profile processing unless the caller explicitly supplied `$process_person_profile`: use `properties.$process_person_profile = false` on legacy `/batch/` delivery or `options.process_person_profile = false` on Capture v1 `/i/v1/analytics/events` delivery.
 4. **Run `before_send` (if configured)**, same as `capture`.
-5. **Enqueue.** Same batching queue as `capture`.
+5. **Submit for delivery.** Use the SDK's normal capture pipeline; a public flush makes the event observable at the receiver regardless of whether this SDK queues or sends immediately.
 6. **Return.** Varies by SDK (UUID / bool / void).
 
 ## State & lifecycle
@@ -142,7 +142,7 @@ identify(
 
 ### Server-side state
 
-- None. Each call is independent; no per-user state is held.
+- Read request-scoped analytics identity, if present. Each call is independent; no per-user state is held or persisted by `identify`.
 
 ### Cross-SDK lifecycle notes
 
@@ -152,8 +152,8 @@ identify(
 
 ## Error handling
 
-- **Never throw** to the caller (except PHP's public façade and Ruby's `check_presence!`, which throw on missing `distinct_id`).
-- **Drop silently** on: disabled SDK, opted-out user, empty distinct id, person-processing disabled, duplicate identified-user call with same properties, `before_send` returning null.
+- **Never throw or reject** to the caller. An omitted server distinct id follows the context/UUID fallback instead of producing a validation error; SDKs that currently raise for this input need correction.
+- **Drop silently** on: disabled SDK, opted-out user, invalid client-side distinct id, person-processing disabled, duplicate identified-user call with same properties, `before_send` returning null.
 - **Log** drops with a descriptive reason in mobile / browser SDKs.
 
 ## Concurrency & ordering
@@ -175,7 +175,7 @@ identify(
 
 ### Requirement: Canonical identify behavior
 
-The SDK SHALL implement the canonical `identify` behavior described by this spec. Implementations MAY adapt method names, parameter casing, type syntax, and lifecycle hooks to platform idioms where this spec explicitly allows variation, but MUST preserve the observable outcomes in the scenarios below.
+The SDK SHALL implement the canonical `identify` behavior described by this spec. Implementations MAY adapt method names, parameter casing, type syntax, and lifecycle hooks to platform idioms where this spec explicitly allows variation, but MUST preserve the observable outcomes in the scenarios below. Server SDKs MUST resolve an omitted per-call distinct id from request-scoped analytics context when available, otherwise generate a fresh UUID for the event and disable person-profile processing unless the caller explicitly supplied `$process_person_profile`. For legacy `/batch/` delivery, this control MUST be represented by `properties.$process_person_profile = false`; for Capture v1 `/i/v1/analytics/events` delivery, it MUST be represented by `options.process_person_profile = false` with no `$process_person_profile` sentinel left in `properties`. An explicit per-call distinct id MUST take precedence over context. Server `identify` MUST NOT throw or reject to the application when the distinct id is omitted. Generated ids MUST NOT be used for feature-flag evaluation or persisted as ambient user identity.
 
 #### Scenario: Client identify changes the current distinct id and sends identity properties (@client)
 - **GIVEN** a fresh SDK acceptance test harness
@@ -208,20 +208,49 @@ The SDK SHALL implement the canonical `identify` behavior described by this spec
 - **AND** one event named "$set" should be enqueued
 - **AND** no event named "$identify" should be enqueued
 
-#### Scenario: Server identify sends a profile update for explicit distinct id (@server)
-- **GIVEN** a fresh SDK acceptance test harness
-- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
-- **AND** persistent storage is empty
-- **AND** the mock PostHog server is reset
-- **GIVEN** the SDK is initialized with token "test-token"
-- **WHEN** identify is called with distinct id "user-123" and properties:
-  | property | value          |
-  | email    | user@test.test |
-- **THEN** one event named "$identify" should be enqueued
-- **AND** the enqueued event distinct id should be "user-123"
-- **AND** the enqueued event property "$set.email" should equal "user@test.test"
+#### Scenario: Server identify delivers a profile update for explicit distinct id (@server)
+- **GIVEN** an isolated SDK instance and a fresh receiver
+- **AND** the SDK is initialized with token "test-token" and flush threshold 20
+- **WHEN** identify is called with distinct id "user-123" and properties `{ "email": "user@test.test", "active": false, "score": 0, "note": null }`
+- **AND** pending captures are flushed
+- **THEN** exactly one capture request contains exactly one `$identify` event
+- **AND** the received event's root `distinct_id` equals `user-123`
+- **AND** its `$set` equals the supplied JSON object, preserving boolean, numeric and null values
 
-#### Scenario: Identify validates distinct id (@both)
+#### Scenario: Server identify delivers nested user properties (@server)
+- **GIVEN** an isolated SDK instance and a fresh receiver
+- **AND** the SDK is initialized with token "test-token" and flush threshold 20
+- **WHEN** identify is called with distinct id "user-456" and properties `{ "preferences": { "theme": "dark" }, "tags": ["beta", "team"] }`
+- **AND** pending captures are flushed
+- **THEN** exactly one capture request contains exactly one `$identify` event
+- **AND** the received event's root `distinct_id` equals `user-456`
+- **AND** its `$set` equals the supplied nested JSON object
+
+#### Scenario: Server identify without explicit or contextual identity generates a personless UUID (@server)
+- **GIVEN** an isolated server SDK instance with no request-scoped identity and a fresh receiver
+- **AND** the SDK is initialized with token "test-token" and flush threshold 20
+- **WHEN** identify is called with person properties and no explicit distinct id
+- **AND** pending captures are flushed
+- **THEN** exactly one capture request contains exactly one `$identify` event
+- **AND** the received event's root `distinct_id` is a generated UUID
+- **AND** its `$set` equals the supplied person properties
+- **AND** the received event has `properties.$process_person_profile` equal to `false` on legacy `/batch/`, or `options.process_person_profile` equal to `false` and no `properties.$process_person_profile` on Capture v1 `/i/v1/analytics/events`
+- **AND** the SDK call does not throw or reject
+
+#### Scenario: Server identify uses request-scoped analytics identity before generating one (@server)
+- **GIVEN** an isolated server SDK instance with request-scoped analytics distinct id "context-user"
+- **WHEN** identify is called without an explicit distinct id
+- **AND** pending captures are flushed
+- **THEN** the received `$identify` event's root `distinct_id` is "context-user"
+- **AND** the SDK call does not throw or reject
+
+#### Scenario: Server identify uses the explicit id before request-scoped analytics identity (@server)
+- **GIVEN** an isolated server SDK instance with request-scoped analytics distinct id "context-user"
+- **WHEN** identify is called with explicit distinct id "explicit-user"
+- **AND** pending captures are flushed
+- **THEN** the received `$identify` event's root `distinct_id` is "explicit-user"
+
+#### Scenario: Client identify validates missing distinct id (@client)
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
 - **AND** persistent storage is empty

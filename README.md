@@ -16,6 +16,16 @@ The `acceptance/` directory contains Gherkin feature files for cross-SDK accepta
 shared internal SDK behavior such as batching, storage, feature flags, sessions, and replay.
 Tags on each feature indicate whether scenarios apply to client SDKs, server SDKs, or both.
 
+The server cases in `acceptance/public/identify.feature` and
+`acceptance/public/alias.feature` call the SDK, flush, and inspect mock-server
+traffic using the draft2 harness. They check delivery rather than private queue
+state. Migrated server scenarios use `@sdk:server` for adapter-declared SDK type
+selection; the parameterized examples have per-row `@case:` labels. An ordinary
+single-case scenario needs no authored case ID. Unmigrated client and negative
+scenarios retain their preconditions and are not selected by the opt-in tags.
+The YAML-parity scenarios use the same Gherkin harness but retain their own
+capability-driven selection.
+
 ## Capabilities
 
 | Capability | Spec | Scope | Status |

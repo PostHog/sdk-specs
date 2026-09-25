@@ -136,14 +136,14 @@ The SDK SHALL implement the canonical `flag-definition-loader` behavior describe
 
 ### Requirement: External flag definition cache providers
 
-The SDK SHALL treat an external flag definition cache provider as the canonical extension point for sharing local-evaluation flag definitions across distributed or stateless SDK instances. Implementations MAY adapt provider type names, method names, return types, and field casing to platform idioms, but the provider contract SHALL preserve these operations and outcomes:
+The SDK SHALL treat an external flag definition cache provider as the canonical extension point for sharing local-evaluation flag definitions across distributed or stateless SDK instances. Implementations MAY adapt provider type names, method names, and return types to platform idioms, but the provider contract SHALL preserve these operations and outcomes:
 
 - retrieve cached flag definition data, returning data or an absent value when the shared cache is empty
 - decide whether the current SDK instance should fetch fresh definitions from PostHog
 - receive freshly fetched definitions after a successful PostHog API load so they can be stored in the shared cache
 - clean up provider resources during SDK shutdown
 
-The cached data SHALL contain the complete local-evaluation definition set: feature flag definitions, group type mapping, cohort definitions, and the top-level `property_matching_version` associated with that snapshot. Older cached data omitting the version SHALL load as legacy; freshly hydrated data omitting it SHALL NOT inherit a previous v2 selector. Every supported provider representation, API projection, on-disk cache, or database-backed definition store SHALL retain the version together with the rules on serialization and hydration. This requirement does not require adding a new cache backend. SDKs MAY expose this as typed data, JSON-compatible maps, or equivalent structures, and MAY use idiomatic casing such as `groupTypeMapping` or `group_type_mapping`.
+The cached data SHALL contain the complete local-evaluation definition set: feature flag definitions, group type mapping, cohort definitions, and the top-level `property_matching_version` associated with that snapshot. Older cached data omitting the version SHALL load as legacy; freshly hydrated data omitting it SHALL NOT inherit a previous v2 selector. Every supported provider representation, API projection, on-disk cache, or database-backed definition store SHALL retain the version together with the rules on serialization and hydration. This requirement does not require adding a new cache backend. SDKs MAY expose this as typed data, JSON-compatible maps, or equivalent structures. Shared cache payload field names SHALL use snake_case, matching the flag-definitions endpoint, including `flags`, `group_type_mapping`, `cohorts`, `minimal_flag_called_events`, and `property_matching_version`. SDKs SHALL write and read these canonical field names so that definitions can be shared across SDKs without renaming payload fields.
 
 On each loader refresh with a provider configured, the SDK SHALL call the provider's fetch-decision operation before making a direct flag-definition API request. If the provider says this instance should fetch, the SDK SHALL fetch from PostHog, update in-memory definitions, and then call the provider's store operation with the fetched data. If the provider says this instance should not fetch, the SDK SHALL try to load definitions from the provider cache and update in-memory definitions from that data without making a direct API request. If the provider cache is empty or unavailable while previous definitions are loaded, the SDK SHALL keep using the previous in-memory definitions rather than clearing local evaluation. If no definitions are loaded and privileged local-evaluation auth is configured, the SDK MAY bypass the negative fetch decision and fetch directly so local evaluation can recover from an empty shared cache.
 
@@ -234,6 +234,14 @@ Provider errors, rejected asynchronous results, malformed cache data, and provid
 - **THEN** the cache provider shutdown operation should have been called
 - **AND** shutdown should not throw because of the cache provider failure
 - **AND** the SDK should record a flag definition cache warning
+
+#### Scenario: Shared payloads are readable across SDKs
+- **GIVEN** one SDK has fetched definitions containing `flags`, `group_type_mapping`, `cohorts`, `minimal_flag_called_events`, and `property_matching_version`
+- **WHEN** that SDK publishes the definitions through its external cache provider
+- **THEN** the shared payload should retain those field names and values
+- **WHEN** another SDK with local evaluation enabled reads that payload through its external cache provider with the fetch-decision operation returning false
+- **THEN** it should load the definitions and metadata without renaming payload fields
+- **AND** no direct flag definition API request should be sent
 
 ### Requirement: Definition snapshots retain the property matching version
 

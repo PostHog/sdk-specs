@@ -1,7 +1,7 @@
 ## 1. Contract correction
 
 - [x] 1.1 Confirm the intentional override in posthog-js #1085 and the compatibility concern in #5129.
-- [x] 1.2 Draft the mandatory-versus-replaceable scrubbing contract and six acceptance scenarios.
+- [x] 1.2 Draft the mandatory-versus-replaceable scrubbing contract and nine acceptance scenarios.
 - [x] 1.3 Sync the canonical spec narrative and requirement, preserving unrelated scenarios.
 - [x] 1.4 Correct the browser compliance finding and associated roll-up counts.
 

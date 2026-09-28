@@ -6,7 +6,8 @@ The replay privacy spec incorrectly requires default body scrubbing before a cus
 
 - Correct the canonical contract: mandatory header redaction, payload-size limiting, and ingestion-path filtering run before either body-scrubbing strategy.
 - A custom `maskCapturedNetworkRequestFn` replaces default body-content scrubbing, rather than running before or after it. Without a custom callback, default scrubbing remains enabled.
-- Add scenarios for default scrubbing, callback ownership of bodies, mandatory protections, and callback-requested drops.
+- Add scenarios for default scrubbing, callback ownership of bodies, mandatory protections, deprecated-hook compatibility, and callback-requested drops.
+- Define modern callback nullish returns and per-record exception isolation: retain only timing metadata for nullish initial entries, but drop throwing records and their derived server timings without affecting unrelated records. Exception isolation requires a separate posthog-js fix; it is not a claim about existing SDK conformance.
 - Withdraw the corresponding compliance finding and its incorrect claim that unconditional pre-hook body scrubbing is backward-compatible.
 
 ## Capabilities

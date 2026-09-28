@@ -110,7 +110,7 @@ rather than treating it as a routine new-row fill-in.
 
 | SDK | Overall | ✅ | 🟡 | ❌ | ➖ | ❓ | Last audited | Open gaps | File |
 |---|---|---|---|---|---|---|---|---|---|
-| posthog-js | 25/59 fully compliant (42%; **59 rows, needs +3 new contracts**) | 25 | 19 | 12 | 3 | 0 | 2026-08-10 · `34a34f3d` | 31 | [posthog-js.md](posthog-js.md) |
+| posthog-js | 26/59 fully compliant (44%; **59 rows, needs +3 new contracts**) | 26 | 18 | 12 | 3 | 0 | 2026-08-10 · `34a34f3d` | 30 | [posthog-js.md](posthog-js.md) |
 | posthog-python | 14/62 fully compliant (23%; 29 contracts N/A on a server SDK) | 14 | 12 | 7 | 29 | 0 | 2026-08-17 · `95c7f6e0` | 19 | [posthog-python.md](posthog-python.md) |
 | posthog-android | 31/59 fully compliant (53%; **59 rows, needs +3 new contracts**) | 31 | 16 | 9 | 3 | 0 | 2026-08-10 · `8659a7b4` | 25 | [posthog-android.md](posthog-android.md) |
 | posthog-ios | 32/62 fully compliant (52%) | 32 | 18 | 7 | 5 | 0 | 2026-08-17 · `c0218386` | 25 | [posthog-ios.md](posthog-ios.md) |
@@ -122,6 +122,8 @@ rather than treating it as a routine new-row fill-in.
 | posthog-go | 10/59 fully compliant (17%; **59 rows, needs +3 new contracts**) | 10 | 11 | 7 | 31 | 0 | 2026-08-06 · `019af19` | 18 | [posthog-go.md](posthog-go.md) |
 | posthog-java | 12/59 fully compliant (20%; **59 rows, needs +3 new contracts**) | 12 | 13 | 6 | 28 | 0 | 2026-08-10 · `8659a7b4` (posthog-android monorepo) | 19 | [posthog-java.md](posthog-java.md) |
 | posthog-dotnet | 7/59 fully compliant (12%; **59 rows, needs +3 new contracts**) | 7 | 15 | 9 | 28 | 0 | 2026-08-06 · `e7f20e3` | 24 | [posthog-dotnet.md](posthog-dotnet.md) |
+
+**2026-09-28 contract correction:** posthog-js n31 is withdrawn: custom network callbacks intentionally replace default body-content scrubbing after mandatory header/path/size cleaning. The browser counts reflect this spec correction, not a new audit; see [posthog-js.md#n31](posthog-js.md#n31).
 
 **Row-count note:** posthog-python, posthog-node, and posthog-ios were re-audited this run and now
 carry the full 62-row matrix (including the 3 new contracts below). The other 9 SDKs' files still
@@ -231,7 +233,6 @@ run, since both were re-verified together in the same monorepo clone.
 | posthog-js | Consent Gating | Backward-compatible | Opt-out drop has no logged reason; persistence writes are only opt-out-gated when explicitly configured — [posthog-js.md#n21](posthog-js.md) |
 | posthog-js | Retry Queue | Needs deprecation path | Unbounded queue, 429 not retried, no `Retry-After` — [posthog-js.md#n28](posthog-js.md) |
 | posthog-js | Session Manager | Needs deprecation path | Idle-rotation is skipped whenever the session id is read via the read-only `get_session_id()` path — [posthog-js.md#n29](posthog-js.md) |
-| posthog-js | Session Replay Privacy | Backward-compatible | Custom network-mask hook bypasses keyword/content scrubbing that runs in the no-hook path — [posthog-js.md#n31](posthog-js.md) |
 | posthog-js | Surveys | Needs deprecation path | Opt-out doesn't block survey display/fetch outside cookieless mode — [posthog-js.md#n32](posthog-js.md) |
 | posthog-js | Logs | Needs deprecation path | Queue is in-memory-only and wiped on `reset()`; OTLP attribute-encoding and 408/`Retry-After` gaps — [posthog-js.md#n33](posthog-js.md) |
 | posthog-python | Flush | Breaking | Failed batches are dropped, not retained — requeue-for-retry would change delivery/ordering semantics — [posthog-python.md#n6](posthog-python.md) |
@@ -268,7 +269,7 @@ run, since both were re-verified together in the same monorepo clone.
 | posthog-dotnet | Setup | Needs deprecation path | Re-`Init` silently swaps the default client's config today; adding a double-init guard changes behavior some callers may rely on — [posthog-dotnet.md#n20](posthog-dotnet.md) |
 | posthog-dotnet | Identify | Breaking or Backward-compatible (implementation-dependent) | Missing/empty `distinctId` silently succeeds today; spec text calls for either a raise (breaking) or drop-with-log (backward-compatible) — [posthog-dotnet.md#n15](posthog-dotnet.md) |
 
-Full contract-by-contract detail (31 posthog-js, 19 posthog-python, 25 posthog-android, 25
+Full contract-by-contract detail (30 posthog-js, 19 posthog-python, 25 posthog-android, 25
 posthog-ios, 24 posthog-node, 34 posthog-flutter, 26 posthog-react-native, 16 posthog-php, 16
 posthog-ruby, 18 posthog-go, 19 posthog-java, and 24 posthog-dotnet non-Pass/non-N/A cells) is in
 the respective per-SDK files.

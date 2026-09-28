@@ -3,7 +3,9 @@
 **Repo:** [PostHog/posthog-js](https://github.com/PostHog/posthog-js)
 **Audited commit:** `34a34f3dbf7dcca94f35e10f3dabab50bb3b8b19` ([commit](https://github.com/PostHog/posthog-js/commit/34a34f3dbf7dcca94f35e10f3dabab50bb3b8b19)) — audited on 2026-08-10
 **Audited against sdk-specs commit:** `2036abde806bc6598c100f8c5d25ba7c608e0eea`
-**Summary:** 25 ✅ · 19 🟡 · 12 ❌ · 3 ➖ · 0 ❓
+**Summary:** 26 ✅ · 18 🟡 · 12 ❌ · 3 ➖ · 0 ❓
+
+**2026-09-28 contract correction:** The n31 body-scrubbing finding is withdrawn against the clarified replay privacy contract. Counts reflect that correction only; the audited commit and all other assessments are unchanged. This is not a fresh SDK audit.
 
 Note on repo layout: this is a pnpm monorepo. The npm package `posthog-js` (the web/browser SDK under audit) lives at `packages/browser/src/`, sharing primitives with `packages/browser-common/src/` and the shared `packages/core/src/` (the latter also backs the Node/React Native SDKs). Confirmed this run: the browser `PostHog` class (`packages/browser/src/posthog-core.ts:403`, `class PostHog implements PostHogInterface`) does **not** extend `PostHogCore`/`PostHogCoreStateless` from `@posthog/core` — it is a structurally separate implementation. Several methods that exist on `PostHogCore` (used by Node and by `packages/react-native`/`packages/web`) are therefore genuinely absent from the browser class, not merely hidden — this was independently re-confirmed by exhaustive grep across `packages/browser/src` and `packages/browser-common/src` for every gap noted below. The local clone is a depth-1 shallow clone (no history prior to HEAD), so this audit is based entirely on direct inspection of the current tree, not a diff against the prior audited commit.
 
@@ -62,7 +64,7 @@ Note on repo layout: this is a pnpm monorepo. The npm package `posthog-js` (the 
 | 51 | Retry Queue | 🟡 | [n28] |
 | 52 | Session Manager | 🟡 | [n29] |
 | 53 | Session Replay Ingestion Controls | 🟡 | [n30] |
-| 54 | Session Replay Privacy | 🟡 | [n31] |
+| 54 | Session Replay Privacy | ✅ | [n31] |
 | 55 | Surveys | 🟡 | [n32] |
 | 56 | Logs | 🟡 | [n33] |
 | 57 | Traces | ❌ | [n34] |
@@ -242,11 +244,11 @@ Note on repo layout: this is a pnpm monorepo. The npm package `posthog-js` (the 
 - **Backwards compatibility:** Backward-compatible — both fixes only add new cases, no removal of existing capability.
 - **Remediation:** Unchanged, plus: validate/clamp `minimumDurationMilliseconds` with a warning on malformed input.
 
-### n31 — Session Replay Privacy (🟡 Partial)
-- **Spec requires:** Config-driven masking (inputs, text selectors, block selectors), markup-level opt-outs, network-request redaction (headers/paths/keywords) before any custom hook runs, client-over-remote precedence.
-- **SDK currently:** New finding this run (downgraded from ✅ in prior audit, which did not inspect this deeply): the network redaction pipeline (`config.ts:265-361`) correctly runs header/path/size cleaning before the user's `maskCapturedNetworkRequestFn`, but the keyword/content deny-list scrub (`scrubPayloads`) only runs in the no-custom-hook branch (line 350) — when a user supplies a custom `maskCapturedNetworkRequestFn`, body content is header/path/size-cleaned but never keyword-scrubbed before reaching the hook, a partial deviation from the spec's redaction-ordering requirement. Config surface (`maskAllInputs`, `maskTextSelector`, `blockSelector`, `maskInputOptions`, `recordHeaders`, `recordBody`), markup controls (`ph-no-capture`, `ph-mask`, `ph-ignore-input`), and client-over-remote masking precedence are all correctly implemented and passed to the externally-loaded rrweb recorder. The DOM mask-traversal implementation itself lives entirely in the separate `@posthog/rrweb-record` fork, outside this repo's scope (N/A for that specific sub-requirement, not a gap).
-- **Backwards compatibility:** Backward-compatible — running `scrubPayloads` before the custom hook unconditionally is additive/corrective.
-- **Remediation:** Apply `scrubPayloads` keyword scrubbing before invoking `maskCapturedNetworkRequestFn`, not only in its absence.
+### n31 — Session Replay Privacy (✅ Contract correction)
+- **Spec requires:** Config-driven masking, markup controls, client-over-remote precedence, and mandatory header/path/size cleaning before custom network masking. A custom `maskCapturedNetworkRequestFn` replaces default body-content scrubbing; without a callback, default scrubbing runs.
+- **SDK evidence:** The audited `config.ts:265-361` already implements this split: header/path/size cleaning precedes the callback, while `scrubPayloads` runs only without a custom callback. This is intentional behavior introduced by [posthog-js #1085](https://github.com/PostHog/posthog-js/pull/1085), not a privacy-ordering implementation gap. The original assessment of the other masking controls is unchanged. DOM mask traversal remains outside this audit's scope in the separate `@posthog/rrweb-record` fork.
+- **Backwards compatibility:** The earlier claim that unconditional pre-hook body scrubbing is additive/backward-compatible was incorrect. It can redact harmless JSON (`author` matches `auth`) before the callback can parse or sanitize it, breaking the deliberate override contract. See [the review of #5129](https://github.com/PostHog/posthog-js/pull/5129#discussion_r4119504513).
+- **Remediation:** Finding withdrawn after correcting the spec. Preserve mandatory cleaning and custom ownership of body scrubbing; no SDK change is required for this ordering.
 
 ### n32 — Surveys (🟡 Partial)
 - **Spec requires:** Opt-out should prevent survey fetch/display (not just the resulting event); `reset()` should clear all seen/in-progress/abandoned survey state; `survey abandoned` should carry the same `$set` marker as `sent`/`dismissed`.

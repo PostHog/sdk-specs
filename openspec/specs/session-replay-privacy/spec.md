@@ -59,8 +59,8 @@ Modifier.postHogUnmask()
 6. **Preserve privacy in screenshot mode.** Screenshot-based recorders must discover sensitive rectangles synchronously with capture where possible and draw masks into the screenshot bitmap/canvas before converting it to base64/PNG/WebP. If a concurrent screen change makes mask rectangles unreliable, implementations should discard that snapshot rather than upload a potentially stale/unmasked image.
 7. **Treat password and sensitive controls specially.** Password/secure text fields remain masked even when broad text masking is disabled. Native implementations inspect secure text traits/input types or obscured text widgets in addition to global masking settings.
 8. **Treat images conservatively when configured.** Mobile screenshot/wireframe implementations mask image views or render-image objects when image masking is enabled, while allowing platform-specific heuristics for safe bundled assets or symbols.
-9. **Redact replay network payloads where captured.** Browser network replay capture is opt-in for headers/bodies and runs deny-list/scrubbing logic before custom masking hooks. Authorization, cookies, API keys, CSRF tokens, known sensitive payload keywords, oversized payloads, PostHog ingestion paths, and default denied hosts are removed, redacted, limited, or dropped before data is attached to replay.
-10. **Allow user-defined network masking on top of enforced cleaning.** Browser `maskCapturedNetworkRequestFn` can modify or drop a cleaned network request. Deprecated URL/request masking hooks are treated as compatibility shims where still supported.
+9. **Apply mandatory replay network protections.** Browser network replay capture is opt-in for headers/bodies. Sensitive-header redaction (including authorization, cookies, API keys, and CSRF tokens), payload-size limits, and PostHog ingestion-path filtering apply regardless of custom masking and run before a custom callback. Existing host exclusions remain in force. A request dropped by mandatory filtering does not reach the callback.
+10. **Allow custom body scrubbing to replace default body scrubbing.** Without a custom callback, eligible request and response bodies pass through the default body-content scrubber. When `maskCapturedNetworkRequestFn` is supplied, it replaces that scrubber: default keyword and other body-content heuristics run neither before nor after the callback. The callback is responsible for sanitizing retained bodies and can modify or drop the request; its inputs have already undergone mandatory cleaning and can contain absent bodies or size-limit replacement markers. Deprecated URL/request masking hooks remain compatibility shims where supported.
 11. **Fail closed for uncertain snapshots.** Mask tree discovery/parsing failures, missing contexts, invalid images, timeout/cancellation, or screen changes should skip the affected replay snapshot or emit no maskable payload rather than crash the app or send known-sensitive unredacted data.
 
 ## State & lifecycle
@@ -93,14 +93,14 @@ Modifier.postHogUnmask()
 
 - Invalid or unavailable view/screenshot/render-tree state causes that snapshot or mask pass to be skipped and logged where the SDK has a logger.
 - Browser missing rrweb record support logs an error and avoids starting capture.
-- Network masking callbacks may drop a request by returning `undefined`; enforced cleaners run before custom masking so sensitive headers and PostHog ingestion loops are still guarded.
+- Network masking callbacks may drop a request by returning `undefined`; mandatory header redaction, payload-size limiting, and ingestion-path filtering run first. Default body-content scrubbing does not run as a fallback for a callback's drop decision.
 - Native/mobile implementations should avoid throwing into application UI code from mask discovery or screenshot masking paths.
 
 ## Concurrency & ordering guarantees
 
 - Masks must be computed against the same UI state that is serialized or screenshotted. If the UI changes during capture and the implementation can detect that race, it should discard the snapshot.
 - Explicit unmask markers take precedence over explicit mask markers and global category masks where a platform exposes both concepts.
-- Enforced replay-network redaction happens before custom user masking callbacks.
+- Mandatory replay-network header redaction, payload-size limiting, and ingestion-path filtering happen before custom user masking callbacks. Default body-content scrubbing and custom callbacks are alternative strategies, not sequential stages.
 - Password/secure input masking takes precedence over disabled broad text masking.
 
 ## Interactions
@@ -163,3 +163,51 @@ The SDK SHALL implement the canonical `session-replay-privacy` behavior describe
 - **GIVEN** the SDK is initialized with token "test-token" and session recording is active
 - **WHEN** a replay snapshot containing masked text is processed
 - **THEN** queued replay data should already be redacted
+
+### Requirement: Browser replay network body scrubber replacement
+
+For browser replay network capture, the SDK MUST apply mandatory sensitive-header redaction, payload-size limits, and PostHog ingestion-path filtering regardless of whether a custom `session_recording.maskCapturedNetworkRequestFn` is supplied. These protections MUST run before invoking a custom callback; requests dropped by mandatory filtering MUST NOT reach that callback. Existing capture opt-ins and host exclusions remain in force.
+
+When no custom callback is supplied, the SDK MUST apply its default body-content scrubber to eligible request and response bodies after mandatory cleaning. When a custom callback is supplied, it MUST replace the default body-content scrubber: the SDK MUST NOT run default keyword or other body-content heuristics either before or after that callback. The callback is responsible for sanitizing the request and response bodies it retains and MAY modify or drop a request. Callback inputs can still contain absent bodies or size-limit replacement markers produced by mandatory cleaning; replacing default scrubbing does not bypass those protections.
+
+#### Scenario: Default body scrubbing runs without a custom callback
+- **GIVEN** browser replay body capture is enabled without a custom network masking callback
+- **AND** an eligible request and response each have a body below the payload-size limit containing `{"password":"secret"}`
+- **WHEN** the request is processed for replay capture
+- **THEN** default body-content scrubbing redacts both bodies before they are attached to replay
+- **AND** neither recorded body contains `secret`
+
+#### Scenario: Custom body scrubbing replaces default heuristics rather than composing with them
+- **GIVEN** browser replay body capture is enabled with a custom network masking callback
+- **AND** an eligible request and response each have a body below the payload-size limit containing `{"author":"Ada","password":"secret"}`
+- **AND** the callback parses each body as JSON, removes `password`, serializes the remaining object, and returns the request
+- **WHEN** the request is processed for replay capture
+- **THEN** the callback receives both original JSON bodies without default body-content redaction
+- **AND** the recorded request and response bodies each contain `{"author":"Ada"}` and no `password` property
+- **AND** the default `auth` substring heuristic does not redact `author` before or after the callback
+
+#### Scenario: Mandatory header redaction runs before a custom callback
+- **GIVEN** browser replay header capture is enabled with a custom network masking callback that returns its input
+- **AND** an eligible request has an `Authorization` header and its response has a `Set-Cookie` header
+- **WHEN** the request is processed for replay capture
+- **THEN** neither sensitive header is present in the callback input
+- **AND** neither sensitive header is recorded in replay
+
+#### Scenario: Mandatory payload-size limits run before a custom callback
+- **GIVEN** browser replay body capture is enabled with a custom network masking callback that returns its input
+- **AND** an eligible request and response each have a body exceeding the SDK payload-size limit
+- **WHEN** the request is processed for replay capture
+- **THEN** the callback receives size-limited replacements rather than either oversized body
+- **AND** neither oversized body is recorded in replay
+
+#### Scenario: Mandatory ingestion-path filtering cannot be bypassed by a custom callback
+- **GIVEN** browser replay network capture is enabled with a custom network masking callback that returns its input
+- **WHEN** a request to a PostHog ingestion path covered by mandatory filtering is processed for replay capture
+- **THEN** the callback is not invoked for that request
+- **AND** that request is not attached to replay
+
+#### Scenario: A custom callback can drop an ordinary network request
+- **GIVEN** browser replay network capture is enabled with a custom network masking callback that returns `undefined`
+- **WHEN** an otherwise eligible non-initial fetch request is processed for replay capture
+- **THEN** that request is not attached to replay
+- **AND** the default body scrubber is not used as a fallback for the callback's drop decision

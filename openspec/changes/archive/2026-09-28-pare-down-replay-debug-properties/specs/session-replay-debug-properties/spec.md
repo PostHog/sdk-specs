@@ -1,114 +1,4 @@
-# Session Replay Debug Properties Specification
-
-## Purpose
-
-`session-replay-debug-properties` is the per-event debug snapshot of the session replay
-subsystem: the `$recording_status` property and the `$sdk_debug_*` keys an SDK attaches
-automatically to captured events. The keys come in two tiers. A short list of required keys
-goes on every event except `$snapshot`, so any event says whether replay was disabled,
-buffering, or active when it was captured. Everything else is an optional bundle that goes only
-on SDK events (names starting with `$`, excluding `$feature_flag_called`, `$snapshot`, and the
-browser's `$$heatmap`), at most once every 30 seconds per SDK instance. One queue-depth key sits
-outside both tiers and stays on every non-`$snapshot` event. On mobile a crash-time
-`$exception` reported on a later launch is stamped from a crash-context snapshot that always
-carries the full bundle.
-
-It is distinct from `is-session-replay-active`, which is a getter the caller invokes; these
-properties are attached without any caller action. The mobile SDKs (`posthog-ios`,
-`posthog-android`) and the hybrid SDKs that inherit their event pipeline are the primary
-conformance targets; `posthog-js` is the reference implementation, with the deliberate
-divergences called out inline.
-
-## Applicability
-
-`client` — browser and UI/mobile SDKs that own session replay capture. Server SDKs do not
-observe a session timeline and attach none of these keys.
-
-## Requirements
-
-### Requirement: Attach debug properties to every captured event except `$snapshot`
-
-The replay debug properties come in two tiers. The *required keys* are the ones the recording
-buttons and the replay capture diagnostics read from individual events:
-
-- on every platform: `$recording_status`, `$sdk_debug_replay_event_trigger_status`,
-  `$sdk_debug_replay_linked_flag_trigger_status`, and `$sdk_debug_replay_internal_buffer_length`;
-- on the browser only, additionally: `$sdk_debug_recording_script_not_loaded`,
-  `$sdk_debug_replay_url_trigger_status`, `$sdk_debug_replay_rrweb_error`, and
-  `$sdk_debug_replay_flushed_size`.
-
-Every other replay debug key belongs to the *optional replay debug bundle*, which is gated and
-throttled by the two requirements that follow; the queue-depth key belongs to neither tier and has
-its own requirement.
-
-The SDK SHALL attach each required key that is available to every captured event **except**
-`$snapshot`: custom events, `$feature_flag_called`, `$$heatmap`, and eligible SDK events inside a
-throttle window all carry them. A required key is *available* when the SDK's current replay state
-produces a value for it: a mobile SDK without a replay integration produces only
-`$recording_status: disabled` (see "Attach the disabled shape when replay is not configured"),
-and posthog-js without the session-recording extension produces none. `$snapshot` events (the
-replay payload itself) SHALL carry neither the required keys nor the optional bundle — they are
-already replay data, not a report about replay. When the outgoing event is the minimal
-`$feature_flag_called` envelope (the allowlisted properties sent when the call is gated and the
-flag has no experiment), the SDK SHALL strip `$recording_status` and every `$sdk_debug_*` key
-along with everything else not on that allowlist; the full `$feature_flag_called` envelope carries
-the required keys like any other event.
-
-Reference: posthog-js `origin/main` `928990ded` (posthog-js#5144) — `REQUIRED_REPLAY_PROPERTIES`
-(`packages/browser/src/posthog-core.ts:190-200`); `calculateEventProperties` copies a key when
-it is required or the optional bundle is allowed (`:2166-2175`), after the `$snapshot` early
-return (`:2133`); `$snapshot` is also listed in `EVENTS_WITHOUT_REPLAY_DEBUG_PROPERTIES` (`:201`).
-The minimal envelope is rebuilt from an explicit allowlist by `minimizeFlagCalledEventProperties`
-(`packages/core/src/featureFlagUtils.ts:263`, applied at `posthog-core.ts:1909-1911`).
-posthog-ios#859 head `fda0e238c` — `requiredReplayDebugPropertyKeys`
-(`PostHog/PostHogSDK.swift:598-605`) copied onto every event that does not carry the optional
-bundle (`:732-737`); `$snapshot` is built with `appendSharedProps: !isSnapshotEvent`
-(`:1581`), so it never reaches that block; the minimal envelope keeps only allowlisted keys
-(`:1590-1594`).
-
-Covering test: posthog-js `packages/browser/src/__tests__/posthog-core-also.test.ts:102` (the
-eight required keys on `custom_event`, `$feature_flag_called`, `$$heatmap`, and on in-window
-`$exception`, `$identify`, `$set`, `$pageview`, `$autocapture`; `$snapshot` carries none) and
-`:806` ("returns calculated properties" — a custom event carries `$recording_status: 'disabled'`);
-`packages/browser/src/__tests__/__snapshots__/featureflags.test.ts.snap:72` (minimal envelope,
-no debug keys) and `:103` (full envelope, `$recording_status: "disabled"` at `:145`).
-posthog-ios#859 `PostHogTests/PostHogSDKTest.swift:383` ("captures $recording_status on every
-event and the full replay debug bundle on the first eligible SDK event only"), `:415` ($snapshot
-exclusion), `:633` (full `$feature_flag_called` carries `$recording_status`), `:705` (minimal
-envelope carries none), `:793` (gated full envelope carries it);
-`PostHogTests/PostHogSessionReplayRemoteConfigBufferTest.swift:659` (a custom event carries all
-four required keys from an installed integration).
-
-#### Scenario: Custom event carries debug properties
-- **GIVEN** the SDK is initialized
-- **WHEN** a custom event is captured
-- **THEN** the captured event's properties include `$recording_status`
-
-#### Scenario: Required keys come from an installed replay integration (mobile)
-- **GIVEN** a mobile SDK with its replay integration installed and buffering one snapshot
-- **WHEN** a custom event is captured
-- **THEN** the event's properties include `$recording_status`,
-  `$sdk_debug_replay_event_trigger_status`, `$sdk_debug_replay_linked_flag_trigger_status`, and
-  `$sdk_debug_replay_internal_buffer_length`
-
-#### Scenario: Snapshot event carries none of the debug properties
-- **GIVEN** the SDK is initialized with session replay active
-- **WHEN** a `$snapshot` event is captured
-- **THEN** the captured event's properties include neither `$recording_status` nor any
-  `$sdk_debug_*` key
-
-#### Scenario: Minimal feature-flag-called event strips debug properties
-- **GIVEN** the SDK is initialized
-- **AND** minimal `$feature_flag_called` events are configured
-- **WHEN** a gated feature flag call with no experiment is captured
-- **THEN** the captured event's properties include neither `$recording_status` nor any
-  `$sdk_debug_*` key
-
-#### Scenario: Full feature-flag-called event carries debug properties
-- **GIVEN** the SDK is initialized
-- **AND** minimal `$feature_flag_called` events are not configured
-- **WHEN** a feature flag call is captured
-- **THEN** the captured event's properties include `$recording_status`
+## ADDED Requirements
 
 ### Requirement: Attach the optional replay debug bundle only to eligible SDK events
 
@@ -374,6 +264,92 @@ snapshot does not).
 - **WHEN** another eligible SDK event is captured
 - **THEN** the event's properties include the queue-depth key
 - **AND** they do not include `$sdk_debug_session_start`
+
+## MODIFIED Requirements
+
+### Requirement: Attach debug properties to every captured event except `$snapshot`
+
+The replay debug properties come in two tiers. The *required keys* are the ones the recording
+buttons and the replay capture diagnostics read from individual events:
+
+- on every platform: `$recording_status`, `$sdk_debug_replay_event_trigger_status`,
+  `$sdk_debug_replay_linked_flag_trigger_status`, and `$sdk_debug_replay_internal_buffer_length`;
+- on the browser only, additionally: `$sdk_debug_recording_script_not_loaded`,
+  `$sdk_debug_replay_url_trigger_status`, `$sdk_debug_replay_rrweb_error`, and
+  `$sdk_debug_replay_flushed_size`.
+
+Every other replay debug key belongs to the *optional replay debug bundle*, which is gated and
+throttled by the two requirements that follow; the queue-depth key belongs to neither tier and has
+its own requirement.
+
+The SDK SHALL attach each required key that is available to every captured event **except**
+`$snapshot`: custom events, `$feature_flag_called`, `$$heatmap`, and eligible SDK events inside a
+throttle window all carry them. A required key is *available* when the SDK's current replay state
+produces a value for it: a mobile SDK without a replay integration produces only
+`$recording_status: disabled` (see "Attach the disabled shape when replay is not configured"),
+and posthog-js without the session-recording extension produces none. `$snapshot` events (the
+replay payload itself) SHALL carry neither the required keys nor the optional bundle — they are
+already replay data, not a report about replay. When the outgoing event is the minimal
+`$feature_flag_called` envelope (the allowlisted properties sent when the call is gated and the
+flag has no experiment), the SDK SHALL strip `$recording_status` and every `$sdk_debug_*` key
+along with everything else not on that allowlist; the full `$feature_flag_called` envelope carries
+the required keys like any other event.
+
+Reference: posthog-js `origin/main` `928990ded` (posthog-js#5144) — `REQUIRED_REPLAY_PROPERTIES`
+(`packages/browser/src/posthog-core.ts:190-200`); `calculateEventProperties` copies a key when
+it is required or the optional bundle is allowed (`:2166-2175`), after the `$snapshot` early
+return (`:2133`); `$snapshot` is also listed in `EVENTS_WITHOUT_REPLAY_DEBUG_PROPERTIES` (`:201`).
+The minimal envelope is rebuilt from an explicit allowlist by `minimizeFlagCalledEventProperties`
+(`packages/core/src/featureFlagUtils.ts:263`, applied at `posthog-core.ts:1909-1911`).
+posthog-ios#859 head `fda0e238c` — `requiredReplayDebugPropertyKeys`
+(`PostHog/PostHogSDK.swift:598-605`) copied onto every event that does not carry the optional
+bundle (`:732-737`); `$snapshot` is built with `appendSharedProps: !isSnapshotEvent`
+(`:1581`), so it never reaches that block; the minimal envelope keeps only allowlisted keys
+(`:1590-1594`).
+
+Covering test: posthog-js `packages/browser/src/__tests__/posthog-core-also.test.ts:102` (the
+eight required keys on `custom_event`, `$feature_flag_called`, `$$heatmap`, and on in-window
+`$exception`, `$identify`, `$set`, `$pageview`, `$autocapture`; `$snapshot` carries none) and
+`:806` ("returns calculated properties" — a custom event carries `$recording_status: 'disabled'`);
+`packages/browser/src/__tests__/__snapshots__/featureflags.test.ts.snap:72` (minimal envelope,
+no debug keys) and `:103` (full envelope, `$recording_status: "disabled"` at `:145`).
+posthog-ios#859 `PostHogTests/PostHogSDKTest.swift:383` ("captures $recording_status on every
+event and the full replay debug bundle on the first eligible SDK event only"), `:415` ($snapshot
+exclusion), `:633` (full `$feature_flag_called` carries `$recording_status`), `:705` (minimal
+envelope carries none), `:793` (gated full envelope carries it);
+`PostHogTests/PostHogSessionReplayRemoteConfigBufferTest.swift:659` (a custom event carries all
+four required keys from an installed integration).
+
+#### Scenario: Custom event carries debug properties
+- **GIVEN** the SDK is initialized
+- **WHEN** a custom event is captured
+- **THEN** the captured event's properties include `$recording_status`
+
+#### Scenario: Required keys come from an installed replay integration (mobile)
+- **GIVEN** a mobile SDK with its replay integration installed and buffering one snapshot
+- **WHEN** a custom event is captured
+- **THEN** the event's properties include `$recording_status`,
+  `$sdk_debug_replay_event_trigger_status`, `$sdk_debug_replay_linked_flag_trigger_status`, and
+  `$sdk_debug_replay_internal_buffer_length`
+
+#### Scenario: Snapshot event carries none of the debug properties
+- **GIVEN** the SDK is initialized with session replay active
+- **WHEN** a `$snapshot` event is captured
+- **THEN** the captured event's properties include neither `$recording_status` nor any
+  `$sdk_debug_*` key
+
+#### Scenario: Minimal feature-flag-called event strips debug properties
+- **GIVEN** the SDK is initialized
+- **AND** minimal `$feature_flag_called` events are configured
+- **WHEN** a gated feature flag call with no experiment is captured
+- **THEN** the captured event's properties include neither `$recording_status` nor any
+  `$sdk_debug_*` key
+
+#### Scenario: Full feature-flag-called event carries debug properties
+- **GIVEN** the SDK is initialized
+- **AND** minimal `$feature_flag_called` events are not configured
+- **WHEN** a feature flag call is captured
+- **THEN** the captured event's properties include `$recording_status`
 
 ### Requirement: `$recording_status` value set, with a mobile subset
 
@@ -652,21 +628,6 @@ manager's start snapshot unconditionally).
 - **WHEN** a custom event is captured
 - **THEN** the event's properties do not include `$sdk_debug_replay_capture_mode`
 
-### Requirement: All debug keys on one event come from a single consistent snapshot
-
-All `$recording_status` and `$sdk_debug_*` keys attached to a single captured event SHALL come
-from one consistent point-in-time snapshot of replay state — no torn reads across locks, where
-one key reflects the state before a concurrent replay-lifecycle transition and another key on
-the same event reflects the state after it.
-
-#### Scenario: Capture racing stop() yields a consistent status, never a torn read
-- **GIVEN** the replay integration is buffering with a hold reason present
-- **WHEN** an event capture races a concurrent `stopSessionRecording()`-equivalent call
-- **THEN** the event's `$recording_status` is one of the allowed values (`disabled`, `active`,
-  or `buffering`)
-- **AND** the event never carries `$sdk_debug_replay_flush_hold_reason` unless its
-  `$recording_status` on that same event is `buffering`
-
 ### Requirement: `$sdk_debug_error_capturing_properties` is attached only on a build failure
 
 `$sdk_debug_error_capturing_properties` SHALL be attached to a captured event, carrying the
@@ -912,35 +873,6 @@ debug keys" and "a backdated event within the current session keeps the debug ke
 - **AND** no window is open
 - **WHEN** an eligible SDK event is captured with an explicit timestamp later than T
 - **THEN** the event carries `$recording_status` and the applicable optional `$sdk_debug_*` keys
-
-### Requirement: Reconciliation with `is-session-replay-active` and `session-replay-ingestion-controls`
-
-The SDK SHALL keep `$recording_status` consistent with the boolean `isSessionReplayActive()`
-getter specified by `is-session-replay-active`: a `$recording_status` of `active` SHALL imply that
-getter returns `true`, and `disabled` SHALL imply it returns `false`. While
-`$recording_status` is `buffering`, this spec makes no claim about the boolean getter's return
-value — that getter's own spec governs its `buffering`-equivalent behavior per platform.
-
-The two mobile `buffering` hold causes reported via `$sdk_debug_replay_flush_hold_reason`
-(`awaiting_remote_config`, `below_minimum_duration`) correspond to the "Setup" resolution step
-and the "Apply the minimum-duration gate" step specified in `session-replay-ingestion-controls`
-(`openspec/specs/session-replay-ingestion-controls/spec.md:73` and `:44` respectively); this
-spec's hold-reason values are the debug-observable surface of those two gates, not an
-independent gating mechanism.
-
-Reference: `is-session-replay-active` spec, `openspec/specs/is-session-replay-active/spec.md`;
-`session-replay-ingestion-controls` spec,
-`openspec/specs/session-replay-ingestion-controls/spec.md`.
-
-#### Scenario: Active recording status implies the boolean getter is true
-- **GIVEN** an SDK conforming to both this spec and `is-session-replay-active`
-- **WHEN** an event's `$recording_status` is `active`
-- **THEN** `isSessionReplayActive()` (or its platform equivalent) returns `true`
-
-#### Scenario: Disabled recording status implies the boolean getter is false
-- **GIVEN** an SDK conforming to both this spec and `is-session-replay-active`
-- **WHEN** an event's `$recording_status` is `disabled`
-- **THEN** `isSessionReplayActive()` (or its platform equivalent) returns `false`
 
 ### Requirement: Out of scope for this capability
 

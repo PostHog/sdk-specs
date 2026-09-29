@@ -25,8 +25,10 @@ Specs now cover three groups of canonical SDK behavior:
   session management, surveys, consent gating, replay privacy, and client/server tracing-header
   correlation.
 - **Product pipelines** such as logs, whose records are enriched, batched, and shipped as
-  OpenTelemetry Logs (OTLP/HTTP JSON) at `POST {host}/i/v1/logs`, and traces, whose spans are
-  shipped as OpenTelemetry Traces (OTLP/HTTP JSON) at `POST {host}/i/v1/traces`.
+  OpenTelemetry Logs (OTLP/HTTP JSON) at `POST {host}/i/v1/logs`; traces, whose spans are
+  shipped as OpenTelemetry Traces (OTLP/HTTP JSON) at `POST {host}/i/v1/traces`; and metrics,
+  which are pre-aggregated in memory (statsd-style counters, gauges, histograms) and shipped as
+  OpenTelemetry Metrics (OTLP/HTTP JSON) at `POST {host}/i/v1/metrics`.
 
 Add a new sibling under `specs/<capability>/` for each genuinely distinct capability. One
 capability per folder.

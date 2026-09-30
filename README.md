@@ -32,6 +32,7 @@ capability-driven selection.
 |------------|------|-------|--------|
 | Logs | [`openspec/specs/logs/spec.md`](openspec/specs/logs/spec.md) | product | Canonical |
 | Traces | [`openspec/specs/traces/spec.md`](openspec/specs/traces/spec.md) | product | Canonical |
+| MCP Analytics | [`openspec/specs/mcp-analytics/spec.md`](openspec/specs/mcp-analytics/spec.md) | product | Canonical |
 | Tracing Headers | [`openspec/specs/tracing-headers/spec.md`](openspec/specs/tracing-headers/spec.md) | cross-SDK correlation | Canonical |
 | Alias | [`openspec/specs/alias/spec.md`](openspec/specs/alias/spec.md) | public API | Canonical |
 | Capture | [`openspec/specs/capture/spec.md`](openspec/specs/capture/spec.md) | public API | Canonical |

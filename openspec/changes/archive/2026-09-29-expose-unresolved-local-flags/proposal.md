@@ -7,8 +7,8 @@ Remote fallback hides this most of the time. Local-only mode has no fallback, so
 ## What Changes
 
 - A server SDK MAY expose the unresolved flags of a snapshot: the keys that have a loaded local definition, are in the requested scope, were inconclusive in local evaluation, and have no value in the snapshot. Each entry carries a stable reason.
-- The spec defines two reasons, `experience_continuity` and `inconclusive`. An SDK MAY add more specific reasons.
-- An SDK that exposes unresolved flags SHALL report the `local_evaluation_inconclusive` error, in place of `flag_missing`, when the enablement or value of an unresolved key is read on an original snapshot. Other errors reported for the same read are unchanged.
+- The spec defines a closed set of reasons, split by what the caller can do about them: `experience_continuity`, `unsupported_definition`, `missing_context` and `unresolved_dependency`. A new reason lands in the spec before an SDK reports it.
+- Any SDK that evaluates locally SHOULD report the `local_evaluation_inconclusive` error, in place of `flag_missing`, when the enablement or value of such a key is read on an original snapshot; an SDK that exposes unresolved flags SHALL. Other errors reported for the same read are unchanged.
 - Filtered snapshots do not carry unresolved entries.
 - Unresolved flags stay absent from the snapshot. Accessor return values, the key list, capture enrichment and the local-only absence rule are unchanged.
 - New scenarios are tagged `@unresolved_flags_capable`.

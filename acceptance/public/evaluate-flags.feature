@@ -564,8 +564,7 @@ Feature: Evaluate Flags
     And the local feature flag definition for "checkout" has experience continuity disabled
     When evaluate flags is called for distinct id "user-123" without person property "plan" and with local-only evaluation enabled
     Then the snapshot should not contain "checkout"
-    And the snapshot unresolved flags should contain "checkout"
-    And the snapshot unresolved reason for "checkout" should not be "experience_continuity"
+    And the snapshot unresolved flags should contain "checkout" with reason "missing_context"
 
   @unresolved_flags_capable
   Scenario: A flag resolved by remote fallback is not unresolved

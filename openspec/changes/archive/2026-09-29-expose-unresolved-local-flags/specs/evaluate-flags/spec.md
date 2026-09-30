@@ -17,6 +17,8 @@ The snapshot SHALL expose each unresolved key with a reason (member name and sha
 
 An SDK SHALL NOT report a reason this spec does not define. A new cause lands in this spec before an SDK reports it.
 
+An SDK that evaluates flags locally SHOULD log a diagnostic warning, when the platform exposes SDK logging, when loaded definitions include a flag that local evaluation can never resolve, such as one with reason `experience_continuity`. The warning SHALL name the flag and the reason. The SDK SHALL NOT repeat it for the same flag until that flag's definition changes. The warning helps a developer notice the flag early; it does not replace the per-snapshot reporting, which also covers call-side causes.
+
 Unresolved flags SHALL stay absent from the snapshot's flags. Exposing them SHALL NOT change the snapshot's key list, the values returned by the enablement, value and payload accessors, or the flags attached by capture enrichment.
 
 Reading the unresolved flags SHALL use only the snapshot and SHALL NOT issue a flag-evaluation request, mark any flag as accessed for `onlyAccessed()`, or emit `$feature_flag_called`.
@@ -33,6 +35,13 @@ Filtered snapshots returned by `only(...)` / `onlyAccessed()` scope capture enri
 - **AND** no remote feature flag evaluation request should have been sent
 - **AND** no event named "$feature_flag_called" should be enqueued
 - **AND** snapshot only accessed should return no flags
+
+#### Scenario: Loading a definition that local evaluation never resolves logs one warning (@unresolved_flags_capable)
+- **GIVEN** SDK logging is enabled
+- **AND** the local feature flag definition for "checkout" has experience continuity enabled
+- **WHEN** local feature flag definitions are refreshed successfully twice without changes
+- **THEN** exactly one warning naming "checkout" and reason "experience_continuity" should be logged
+- **AND** no remote feature flag evaluation request should have been sent
 
 #### Scenario: Other inconclusive causes are reported as unresolved (@unresolved_flags_capable)
 - **GIVEN** local feature flag definitions include a flag "checkout" matching person property "plan" with operator "exact" and value "pro"

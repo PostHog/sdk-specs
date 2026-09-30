@@ -559,6 +559,14 @@ Feature: Evaluate Flags
     And snapshot only accessed should return no flags
 
   @unresolved_flags_capable
+  Scenario: Loading a definition that local evaluation never resolves logs one warning
+    Given SDK logging is enabled
+    And the local feature flag definition for "checkout" has experience continuity enabled
+    When local feature flag definitions are refreshed successfully twice without changes
+    Then exactly one warning naming "checkout" and reason "experience_continuity" should be logged
+    And no remote feature flag evaluation request should have been sent
+
+  @unresolved_flags_capable
   Scenario: Other inconclusive causes are reported as unresolved
     Given local feature flag definitions include a flag "checkout" matching person property "plan" with operator "exact" and value "pro"
     And the local feature flag definition for "checkout" has experience continuity disabled

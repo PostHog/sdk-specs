@@ -18,6 +18,8 @@ Non-goals: evaluate experience continuity locally, narrow when the evaluator tre
 - **Inactive flags and out-of-scope flags are never unresolved.** An inactive flag resolves to `false`. A flag outside the requested keys was not asked for, even when the evaluator inspects it as a dependency.
 - **A key without a local definition is never unresolved.** It stays `flag_missing`. This keeps the distinction the change exists to draw.
 - **A dedicated error value, for every SDK that evaluates locally.** `local_evaluation_inconclusive` replaces `flag_missing` for such a key, so the event data separates the two cases without code changes on the caller's side. It is a `SHOULD` on its own, not tied to the optional snapshot member, because it is the part that helps without any new API.
+- **A load-time warning as well, not instead.** A definition-side cause is known as soon as definitions load, so a one-time warning surfaces it early with no new API. It cannot replace the snapshot member: a log line is not something code can check, and a call-side cause such as a missing property only shows up per call.
+- **Older single-flag APIs are out of scope.** `getFeatureFlag` and `isFeatureEnabled` return one value and have no snapshot to carry the list. Extending the error value to them is a separate change.
 - **Optional, behind a capability tag.** No SDK ships this today. `MAY` follows the `@evaluation_runtime_capable` precedent.
 - **Filtered snapshots do not carry the entries.** They scope capture enrichment, and the filters already define what happens to a key that is absent from the source snapshot. One rule for every SDK is simpler than an optional carry-over with its own scoping and error rules. The original snapshot is where unresolved flags are inspected.
 

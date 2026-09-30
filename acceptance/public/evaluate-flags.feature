@@ -621,6 +621,18 @@ Feature: Evaluate Flags
     And the snapshot unresolved flags should be empty
 
   @unresolved_flags_capable
+  Scenario: Reading a flag the remote fallback resolved reports no inconclusive error
+    Given the local feature flag definition for "checkout" has experience continuity enabled
+    And remote feature flag evaluation for distinct id "user-123" returns:
+      | key      | value |
+      | checkout | true  |
+    When evaluate flags is called for distinct id "user-123"
+    And snapshot enablement is read for "checkout"
+    Then the returned enabled value for "checkout" should be true
+    And the "$feature_flag_called" event for flag "checkout" should not report error "local_evaluation_inconclusive"
+    And the "$feature_flag_called" event for flag "checkout" should not report error "flag_missing"
+
+  @unresolved_flags_capable
   Scenario: Reading an unresolved flag reports an inconclusive local evaluation
     Given the local feature flag definition for "checkout" has experience continuity enabled
     When evaluate flags is called for distinct id "user-123" with local-only evaluation enabled

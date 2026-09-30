@@ -11,11 +11,11 @@ A flag that a remote `/flags` (or equivalent) fallback resolved is not unresolve
 The snapshot SHALL expose each unresolved key with a reason (member name and shape per platform convention). The reason SHALL be one of the values below, chosen by what the caller can do about it. The reason describes the flag's own definition and the call that evaluated it, not a dependency's.
 
 - `experience_continuity`: the flag's definition has experience continuity enabled. Local evaluation never resolves it; the fix is to change the flag.
-- `unsupported_definition`: the flag's definition uses something the local evaluator does not support, such as a static cohort, an unrecognized operator, or a malformed value. The fix is to change the flag or upgrade the SDK.
-- `missing_context`: the call did not supply a property, group key or group property the flag's conditions need, or supplied it in a form the evaluator cannot use. The fix is to pass it.
-- `unresolved_dependency`: a flag the definition depends on was unresolved. The dependency's own entry carries its reason.
+- `unsupported_definition`: the flag's definition uses something the local evaluator does not support, such as a static cohort, an unrecognized operator, a malformed value, or a dependency with no loaded definition. The fix is to change the flag or upgrade the SDK.
+- `missing_context`: the call did not supply a property, group key, group property or device id the flag needs, or supplied it in a form the evaluator cannot use. The fix is to pass it.
+- `unresolved_dependency`: a flag the definition depends on has a loaded definition but was unresolved. The dependency's own entry carries its reason when the dependency is in the requested scope.
 
-An SDK SHALL NOT report a reason this spec does not define. A new cause lands in this spec before an SDK reports it.
+When more than one cause applies to a flag, the SDK SHALL report the reason of the first cause it found during evaluation. An SDK SHALL NOT report a reason this spec does not define. A new cause lands in this spec before an SDK reports it.
 
 An SDK that evaluates flags locally SHOULD log a diagnostic warning, when the platform exposes SDK logging, when loaded definitions include a flag that local evaluation can never resolve, such as one with reason `experience_continuity`. The warning SHALL name the flag and the reason. The SDK SHALL NOT repeat it for the same flag until that flag's definition changes. The warning helps a developer notice the flag early; it does not replace the per-snapshot reporting, which also covers call-side causes.
 
@@ -99,7 +99,7 @@ Creating a `FeatureFlagEvaluations` snapshot SHALL NOT by itself emit `$feature_
 
 Repeated enablement/value reads for the same identity, group context, key, and canonical value SHALL follow the existing tracker dedupe contract rather than emit one event per accessor call. On an original evaluation snapshot, reading a key absent from the evaluated set SHALL be treated as an attempted access and, when a distinct id is available, SHALL report the `flag_missing` error through the normal event metadata. Ancillary event metadata and the null/false response sentinel for a missing flag MAY vary by platform.
 
-When the key read on an original evaluation snapshot has a loaded local definition and local evaluation for it was inconclusive, an SDK that evaluates flags locally SHOULD report the `local_evaluation_inconclusive` error in place of the `flag_missing` error, whether or not it exposes unresolved flags; an SDK that exposes unresolved flags SHALL. Any other error reported for the same read, such as a response-level error, is unchanged. The returned enablement/value still follows the missing-key contract.
+When the key read on an original evaluation snapshot is absent from the snapshot's flags, has a loaded local definition, and local evaluation for it was inconclusive, an SDK that evaluates flags locally SHOULD report the `local_evaluation_inconclusive` error in place of the `flag_missing` error, whether or not it exposes unresolved flags; an SDK that exposes unresolved flags SHALL. Any other error reported for the same read, such as a response-level error, is unchanged. The returned enablement/value still follows the missing-key contract.
 
 Filtered snapshots returned by `only(...)` / `onlyAccessed()` are intended to scope capture enrichment rather than support further branching. When a key was present in the original evaluation but excluded from a filtered snapshot, the SDK MAY suppress a missing-key event instead of reporting `flag_missing`; the excluded key is not evidence that the flag was absent from the evaluation.
 
@@ -120,6 +120,17 @@ Filtered snapshots returned by `only(...)` / `onlyAccessed()` are intended to sc
 - **WHEN** the enablement or value accessor is called for "typo-flag"
 - **THEN** the returned enablement/value follows the missing-key contract
 - **AND** `$feature_flag_called` metadata identifies "typo-flag" as `flag_missing`
+
+#### Scenario: Reading a flag the remote fallback resolved reports no inconclusive error (@unresolved_flags_capable)
+- **GIVEN** the local feature flag definition for "checkout" has experience continuity enabled
+- **AND** remote feature flag evaluation for distinct id "user-123" returns:
+  | key      | value |
+  | checkout | true  |
+- **WHEN** evaluate flags is called for distinct id "user-123"
+- **AND** snapshot enablement is read for "checkout"
+- **THEN** the returned enabled value for "checkout" should be true
+- **AND** the "$feature_flag_called" event for flag "checkout" should not report error "local_evaluation_inconclusive"
+- **AND** the "$feature_flag_called" event for flag "checkout" should not report error "flag_missing"
 
 #### Scenario: Reading an unresolved flag reports an inconclusive local evaluation (@unresolved_flags_capable)
 - **GIVEN** the local feature flag definition for "checkout" has experience continuity enabled

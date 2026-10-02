@@ -24,41 +24,76 @@ observe a session timeline and attach none of these keys.
 
 ### Requirement: Attach debug properties to every captured event except `$snapshot`
 
-The SDK SHALL attach `$recording_status` and the applicable `$sdk_debug_*` properties (this
-spec's key list) to every captured event **except** `$snapshot`. `$snapshot` events (the replay
-payload itself) SHALL carry none of these keys — they are already replay data, not a report
-about replay. When the outgoing event is the minimal `$feature_flag_called` shape (the
-allowlisted properties sent when the call is gated and the flag has no experiment), the SDK
-SHALL strip `$recording_status` and every `$sdk_debug_*` key along with everything else not on
-that allowlist; the full (non-minimal) `$feature_flag_called` shape carries them like any other
-event.
+The SDK SHALL attach `$recording_status` and the **required** debug keys of this spec's key list
+to every captured event **except** `$snapshot`. The required keys are `$recording_status`, the
+platform's queue-depth key (`$sdk_debug_retry_queue_size` on posthog-js,
+`$sdk_debug_pending_queue_size` on mobile), `$sdk_debug_replay_internal_buffer_length`,
+`$sdk_debug_replay_linked_flag_trigger_status`, `$sdk_debug_replay_event_trigger_status`, and —
+where the SDK attaches them at all — `$sdk_debug_replay_rrweb_error`,
+`$sdk_debug_replay_flushed_size`, `$sdk_debug_recording_script_not_loaded`, and
+`$sdk_debug_replay_url_trigger_status`. These are the keys the recording controls and capture
+diagnostics read off an individual event, so an event that reports replay state at all SHALL
+report them. Every other `$recording_status`/`$sdk_debug_*` key this spec describes is
+**supporting** and MAY be withheld under the rate-limiting requirement below.
+
+`$snapshot` events (the replay payload itself) SHALL carry no required or supporting key — they
+are already replay data, not a report about replay. A `$snapshot` MAY carry the cumulative
+replay-drop counters `$sdk_debug_replay_unstringifiable_events_dropped`,
+`$sdk_debug_replay_throttled_mutations_dropped`,
+`$sdk_debug_replay_oversized_mutations_dropped`, and
+`$sdk_debug_replay_oversized_mutation_bytes_dropped`, each only when its value exceeds zero.
+These counters describe loss in the payload they ride on, so they belong on `$snapshot` and
+nowhere else; they accumulate across a session, reset on session rotation, and are not
+rate-limited.
+
+When the outgoing event is the minimal `$feature_flag_called` shape (the allowlisted properties
+sent when the call is gated and the flag has no experiment), the SDK SHALL strip
+`$recording_status` and every `$sdk_debug_*` key along with everything else not on that
+allowlist; the full (non-minimal) `$feature_flag_called` shape carries the required keys like any
+other event.
 
 Reference: posthog-js merges the debug map inside `calculateEventProperties`
-(`packages/browser/src/posthog-core.ts:2024`), after the `$snapshot` early return at
-`posthog-core.ts:1989-2000` — so `$snapshot` never reaches the merge. The minimal
-`$feature_flag_called` allowlist is built by `minimizeFlagCalledEventProperties`
+(`packages/browser/src/posthog-core.ts:2165`), after the `$snapshot` early return — so
+`$snapshot` never reaches the merge — and filters it against `REQUIRED_REPLAY_PROPERTIES`
+(`posthog-core.ts:191`). The snapshot drop counters are attached where the payload is built
+(`extensions/replay/external/lazy-loaded-session-recorder.ts`, the `$snapshot` property block).
+The minimal `$feature_flag_called` allowlist is built by `minimizeFlagCalledEventProperties`
 (`packages/core/src/featureFlagUtils.ts:263`), constructing a new object from an explicit key
 list rather than deleting keys, so `$recording_status`/`$sdk_debug_*` are structurally excluded
 unless allowlisted.
 
-Covering test: `packages/browser/src/__tests__/__snapshots__/featureflags.test.ts.snap` —
-the minimal snapshot ("sends exactly the allowlisted properties when gated and the flag has no
-experiment") has no `$recording_status` or `$sdk_debug_*` key; the full snapshot ("sends the
-full event when gated but the flag has an experiment") has `$recording_status: "disabled"`.
-`packages/browser/src/__tests__/posthog-core-also.test.ts:618` and `:767`
-(`calculateEventProperties` "returns calculated properties") assert `$recording_status` and
-`$sdk_debug_retry_queue_size` on an ordinary custom event.
+Covering test: `packages/browser/src/__tests__/__snapshots__/featureflags.test.ts.snap` — the
+minimal snapshot ("sends exactly the allowlisted properties when gated and the flag has no
+experiment") has no `$recording_status` or `$sdk_debug_*` key; the full snapshot has
+`$recording_status: "disabled"`. `packages/browser/src/__tests__/posthog-core-also.test.ts`
+(`calculateEventProperties` "returns calculated properties") asserts `$recording_status` and
+`$sdk_debug_retry_queue_size` on an ordinary custom event; the snapshot drop-counter tests in
+`packages/browser/src/__tests__/extensions/replay/lazy-sessionrecording.test.ts` cover
+accumulation, omission at zero, and reset on rotation.
 
-#### Scenario: Custom event carries debug properties
+#### Scenario: Custom event carries the required debug properties
 - **GIVEN** the SDK is initialized
 - **WHEN** a custom event is captured
 - **THEN** the captured event's properties include `$recording_status`
 
 #### Scenario: Snapshot event carries none of the debug properties
 - **GIVEN** the SDK is initialized with session replay active
+- **AND** no replay data has been dropped in this session
 - **WHEN** a `$snapshot` event is captured
 - **THEN** the captured event's properties include neither `$recording_status` nor any
   `$sdk_debug_*` key
+
+#### Scenario: Snapshot event carries non-zero cumulative drop counters
+- **GIVEN** an SDK that counts replay data it dropped
+- **AND** three oversized mutations have been dropped in this session and nothing else has
+- **WHEN** a `$snapshot` event is captured
+- **THEN** the captured event's properties include
+  `$sdk_debug_replay_oversized_mutations_dropped` with value 3
+- **AND** they do not include a drop counter whose value is zero
+- **AND** they include no other `$recording_status` or `$sdk_debug_*` key
+- **WHEN** the session rotates and another `$snapshot` event is captured with nothing dropped
+  since
+- **THEN** the captured event's properties include no drop counter
 
 #### Scenario: Minimal feature-flag-called event strips debug properties
 - **GIVEN** the SDK is initialized
@@ -121,10 +156,14 @@ analog to test) — planned test (repo plan row: each native SDK's own buffering
 ### Requirement: Session, queue, hold-reason, trigger, and mode keys
 
 In addition to `$recording_status`, the SDK SHALL attach the following keys where applicable to
-the current platform. `$sdk_debug_session_start` (an epoch-millisecond integer, the session's
-start time) and `$sdk_debug_current_session_duration` (the millisecond difference between now
-and that start time) SHALL be attached whenever a session start time is available, and SHALL
-describe the session identified by the event's own `$session_id` — the two keys and `$session_id`
+the current platform, subject to the rate-limiting requirement below for the supporting ones.
+`$sdk_debug_session_start` (an epoch-millisecond integer, the session's start time) SHALL be
+attached whenever a session start time is available. `$sdk_debug_current_session_duration` (the
+millisecond difference between now and that start time) is not required: posthog-js no longer
+attaches it, because the consumer can subtract `$sdk_debug_session_start` from the event's own
+timestamp; mobile SDKs read it from their own session manager and continue to attach it. Each of
+these keys an SDK does attach SHALL describe the session identified by the event's own
+`$session_id` — the two keys and `$session_id`
 on one event MUST never describe different sessions. When that id is the SDK session manager's
 current session, the start time is the manager's. When a caller pre-attached a different
 `$session_id` (the React Native and Flutter bridges do this on mobile; posthog-js never accepts
@@ -199,9 +238,9 @@ posthog-js have no dedicated posthog-js test asserting each key individually;
 
 #### Scenario: Session and queue keys are present when a session exists (posthog-js)
 - **GIVEN** the SDK is initialized with an active session
-- **WHEN** an event is captured
-- **THEN** the event's properties include `$sdk_debug_session_start`,
-  `$sdk_debug_current_session_duration`, and `$sdk_debug_retry_queue_size`
+- **WHEN** an event that carries the supporting keys is captured
+- **THEN** the event's properties include `$sdk_debug_session_start` and
+  `$sdk_debug_retry_queue_size`
 
 #### Scenario: Session and queue keys are present when a session exists (mobile)
 - **GIVEN** the SDK is initialized with an active session
@@ -297,6 +336,78 @@ manager's start unconditionally today).
 - **AND** the host SDK name is not `posthog-flutter`
 - **WHEN** an event is captured
 - **THEN** `$sdk_debug_replay_capture_mode` is `wireframe`
+
+### Requirement: Supporting debug keys may be rate-limited
+
+Supporting keys are optional telemetry, not a per-event contract. An SDK MAY attach them to at
+most one event per **rate-limiting interval** per SDK instance (posthog-js: 30 seconds), and MAY
+restrict them to an **eligible event set** chosen so that high-volume or shape-constrained events
+do not carry them (posthog-js: event names beginning with `$`, excluding `$feature_flag_called`,
+`$$heatmap`, and `$snapshot`). Required keys SHALL be attached regardless of the interval and of
+event eligibility. An SDK that attaches supporting keys to every event remains conformant; this
+requirement permits the reduction, it does not mandate it.
+
+An SDK that rate-limits SHALL compute an event's properties before deciding whether that event
+consumes the interval, so the event that starts an interval carries the supporting keys rather
+than the next one. Only a capture the SDK accepts SHALL consume the interval: an event rejected
+by a `before_send` hook, and enrichment of another library's properties that produces no capture,
+SHALL leave the interval unconsumed, so a rejected event cannot silence the next accepted one.
+Rate limiting is scoped to the SDK instance, not to a session, so the first eligible capture
+after initialization carries the supporting keys.
+
+Where a supporting key is withheld by the interval or by event eligibility, its absence SHALL NOT
+be read as a violation of any presence rule this spec states for that key. In particular, the
+mobile rule that `$sdk_debug_replay_flush_hold_reason` is present exactly while
+`$recording_status` is `buffering` constrains the events that carry supporting keys; a withheld
+key still means "not reported", never "no hold". A consumer SHALL read a supporting key's absence
+as "not reported on this event" and SHALL NOT infer SDK state from it.
+
+`$sdk_debug_current_session_duration` is not required of any SDK. posthog-js no longer attaches
+it: the duration is the difference between the event's own timestamp and
+`$sdk_debug_session_start`, so sending both spends payload on a value the consumer can compute.
+An SDK that still attaches it — mobile SDKs read it from their own session manager — SHALL keep
+it consistent with the event's `$session_id` as the keys requirement states.
+
+Reference: posthog-js `REQUIRED_REPLAY_PROPERTIES`, `EVENTS_WITHOUT_REPLAY_DEBUG_PROPERTIES`,
+`REPLAY_DEBUG_PROPERTIES_INTERVAL_MS`, and `isReplayDebugEvent`
+(`packages/browser/src/posthog-core.ts:191-203`); the interval is consumed after `before_send`
+accepts the event (`posthog-core.ts:1959`), while properties are built earlier
+(`posthog-core.ts:1800`, `calculateEventProperties` filtering at `:2169-2171`). Introduced in
+[posthog-js #5144](https://github.com/PostHog/posthog-js/pull/5144).
+
+Covering test: `packages/browser/src/__tests__/posthog-core-also.test.ts` — the capture
+regression tests covering interval consumption, enrichment that does not consume it, and
+`before_send` rejections that do not consume it.
+
+#### Scenario: Supporting keys are withheld for the rest of the interval
+- **GIVEN** an SDK that rate-limits supporting debug keys, with session replay installed
+- **WHEN** an eligible event is captured and accepted
+- **THEN** its properties include the supporting keys the platform attaches
+- **WHEN** another eligible event is captured within the rate-limiting interval
+- **THEN** its properties include every required key
+- **AND** they include none of the supporting keys
+- **WHEN** another eligible event is captured after the interval has elapsed
+- **THEN** its properties include the supporting keys again
+
+#### Scenario: An event outside the eligible set still carries the required keys
+- **GIVEN** an SDK that restricts supporting debug keys to an eligible event set
+- **WHEN** an event outside that set is captured
+- **THEN** its properties include `$recording_status` and the platform's other required keys
+- **AND** they include none of the supporting keys
+
+#### Scenario: A rejected capture does not consume the interval
+- **GIVEN** an SDK that rate-limits supporting debug keys
+- **AND** a `before_send` hook that drops the next event
+- **WHEN** an eligible event is captured and the hook drops it
+- **AND** another eligible event is captured immediately afterwards and is accepted
+- **THEN** the accepted event's properties include the supporting keys
+
+#### Scenario: Omitting the session duration key is not a violation
+- **GIVEN** an SDK that does not attach `$sdk_debug_current_session_duration`
+- **AND** a session whose start time is available
+- **WHEN** an event carrying the supporting keys is captured
+- **THEN** the event's properties include `$sdk_debug_session_start`
+- **AND** the absence of `$sdk_debug_current_session_duration` is not a violation of this spec
 
 ### Requirement: All debug keys on one event come from a single consistent snapshot
 

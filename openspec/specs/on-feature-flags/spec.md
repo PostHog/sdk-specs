@@ -36,6 +36,7 @@ The exact callback shape varies by SDK:
 
 - **browser:** `onFeatureFlags(callback): () => void`
 - **js-core / react-native:** `onFeatureFlags(callback): () => void` with a simpler callback that receives the latest `featureFlags` map/list
+- **iOS:** `onFeatureFlags(callback) -> Subscription` with `unsubscribe()`, whose callback receives the enabled flag keys, their variants, and `errorsLoading`; also available from Objective-C as `onFeatureFlags:`
 - **Android:** `PostHogConfig.onFeatureFlags = callback` and `reloadFeatureFlags(onFeatureFlags?)`
 - **Flutter:** `PostHogConfig(onFeatureFlags: ...)` / `config.onFeatureFlags = ...` during `setup(...)`
 - **Unity:** `PostHogConfig.OnFeatureFlagsLoaded = Action` and static event `PostHog.OnFeatureFlagsLoaded += handler`
@@ -52,11 +53,11 @@ The exact callback shape varies by SDK:
 3. **Invoke again on subsequent updates.**
    - The callback is not one-shot; it is intended to react to future flag changes as well.
 4. **Pass callback data according to SDK style.**
-   - Browser passes enabled flag keys, variants, and an optional context like `{ errorsLoading }`.
+   - Browser and iOS pass enabled flag keys, variants, and an error indication like `errorsLoading`.
    - js-core / React Native expose a simpler callback shape centered on the latest feature-flag values.
    - Android, Flutter, and Unity primarily expose a readiness signal with no direct payload; callers re-read flags through getter APIs when notified.
 5. **Support immediate invocation when state is already loaded in some SDKs.**
-   - Browser calls the callback immediately if flags were already loaded.
+   - Browser and iOS call the callback once with the current values if flags were already loaded.
    - Other SDKs may instead invoke only on the next load/update cycle.
 6. **Do not mutate flags by subscribing.** The callback only observes flag readiness/change notifications.
 7. **Handle missing/no-flag cases SDK-specifically.**
@@ -91,7 +92,7 @@ The exact callback shape varies by SDK:
 
 ## Concurrency & ordering guarantees
 
-- Callbacks are invoked after the corresponding flag update/load work has committed enough state for getters to read the new values.
+- Callbacks are invoked after the corresponding flag update/load work has committed enough state for getters to read the new values. On SDKs with a main/UI thread, delivery happens on that thread; posthog-ios delivers on the main thread after its getters already return the new values.
 - Ordering between multiple callbacks follows the SDK's own listener/event registration model.
 - If flags update rapidly, callbacks may fire multiple times; callers should treat them as change notifications, not exactly-once events.
 
@@ -148,3 +149,19 @@ The SDK SHALL implement the canonical `on-feature-flags` behavior described by t
   | key     | value |
   | beta-ui | true  |
 - **THEN** the feature flag listener should not be invoked again
+
+#### Scenario: Listener is invoked with the last known flags when a load fails
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** feature flags are already loaded with values:
+  | key     | value |
+  | beta-ui | true  |
+- **AND** a feature flag listener is registered
+- **WHEN** a feature flag load fails
+- **THEN** the feature flag listener should be invoked with flags:
+  | key     | value |
+  | beta-ui | true  |
+- **AND** the feature flag listener should be told that loading flags errored

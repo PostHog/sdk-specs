@@ -1,0 +1,53 @@
+## Why
+
+Two SDKs let an app drop `$exception` events by exception type, and `capture-exception` says
+nothing about it. The spec only notes, in prose, that "some SDKs may drop the event before capture
+when local suppression/error-tracking rules say it should not be sent."
+
+- **posthog-ios** `PostHogErrorTrackingConfig.ignoredExceptionTypes`
+- **posthog-android** `PostHogErrorTrackingConfig.ignoredExceptionTypes`
+
+Until posthog-ios [#894](https://github.com/PostHog/posthog-ios/pull/894) the two disagreed on the
+one part of this that is observable without configuring anything: posthog-ios defaulted to
+`["RCTFatalException"]` while posthog-android defaulted to empty. posthog-ios now defaults to `[]`,
+so the defaults agree and the shared contract is worth stating.
+
+Read from the shipped sources:
+
+| | posthog-ios | posthog-android |
+|---|---|---|
+| Default | `[]` (was `["RCTFatalException"]`) | `mutableListOf()` |
+| Manual `captureException` | dropped (`captureInternal` chokepoint) | dropped (`isIgnoredThrowable`) |
+| Autocapture / crash reports | dropped | dropped (same chokepoint) |
+| Generic `capture("$exception", …)` | dropped | dropped (`hasIgnoredTypeInExceptionList`) |
+| Chain | every `$exception_list` entry | bounded cause-chain walk |
+| Matched on | `$exception_list[*].type`, exact, case-sensitive | `Class.isInstance` when the throwable is in hand; `module` + `type` by name when only the payload is |
+
+## What Changes
+
+- Add one requirement to `capture-exception`, **Ignored exception types**, stating: the option is
+  optional; where it exists it defaults to empty; a non-empty list drops the matching `$exception`
+  event on every path before it enters the capture pipeline; matching walks the whole exception
+  chain and is case-sensitive; and the identifier matched on is platform-idiomatic (live error type
+  including subtypes where the SDK has the error object, serialized `type` otherwise).
+
+## Capabilities
+
+### New Capabilities
+
+_None._
+
+### Modified Capabilities
+
+- `capture-exception`: adds the **Ignored exception types** requirement.
+
+## Impact
+
+Not a breaking change, and no SDK has to move: it records what posthog-ios and posthog-android
+already do after posthog-ios #894. SDKs without the option stay conformant — the requirement is
+conditioned on exposing it.
+
+- **posthog-ios** conforms as of #894.
+- **posthog-android** already conforms, including its server flavor.
+- **posthog-js, posthog-flutter, posthog-react-native** expose no such option; the React Native
+  plugin deduplicates with `beforeSend` instead. Unaffected.

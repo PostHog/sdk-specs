@@ -11,27 +11,20 @@ splits the keys in two. A short list of required keys stays on every event. Ever
 becomes an optional bundle, attached only to SDK events and at most once every 30 seconds. The
 window starts when `before_send` accepts the event carrying the bundle. #5144 also keeps four
 cumulative replay drop counters on `$snapshot` events, each only while it is above zero.
-posthog-ios [#859](https://github.com/PostHog/posthog-ios/pull/859) ports that shape to iOS. It
-also holds at most one claim on the window at a time. That closes a gap posthog-js still has: an
-event captured from inside `before_send` can also get the bundle. The spec now has to describe
-the split, so posthog-android and posthog-flutter have one contract to port against.
+
+The spec has to describe that split so the mobile SDKs have one contract to port against. Where
+mobile needs a rule posthog-js lacks, the spec states it as the contract: for example, holding at
+most one outstanding claim on the window, which closes a gap posthog-js still has, where an event
+captured from inside `before_send` can also get the bundle.
 
 ## References
 
 - **posthog-js:** `origin/main` `928990ded`, which contains #5144. The spec's posthog-js
   citations are pinned there.
-- **posthog-ios#859:** still open. Its citations are pinned to head `fda0e238c`, the commit that
-  moved the window start to acceptance and added the one-claim rule. The later merges of `main`
-  into the branch (`563de3776` and the current head `b9bfa38fa`) did not change the debug-property
-  code: the diff of `PostHog/PostHogSDK.swift` and `PostHog/Replay/PostHogReplayIntegration.swift`
-  between `fda0e238c` and `b9bfa38fa` adds `$geoip_disable` and the explicit-start gating for
-  `config.sessionReplay`, neither of which touches the debug keys. Line numbers after those edits
-  shifted, so the `fda0e238c` pins stay as written. `tasks.md` keeps an open task to re-pin the iOS
-  citations once #859 merges.
-
-An earlier draft of this change followed posthog-js#5119, which gated `$recording_status` along
-with everything else. #5119 was never merged, and #5144 replaced it with the required/optional
-split. This change follows #5144.
+- **posthog-ios:** `origin/main` `88f4b6b56`. The spec cites it only for behavior already there,
+  such as capture-mode derivation, the hold reason, and the crash-context snapshot. Rules with
+  no posthog-js analog and no mobile code yet are stated as the contract, with their mobile tests
+  marked planned.
 
 ## What Changes
 
@@ -68,8 +61,8 @@ split. This change follows #5144.
   replay (mobile puts `$recording_status: disabled` on every event and adds capture mode and
   session start only with the optional bundle), stop/uninstall, event-time, and out-of-scope
   requirements are updated for the split. The out-of-scope requirement no longer lists the four
-  drop counters among the removed counters. The backdated-capture rule from the earlier draft is
-  gone, because iOS now uses the wall clock. The error-capture requirement's citation is re-pinned.
+  drop counters among the removed counters. The backdated-capture rule is gone, because the
+  window runs on the wall clock. The error-capture requirement's citation is re-pinned.
 - **Not in scope:** the `$sdk_diagnostics_config` event; Unity and React Native (separate
   follow-ups, unchanged); Android and Flutter implementation (their own PRs).
 
@@ -90,9 +83,9 @@ _None._
 
 - `openspec/specs/session-replay-debug-properties/spec.md` is updated on archive from this
   change's delta. The README capability row is unchanged (same scope and status).
-- Reference implementations: posthog-js#5144 (merged) and posthog-ios#859 (open).
-- Downstream: posthog-android and posthog-flutter port the same shape in their own PRs. Flutter
-  inherits the native `buildProperties` path, and its `throttleDelay` forwarding follow-up is moot
+- Reference implementation: posthog-js#5144 (merged).
+- Downstream: posthog-ios, posthog-android, and posthog-flutter port this contract in their own
+  repositories. Flutter inherits the native `buildProperties` path, and its `throttleDelay` forwarding follow-up is moot
   now that the key is gone.
 - No backend or ingestion change. Events carry fewer ordinary properties, with no new endpoint
   or wire format.

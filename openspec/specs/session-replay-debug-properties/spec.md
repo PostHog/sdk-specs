@@ -29,7 +29,7 @@ observe a session timeline and attach none of these keys.
 
 ### Requirement: Attach debug properties to every captured event except `$snapshot`
 
-The replay debug properties come in two tiers. The *required keys* are the ones the recording
+The replay debug properties SHALL come in two tiers. The *required keys* are the ones the recording
 buttons and the replay capture diagnostics read from individual events:
 
 - on every platform: `$recording_status`, `$sdk_debug_replay_event_trigger_status`,
@@ -63,11 +63,11 @@ it is required or the optional bundle is allowed (`:2166-2175`), after the `$sna
 return (`:2133`); `$snapshot` is also listed in `EVENTS_WITHOUT_REPLAY_DEBUG_PROPERTIES` (`:201`).
 The minimal envelope is rebuilt from an explicit allowlist by `minimizeFlagCalledEventProperties`
 (`packages/core/src/featureFlagUtils.ts:263`, applied at `posthog-core.ts:1909-1911`).
-posthog-ios#859 head `fda0e238c` — `requiredReplayDebugPropertyKeys`
-(`PostHog/PostHogSDK.swift:598-605`) copied onto every event that does not carry the optional
-bundle (`:732-737`); `$snapshot` is built with `appendSharedProps: !isSnapshotEvent`
-(`:1581`), so it never reaches that block; the minimal envelope keeps only allowlisted keys
-(`:1590-1594`).
+Mobile SDKs port the required-key split from this requirement; posthog-js is its only reference.
+Two behaviors it keeps are already in posthog-ios `origin/main` `88f4b6b56`: `$snapshot` is built with
+`appendSharedProps: !isSnapshotEvent` (`PostHog/PostHogSDK.swift:1552`), so it never reaches the
+debug-key block (`:666`, `:695-714`), and the minimal envelope is filtered to its allowlist
+(`:1561-1562`, applied at `:2612-2617`).
 
 Covering test: posthog-js `packages/browser/src/__tests__/posthog-core-also.test.ts:102` (the
 eight required keys on `custom_event`, `$feature_flag_called`, `$$heatmap`, and on in-window
@@ -75,12 +75,12 @@ eight required keys on `custom_event`, `$feature_flag_called`, `$$heatmap`, and 
 `:806` ("returns calculated properties" — a custom event carries `$recording_status: 'disabled'`);
 `packages/browser/src/__tests__/__snapshots__/featureflags.test.ts.snap:72` (minimal envelope,
 no debug keys) and `:103` (full envelope, `$recording_status: "disabled"` at `:145`).
-posthog-ios#859 `PostHogTests/PostHogSDKTest.swift:383` ("captures $recording_status on every
-event and the full replay debug bundle on the first eligible SDK event only"), `:415` ($snapshot
-exclusion), `:633` (full `$feature_flag_called` carries `$recording_status`), `:705` (minimal
-envelope carries none), `:793` (gated full envelope carries it);
-`PostHogTests/PostHogSessionReplayRemoteConfigBufferTest.swift:659` (a custom event carries all
-four required keys from an installed integration).
+posthog-ios `PostHogTests/PostHogSDKTest.swift:407` ("excludes $recording_status and $sdk_debug_*
+properties from $snapshot events"), `:695` ("sends minimal feature flag event when gated and flag
+has no experiment": no debug key, `:732-733`) and `:783` ("sends full feature flag event when gated
+but flag has an experiment": `$recording_status` present, `:800`) at `88f4b6b56`. Planned (mobile): a
+custom event and an in-window eligible event from an installed replay integration carry exactly
+the four required keys.
 
 #### Scenario: Custom event carries debug properties
 - **GIVEN** the SDK is initialized
@@ -116,7 +116,7 @@ four required keys from an installed integration).
 
 ### Requirement: Attach the optional replay debug bundle only to eligible SDK events
 
-The *optional replay debug bundle* is every replay debug key that is not a required key (the
+The *optional replay debug bundle* SHALL be every replay debug key that is not a required key (the
 required keys are listed in "Attach debug properties to every captured event except
 `$snapshot`"). On mobile it is `$sdk_debug_session_start`, `$sdk_debug_replay_flush_hold_reason`,
 `$sdk_debug_replay_pending_trigger_conditions`, and the mobile-only
@@ -143,22 +143,17 @@ Reference: posthog-js `origin/main` `928990ded` (posthog-js#5144, merged as `bd6
 from `sessionRecording.sdkDebugProperties` only when `includeDebugProperties` (not paused and
 eligible) or the key is required (`posthog-core.ts:2166-2175`); eligibility is tested on
 the name `capture()` was called with (`eventName` at build, `event_name` when arming the window,
-`:1959`), so a `before_send` rename does not change it. posthog-ios#859 head `fda0e238c` —
-`isReplayDebugEvent` (`PostHog/PostHogSDK.swift:613-618`) checks the `event` passed to
-`buildProperties`, before `beforeSend`; the optional bundle is merged only when the window is
-claimed (`:726-737`); `PostHogEvent.carriesReplayDebugBundle`
-(`PostHog/Models/PostHogEvent.swift:37`) carries the claim through a `beforeSend` rename or
-replacement (`PostHogSDK.swift:1912-1913`).
+`:1959`), so a `before_send` rename does not change it. posthog-js is the only reference for the gate. Mobile SDKs port it, and the two rename cases above
+are the mobile contract: the eligibility decision made when the properties are built SHALL
+survive `beforeSend`, so a rename in either direction does not change it. posthog-js gets this by
+reading the original name directly; a mobile SDK needs its own way to carry the decision across
+the hook.
 
 Covering test: posthog-js `packages/browser/src/__tests__/posthog-core-also.test.ts:102` ("keeps
 replay diagnosis on every event while throttling optional debug properties" — `custom_event`,
 `$feature_flag_called`, and `$$heatmap` get the required keys only; `$pageview` gets the full
-bundle). posthog-ios#859 `PostHogTests/PostHogSessionManagerTest.swift:316` ("a custom event
-carries the required keys but none of the optional replay debug bundle"), `:594` ("an eligible
-event renamed by beforeSend still carries the bundle and consumes the window"), `:625` ("a custom
-event renamed to an eligible name by beforeSend carries no bundle and does not consume the
-window"); `PostHogTests/PostHogSessionReplayRemoteConfigBufferTest.swift:659` ("a custom event
-carries every required key from the installed integration, and none of the gated ones").
+bundle). Planned (mobile): one test per scenario in this requirement, including both `beforeSend` rename
+scenarios.
 
 #### Scenario: An eligible SDK event carries the optional bundle
 - **GIVEN** the SDK is initialized with an active session
@@ -237,34 +232,22 @@ Reference: posthog-js `origin/main` `928990ded` — `REPLAY_DEBUG_PROPERTIES_INT
 runs `before_send` and returns on a drop (`:1948-1957`), then sets the paused flag and starts the
 30-second timer only for an eligible event when `this.sessionRecording` exists and the flag is
 not already set (`:1959-1962`), before the event is handed on (`:1971`); `calculateEventProperties`
-reads the flag but never sets it (`:2169`). posthog-ios#859 head `fda0e238c` —
-`replayDebugPropertiesInterval = 30` (`PostHog/PostHogSDK.swift:596`);
-`claimReplayDebugPropertiesWindow` refuses while the last acceptance or an outstanding claim is
-less than 30 s old on the wall clock (`:620-641`); `commitReplayDebugPropertiesWindow` stores
-`now()` at acceptance (`:643-649`); `releaseReplayDebugPropertiesClaim` frees a dropped claim
-(`:651-656`); `buildEvent` releases the claim when `beforeSend` drops the event (`:1898-1927`);
-`queueEvent` releases it for a deduplicated `$set`/`$identify` and commits only when the event
-was stored (`:1929-1974`); `close()` clears both timestamps (`:2757-2760`); read-only builds never
-claim and always merge the bundle (`:726-728`).
+reads the flag but never sets it (`:2169`). The mobile-only rules below have no posthog-js analog and are stated here as the contract: the
+window starts when the event is accepted into the send queue, measured as a stored acceptance
+time against the wall clock; a dropped, deduplicated, or unstored event releases its claim; at
+most one claim is outstanding (SHOULD); `close()` clears the window; and the crash-context
+snapshot never moves it. posthog-js arms a timer after `before_send` returns, has no
+deduplication or close path, and does not hold a claim across `before_send`.
 
 Covering test: posthog-js `packages/browser/src/__tests__/posthog-core-also.test.ts:102` (a
 direct `calculateEventProperties(..., readOnly: true)` build carries the bundle without arming;
 the next `$pageview` carries it; eligible events inside the window get required keys only; at
 +29 999 ms still required-only; at +30 000 ms the bundle returns) and `:188` ("does not consume
 the replay diagnostic interval on %s" — property enrichment, `before_send` rejection, and
-snapshot capture). posthog-ios#859 `PostHogTests/PostHogSessionManagerTest.swift:342` ("the
-optional replay debug bundle is attached at most once every 30 seconds; required keys stay on
-every event"), `:375` ("a far-future eligible capture doesn't suppress the optional bundle once
-wall clock catches up"), `:401` ("the crash-context snapshot always carries the bundle and never
-arms the window"), `:441` ("an event dropped by beforeSend does not consume the throttle
-window"), `:469` ("an event that carried no bundle does not consume the window when the interval
-elapses mid-capture"), `:506` ("a deduplicated identify() $set does not arm the throttle
-window"), `:541` ("a custom event captured while the window is open does not arm it"), `:566`
-("an eligible event captured from inside beforeSend does not also carry the optional bundle"),
-`:656` ("the window starts when the event is accepted, not while beforeSend is running"), `:684`
-("a claimer dropped by beforeSend releases the claim so the next eligible event gets the bundle
-immediately"), `:709` ("the internal claim marker never reaches a queued event"). No iOS test
-covers the `close()` reset (`PostHogSDK.swift:2757-2760`); posthog-js has no test for the nested
+snapshot capture). Planned (mobile): one test per scenario in this requirement: a burst of eligible events, the 29 s
+and 30 s boundaries, a slow `beforeSend`, a `beforeSend` drop, a deduplicated `$set`/`$identify`,
+a future-dated capture, a non-capture property build, the crash-context snapshot, a capture
+nested in `beforeSend`, and the `close()` reset. posthog-js has no test for the nested
 `before_send` case, where it diverges.
 
 #### Scenario: Only the first eligible event in a burst carries the optional bundle
@@ -353,18 +336,19 @@ specified in the keys requirement.
 Reference: posthog-js `origin/main` `928990ded` sets `$sdk_debug_retry_queue_size` outside the
 `this.sessionRecording` block (`packages/browser/src/posthog-core.ts:2176`); the minimal envelope
 is rebuilt from an allowlist (`:1909-1911`, `packages/core/src/featureFlagUtils.ts:263`).
-posthog-ios#859 head `fda0e238c` sets `$sdk_debug_pending_queue_size` after and outside the
-bundle merge (`PostHog/PostHogSDK.swift:739-741`) and lists it in `pointInTimeDebugKeys`
-(`:3265-3268`), which `notifyContextDidChange` strips (`:3292-3294`).
+posthog-ios `origin/main` `88f4b6b56` sets `$sdk_debug_pending_queue_size` from the queue's depth
+(`PostHog/PostHogSDK.swift:638-640`) in the shared-properties build (`:714`), so it is on every
+non-`$snapshot` event whether or not replay is configured, and lists it in `pointInTimeDebugKeys`
+(`:3251-3255`), which `notifyContextDidChange` strips (`:3277-3279`).
 
 Covering test: posthog-js `packages/browser/src/__tests__/posthog-core-also.test.ts:806`
 ("returns calculated properties" — a custom event carries `$sdk_debug_retry_queue_size: 0`) and
 `packages/browser/src/__tests__/__snapshots__/featureflags.test.ts.snap:103` (the full
-`$feature_flag_called` envelope carries it). posthog-ios#859 `PostHogTests/PostHogSDKTest.swift:383`
-(every event in the burst carries `$sdk_debug_pending_queue_size`), `:633` (the full
-`$feature_flag_called` envelope carries it), `:705` (the minimal envelope carries no
-`$sdk_debug_*` key), and `PostHogTests/PostHogSessionManagerTest.swift:401` (the crash-context
-snapshot does not).
+`$feature_flag_called` envelope carries it). posthog-ios `PostHogTests/PostHogSDKTest.swift:474` ("reports disabled recording status with no
+replay keys on non-iOS platforms": the queue-depth key is present, `:486`), `:695` (the minimal
+envelope carries no `$sdk_debug_*` key), and
+`PostHogTests/PostHogSessionReplayRemoteConfigBufferTest.swift:580` ("crash context re-snapshots on
+recording transitions and omits point-in-time counters") at `88f4b6b56`.
 
 #### Scenario: A custom event carries the queue-depth key
 - **GIVEN** the SDK is initialized
@@ -381,8 +365,9 @@ snapshot does not).
 
 ### Requirement: `$snapshot` events MAY carry the browser's replay drop counters
 
-The browser recorder keeps four cumulative counts of replay data it dropped, and posthog-js
-attaches each one to the `$snapshot` events it flushes, only while its value is greater than zero:
+An SDK that reports the browser's replay drop counters SHALL attach each one only to the
+`$snapshot` events it flushes, and only while its value is greater than zero, as posthog-js does.
+The browser recorder keeps four cumulative counts of replay data it dropped:
 
 - `$sdk_debug_replay_unstringifiable_events_dropped`: events dropped because their JSON could not
   be stringified (longer than the engine's maximum string length);
@@ -517,13 +502,13 @@ snapshot.
 Reference: the full value set is `sessionRecordingStatuses`
 (`packages/browser/src/extensions/replay/external/triggerMatching.ts:85-96` at posthog-js
 `origin/main` `928990ded`); the mobile three-value mapping is
-`PostHog/Replay/PostHogReplayIntegration.swift:1848-1850` at posthog-ios#859 head `fda0e238c`.
+`PostHog/Replay/PostHogReplayIntegration.swift:1918-1920` at posthog-ios `origin/main` `88f4b6b56`.
 
 Covering test: no covering test in posthog-js for the mobile subset (mobile has no browser
-analog to test). posthog-ios#859 `PostHogTests/PostHogSessionReplayRemoteConfigBufferTest.swift:474`
-("holding for remote config or minimum duration reports buffering with a hold reason, then active
-once resolved"); Android's equivalent (`PostHogReplayIntegrationTest.kt` "buffering to active")
-is not yet in the repo.
+analog to test). posthog-ios `PostHogTests/PostHogSessionReplayRemoteConfigBufferTest.swift:486` ("holding for
+remote config or minimum duration reports buffering with a hold reason, then active once
+resolved") at `88f4b6b56`; Android's equivalent (`PostHogReplayIntegrationTest.kt` "buffering to
+active") is not yet in the repo.
 
 #### Scenario: Replay not configured reports disabled
 - **GIVEN** a mobile SDK is initialized without session replay configured
@@ -633,28 +618,26 @@ Reference: posthog-js `origin/main` `928990ded` — `REQUIRED_REPLAY_PROPERTIES`
 (`packages/browser/src/extensions/replay/session-recording.ts:51-61`, `:487-499`); their `hidden`
 exposure (`packages/browser/src/persistence-key-policy.ts:192-200`); the `register_for_session`
 writes (`triggerMatching.ts:303`, `:415`, `:529`); the merge (`posthog-core.ts:2166-2175`);
-session-start source `sessionid.ts:25`. posthog-ios#859 head `fda0e238c` — required keys
-(`PostHog/PostHogSDK.swift:598-605`); the no-integration fallback and
-`$sdk_debug_session_start` from the session manager's start snapshot (`:714-724`); the debug map
-merged last with `{ _, new in new }` (`:728`); the integration's builder
-`debugProperties()` (`PostHog/Replay/PostHogReplayIntegration.swift:1829-1884`: status
-`:1848-1850`, hold reason `:1851-1853`, capture mode `:1857`, buffer length `:1859`, trigger
-statuses `:1874-1875`, pending conditions `:1877-1882`); `captureMode(config:)` (`:1803-1805`);
-`throttleDelayMs` and `$sdk_debug_current_session_duration` are absent from both files.
+session-start source `sessionid.ts:25`. posthog-ios `origin/main` `88f4b6b56` — the integration's builder `debugProperties()`
+(`PostHog/Replay/PostHogReplayIntegration.swift:1899-1956`: status `:1918-1920`, hold reason
+`:1921-1923`, capture mode `:1927`, buffer length `:1930`, trigger statuses `:1945-1946`, pending
+conditions `:1948-1953`); `captureMode(config:)` (`:1862-1864`); the session start from the
+session manager's start snapshot (`PostHog/PostHogSDK.swift:633-635`); the debug map merged so it
+overrides a same-named property (`:705`, `:714`, `{ _, new in new }`). The required/optional tiers,
+the two removed keys, and the capture-mode classification are the contract mobile SDKs port; no
+mobile code is cited for them.
 
 Covering test: posthog-js `packages/browser/src/__tests__/posthog-core-also.test.ts:102` (the
 required/optional split, including the trigger statuses on every event and
 `$sdk_debug_replay_pending_trigger_conditions` / `$sdk_debug_session_start` only on
-bundle-carrying events). posthog-ios#859 `PostHogTests/PostHogSessionManagerTest.swift:282`
-("$sdk_debug_session_start describes the rotated session on the event that rotates it"),
-`PostHogTests/PostHogSDKTest.swift:383` (the no-integration fallback puts `wireframe` capture
-mode on the bundle-carrying `$screen` only), `:444` ("reports screenshot capture mode for the
-flutter host"), `:460` ("SDK-computed debug keys win over a same-named registered super
-property"), `PostHogTests/PostHogSessionReplayRemoteConfigBufferTest.swift:627`
-("sessionReplayDebugProperties() returns the same replay debug keys and values a captured event
-carries"), `:659` (required vs gated keys on a custom event). No test on either mobile SDK
-derives the session start from a caller-supplied UUIDv7 `$session_id` (iOS reads the manager's
-snapshot at `PostHogSDK.swift:722-724`); that scenario remains planned.
+bundle-carrying events). posthog-ios `PostHogTests/PostHogSDKTest.swift:441` ("reports screenshot capture mode for the
+flutter host"), `:457` ("SDK-computed debug keys win over a same-named registered super
+property"), and `PostHogTests/PostHogSessionReplayEventTriggersTest.swift:235` ("trigger status
+reflects pending state before either trigger resolves, then activation as each fires") at
+`88f4b6b56`. Planned (mobile): the required/optional split on a custom event, and the `wireframe`
+default. No test on either mobile SDK derives the session start from a caller-supplied UUIDv7
+`$session_id` (iOS reads the manager's snapshot at `PostHog/PostHogSDK.swift:633-635`); that
+scenario remains planned.
 
 #### Scenario: Session and queue keys are present when a session exists (posthog-js)
 - **GIVEN** posthog-js is initialized with session replay and an active session
@@ -697,8 +680,8 @@ loaded" on mobile; `$recording_status` is.
 - **AND** `$sdk_debug_session_start` is T − 1h, the timestamp embedded in that id, not T
 
 Covering test: planned — `PostHogTest.kt` "session debug keys follow a caller-provided session
-id" on Android; iOS equivalent not in posthog-ios#859 (`PostHogSDK.swift:722-724` reads the
-manager's start snapshot unconditionally).
+id" on Android; the iOS equivalent is planned too (`PostHog/PostHogSDK.swift:633-635` at
+posthog-ios `88f4b6b56` reads the manager's start snapshot unconditionally).
 
 #### Scenario: Session keys are omitted for a non-UUIDv7 caller session id (mobile)
 - **GIVEN** a caller captures an eligible SDK event, with the window allowing the optional
@@ -822,16 +805,14 @@ supplies it (the "Debug keys describe the SDK state when the event occurred" req
 Reference: posthog-js `origin/main` `928990ded` — `isReplayDebugEvent` accepts any `$`-prefixed
 name not in `EVENTS_WITHOUT_REPLAY_DEBUG_PROPERTIES` (`packages/browser/src/posthog-core.ts:201-204`),
 so `$exception`, `$identify`, and `$set` qualify, and the required keys are copied regardless
-(`:2166-2175`). posthog-ios#859 head `fda0e238c` passes the event name into `buildProperties`
-for `$identify`, `$screen`, `$create_alias`, `$groupidentify`, and every `capture()` path, so the
-same gate and the same required-key copy apply (`PostHog/PostHogSDK.swift:726-737`).
+(`:2166-2175`). Mobile SDKs port the same gate and the same required-key copy for every capture path, including
+`$identify`, `$screen`, `$create_alias`, and `$groupidentify`.
 
 Covering test: posthog-js `packages/browser/src/__tests__/posthog-core-also.test.ts:102` (inside
 a window, `$exception`, `$identify`, and `$set` carry exactly the required keys; after the window
 `$autocapture` carries the bundle and the following `$exception` the required keys only).
-posthog-ios#859 `PostHogTests/PostHogSDKTest.swift:383` covers `$exception` inside the window
-(`$recording_status` present, optional bundle absent); no iOS test asserts `$identify` or `$set`
-specifically — planned.
+Planned (mobile): `$exception`, `$identify`, and `$set` inside a window carry the required keys
+and not the optional bundle.
 
 #### Scenario: Exception event carries recording status
 - **GIVEN** the SDK is initialized
@@ -879,21 +860,20 @@ Reference: posthog-js `origin/main` `928990ded` — `if (this.sessionRecording)`
 `SessionRecording.sdkDebugProperties`
 (`packages/browser/src/extensions/replay/session-recording.ts:487-499`, the
 `{ $recording_status: this.status }` arm at `:497`); the extension is created only when
-`ext.sessionRecording && !startInCookielessMode` (`posthog-core.ts:1180`). posthog-ios#859 head
-`fda0e238c` — the no-integration fallback `["$recording_status": "disabled",
-"$sdk_debug_replay_capture_mode": …]` on iOS and `["$recording_status": "disabled"]` on other
-Apple platforms (`PostHog/PostHogSDK.swift:714-721`), `$sdk_debug_session_start` added at
-`:722-724`; the fallback is split into required and optional keys by the same block as the
-integration's map (`:726-737`).
+`ext.sessionRecording && !startInCookielessMode` (`posthog-core.ts:1180`). posthog-ios `origin/main` `88f4b6b56` — the no-integration fallback sets `$recording_status:
+disabled` and `$sdk_debug_replay_capture_mode` on iOS and only `$recording_status: disabled` on
+other Apple platforms (`PostHog/PostHogSDK.swift:703-713`); `$sdk_debug_session_start` comes from
+the session manager (`:633-635`, merged at `:714`). Splitting that fallback into required and
+optional keys is the contract mobile SDKs port.
 
 Covering test: posthog-js `packages/browser/src/__tests__/posthog-core-also.test.ts:806`
 ("returns calculated properties" — the extension is present but not started, so a custom event
 carries `$recording_status: 'disabled'`); no posthog-js test asserts the no-extension case.
-posthog-ios#859 `PostHogTests/PostHogSDKTest.swift:383` (no integration installed: the custom
-event and the in-window `$exception` carry `$recording_status: disabled` without capture mode or
-session start; the `$screen` in between carries `wireframe` capture mode and a session start),
-`:477` ("reports disabled recording status with no replay keys on non-iOS platforms"). Android's
-`PostHogTest.kt` "with no handler" is not yet in the repo.
+posthog-ios `PostHogTests/PostHogSDKTest.swift:474` ("reports disabled recording status with no
+replay keys on non-iOS platforms") at `88f4b6b56`. Planned (mobile): with no integration installed, a
+custom event carries `$recording_status: disabled` only, and an eligible event the window allows
+adds capture mode and session start. Android's `PostHogTest.kt` "with no handler" is not yet in
+the repo.
 
 #### Scenario: No replay integration installed still reports disabled
 - **GIVEN** a mobile SDK is initialized with no session replay integration installed
@@ -931,17 +911,15 @@ refreshed on the same transition, so the crash reporter's copy is reset too.
 
 Reference: posthog-js clears the hold reason on stop,
 `packages/browser/src/extensions/replay/external/lazy-loaded-session-recorder.ts:1522-1523` at
-posthog-js `origin/main` `928990ded`. posthog-ios#859 head `fda0e238c` computes the hold reason
-fresh on every `debugProperties()` call
-(`PostHog/Replay/PostHogReplayIntegration.swift:1830-1853`).
+posthog-js `origin/main` `928990ded`. posthog-ios `origin/main` `88f4b6b56` computes the hold reason fresh on every `debugProperties()`
+call (`PostHog/Replay/PostHogReplayIntegration.swift:1899-1923`).
 
 Covering test: `lazy-sessionrecording.test.ts` replay-stop tests (posthog-js's fix for the
-staleness this requirement generalizes). posthog-ios#859
-`PostHogTests/PostHogSessionReplayRemoteConfigBufferTest.swift:500` ("stopping recording reports
-disabled and clears the hold reason") and `:523` ("uninstalling the replay integration reports
-disabled and clears the hold reason"), both also asserting `$sdk_debug_replay_capture_mode`
-remains present; Android's `PostHogReplayIntegrationTest.kt` "stopped integration" is not yet in
-the repo.
+staleness this requirement generalizes). posthog-ios `PostHogTests/PostHogSessionReplayRemoteConfigBufferTest.swift:512` ("stopping
+recording reports disabled and clears the hold reason") and `:536` ("uninstalling the replay
+integration reports disabled and clears the hold reason"), both also asserting
+`$sdk_debug_replay_capture_mode` remains present (`:532`, `:555`), at `88f4b6b56`; Android's
+`PostHogReplayIntegrationTest.kt` "stopped integration" is not yet in the repo.
 
 #### Scenario: Stopping recording clears the hold reason
 - **GIVEN** the replay integration is buffering with a hold reason present
@@ -993,20 +971,23 @@ Reference: no posthog-js analog — a browser page does not report previous-proc
 principle is posthog-js's own, though: `calculateEventProperties` resolves the session against
 the event's timestamp rather than "now" (`timestamp.getTime()` passed into
 `checkAndGetSessionAndWindowId`, `packages/browser/src/posthog-core.ts:2153-2159` at posthog-js
-`origin/main` `928990ded`). posthog-ios#859 head `fda0e238c` resolves the session against
-`eventTime = timestamp ?? now()` (`PostHog/PostHogSDK.swift:675-679`) while the window uses
-`now()` (`:620-649`); the crash-context snapshot is `notifyContextDidChange` (`:3275-3294`:
-`event: nil`, `readOnlySession: true`, `pointInTimeDebugKeys` stripped), and the replay
-integration re-notifies on every recording transition.
+`origin/main` `928990ded`). posthog-ios `origin/main` `88f4b6b56` resolves the session against `eventTime = timestamp ?? now()`
+(`PostHog/PostHogSDK.swift:660-663`); the crash-context snapshot is `notifyContextDidChange`
+(`:3262-3290`: `readOnlySession: true`, `pointInTimeDebugKeys` stripped), and the replay
+integration refreshes it whenever `$recording_status` can change
+(`PostHog/Replay/PostHogReplayIntegration.swift:373`). The rules that the snapshot always carries
+the full optional bundle and never starts or moves the window, and that the window runs on the
+wall clock, are the mobile contract; posthog-js has no analog.
 
-Covering test: posthog-ios#859 `PostHogTests/PostHogSessionManagerTest.swift:401` ("the
-crash-context snapshot always carries the bundle and never arms the window"), `:375` ("a
-far-future eligible capture doesn't suppress the optional bundle once wall clock catches up"),
-and `PostHogTests/PostHogSessionReplayRemoteConfigBufferTest.swift:566` ("crash context
-re-snapshots on recording transitions and omits point-in-time counters"); iOS's crash-report
-decode path in `PostHogErrorTrackingAutoCaptureIntegration` (the `customData` branch) covers the
-persisted-snapshot arm. Planned — `PostHogTest.kt` "a previous-run exception carries none of the
-debug keys" and "a backdated event within the current session keeps the debug keys" on Android.
+Covering test: posthog-ios `PostHogTests/PostHogSessionReplayRemoteConfigBufferTest.swift:580`
+("crash context re-snapshots on recording transitions and omits point-in-time counters") at
+`88f4b6b56`; iOS's crash-report decode path in `PostHogErrorTrackingAutoCaptureIntegration` (the
+`customData` branch, `PostHog/ErrorTracking/PostHogErrorTrackingAutoCaptureIntegration.swift:255-259`)
+covers the persisted-snapshot arm. Planned (mobile): the crash-context snapshot always carries
+the bundle and never arms the window, and a far-future eligible capture does not suppress the
+bundle once the wall clock catches up. Planned — `PostHogTest.kt` "a previous-run exception
+carries none of the debug keys" and "a backdated event within the current session keeps the debug
+keys" on Android.
 
 #### Scenario: A previous-process crash carries no live debug state
 - **GIVEN** the SDK is initialized with session replay active in the current process

@@ -62,7 +62,8 @@ captured from inside `before_send` can also get the bundle.
   session start only with the optional bundle), stop/uninstall, event-time, and out-of-scope
   requirements are updated for the split. The out-of-scope requirement no longer lists the four
   drop counters among the removed counters. The backdated-capture rule is gone, because the
-  window runs on the wall clock. The error-capture requirement's citation is re-pinned.
+  window runs on the wall clock. The error-capture requirement's citation is re-pinned, and the
+  requirement is scoped to SDKs whose debug-map build can throw.
 - **Not in scope:** the `$sdk_diagnostics_config` event; Unity and React Native (separate
   follow-ups, unchanged); Android and Flutter implementation (their own PRs).
 

@@ -785,15 +785,22 @@ the same event reflects the state after it.
 stringified error, if and only if building the `$recording_status` / `$sdk_debug_*` debug map
 throws. On a successful build, the key SHALL be absent.
 
+This requirement applies only where the debug-map build can fail. An SDK whose build cannot
+throw (the posthog-ios build is a non-throwing function) never attaches the key, and that is
+conformant: the build-failure scenario below does not apply to it, and the SDK is not required
+to add a failure path in order to emit the key.
+
 Reference: posthog-js wraps the debug-map build in a try/catch and sets this key only in the
 catch branch, `packages/browser/src/posthog-core.ts:2177-2178` at posthog-js `origin/main`
 `928990ded`.
 
 Covering test: no dedicated posthog-js test forces the debug-map build to throw — planned test
-(repo plan row: native "error path" case), not yet in the repo, for both SDKs.
+(repo plan row: native "error path" case), not yet in the repo, for each SDK whose build can
+throw.
 
 #### Scenario: A build failure attaches the stringified error and nothing else from the debug map
-- **GIVEN** building the debug properties map throws an error
+- **GIVEN** an SDK whose debug properties map build can throw
+- **AND** building the debug properties map throws an error
 - **WHEN** an event is captured
 - **THEN** the event's properties include `$sdk_debug_error_capturing_properties` with the
   stringified error

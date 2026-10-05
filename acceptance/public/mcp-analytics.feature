@@ -181,6 +181,20 @@ Feature: MCP analytics
     And the "$mcp_tool_call" event property "$mcp_intent" should equal "find the flags docs"
     And the "$mcp_tool_call" event property "$mcp_intent_source" should equal "context_parameter"
 
+  @sdk:server @mcp_fresh_lowlevel_ownership_capable
+  Scenario: A fresh low-level server resolves injected argument ownership
+    Given automatic instrumentation creates a fresh low-level server for "tools/call"
+    And the tool "search_docs" has a strict schema that declares only "query"
+    And that server instance has not served "tools/list"
+    When the MCP client calls tool "search_docs" with JSON arguments:
+      """application/json
+      {"query":"flags","context":"find docs","llm_model":"model-a"}
+      """
+    And pending captures are flushed
+    Then the tool handler for "search_docs" should have received JSON arguments {"query":"flags"}
+    And the "$mcp_tool_call" event property "$mcp_intent" should equal "find docs"
+    And the "$mcp_tool_call" event property "$mcp_llm_model" should equal "model-a"
+
   @sdk:server
   Scenario: A tool that declares its own context keeps it as data, not intent
     Given an instrumented MCP server with a tool "summarize" whose schema declares a string property "context"

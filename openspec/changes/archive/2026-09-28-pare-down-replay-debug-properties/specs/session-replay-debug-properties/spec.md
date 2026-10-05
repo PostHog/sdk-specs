@@ -28,8 +28,8 @@ Reference: posthog-js `origin/main` `928990ded` (posthog-js#5144, merged as `bd6
 `isReplayDebugEvent` (`packages/browser/src/posthog-core.ts:201-204`); the merge copies a key
 from `sessionRecording.sdkDebugProperties` only when `includeDebugProperties` (not paused and
 eligible) or the key is required (`posthog-core.ts:2166-2175`); eligibility is tested on
-`eventName`, the name `capture()` was called with, both at build and when arming the window
-(`:1959`), so a `before_send` rename does not change it. posthog-ios#859 head `fda0e238c` —
+the name `capture()` was called with (`eventName` at build, `event_name` when arming the window,
+`:1959`), so a `before_send` rename does not change it. posthog-ios#859 head `fda0e238c` —
 `isReplayDebugEvent` (`PostHog/PostHogSDK.swift:613-618`) checks the `event` passed to
 `buildProperties`, before `beforeSend`; the optional bundle is merged only when the window is
 claimed (`:726-737`); `PostHogEvent.carriesReplayDebugBundle`
@@ -265,6 +265,118 @@ snapshot does not).
 - **THEN** the event's properties include the queue-depth key
 - **AND** they do not include `$sdk_debug_session_start`
 
+### Requirement: `$snapshot` events MAY carry the browser's replay drop counters
+
+The browser recorder keeps four cumulative counts of replay data it dropped, and posthog-js
+attaches each one to the `$snapshot` events it flushes, only while its value is greater than zero:
+
+- `$sdk_debug_replay_unstringifiable_events_dropped`: events dropped because their JSON could not
+  be stringified (longer than the engine's maximum string length);
+- `$sdk_debug_replay_throttled_mutations_dropped`: attribute mutations dropped by the mutation
+  throttler's per-node rate limit;
+- `$sdk_debug_replay_oversized_mutations_dropped`: mutation events dropped for exceeding the
+  mutation byte budget;
+- `$sdk_debug_replay_oversized_mutation_bytes_dropped`: the summed estimated compressed size, in
+  bytes, of those oversized mutations.
+
+An SDK that attaches these counters SHALL attach each one only while its value is greater than
+zero, never as `0`. Each is cumulative for the current session: it grows until the SDK rotates to a
+new session id, and it SHALL reset to zero on that rotation, so the first `$snapshot` event of the
+new session carries none of them until something is dropped again. A `$snapshot` event carries
+every counter that is currently above zero. The counters are independent of the 30-second window
+and of event eligibility: they neither open, hold, nor consume the window, and an open window
+does not hide them.
+
+A `$snapshot` event SHALL carry nothing else from this spec: no required key, no optional-bundle
+key, and no queue-depth key. The counters SHALL NOT be attached to any other event. They are not
+part of the recorder's debug-properties map, so the required/optional merge cannot put them on a
+custom or SDK event.
+
+The counters are browser-only as implemented: they count drops in rrweb's mutation pipeline and
+in the browser's JSON encoder. iOS has no analog (no `_dropped` counter exists in posthog-ios), so
+a mobile `$snapshot` event carries none of them, and a mobile SDK that omits them does not violate
+this spec. This spec does not require a mobile SDK to count or attach them. A mobile SDK that later
+adds a drop counter of its own starts a new change with its own reference.
+
+Reference: posthog-js `origin/main` `928990ded` (posthog-js#5144, merged as `bd66ceef9`; the
+`$snapshot` placement is the PR's last commit, "preserve mutation drop counters on snapshots").
+The declaration, increment, reset, and attach sites below (`:531-536`, `:1716`, `:1618-1621`,
+`:2388-2401`, `:2954-2967`) are at the same lines on `origin/main` `6538babc7`. Counters declared
+in `packages/browser/src/extensions/replay/external/lazy-loaded-session-recorder.ts:531-536`.
+Incremented: unstringifiable events in `_captureProcessedEvent` when the event size is
+`UNSTRINGIFIABLE_EVENT_SIZE` (`:1715-1719`); throttled attribute mutations through
+`onDroppedAttributeMutations` (`:2954`, called at `mutation-throttler.ts:140`); oversized mutations
+and their bytes through `onDroppedOversizedMutation` (`:2958-2968`, called at
+`mutation-throttler.ts:159` with the estimated event size). Reset: `_restartForSessionIdChange`
+zeroes all four (`:1618-1621`), and no other site resets them. Attached: the `$snapshot` flush in
+`_flushBuffer` adds each counter with a `> 0` spread guard to the properties of every chunk it
+captures (`:2380-2403`), through `_captureSnapshot` (`:2537-2545`). Not part of the debug map:
+`sdkDebugProperties` (`:2767-2781`) lists none of them. `calculateEventProperties` returns a
+`$snapshot` event's caller-supplied properties without adding any debug key
+(`packages/browser/src/posthog-core.ts:2133-2143`), and `isReplayDebugEvent` excludes `$snapshot`
+(`:201-204`), so a `$snapshot` neither carries nor arms the window.
+
+Covering test: posthog-js
+`packages/browser/src/__tests__/extensions/replay/lazy-sessionrecording.test.ts:4455`
+("reports cumulative %s mutation drops only on snapshots and resets on rotation", run for
+`attribute` and `oversized`: absent at zero, cumulative values after each drop, the other counters
+absent, absent from `sdkDebugProperties`, and absent again on the first `$snapshot` after
+`_onSessionIdCallback` rotates the session);
+`packages/browser/src/__tests__/extensions/replay/lazy-sessionrecording-compression.test.ts:394`
+("counts an event dropped for being too large to stringify") and `:427` ("includes the drop counts
+in the encoded surviving snapshot on %s", all four counters on the `$snapshot` sent on
+`_onBeforeUnload` and `_onPageHide`). `posthog-core-also.test.ts:102` covers the other side: a
+`$snapshot` captured with no counters carries no replay debug key. No test resets the
+unstringifiable counter on rotation or checks a counter against an open window; the source covers
+both (`:1618-1621`; `:2380-2403` never consults the window). No iOS test applies, since iOS has
+no counters.
+
+#### Scenario: Non-zero counters ride on `$snapshot` events and accumulate (browser)
+- **GIVEN** posthog-js is recording and the mutation throttler has dropped 3 attribute mutations
+  in the current session
+- **AND** no other drop counter is above zero
+- **WHEN** a `$snapshot` event is flushed
+- **THEN** its properties include `$sdk_debug_replay_throttled_mutations_dropped` with value 3
+- **AND** they include none of the other three counters
+- **WHEN** 3 more attribute mutations are dropped and the next `$snapshot` event is flushed
+- **THEN** its `$sdk_debug_replay_throttled_mutations_dropped` is 6
+
+#### Scenario: A zero counter is omitted (browser)
+- **GIVEN** posthog-js is recording and an oversized mutation of 2048 estimated bytes has been
+  dropped in the current session
+- **AND** no event was dropped for being unstringifiable and no attribute mutation was throttled
+- **WHEN** a `$snapshot` event is flushed
+- **THEN** its properties include `$sdk_debug_replay_oversized_mutations_dropped` with value 1 and
+  `$sdk_debug_replay_oversized_mutation_bytes_dropped` with value 2048
+- **AND** they include neither `$sdk_debug_replay_unstringifiable_events_dropped` nor
+  `$sdk_debug_replay_throttled_mutations_dropped`, not even with value 0
+
+#### Scenario: Counters reset on session rotation (browser)
+- **GIVEN** posthog-js is recording and at least one drop counter is above zero
+- **WHEN** the session rotates to a new session id
+- **AND** the next `$snapshot` event is flushed
+- **THEN** its properties include none of the four drop counters
+
+#### Scenario: Counters ignore the 30-second window and carry nothing else (browser)
+- **GIVEN** an eligible SDK event carrying the optional bundle was accepted 5 seconds ago
+- **AND** an oversized mutation has been dropped in the current session
+- **WHEN** a `$snapshot` event is flushed
+- **THEN** its properties include `$sdk_debug_replay_oversized_mutations_dropped`
+- **AND** they include no required key, no optional-bundle key, and no queue-depth key
+- **AND** the flush does not change when the window reopens
+
+#### Scenario: Counters never ride on other events (browser)
+- **GIVEN** posthog-js is recording and a drop counter is above zero
+- **WHEN** a custom event, an eligible SDK event the window allows, and a `$feature_flag_called`
+  event are captured
+- **THEN** none of them includes any of the four drop counters
+
+#### Scenario: A mobile `$snapshot` event carries no drop counters
+- **GIVEN** a mobile SDK recording session replay
+- **WHEN** a `$snapshot` event is captured
+- **THEN** its properties include none of the four drop counters
+- **AND** that absence is not a violation of this spec
+
 ## MODIFIED Requirements
 
 ### Requirement: Attach debug properties to every captured event except `$snapshot`
@@ -288,8 +400,10 @@ throttle window all carry them. A required key is *available* when the SDK's cur
 produces a value for it: a mobile SDK without a replay integration produces only
 `$recording_status: disabled` (see "Attach the disabled shape when replay is not configured"),
 and posthog-js without the session-recording extension produces none. `$snapshot` events (the
-replay payload itself) SHALL carry neither the required keys nor the optional bundle — they are
-already replay data, not a report about replay. When the outgoing event is the minimal
+replay payload itself) SHALL carry neither the required keys, the optional bundle, nor the
+queue-depth key — they are already replay data, not a report about replay. The only replay debug
+keys a `$snapshot` event MAY carry are the browser's four drop counters (see "`$snapshot` events
+MAY carry the browser's replay drop counters"). When the outgoing event is the minimal
 `$feature_flag_called` envelope (the allowlisted properties sent when the call is gated and the
 flag has no experiment), the SDK SHALL strip `$recording_status` and every `$sdk_debug_*` key
 along with everything else not on that allowlist; the full `$feature_flag_called` envelope carries
@@ -332,8 +446,9 @@ four required keys from an installed integration).
   `$sdk_debug_replay_event_trigger_status`, `$sdk_debug_replay_linked_flag_trigger_status`, and
   `$sdk_debug_replay_internal_buffer_length`
 
-#### Scenario: Snapshot event carries none of the debug properties
+#### Scenario: Snapshot event carries none of the debug properties when nothing was dropped
 - **GIVEN** the SDK is initialized with session replay active
+- **AND** no replay drop counter is above zero (always the case on mobile)
 - **WHEN** a `$snapshot` event is captured
 - **THEN** the captured event's properties include neither `$recording_status` nor any
   `$sdk_debug_*` key
@@ -892,15 +1007,19 @@ browser-only optional keys `$sdk_debug_replay_stale_config`,
 `origin/main` `928990ded`); the browser-only `$sdk_debug_extensions_init_method` /
 `$sdk_debug_extensions_init_time_ms` keys (`event` exposure,
 `persistence-key-policy.ts:189-190`) — these describe the browser's own lazy-extension-loading
-path, which mobile SDKs do not have, and are not part of either tier; the browser-only `$$heatmap`
+path, which mobile SDKs do not have, and are not part of either tier; the browser-only drop
+counters on `$snapshot` events (the drop-counter requirement above); the browser-only `$$heatmap`
 exclusion (mobile has no such event). The rrweb performance counters the browser used to attach
 (full-snapshot timestamps, `$snapshot_max_depth_exceeded`, slowest-full-snapshot and
-deferred-stylesheet stats, slowest mutation batch, discarded duration samples, throttled- and
-oversized-mutation drop counts and bytes, unstringifiable-event drops, observer init failures)
+deferred-stylesheet stats, slowest mutation batch, discarded duration samples, observer init
+failures)
 were removed from captured events by posthog-js#5144 (merged as `bd66ceef9`) and are emitted by
-no platform; the previously planned follow-up `session-replay-debug-counters` change therefore has
-no shipped reference to describe and is not a pending obligation of this spec — if a counter is
-later needed it starts as a new change with its own reference. Unity, which has its own recorder
+no platform. The four replay drop counters are the exception: #5144 moved them onto `$snapshot`
+events, where the drop-counter requirement above governs them and mobile SDKs are not required to
+emit them. The previously planned follow-up `session-replay-debug-counters` change therefore has
+no shipped reference to describe beyond those four and is not a pending obligation of this spec;
+any other Tier-2 counter stays out of scope, and if one is later needed it starts as a new change
+with its own reference. Unity, which has its own recorder
 and its own event-property edit site, is tracked as a separate follow-up; React Native, which
 builds its own events in JS and does not inherit these properties the way Flutter does, is
 tracked as a separate follow-up. The `$sdk_diagnostics_config` event (masking flags,
@@ -914,8 +1033,8 @@ to them.
 #### Scenario: Browser-only and counter keys are not required by this spec
 - **GIVEN** an SDK conforming to this spec
 - **WHEN** it attaches replay debug keys to a captured event
-- **THEN** the absence of a browser-only interaction-hold value, of
-  `$sdk_debug_recording_script_not_loaded`, `$sdk_debug_replay_url_trigger_status`,
+- **THEN** the absence of the four replay drop counters, of a browser-only interaction-hold
+  value, of `$sdk_debug_recording_script_not_loaded`, `$sdk_debug_replay_url_trigger_status`,
   `$sdk_debug_replay_rrweb_error`, `$sdk_debug_replay_flushed_size`,
   `$sdk_debug_replay_stale_config`, `$sdk_debug_replay_matched_recording_trigger_groups`,
   `$sdk_debug_replay_remote_trigger_matching_config`, `$sdk_debug_replay_trigger_groups_count`,

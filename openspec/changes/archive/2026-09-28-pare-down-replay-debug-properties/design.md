@@ -3,7 +3,8 @@
 The archived `add-session-replay-debug-properties` design recorded six decisions. This change
 keeps 1 (buffering spans both mobile holds), 3 (posthog-js's trigger value set), 5 (session keys
 follow the event's own `$session_id`) and 6 (a previous-process crash carries no live state). It
-revises 2 (how trigger state reaches events) and 4 (the counters follow-up). The decisions below
+revises 2 (how trigger state reaches events) and 4 (the counters follow-up, which stays closed
+except for four drop counters on `$snapshot`). The decisions below
 cover what the delta doesn't make obvious on its own.
 
 ## Decisions
@@ -80,12 +81,22 @@ it attaches `$recording_status: 'disabled'`, and the "returns calculated propert
 that for a custom event. The spec states the mobile rule as the requirement and the browser
 behavior as a named divergence.
 
-### 8. The counters follow-up is closed
+### 8. The counters follow-up is closed, except four drop counters on `$snapshot`
 
 The original design deferred the rrweb performance counters to a later
-`session-replay-debug-counters` change. #5144 removed them from captured events, so no platform
-emits them and the out-of-scope requirement says so. `$sdk_debug_current_session_duration` and
-`$sdk_debug_replay_throttle_delay_ms` are removed the same way.
+`session-replay-debug-counters` change. #5144 removed most of them from captured events, so no
+platform emits those and the out-of-scope requirement says so. `$sdk_debug_current_session_duration`
+and `$sdk_debug_replay_throttle_delay_ms` are removed the same way.
+
+Four drop counters survive. They count replay data the recorder discarded: unstringifiable events,
+throttled attribute mutations, and oversized mutations with their bytes. A drop does nothing
+visible to the page, and the recording quietly loses data, so the count has to ship. #5144 sends
+them on `$snapshot` events only, each only while above zero, outside the 30-second window, and
+resets them on session rotation. The spec gives them their own requirement instead of widening the
+optional bundle, because they never ride on the events the bundle rides on, and `$snapshot` still
+carries no required, optional, or queue-depth key. They are browser-only as implemented and iOS has
+no analog, so the spec says a mobile SDK that omits them conforms and does not ask Android or
+Flutter to add them.
 
 ### 9. posthog-js citations are merged; iOS citations wait for a re-pin
 

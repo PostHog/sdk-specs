@@ -9,7 +9,8 @@ still stores them for the whole retention window, and that costs real money.
 posthog-js [#5144](https://github.com/PostHog/posthog-js/pull/5144) (merged as `bd66ceef9`)
 splits the keys in two. A short list of required keys stays on every event. Everything else
 becomes an optional bundle, attached only to SDK events and at most once every 30 seconds. The
-window starts when `before_send` accepts the event carrying the bundle.
+window starts when `before_send` accepts the event carrying the bundle. #5144 also keeps four
+cumulative replay drop counters on `$snapshot` events, each only while it is above zero.
 posthog-ios [#859](https://github.com/PostHog/posthog-ios/pull/859) ports that shape to iOS. It
 also holds at most one claim on the window at a time. That closes a gap posthog-js still has: an
 event captured from inside `before_send` can also get the bundle. The spec now has to describe
@@ -20,9 +21,13 @@ the split, so posthog-android and posthog-flutter have one contract to port agai
 - **posthog-js:** `origin/main` `928990ded`, which contains #5144. The spec's posthog-js
   citations are pinned there.
 - **posthog-ios#859:** still open. Its citations are pinned to head `fda0e238c`, the commit that
-  moved the window start to acceptance and added the one-claim rule. A later merge of `main` into
-  the branch (`563de3776`) did not touch the debug-property code. `tasks.md` keeps an open task
-  to re-pin the iOS citations once #859 merges.
+  moved the window start to acceptance and added the one-claim rule. The later merges of `main`
+  into the branch (`563de3776` and the current head `b9bfa38fa`) did not change the debug-property
+  code: the diff of `PostHog/PostHogSDK.swift` and `PostHog/Replay/PostHogReplayIntegration.swift`
+  between `fda0e238c` and `b9bfa38fa` adds `$geoip_disable` and the explicit-start gating for
+  `config.sessionReplay`, neither of which touches the debug keys. Line numbers after those edits
+  shifted, so the `fda0e238c` pins stay as written. `tasks.md` keeps an open task to re-pin the iOS
+  citations once #859 merges.
 
 An earlier draft of this change followed posthog-js#5119, which gated `$recording_status` along
 with everything else. #5119 was never merged, and #5144 replaced it with the required/optional
@@ -34,8 +39,9 @@ split. This change follows #5144.
   `$recording_status`, `$sdk_debug_replay_event_trigger_status`,
   `$sdk_debug_replay_linked_flag_trigger_status`, and `$sdk_debug_replay_internal_buffer_length`.
   The browser adds four browser-only keys to that list. They go on every event when available,
-  custom events and full-envelope `$feature_flag_called` included. `$snapshot` and the minimal
-  `$feature_flag_called` envelope still carry none.
+  custom events and full-envelope `$feature_flag_called` included. The minimal
+  `$feature_flag_called` envelope still carries none, and `$snapshot` carries none of these keys
+  apart from the browser's drop counters (below).
 - **Optional bundle (ADDED):** every other replay debug key goes only on *eligible SDK events*:
   names that start with `$`, excluding `$feature_flag_called`, `$snapshot`, and the browser's
   `$$heatmap`. Eligibility is decided on the captured name, before `beforeSend` runs.
@@ -45,6 +51,12 @@ split. This change follows #5144.
   start it. The window runs on the wall clock, not the event's timestamp. A property build that
   is not a capture never starts it, and the mobile crash-context snapshot always carries the full
   bundle. Holding at most one outstanding claim is a SHOULD, and posthog-js's gap is named.
+- **Drop counters (ADDED):** `$snapshot` events MAY carry four cumulative browser replay drop
+  counters, `$sdk_debug_replay_unstringifiable_events_dropped`,
+  `$sdk_debug_replay_throttled_mutations_dropped`, `$sdk_debug_replay_oversized_mutations_dropped`,
+  and `$sdk_debug_replay_oversized_mutation_bytes_dropped`, each only while above zero. They reset
+  on session rotation, ignore the 30-second window and event eligibility, and appear on no other
+  event. They are browser-only as implemented, and mobile SDKs are not required to add them.
 - **Queue-depth key (ADDED):** `$sdk_debug_retry_queue_size` / `$sdk_debug_pending_queue_size`
   stays on every non-`$snapshot` event outside both tiers.
 - **Key list (MODIFIED):** each key is labelled required or optional.
@@ -55,7 +67,8 @@ split. This change follows #5144.
 - **Other requirements (MODIFIED):** the value set, `$exception`/`$identify`/`$set`, unconfigured
   replay (mobile puts `$recording_status: disabled` on every event and adds capture mode and
   session start only with the optional bundle), stop/uninstall, event-time, and out-of-scope
-  requirements are updated for the split. The backdated-capture rule from the earlier draft is
+  requirements are updated for the split. The out-of-scope requirement no longer lists the four
+  drop counters among the removed counters. The backdated-capture rule from the earlier draft is
   gone, because iOS now uses the wall clock. The error-capture requirement's citation is re-pinned.
 - **Not in scope:** the `$sdk_diagnostics_config` event; Unity and React Native (separate
   follow-ups, unchanged); Android and Flutter implementation (their own PRs).
@@ -70,7 +83,8 @@ _None._
 
 - `session-replay-debug-properties`: required keys on every event, an optional bundle limited to
   eligible SDK events and a 30-second window that starts at acceptance, the queue-depth key
-  outside both tiers, a mobile-only optional capture-mode key, and two keys removed.
+  outside both tiers, four browser drop counters allowed on `$snapshot` events, a mobile-only
+  optional capture-mode key, and two keys removed.
 
 ## Impact
 

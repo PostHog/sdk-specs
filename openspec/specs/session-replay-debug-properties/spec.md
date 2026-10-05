@@ -221,8 +221,11 @@ the last known replay state a later-launch crash report is stamped with.
 Between building an event with the optional bundle and accepting or releasing it, the SDK SHOULD
 hold at most one outstanding claim on the window, so an eligible event captured from inside
 `beforeSend` (or concurrently on another thread) while the claim is outstanding does not also
-carry the bundle. An SDK that holds such a claim MAY treat a claim older than the 30-second
-interval as leaked and let a new event replace it. This is stronger than posthog-js, which sets
+carry the bundle. An SDK that holds such a claim SHALL NOT expire it by age: a capture that
+spends longer than the 30-second interval inside `beforeSend` still holds its claim, because it
+already carries the bundle. Every path out of a claiming capture SHALL either start the window
+(the event is accepted) or release the claim (the event is dropped, deduplicated, or not stored),
+and closing the SDK instance SHALL clear it. This is stronger than posthog-js, which sets
 its paused flag only after `before_send` returns, so an eligible event captured from inside
 `before_send` also carries the bundle there; that is a known posthog-js gap, not a behavior to
 copy.
@@ -247,7 +250,8 @@ the replay diagnostic interval on %s" — property enrichment, `before_send` rej
 snapshot capture). Planned (mobile): one test per scenario in this requirement: a burst of eligible events, the 29 s
 and 30 s boundaries, a slow `beforeSend`, a `beforeSend` drop, a deduplicated `$set`/`$identify`,
 a future-dated capture, a non-capture property build, the crash-context snapshot, a capture
-nested in `beforeSend`, and the `close()` reset. posthog-js has no test for the nested
+nested in `beforeSend`, a nested capture after `beforeSend` has outlasted the interval, and the
+`close()` reset. posthog-js has no test for the nested
 `before_send` case, where it diverges.
 
 #### Scenario: Only the first eligible event in a burst carries the optional bundle
@@ -315,6 +319,15 @@ nested in `beforeSend`, and the `close()` reset. posthog-js has no test for the 
 - **WHEN** `$outer` is captured
 - **THEN** exactly one of `$outer` and `$inner` SHOULD carry `$sdk_debug_session_start`, and it
   is `$outer`
+
+#### Scenario: An outstanding claim does not expire while beforeSend runs
+- **GIVEN** an SDK that holds one outstanding claim on the window
+- **AND** no window is open
+- **AND** a `beforeSend` hook that, while processing `$slow`, lets more than 30 seconds of
+  wall-clock time pass and then captures `$inner`
+- **WHEN** `$slow` is captured and accepted
+- **THEN** `$slow` carries `$sdk_debug_session_start`
+- **AND** `$inner` does not carry `$sdk_debug_session_start`
 
 #### Scenario: Closing the SDK instance clears the window (mobile)
 - **GIVEN** an eligible SDK event carrying the optional bundle was accepted less than 30 seconds

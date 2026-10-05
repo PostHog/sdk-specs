@@ -48,7 +48,10 @@ Holding at most one outstanding claim means an eligible event captured from insi
 sets its paused flag only after `before_send` returns, so a nested capture there gets the bundle
 as well. Making this a MUST would put the flagship SDK out of conformance for something that
 costs one extra bundle per nested capture, which is minor. The spec therefore makes it a SHOULD,
-names the posthog-js gap, and lets a port treat a claim older than the interval as leaked. The
+and names the posthog-js gap. A port that does hold a claim must not expire it by age: a claim
+that lapsed after 30 seconds would let a capture nested in a slow `beforeSend` carry the bundle
+too, which is the case the claim exists to prevent. Every exit from a claiming capture starts
+the window or releases the claim instead. The
 repo's convention is to describe reference behavior, so any stronger rule has to come after
 posthog-js closes the gap.
 

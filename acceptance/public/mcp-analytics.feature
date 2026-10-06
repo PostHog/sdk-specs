@@ -3,16 +3,16 @@ Feature: MCP analytics
   Acceptance tests for the canonical MCP analytics behavior across PostHog server SDKs.
   The SDK adapter hosts a small MCP server instrumented by the SDK and acts as its MCP client.
   Unless a scenario says otherwise, the adapter's MCP transport carries no session.
-  Scenarios tagged @mcp_input_required_capable, @mcp_unknown_tool_capable, @mcp_tools_list_capable,
-  @mcp_task_store_capable, @mcp_missing_capability_capable, or @mcp_feedback_capable cover optional
-  behavior; they apply only to an SDK that declares the matching capability.
+  Scenarios tagged @mcp_input_required_capable, @mcp_unknown_tool_capable, @mcp_tools_list_capable, @mcp_task_store_capable,
+  or tagged @mcp_missing_capability_capable or @mcp_feedback_capable cover optional behavior;
+  they apply only to an SDK that declares the matching capability.
 
   Background:
     Given an isolated SDK instance
     And the mock PostHog server is reset
     And the SDK is initialized with token "test-token" and flush threshold 20
 
-  @sdk:server
+  @server
   Scenario: A successful tool call produces one event with the required properties
     Given an instrumented MCP server with a tool "search_docs" that returns the text "Found 3 results"
     When the MCP client calls tool "search_docs" with JSON arguments:
@@ -28,7 +28,7 @@ Feature: MCP analytics
     And the "$mcp_tool_call" event property "$session_id" should be a non-empty string
     And the "$mcp_tool_call" event property "$lib" should end with "-mcp"
 
-  @sdk:server
+  @server
   Scenario: A tool result reaches the client unchanged
     Given an instrumented MCP server with conversation anchoring disabled and a tool "search_docs" that returns the text "Found 3 results"
     When the MCP client calls tool "search_docs" with JSON arguments:
@@ -37,7 +37,7 @@ Feature: MCP analytics
       """
     Then the MCP client should receive a result with exactly one text block "Found 3 results" and isError false
 
-  @sdk:server
+  @server
   Scenario: An unreachable PostHog endpoint does not affect the tool call
     Given an instrumented MCP server with a tool "search_docs" that returns the text "Found 3 results"
     And the mock PostHog server rejects all requests
@@ -48,7 +48,7 @@ Feature: MCP analytics
     And pending captures are flushed
     Then the MCP client should receive a result that includes the text block "Found 3 results"
 
-  @sdk:server
+  @server
   Scenario: A result that asks for more input is counted once, when the call completes
     Given an instrumented MCP server with a tool "deploy" that first returns a result with resultType "input_required" carrying one "elicitation/create" request
     When the MCP client calls tool "deploy" with JSON arguments:
@@ -61,7 +61,7 @@ Feature: MCP analytics
     And pending captures are flushed
     Then exactly 1 received event should be named "$mcp_tool_call"
 
-  @sdk:server @mcp_input_required_capable
+  @server @mcp_input_required_capable
   Scenario: A round that asks for more input is recorded
     Given an instrumented MCP server with a tool "deploy" that first returns a result with resultType "input_required" carrying one "elicitation/create" request
     When the MCP client calls tool "deploy" with JSON arguments:
@@ -74,7 +74,7 @@ Feature: MCP analytics
     And the "$mcp_input_required" event property "$mcp_input_request_methods" should equal JSON ["elicitation/create"]
     And the "$mcp_input_required" event property "$mcp_duration_ms" should be a number
 
-  @sdk:server
+  @server
   Scenario: A task handle is never counted as a successful call
     Given an instrumented MCP server with a tool "export_report" that returns a task and completes it later
     When the MCP client calls tool "export_report" with JSON arguments:
@@ -84,7 +84,7 @@ Feature: MCP analytics
     And pending captures are flushed
     Then no received event should be named "$mcp_tool_call"
 
-  @sdk:server @mcp_task_store_capable
+  @server @mcp_task_store_capable
   Scenario: A task-backed call is counted once, when the task finishes
     Given an instrumented MCP server with a tool "export_report" that returns a task and completes it later
     When the MCP client calls tool "export_report" with JSON arguments:
@@ -96,7 +96,7 @@ Feature: MCP analytics
     Then exactly 1 received event should be named "$mcp_tool_call"
     And the "$mcp_tool_call" event property "$mcp_is_error" should equal JSON false
 
-  @sdk:server
+  @server
   Scenario: Tool metadata from the server's tools is attached to calls, without a prior listing
     Given an instrumented MCP server with a tool "search_docs" described as "Search the docs" with _meta category "docs"
     When the MCP client calls tool "search_docs" with JSON arguments:
@@ -107,7 +107,7 @@ Feature: MCP analytics
     Then the "$mcp_tool_call" event property "$mcp_tool_description" should equal "Search the docs"
     And the "$mcp_tool_call" event property "$mcp_tool_category" should equal "docs"
 
-  @sdk:server @case:acceptance:server:mcp-analytics:failure:<case_id>
+  @server @case:acceptance:server:mcp-analytics:failure:<case_id>
   Scenario Outline: A failed tool call is captured as an error
     Given an instrumented MCP server with a tool "fetch_page" that <failure>
     When the MCP client calls tool "fetch_page" with JSON arguments:
@@ -124,7 +124,7 @@ Feature: MCP analytics
       | is_error     | returns a result with isError true and the text "403 Forbidden" | 403 Forbidden      |
       | thrown_error | throws an error with message "upstream timed out"               | upstream timed out |
 
-  @sdk:server
+  @server
   Scenario: A thrown error's type names the failure
     Given an instrumented MCP server with a tool "query" whose handler throws an error of a custom type named "UpstreamTimeout" with message "upstream timed out"
     When the MCP client calls tool "query" with JSON arguments:
@@ -139,14 +139,14 @@ Feature: MCP analytics
     And the "$exception" event property "$mcp_tool_name" should equal "query"
     And the "$exception" event property "$session_id" should equal the "$mcp_tool_call" event property "$session_id"
 
-  @sdk:server
+  @server
   Scenario: An explicit error type labels the call but not the exception
     Given the SDK's manual MCP capture API records a failed call to tool "query" with error type "validation" and a thrown error of a custom type named "UpstreamTimeout"
     And pending captures are flushed
     Then the "$mcp_tool_call" event property "$mcp_error_type" should equal "validation"
     And the "$exception" event's first exception type should name the type "UpstreamTimeout"
 
-  @sdk:server
+  @server
   Scenario: A call to a tool that does not exist is not counted as a call
     Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
     When the MCP client calls tool "no_such_tool" with JSON arguments:
@@ -156,7 +156,7 @@ Feature: MCP analytics
     And pending captures are flushed
     Then no received event should be named "$mcp_tool_call"
 
-  @sdk:server @mcp_unknown_tool_capable
+  @server @mcp_unknown_tool_capable
   Scenario: A call to a tool that does not exist is recorded as unknown
     Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
     When the MCP client calls tool "no_such_tool" with JSON arguments:
@@ -167,7 +167,7 @@ Feature: MCP analytics
     Then exactly 1 received event should be named "$mcp_unknown_tool"
     And the "$mcp_unknown_tool" event property "$mcp_tool_name" should equal "no_such_tool"
 
-  @sdk:server
+  @server
   Scenario: The context argument is advertised, captured as intent, and removed
     Given an instrumented MCP server with a tool "search_docs" whose schema declares only "query"
     When the MCP client lists tools
@@ -181,7 +181,7 @@ Feature: MCP analytics
     And the "$mcp_tool_call" event property "$mcp_intent" should equal "find the flags docs"
     And the "$mcp_tool_call" event property "$mcp_intent_source" should equal "context_parameter"
 
-  @sdk:server
+  @server
   Scenario: A tool that declares its own context keeps it as data, not intent
     Given an instrumented MCP server with a tool "summarize" whose schema declares a string property "context"
     When the MCP client calls tool "summarize" with JSON arguments:
@@ -193,7 +193,7 @@ Feature: MCP analytics
     And the "$mcp_tool_call" event should not have property "$mcp_intent"
     And the "$mcp_tool_call" event property "$mcp_parameters" should include JSON {"request":{"params":{"arguments":{"context":"the meeting notes"}}}}
 
-  @sdk:server
+  @server
   Scenario: Personal data in the intent is redacted
     Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
     When the MCP client calls tool "search_docs" with JSON arguments:
@@ -203,7 +203,7 @@ Feature: MCP analytics
     And pending captures are flushed
     Then the "$mcp_tool_call" event property "$mcp_intent" should equal "find orders for [redacted]"
 
-  @sdk:server
+  @server
   Scenario: Clients without a session or handle never share a session
     Given an instrumented MCP server with conversation anchoring disabled and a tool "search_docs" that returns the text "ok"
     When MCP client "A" calls tool "search_docs" with JSON arguments:
@@ -218,7 +218,7 @@ Feature: MCP analytics
     Then exactly 2 received events should be named "$mcp_tool_call"
     And the two "$mcp_tool_call" events should have different "$session_id" values
 
-  @sdk:server
+  @server
   Scenario: A conversation handle keeps a stateless client's calls in one session
     Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
     When the MCP client calls tool "search_docs" with JSON arguments:
@@ -232,7 +232,7 @@ Feature: MCP analytics
     And both "$mcp_tool_call" events should have the same "$session_id"
     And both "$mcp_tool_call" events should have property "$mcp_conversation_id" equal to the returned conversation_id
 
-  @sdk:server
+  @server
   Scenario: A malformed conversation handle is replaced and never reaches the tool
     Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
     When the MCP client calls tool "search_docs" with JSON arguments:
@@ -242,7 +242,7 @@ Feature: MCP analytics
     Then the MCP client result should end with a conversation_id text block
     And the tool handler for "search_docs" should have received JSON arguments {"query":"flags"}
 
-  @sdk:server
+  @server
   Scenario: A conversation handle derives the canonical session id
     Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
     When the MCP client calls tool "search_docs" with JSON arguments:
@@ -252,7 +252,7 @@ Feature: MCP analytics
     And pending captures are flushed
     Then the "$mcp_tool_call" event property "$session_id" should equal "ses_6df45f0102a182bcd5e8dd5dad6c65a0"
 
-  @sdk:server
+  @server
   Scenario: An anonymous call does not create a person
     Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
     When the MCP client calls tool "search_docs" with JSON arguments:
@@ -263,7 +263,7 @@ Feature: MCP analytics
     Then the "$mcp_tool_call" event's distinct_id should equal its property "$session_id"
     And the "$mcp_tool_call" event property "$process_person_profile" should equal JSON false
 
-  @sdk:server
+  @server
   Scenario: An identified call processes the person
     Given an instrumented MCP server whose identify callback returns distinct id "user-123" with properties {"plan":"pro"}
     And the instrumented MCP server has a tool "search_docs" that returns the text "ok"
@@ -276,7 +276,7 @@ Feature: MCP analytics
     And the "$mcp_tool_call" event property "$set" should equal JSON {"plan":"pro"}
     And the "$mcp_tool_call" event property "$process_person_profile" should not equal JSON false
 
-  @sdk:server
+  @server
   Scenario: A 2026-07-28 request identifies its client from _meta
     Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
     When the MCP client on protocol revision "2026-07-28" with clientInfo name "claude-code" version "2.1.0" calls tool "search_docs" with JSON arguments:
@@ -288,7 +288,7 @@ Feature: MCP analytics
     And the "$mcp_tool_call" event property "$mcp_client_version" should equal "2.1.0"
     And the "$mcp_tool_call" event property "$mcp_protocol_version" should equal "2026-07-28"
 
-  @sdk:server
+  @server
   Scenario: Arguments are captured in the request shape with injected arguments removed
     Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
     When the MCP client calls tool "search_docs" with JSON arguments:
@@ -298,7 +298,7 @@ Feature: MCP analytics
     And pending captures are flushed
     Then the "$mcp_tool_call" event property "$mcp_parameters" should include JSON {"request":{"method":"tools/call","params":{"name":"search_docs","arguments":{"query":"flags"}}}}
 
-  @sdk:server
+  @server
   Scenario: Credentials in arguments and error text are redacted
     Given an instrumented MCP server with a tool "fetch_page" that fails with message "GET https://svc:hunter2@internal.test/doc?token=abc failed"
     When the MCP client calls tool "fetch_page" with JSON arguments:
@@ -312,7 +312,7 @@ Feature: MCP analytics
     And the "$mcp_tool_call" event property "$mcp_error_message" should not contain "hunter2"
     And the "$mcp_tool_call" event property "$mcp_error_message" should not contain "token=abc"
 
-  @sdk:server
+  @server
   Scenario: A credential in a result's JSON text copy is redacted
     Given an instrumented MCP server with a tool "get_user" that returns structured content and a text block, both:
       """application/json
@@ -329,7 +329,7 @@ Feature: MCP analytics
       """
     And the "$mcp_tool_call" event property "$mcp_response" should not contain "hunter2"
 
-  @sdk:server
+  @server
   Scenario: A successful call's response is captured by default
     Given an instrumented MCP server with a tool "search_docs" that returns the text "Found 3 results"
     When the MCP client calls tool "search_docs" with JSON arguments:
@@ -339,7 +339,7 @@ Feature: MCP analytics
     And pending captures are flushed
     Then the "$mcp_tool_call" event property "$mcp_response" should contain "Found 3 results"
 
-  @sdk:server
+  @server
   Scenario: A failing before-send hook drops the event
     Given an instrumented MCP server with a before-send hook that throws
     And the instrumented MCP server has a tool "search_docs" that returns the text "ok"
@@ -351,7 +351,7 @@ Feature: MCP analytics
     Then no received event should be named "$mcp_tool_call"
     And the MCP client should receive a result that includes the text block "ok"
 
-  @sdk:server
+  @server
   Scenario: Media in a result is never sent
     Given an instrumented MCP server with a tool "screenshot" that returns the text "done" and a 200 KB image
     When the MCP client calls tool "screenshot" with JSON arguments:
@@ -362,7 +362,7 @@ Feature: MCP analytics
     Then the "$mcp_tool_call" event property "$mcp_response" should contain "done"
     And the "$mcp_tool_call" event property "$mcp_response" should not contain image data
 
-  @sdk:server
+  @server
   Scenario: A very large response still produces a bounded event
     Given an instrumented MCP server with a tool "export" that returns a 2 MB text block
     When the MCP client calls tool "export" with JSON arguments:
@@ -374,7 +374,7 @@ Feature: MCP analytics
     And the "$mcp_tool_call" event's serialized properties should be at most 102400 bytes
     And the "$mcp_tool_call" event property "$mcp_tool_name" should equal "export"
 
-  @sdk:server @mcp_tools_list_capable
+  @server @mcp_tools_list_capable
   Scenario: A tool listing records names and only the result envelope
     Given an instrumented MCP server with 101 tools and a page size of 100
     When the MCP client lists tools
@@ -383,7 +383,7 @@ Feature: MCP analytics
     And the first "$mcp_tools_list" event property "$mcp_response" should contain "nextCursor"
     And the first "$mcp_tools_list" event property "$mcp_response" should not contain "tools"
 
-  @sdk:server @mcp_missing_capability_capable
+  @server @mcp_missing_capability_capable
   Scenario: A missing capability report carries its text as intent
     Given an instrumented MCP server with missing-capability reporting enabled
     When the MCP client calls the missing-capability tool with context "export a dashboard to PDF"
@@ -392,14 +392,14 @@ Feature: MCP analytics
     And the "$mcp_missing_capability" event property "$mcp_intent" should equal "export a dashboard to PDF"
     And no received event should be named "$mcp_tool_call"
 
-  @sdk:server
+  @server
   Scenario: The virtual tools are not advertised by default
     Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
     When the MCP client lists tools
     Then the MCP client should not see a tool named "send_feedback"
     And the MCP client should not see a tool named "get_more_tools"
 
-  @sdk:server @mcp_feedback_capable
+  @server @mcp_feedback_capable
   Scenario: A feedback report becomes one feedback event
     Given an instrumented MCP server with feedback reporting enabled
     And the identify option resolves the user "user-1"
@@ -418,7 +418,7 @@ Feature: MCP analytics
     And no received event should contain "ada@example.com"
     And no received event should be named "$mcp_tool_call"
 
-  @sdk:server @mcp_feedback_capable
+  @server @mcp_feedback_capable
   Scenario: Only declared extra report arguments are captured
     Given an instrumented MCP server with feedback reporting enabled and a declared report argument "severity" of type integer
     When the MCP client calls tool "send_feedback" with JSON arguments:
@@ -429,7 +429,7 @@ Feature: MCP analytics
     Then the "$mcp_feedback" event property "$mcp_feedback_severity" should equal 3
     And the "$mcp_feedback" event should not have property "$mcp_feedback_invented"
 
-  @sdk:server
+  @server
   Scenario: A resource's contents never reach PostHog
     Given an instrumented MCP server with a resource "docs://guide" whose text is "RESOURCE-BODY-7f3a"
     When the MCP client reads resource "docs://guide"
@@ -437,7 +437,7 @@ Feature: MCP analytics
     Then the MCP client should receive a resource whose text is "RESOURCE-BODY-7f3a"
     And no received event should contain "RESOURCE-BODY-7f3a"
 
-  @sdk:server
+  @server
   Scenario: A manually captured call matches the automatic one
     Given an MCP server that dispatches tool "search_docs" itself through the SDK's manual API
     And an instrumented MCP server with a tool "search_docs" that returns the text "ok"

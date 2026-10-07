@@ -17,8 +17,10 @@ option on `capture-exception`, now that posthog-ios and posthog-android agree on
 - **Leave the matched identifier platform-idiomatic.** posthog-android matches `Class.isInstance`,
   so a subclass of an ignored type is dropped; posthog-ios matches the serialized `type` string
   exactly. Both are right for their platform — an `NSException`'s `name` is not a class hierarchy.
-  The spec pins the chain and the case sensitivity, which are observable, and lets the identifier
-  follow the platform.
+  posthog-android also matches by name on the generic-capture path, rejoining `module` and `type`
+  into the qualified class name. The spec pins the chain, the case sensitivity and exact equality
+  on a form the SDK documents, which are observable, and lets the identifier follow the platform;
+  a scenario covers the qualified-name form.
 - **Keep it in `capture-exception` rather than a new capability.** The spec's "Error handling"
   section already gestures at local suppression; this gives that sentence a contract. Autocapture
   shares the same filter and the same chokepoint, so splitting it would duplicate the requirement.

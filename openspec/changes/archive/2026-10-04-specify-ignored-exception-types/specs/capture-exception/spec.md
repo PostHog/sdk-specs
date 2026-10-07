@@ -17,10 +17,12 @@ Where the option exists:
 - Matching SHALL consider every exception in the chain (every `$exception_list` entry, or every
   link of the cause chain the SDK would serialize), not only the outermost one, and SHALL be
   case-sensitive.
-- The identifier matched on is platform-idiomatic. An SDK holding the live error object MAY match
-  the platform error type, in which case a subtype of a listed type matches. An SDK holding only
-  the event payload SHALL match the serialized `$exception_list[*].type`, rejoined with the
-  entry's `module` where the SDK splits a qualified name across the two fields.
+- The identifier matched on is platform-idiomatic, and the SDK SHALL document which form it
+  accepts. An SDK holding the live error object MAY match the platform error type, in which case
+  a subtype of a listed type matches (posthog-android: `Class.isInstance` across the cause chain).
+  An SDK matching the serialized payload SHALL compare each `$exception_list[*].type` for exact
+  equality in its documented form: posthog-ios compares the bare `type`; posthog-android rejoins
+  `module` and `type` into the qualified class name for events handed to the generic capture API.
 
 #### Scenario: default configuration drops nothing
 - **GIVEN** an SDK configured with defaults
@@ -41,6 +43,13 @@ Where the option exists:
 - **GIVEN** the ignore list contains `MyNoisyError`
 - **WHEN** a wrapper SDK calls the generic capture API with `$exception` and an `$exception_list`
   entry whose `type` is `MyNoisyError`
+- **THEN** no `$exception` event enters the capture pipeline
+
+#### Scenario: a qualified type is matched in the SDK's documented form
+- **GIVEN** an SDK that documents its identifiers as qualified class names and an ignore list
+  containing `com.example.MyNoisyError`
+- **WHEN** an `$exception` event whose `$exception_list` entry has `module` `com.example` and
+  `type` `MyNoisyError` is handed to the generic capture API
 - **THEN** no `$exception` event enters the capture pipeline
 
 #### Scenario: matching is case-sensitive

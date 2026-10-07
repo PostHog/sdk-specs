@@ -47,7 +47,9 @@ Not a breaking change, and no SDK has to move: it records what posthog-ios and p
 already do after posthog-ios #894. SDKs without the option stay conformant — the requirement is
 conditioned on exposing it.
 
-- **posthog-ios** conforms as of #894.
+- **posthog-ios** conforms as of #894 on iOS, macOS and tvOS. On watchOS and visionOS the matcher is
+  compiled out with the crash reporter, so a non-empty list drops nothing on the manual and generic
+  capture paths; that is an SDK gap to fix, not a reason for the spec to carve those platforms out.
 - **posthog-android** already conforms, including its server flavor.
 - **posthog-js, posthog-flutter, posthog-react-native** expose no such option; the React Native
   plugin deduplicates with `beforeSend` instead. Unaffected.

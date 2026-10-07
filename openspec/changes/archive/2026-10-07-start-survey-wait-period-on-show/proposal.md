@@ -60,7 +60,9 @@ per wait period even across a restart or crash mid-survey.
 
 - **posthog-js** browser: already conforms; this records the reference behavior. React Native writes
   the date on show but does not evaluate it (see below), so it does not yet conform.
-- **posthog-ios**, **posthog-android**: conform as of #917 and #844.
+- **posthog-ios**, **posthog-android**: write the date on show as of #917 and #844; both still
+  refresh it again in `setSurveySeen` on submit or dismiss, which this requirement forbids — a
+  follow-up SDK change.
 - **posthog-flutter**, **posthog-kmp**: inherit through the native SDKs.
 - posthog-js React Native has the wait-period check itself commented out in
   `getActiveMatchingSurveys.ts` even though it writes the date, so it writes the state without

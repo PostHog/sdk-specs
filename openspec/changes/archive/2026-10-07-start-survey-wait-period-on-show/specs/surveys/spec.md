@@ -8,8 +8,9 @@ SHALL NOT be collapsed into one.
 
 The SDK SHALL write the device-wide last-seen survey date when a survey is shown — at the point the
 survey becomes visible, before or alongside the `survey shown` event — and SHALL NOT defer that
-write to submit or dismiss. A survey's `seenSurveyWaitPeriodInDays` condition SHALL be evaluated
-against that date, so showing any survey starts the wait period for every survey that carries one.
+write to submit or dismiss. Submit and dismiss SHALL NOT move the date; the wait period runs from
+the show. A survey's `seenSurveyWaitPeriodInDays` condition SHALL be evaluated against that date, so
+showing any survey starts the wait period for every survey that carries one.
 
 The per-survey seen key is unchanged: it SHALL still be written only when the survey is submitted or
 dismissed. Showing a survey SHALL NOT mark it seen, so an unanswered survey without a wait period

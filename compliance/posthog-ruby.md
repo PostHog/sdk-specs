@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-ruby](https://github.com/PostHog/posthog-ruby)
 **Audited commit:** `185060ab46517ae2e944d3f27b3c89630fc09a4f` ([commit](https://github.com/PostHog/posthog-ruby/commit/185060ab46517ae2e944d3f27b3c89630fc09a4f)) — audited on 2026-09-28
 **Audited against sdk-specs commit:** `1d5fe4255c7990e8c2c09613c600fda590baf3cb`
-**Summary:** 9 ✅ · 14 🟡 · 8 ❌ · 32 ➖ · 0 ❓
+**Summary:** 8 ✅ · 14 🟡 · 8 ❌ · 33 ➖ · 0 ❓
 
 Note on repo layout: `posthog-ruby` is a monorepo containing the core gem plus a Rails
 integration gem. Core SDK logic lives at `lib/posthog/`: `client.rb` — the main public API
@@ -84,7 +84,7 @@ raw string when `JSON.parse` fails.
 | 39 | Opt In | ➖ | client-side persistent consent toggle (`Applicability: client`); acceptance file is `@client`-only |
 | 40 | Persistent Storage | ➖ | client-side persistent state layer (ambient identity/cached SDK state) (`Applicability: client`); acceptance is `@client`-only; Ruby has no local disk persistence |
 | 41 | Register | ➖ | client-side persistent super-properties registry (`Applicability: client`); acceptance file is `@client`-only; Ruby is stateless per call |
-| 42 | Reload Feature Flags | ✅ |  |
+| 42 | Reload Feature Flags | ➖ | client-side ambient flag-cache refresh primitive (`Applicability: client`); acceptance file is `@client`-only; Ruby's `reload_feature_flags` (`lib/posthog/client.rb:882-892`) calls `@feature_flags_poller.load_feature_flags(true)` to refetch local-evaluation *definitions* (a distinct capability, see Flag Definition Loader), not a per-identity evaluated-flags cache |
 | 43 | Remote Config | ➖ | spec's `client` applicability describes a broad subsystem (replay/surveys/error-tracking config bundled with flag preload, listener notification); acceptance is `@client`-only; Ruby's `get_remote_config_payload` is a narrow, unrelated per-flag encrypted-payload fetch that happens to share the name. Re-checked against the HTTP endpoint contract added this cycle (`openspec/specs/remote-config/spec.md`, PR #70) — still no `/config`-style remote-settings fetch to bind those requirements to |
 | 44 | Reset | ➖ | client-side ambient-identity/session/super-properties clear (`Applicability: client`); acceptance file is `@client`-only with no `@server`/`@both` scenarios; no `reset()` public method exists on `Client` |
 | 45 | Reset Group Properties For Flags | ❌ | [n17] |

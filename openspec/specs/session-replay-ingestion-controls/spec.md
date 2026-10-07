@@ -382,7 +382,7 @@ This requirement applies only to hybrid SDKs that span a managed layer and an em
 
 When a new recording epoch begins — whether from a session id rotating because of an inactivity/idle timeout, or from a fresh (non-rotation) session start — without confirmed user activity for that epoch, the SDK SHALL withhold emitting the epoch's buffered replay data until the earliest of: the first genuine user interaction is captured, an event/URL trigger independently activates recording, or an explicit recording override (for example a `startSessionRecording(...)`-style call, which is explicit intent to record) is invoked. Buffered data held under this rule that is never released SHALL NOT be emitted. A clean page/app unload SHALL release and ship a held fresh-start epoch's buffered data, preserving pre-hold behavior for passive visits (e.g. reading, watching); a held rotation-born epoch's data SHALL NOT be released on unload and is discarded instead — an idle tab that rotates and is never interacted with again must not ship a recording.
 
-When a held epoch's buffered data reaches the emission size cap, the SDK SHALL stop collecting further replay data for that epoch but SHALL NOT discard what it has already buffered — the cap bounds the memory either way, and the discarded part is the epoch start, which is what the hold exists to preserve. On release the retained data SHALL be emitted, and the SDK SHALL take a fresh full snapshot so playback is continuous across the gap between the cap and the release point. Reaching the cap SHALL NOT by itself make a held fresh-start epoch ineligible for the clean-unload release. A held epoch at the cap that is never released SHALL still emit nothing.
+When adding the next replay event would make a held epoch's buffered data exceed the emission size cap (the buffer size at which the SDK would otherwise flush a non-held buffer as a single emission), the SDK SHALL stop collecting further replay data for that epoch but SHALL NOT discard what it has already buffered — the cap bounds the memory either way, and the discarded part is the epoch start, which is what the hold exists to preserve. On release the retained data SHALL be emitted, and the SDK SHALL take a fresh full snapshot so playback is continuous across the gap between the cap and the release point. Reaching the cap SHALL NOT by itself make a held fresh-start epoch ineligible for the clean-unload release. A held epoch at the cap that is never released SHALL still emit nothing.
 
 This requirement applies to SDKs whose sessions can start or rotate without a confirmed-interaction signal (currently posthog-js / web). SDKs without this concept, or whose sessions never start/rotate this way, are exempt.
 
@@ -415,7 +415,7 @@ This requirement applies to SDKs whose sessions can start or rotate without a co
 #### Scenario: A held epoch at the size cap keeps its data and ships it on release
 - **GIVEN** session replay is enabled
 - **AND** a recording epoch is held with no confirmed user activity
-- **WHEN** the held epoch's buffered data reaches the emission size cap
+- **WHEN** adding the next replay event would make the held epoch's buffered data exceed the emission size cap
 - **THEN** no replay data should be emitted
 - **AND** further replay data for the epoch should not be collected
 - **AND** the data buffered before the cap should be retained
@@ -426,6 +426,6 @@ This requirement applies to SDKs whose sessions can start or rotate without a co
 #### Scenario: A clean unload ships a fresh-start hold that reached the size cap
 - **GIVEN** session replay is enabled
 - **AND** a fresh session start is held with no confirmed user activity
-- **AND** the held epoch's buffered data has reached the emission size cap
+- **AND** the held epoch's buffered data has hit the emission size cap
 - **WHEN** the page or app unloads cleanly
 - **THEN** the retained buffered data should be released and shipped

@@ -58,7 +58,8 @@ _None._
 No API or service change; this is display-logic state. End users of an app see at most one survey
 per wait period even across a restart or crash mid-survey.
 
-- **posthog-js** (browser, React Native): already conforms; this records the reference behavior.
+- **posthog-js** browser: already conforms; this records the reference behavior. React Native writes
+  the date on show but does not evaluate it (see below), so it does not yet conform.
 - **posthog-ios**, **posthog-android**: conform as of #917 and #844.
 - **posthog-flutter**, **posthog-kmp**: inherit through the native SDKs.
 - posthog-js React Native has the wait-period check itself commented out in

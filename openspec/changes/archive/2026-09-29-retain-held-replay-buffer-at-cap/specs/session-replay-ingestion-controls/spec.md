@@ -48,7 +48,7 @@ This requirement applies to SDKs whose sessions can start or rotate without a co
 #### Scenario: A clean unload ships a fresh-start hold that reached the size cap
 - **GIVEN** session replay is enabled
 - **AND** a fresh session start is held with no confirmed user activity
-- **AND** the held epoch's buffered data has hit the emission size cap
+- **AND** the held epoch has stopped collecting because the next replay event would have made its buffered data exceed the emission size cap
 - **WHEN** the page or app unloads cleanly
 - **THEN** the retained buffered data should be released and shipped
 - **AND** a fresh full snapshot should be taken so playback continues across the gap

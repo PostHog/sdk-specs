@@ -76,7 +76,7 @@ renderSurvey(displaySurvey, onShown, onResponse, onClosed): void
 - **Setup:** installed as an extension/integration/provider only when the SDK and config enable surveys.
 - **Remote-config update:** updates cached survey definitions and may rebuild event-to-survey activation maps.
 - **App/page lifecycle:** foreground/layout/page-unload hooks can trigger survey display checks or abandoned-event emission.
-- **User interaction:** the shown callback writes the device-wide last-seen survey date; response/close callbacks update active state, seen state, responses, and emitted events.
+- **User interaction:** shown/response/close callbacks update active state, seen state, responses, and emitted events; the shown callback additionally writes the device-wide last-seen survey date.
 - **Reset/teardown:** reset clears local survey history in SDKs that own survey storage; integration uninstall/provider unmount should remove listeners or stop rendering active UI.
 
 ## Error handling

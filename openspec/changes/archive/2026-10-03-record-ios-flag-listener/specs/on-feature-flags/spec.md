@@ -8,8 +8,9 @@ When syncing this delta, add posthog-ios to the **Surface variants** list:
 
 In **Behavior** item 4, group iOS with browser as a payload-carrying surface rather than a
 readiness-only one. In item 5, add iOS alongside browser as an SDK that invokes a late-registered
-listener once with the current values. Leave the readiness-only description of Android, Flutter, and
-Unity unchanged.
+listener once with the current values. In item 7, note that quota-limited flag responses are outside
+the failed-load scenario until the cross-SDK contract is settled. Leave the readiness-only
+description of Android, Flutter, and Unity unchanged.
 
 In **Concurrency & ordering guarantees**, keep the existing post-commit ordering rule and note that
 an SDK with a main/UI thread (posthog-ios) delivers on that thread, after the getters already return
@@ -62,7 +63,7 @@ The SDK SHALL implement the canonical `on-feature-flags` behavior described by t
   | beta-ui | true  |
 - **THEN** the feature flag listener should not be invoked again
 
-#### Scenario: Listener is invoked with the last known flags when a load fails
+#### Scenario: Listener is invoked with the last known flags when a non-quota load fails
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
 - **AND** persistent storage is empty
@@ -72,8 +73,9 @@ The SDK SHALL implement the canonical `on-feature-flags` behavior described by t
   | key     | value |
   | beta-ui | true  |
 - **AND** a feature flag listener is registered
-- **WHEN** a feature flag load fails
-- **THEN** the feature flag listener should be invoked with flags:
+- **WHEN** a feature flag load fails for a reason other than quota limiting
+- **THEN** the feature flag listener should be invoked
+- **AND** payload-carrying feature flag listeners should receive flags:
   | key     | value |
   | beta-ui | true  |
-- **AND** the feature flag listener should be told that loading flags errored
+- **AND** payload-carrying feature flag listeners should be told that loading flags errored

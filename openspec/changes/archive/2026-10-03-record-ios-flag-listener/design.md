@@ -5,16 +5,18 @@ change.
 
 ## Key Decisions
 
-- **Pin "invoked on a failed load", not the payload shape.** The canonical signature already
+- **Pin "invoked on a failed load", not a uniform payload shape.** The canonical signature already
   describes `errorsLoading`; what was never stated is that a failed load still notifies at all. An
   app that blocks its UI until the listener fires hangs forever otherwise, which is the failure the
-  iOS implementation and posthog-js#5045 both address.
+  iOS implementation and browser failed-load path address. Payload and error-context assertions are
+  scoped to SDKs that expose a payload-carrying listener.
 - **Last known flags, not an empty set.** Clearing on failure would make every listener treat a
   transient network error as "all flags off", which is a worse default than stale values. Both
   implementations keep the cached values.
 - **Leave quota-limited responses out.** iOS notifies with the cached flags and `errorsLoading:
   false`; browser currently does not notify at all, and the fix for it is unmerged. Two SDKs
-  disagreeing with one side still in review is not a settled contract.
+  disagreeing with one side still in review is not a settled contract, so the failed-load scenario
+  excludes quota limiting explicitly.
 - **Record iOS in the narrative rather than restructuring the variant list.** The existing split
   between payload-carrying and readiness-only surfaces still describes the field accurately; iOS
   joins the payload-carrying side.

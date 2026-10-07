@@ -13,9 +13,9 @@ signature has no requirement behind it even though it is now the observable the 
 ## What Changes
 
 - Record the iOS surface variant and its payload-carrying shape alongside the existing entries.
-- Add one scenario to the canonical requirement: when a flag load fails, the listener is still
-  invoked, `errorsLoading` reports the failure, and the payload carries the last known flags rather
-  than an empty set.
+- Add one scenario to the canonical requirement: when a non-quota flag load fails, the listener is
+  still invoked, and payload-carrying listeners report the failure while carrying the last known
+  flags rather than an empty set.
 - Note in the narrative that iOS, like browser, invokes a late-registered listener once with the
   current values, and delivers after the getters already return the new values.
 
@@ -37,8 +37,10 @@ and pins an observable the canonical signature already names.
 
 - **posthog-ios** conforms as of #897: payload on the main thread after getters update, one delivery
   for a late registration, `errorsLoading: true` with the cached flags on a failed load.
-- **posthog-js** (browser) carries `errorsLoading` but reached consumers as `undefined` on six call
-  paths; [posthog-js #5045](https://github.com/PostHog/posthog-js/pull/5045) makes it an explicit
-  boolean. That PR is still open, so browser conforms only once it lands.
-- SDKs whose listener is a payload-free readiness signal (Android, Flutter, Unity) are unaffected:
-  the scenario is about invoking the listener on a failed load, not about carrying a payload.
+- **posthog-js** (browser) already invokes listeners with cached flags and `errorsLoading: true` on
+  failed loads. [posthog-js #5045](https://github.com/PostHog/posthog-js/pull/5045) is still relevant
+  to making non-error paths an explicit boolean and to quota-limited responses, which are outside this
+  change.
+- SDKs whose listener is a payload-free readiness signal (Android, Flutter, Unity) are unaffected by
+  the payload assertion: the scenario requires invocation on a non-quota failed load, while carrying
+  flags and error context applies only to payload-carrying surfaces.

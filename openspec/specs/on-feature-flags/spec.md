@@ -62,6 +62,7 @@ The exact callback shape varies by SDK:
 6. **Do not mutate flags by subscribing.** The callback only observes flag readiness/change notifications.
 7. **Handle missing/no-flag cases SDK-specifically.**
    - Some implementations still invoke the callback even when there are no flags or when loading errored, so app code waiting on readiness can continue.
+   - Quota-limited flag responses are not covered by the failed-load scenario below; SDK behavior remains implementation-specific until the cross-SDK contract is settled.
 
 ## State & lifecycle
 
@@ -150,7 +151,7 @@ The SDK SHALL implement the canonical `on-feature-flags` behavior described by t
   | beta-ui | true  |
 - **THEN** the feature flag listener should not be invoked again
 
-#### Scenario: Listener is invoked with the last known flags when a load fails
+#### Scenario: Listener is invoked with the last known flags when a non-quota load fails
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
 - **AND** persistent storage is empty
@@ -160,8 +161,9 @@ The SDK SHALL implement the canonical `on-feature-flags` behavior described by t
   | key     | value |
   | beta-ui | true  |
 - **AND** a feature flag listener is registered
-- **WHEN** a feature flag load fails
-- **THEN** the feature flag listener should be invoked with flags:
+- **WHEN** a feature flag load fails for a reason other than quota limiting
+- **THEN** the feature flag listener should be invoked
+- **AND** payload-carrying feature flag listeners should receive flags:
   | key     | value |
   | beta-ui | true  |
-- **AND** the feature flag listener should be told that loading flags errored
+- **AND** payload-carrying feature flag listeners should be told that loading flags errored

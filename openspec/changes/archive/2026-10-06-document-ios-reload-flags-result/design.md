@@ -1,6 +1,6 @@
 ## Context
 
-The canonical reload signature passes `error?: Error`, but no SDK passes an error to the reload caller in practice: posthog-js core's `cb(err)` is not filled for network or HTTP failures, React Native resolves `undefined`, and Android and Flutter callbacks take no arguments. The browser's `onFeatureFlags` `errorsLoading` boolean is the only failure signal SDKs actually expose.
+The canonical reload signature passes `error?: Error`, but no SDK passes an error to the reload caller in practice: posthog-js core's `cb(err)` is not filled for network or HTTP failures, React Native resolves `undefined`, and Android and Flutter callbacks take no arguments. Failure signals SDKs do expose live on `onFeatureFlags`, not the reload completion: for example, the `errorsLoading` boolean in the browser and on iOS. This change concerns adding an outcome to the explicit reload completion.
 
 ## Goals / Non-Goals
 

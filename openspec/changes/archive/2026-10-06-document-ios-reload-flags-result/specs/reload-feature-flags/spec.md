@@ -6,7 +6,7 @@ When syncing this delta, update the iOS surface variant to `reloadFeatureFlags(_
 
 ### Requirement: Reload completion failure reporting
 
-An SDK MAY report whether a reload failed through its reload completion (callback argument, resolved value, or equivalent). An SDK that does MUST report failure when that reload's feature flag request fails, and MUST NOT report failure when it succeeds. When reporting failure, the completion MUST carry the last known cached flags rather than an empty set, unless no flags were cached. Classification of quota-limited and partial-computation responses is SDK-specific.
+An SDK MAY report whether a reload failed through its reload completion (callback argument, resolved value, or equivalent). An SDK that does MUST report failure when that reload's feature flag request fails, and MUST NOT report failure when it succeeds. When reporting failure, the completion MUST carry the last known cached flags, in the SDK's documented completion representation, rather than discarding them. A representation that omits some values (for example, iOS `PostHogFeatureFlagsLoaded` excludes disabled flags) MAY therefore be empty while cached flags are retained. Classification of quota-limited and partial-computation responses is SDK-specific.
 
 #### Scenario: Reload completion reports success with the loaded flags
 - **GIVEN** a fresh SDK acceptance test harness

@@ -7,6 +7,7 @@ Three server SDKs now stamp a deploy-time release identifier onto every event th
 - Specify `POSTHOG_RELEASE_ID` as the environment input for `$release_id` on server SDKs that can read process environment: read once at client construction, trimmed, blank treated as unset.
 - Specify that the property is stamped on the shared event path, so `capture`, exception capture, `identify`, `alias`, and `group_identify` events all carry it.
 - Specify precedence: an explicit `$release_id` from caller properties, super/registered properties, or a request context wins over the environment value.
+- Specify that a minimized `$feature_flag_called` event retains `$release_id`, matching PHP and Ruby; Python needs a follow-up.
 - Specify that the value is a plain event property and is never copied into `$set`, `$set_once`, or `$group_set`, and that `before_send` observes and may remove it.
 - Leave low-level passthrough APIs that bypass the shared event path (for example PHP's `raw()`) out of the requirement.
 
@@ -22,4 +23,4 @@ Three server SDKs implement this today. Browser bundles get `$release_id` inject
 
 ## Non-goals
 
-No change to release creation, symbol upload, or server-side release resolution. This change does not standardize whether minimized `$feature_flag_called` events carry `$release_id` — the SDKs currently disagree and the existing allowlist requirement already states the allowlist at the category level.
+No change to release creation, symbol upload, or server-side release resolution. Implementing the minimized `$feature_flag_called` rule in posthog-python is tracked in that repository.

@@ -12,7 +12,7 @@
 3. Require the stamp on the shared event path rather than enumerating public methods, matching the PHP and Ruby rationale that a new event type cannot then miss it.
 4. Make an explicit caller or super/context value win. All three SDKs implement the environment value as a default, not an override.
 5. Keep the property out of person and group property payloads. Ruby asserts this explicitly; a release id is event context, not a person trait.
-6. Leave the minimized `$feature_flag_called` case unspecified. Python excludes `$release_id` from its allowlist while PHP includes it, and the `feature-flag-called-tracker` allowlist requirement is deliberately stated at the category level. Picking a winner here would be a guess about intent rather than a record of settled behavior.
+6. Require minimized `$feature_flag_called` events to keep `$release_id`. PHP and Ruby include it in their minimal allowlist, each with a test; Python excludes it and needs a follow-up in posthog-python. A release id is static and low-cardinality per process, which is the category the `feature-flag-called-tracker` allowlist already keeps for flag-call debugging breakdowns.
 
 ## Validation
 
@@ -20,4 +20,4 @@
 
 ## Risks
 
-Scoping the requirement to "server SDKs that can read process environment" leaves the boundary for embedded and sandboxed runtimes soft. The alternative — naming the current three SDKs — would date immediately. The unresolved minimized-flag-event divergence is called out rather than settled.
+Scoping the requirement to "server SDKs that can read process environment" leaves the boundary for embedded and sandboxed runtimes soft. The alternative — naming the current three SDKs — would date immediately. posthog-python diverges on minimized `$feature_flag_called` events until it adds `$release_id` to its allowlist.

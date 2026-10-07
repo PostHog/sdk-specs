@@ -44,8 +44,13 @@ Not a breaking change for applications: the affected surveys cannot be completed
   displayed and logs why; because the displayed questions now always match the full survey, the
   response's question id is read straight from the full survey. The same path covers its custom and
   Flutter UIs.
-- **posthog-flutter** inherits the native behavior through that path.
-- **posthog-js** (browser and React Native) renders questions through a per-type switch and has no
-  equivalent guard in `canRenderSurvey`/`_checkSurveyRenderability`, so it is the SDK this
-  requirement is most likely to be ahead of. Conforming is an SDK-side change, which the repo's
-  workflow does not block archiving on.
+- **posthog-android** does not conform: `toDisplaySurvey` drops questions it cannot display with
+  `mapIndexedNotNull` and shows the rest, the same partial display #887 removed on iOS. Conforming
+  is an SDK-side change.
+- **posthog-flutter** inherits the native behavior on each platform: it conforms on iOS through #887
+  and follows posthog-android on Android.
+- **posthog-js** (browser and React Native) renders questions by type (a switch in the browser, a
+  component map in React Native) and has no equivalent guard in
+  `canRenderSurvey`/`_checkSurveyRenderability`, so it is the SDK this requirement is most likely to
+  be ahead of. Conforming is an SDK-side change, which the repo's workflow does not block archiving
+  on.

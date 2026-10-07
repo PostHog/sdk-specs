@@ -32,6 +32,11 @@ frames, identity and caller properties. Migrated server scenarios use `@sdk:serv
 selection; the parameterized examples have per-row `@case:` labels. An ordinary
 single-case scenario needs no authored case ID. Unmigrated client and negative
 scenarios retain their preconditions and are not selected by the opt-in tags.
+Server cases in `acceptance/public/evaluate-flags.feature` evaluate once per request,
+then call public getters and filters on the native snapshot. They compare documented
+scalar/rich values and decoded/serialized payloads, and inspect remote context and
+flushed exposure delivery. Integration tags identify executable coverage, not a
+passing conformance verdict: non-compliant SDK results remain failing assertions.
 The YAML-parity scenarios use the same Gherkin harness but retain their own
 capability-driven selection.
 

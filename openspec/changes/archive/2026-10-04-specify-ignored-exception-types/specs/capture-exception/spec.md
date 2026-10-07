@@ -2,9 +2,9 @@
 
 ### Requirement: Ignored exception types
 
-An SDK MAY expose an error-tracking option that drops `$exception` events by exception type
-(`errorTrackingConfig.ignoredExceptionTypes` on posthog-ios and posthog-android). An SDK that does
-not expose it is conformant.
+Where an SDK exposes an option that drops `$exception` events by exception type, it SHALL honor
+the rules below (`errorTrackingConfig.ignoredExceptionTypes` on posthog-ios and posthog-android).
+The option is optional: an SDK that does not expose it is conformant.
 
 Where the option exists:
 

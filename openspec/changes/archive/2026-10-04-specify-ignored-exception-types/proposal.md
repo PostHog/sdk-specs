@@ -50,7 +50,8 @@ conditioned on exposing it.
 - **posthog-ios** conforms as of #894 on iOS, macOS and tvOS. On watchOS and visionOS the matcher is
   compiled out with the crash reporter, so a non-empty list drops nothing on the manual and generic
   capture paths; that is an SDK gap to fix, not a reason for the spec to carve those platforms out.
-- **posthog-android** already conforms, including its server flavor.
+- **posthog-android** already conforms. Its server flavor gates `captureException` but not
+  `$exception` events handed to the generic `capture`, the same kind of SDK gap as the watchOS one above.
 - **posthog-js, posthog-flutter, posthog-react-native** expose no such option. The React Native
   plugin consumes it on Android, adding `JavascriptException` to posthog-android's list, and
   deduplicates with `beforeSend` on iOS. Unaffected.

@@ -320,6 +320,20 @@ the last-seen survey date along with the rest of locally owned survey history.
 - **AND** survey eligibility is evaluated
 - **THEN** survey display callback should be invoked for survey "survey-2"
 
+#### Scenario: Reset clears the last-seen survey date
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and surveys enabled
+- **AND** cached surveys include an active survey "survey-1" eligible for the current user with a seen-survey wait period of 7 days
+- **WHEN** survey eligibility is evaluated
+- **THEN** survey display callback should be invoked for survey "survey-1"
+- **WHEN** reset is called
+- **AND** the SDK is restarted against the same persistent storage
+- **AND** survey eligibility is evaluated
+- **THEN** survey display callback should be invoked for survey "survey-1"
+
 #### Scenario: Showing a survey does not mark it seen
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"

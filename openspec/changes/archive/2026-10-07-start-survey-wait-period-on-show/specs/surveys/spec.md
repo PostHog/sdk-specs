@@ -27,32 +27,20 @@ The write SHALL happen under whatever lock or serialization guards the active su
 that lands between the display decision and the write cannot be followed by a stale date. `reset`
 SHALL clear the last-seen survey date along with the rest of locally owned survey history.
 
-#### Scenario: Showing a survey starts the wait period for other surveys
+#### Scenario: Showing a survey starts the wait period and it survives a restart
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
 - **AND** persistent storage is empty
 - **AND** the mock PostHog server is reset
 - **GIVEN** the SDK is initialized with token "test-token" and surveys enabled
-- **AND** cached surveys include an active survey "survey-1" eligible for the current user
-- **AND** cached surveys include an active survey "survey-2" eligible for the current user with a seen-survey wait period of 7 days
-- **WHEN** survey eligibility is evaluated
-- **THEN** survey display callback should be invoked for survey "survey-1"
-- **WHEN** survey eligibility is evaluated again
-- **THEN** survey display callback should not be invoked for survey "survey-2"
-
-#### Scenario: The wait period survives a restart while a survey is open
-- **GIVEN** a fresh SDK acceptance test harness
-- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
-- **AND** persistent storage is empty
-- **AND** the mock PostHog server is reset
-- **GIVEN** the SDK is initialized with token "test-token" and surveys enabled
-- **AND** cached surveys include an active survey "survey-1" eligible for the current user
+- **AND** cached surveys include an active survey "survey-1" eligible for the current user with a seen-survey wait period of 7 days
 - **AND** cached surveys include an active survey "survey-2" eligible for the current user with a seen-survey wait period of 7 days
 - **WHEN** survey eligibility is evaluated
 - **THEN** survey display callback should be invoked for survey "survey-1"
 - **WHEN** the SDK is restarted against the same persistent storage without survey "survey-1" being submitted or dismissed
 - **AND** survey eligibility is evaluated
-- **THEN** survey display callback should not be invoked for survey "survey-2"
+- **THEN** survey display callback should not be invoked for survey "survey-1"
+- **AND** survey display callback should not be invoked for survey "survey-2"
 
 #### Scenario: Showing a survey does not mark it seen
 - **GIVEN** a fresh SDK acceptance test harness

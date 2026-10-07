@@ -21,10 +21,10 @@ type. Writing the rule down makes the safe behavior the contract rather than one
 - Add a requirement to `surveys`: a survey is displayed only if the SDK can display **every** one of
   its questions. An undisplayable question makes the whole survey not displayable — log and return,
   no interaction events, and no partial display.
-- A survey skipped this way is not marked seen and does not consume wait-period or activation state,
+- A survey skipped this way is not marked seen and writes no seen key or last-seen timestamp,
   so a later SDK version that understands the question type can still show it.
-- A public renderability check (`canRenderSurvey`-style) reports the survey as not displayable with
-  that reason.
+- A public renderability check (`canRenderSurvey`-style) reports the survey as not displayable.
+- A skipped survey does not prevent another eligible survey from being displayed.
 
 ## Capabilities
 

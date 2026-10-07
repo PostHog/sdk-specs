@@ -51,3 +51,4 @@ This requirement applies to SDKs whose sessions can start or rotate without a co
 - **AND** the held epoch's buffered data has hit the emission size cap
 - **WHEN** the page or app unloads cleanly
 - **THEN** the retained buffered data should be released and shipped
+- **AND** a fresh full snapshot should be taken so playback continues across the gap

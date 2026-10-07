@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-php](https://github.com/PostHog/posthog-php)
 **Audited commit:** `ed93a674c279f7d60720ae285f4d38dec1de21d6` ([commit](https://github.com/PostHog/posthog-php/commit/ed93a674c279f7d60720ae285f4d38dec1de21d6)) — audited on 2026-08-06
 **Audited against sdk-specs commit:** `6369cae3b1898957cca59b88380efd0f893820c0`
-**Summary:** 12 ✅ · 9 🟡 · 7 ❌ · 31 ➖ · 0 ❓
+**Summary:** 13 ✅ · 8 🟡 · 7 ❌ · 31 ➖ · 0 ❓
 
 Note on repo layout: posthog-php is a single-package, server-only SDK (`composer.json` name
 `posthog/posthog-php`, PSR-4 root `lib/` → namespace `PostHog\`). Key files: `lib/Client.php`
@@ -41,7 +41,7 @@ narrower carve-outs apply and which acceptance files are tagged `@client`-only v
 | 4 | Before Send Hook | ✅ | |
 | 5 | Bootstrap | ➖ | client-side cold-start flag/identity hydration from server-rendered values (`Applicability: client`); acceptance is `@client`-only; no local-storage/cold-start problem exists server-side |
 | 6 | Capture | 🟡 | [n1] |
-| 7 | Capture Exception | 🟡 | [n2] |
+| 7 | Capture Exception | ✅ | [n2] |
 | 8 | Consent Gating | ➖ | client-side persistent per-user consent gate (`Applicability: client`); acceptance is `@client`-only; PHP has no consent-state mechanism at all (see n1) |
 | 9 | Create Person Profile | ➖ | client-side identity/profile-control API (`Applicability: client`); no `createPersonProfile()`-equivalent exists; acceptance is `@client`-only |
 | 10 | Debug | ➖ | client-side runtime toggle (`Applicability: client`); PHP only exposes a constructor-time `debug` option, matching the spec's own carve-out for config-time-only logging options |
@@ -103,11 +103,11 @@ narrower carve-outs apply and which acceptance files are tagged `@client`-only v
 - **Backwards compatibility:** Backward-compatible — adding `optOutCapturing()`/`optInCapturing()`/`isOptedOut()` methods plus a mutable internal flag checked at the top of `capture()`/`identify()`/`alias()`/flag-evaluation paths is purely additive.
 - **Remediation:** Add a runtime-mutable opt-out flag and `Client::optOutCapturing()`/`optInCapturing()`/`isOptedOut()` (and matching `PostHog::` facade methods), checked before enqueue in `capture()`, `identify()`, `alias()`, `captureException()`, and the flag-evaluation capture-side-effect paths.
 
-### n2 — Capture Exception (🟡 Partial)
-- **Spec requires:** Acceptance scenario "Capturing a handled exception emits an exception event" (`acceptance/public/capture-exception.feature`) requires flat, top-level `$exception_type`/`$exception_message` properties on the enqueued event, in addition to the structured `$exception_list`. Also requires bottom-up frame ordering, outermost-first exception-list ordering, ascending source-context windows, and stack-trace preservation over synthesis.
-- **SDK currently:** `Client::captureException()` (`lib/Client.php:543-574`) builds `$exception_list` and `$exception_handled` via `ExceptionPayloadBuilder::buildExceptionList()`/`getPrimaryHandled()`, but **never sets a top-level `$exception_type` or `$exception_message` property** — confirmed by `grep -rn "exception_type\|exception_message" lib/ test/` returning zero matches anywhere in the codebase (type/value only exist nested inside `$exception_list[0].type`/`.value`, `lib/ExceptionPayloadBuilder.php:206-208`). This directly contradicts the acceptance scenario's explicit requirement for `$exception_type=TypeError`/`$exception_message=boom` as top-level enqueued properties. Everything else is correctly implemented and tested: outermost-first `$exception_list` via `buildExceptionList()`'s `getPrevious()` walk (`lib/ExceptionPayloadBuilder.php:32-45`); bottom-up frame ordering via an explicit `array_reverse()` with a comment documenting the PHP-innermost-first → PostHog-outermost-first conversion (`lib/ExceptionPayloadBuilder.php:236-244`); ascending `pre_context`/`context_line`/`post_context` windows (`addContextLines()`, `lib/ExceptionPayloadBuilder.php:291-320`); and stack preservation (throw-site reconciliation heuristics, `normalizeThrowableTrace()`, `lib/ExceptionPayloadBuilder.php:136-169`) rather than synthesis, confirmed by `test/ExceptionPayloadBuilderTest.php`.
-- **Backwards compatibility:** Backward-compatible — adding `$exception_type`/`$exception_message` (sourced from `$exception_list[0].type`/`.value`) as flat top-level properties is additive and does not remove or rename any currently-emitted field.
-- **Remediation:** In `Client::captureException()` (and the equivalent auto-capture path in `ExceptionCapture::sendExceptionEvent()`, `lib/ExceptionCapture.php:399-450`), add `$properties['$exception_type']`/`$properties['$exception_message']` mirrored from the first (outermost) entry of the built `$exception_list`.
+### n2 — Capture Exception (✅ Pass)
+- **Spec requires:** Acceptance scenario "Capturing a handled exception emits an exception event" (`acceptance/public/capture-exception.feature`) requires the primary exception type/message at `$exception_list[0].type` / `$exception_list[0].value`, plus bottom-up frame ordering, outermost-first exception-list ordering, ascending source-context windows, and stack-trace preservation over synthesis. Legacy top-level `$exception_type` / `$exception_message` properties are no longer required for standard capture paths.
+- **SDK currently:** `Client::captureException()` (`lib/Client.php:543-574`) builds `$exception_list` via `ExceptionPayloadBuilder::buildExceptionList()` and stores type/value on `$exception_list[0].type` / `.value` (`lib/ExceptionPayloadBuilder.php:206-208`). Outermost-first `$exception_list` ordering is implemented by `buildExceptionList()`'s `getPrevious()` walk (`lib/ExceptionPayloadBuilder.php:32-45`); bottom-up frame ordering by an explicit `array_reverse()` with a comment documenting the PHP-innermost-first → PostHog-outermost-first conversion (`lib/ExceptionPayloadBuilder.php:236-244`); ascending `pre_context`/`context_line`/`post_context` windows by `addContextLines()` (`lib/ExceptionPayloadBuilder.php:291-320`); and stack preservation by the throw-site reconciliation heuristics in `normalizeThrowableTrace()` (`lib/ExceptionPayloadBuilder.php:136-169`), confirmed by `test/ExceptionPayloadBuilderTest.php`.
+- **Backwards compatibility:** No SDK change required for this note after the spec update. Existing PHP events already carry the canonical structured exception summary in `$exception_list`.
+- **Remediation:** None for `capture-exception`; remaining PHP exception-envelope gaps, if any, belong under the separate Exception Event Metadata contract.
 
 ### n3 — Event Batcher (🟡 Partial)
 - **Spec requires:** `both`. Accumulate events; flush at a count threshold (`flushAt`) or on an interval timer (`flushInterval`); cap batch payload size; preserve FIFO order; explicit flush/shutdown drains immediately; spec item 11 notes "some SDKs" shrink the batch and retry on HTTP 413.

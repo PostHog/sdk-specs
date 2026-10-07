@@ -2,9 +2,9 @@
 
 ### Requirement: The survey wait period starts when a survey is shown
 
-Repeat display is gated by two distinct pieces of persisted state: a **per-survey seen key**, and a
-single device-wide **last-seen survey date**. They are written at different moments and SHALL NOT be
-collapsed into one.
+The SDK SHALL gate repeat display on two distinct pieces of persisted state: a **per-survey seen
+key**, and a single device-wide **last-seen survey date**. They are written at different moments and
+SHALL NOT be collapsed into one.
 
 The SDK SHALL write the device-wide last-seen survey date when a survey is shown — at the point the
 survey becomes visible, before or alongside the `survey shown` event — and SHALL NOT defer that

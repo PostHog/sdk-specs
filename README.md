@@ -25,7 +25,10 @@ The server cases in `acceptance/public/identify.feature`,
 `acceptance/public/alias.feature`, and `acceptance/public/group-identify.feature`
 call the SDK, flush, and inspect mock-server traffic using the draft2 harness.
 They check delivery rather than private queue state. Group-identify cases check
-group identity and supplied scalar or nested properties under `$group_set`. Migrated server scenarios use `@sdk:server` for adapter-declared SDK type
+group identity and supplied scalar or nested properties under `$group_set`. Server cases in
+`acceptance/public/capture-exception.feature` report a native handled exception,
+flush, and check the received structured exception summary, handled state, stack
+frames, identity and caller properties. Migrated server scenarios use `@sdk:server` for adapter-declared SDK type
 selection; the parameterized examples have per-row `@case:` labels. An ordinary
 single-case scenario needs no authored case ID. Unmigrated client and negative
 scenarios retain their preconditions and are not selected by the opt-in tags.

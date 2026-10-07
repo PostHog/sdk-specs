@@ -23,9 +23,10 @@ A survey resumed from persisted in-progress response state SHALL be subject to t
 any other display, because the earlier show already wrote the date. An SDK SHALL NOT exempt
 in-progress surveys from the check.
 
-The write SHALL happen under whatever lock or serialization guards the active survey, so a `reset`
-that lands between the display decision and the write cannot be followed by a stale date. `reset`
-SHALL clear the last-seen survey date along with the rest of locally owned survey history.
+Where the SDK serializes active-survey state, the write SHALL happen within that serialization and
+SHALL be skipped if a `reset` has occurred since the display decision, so a `reset` that lands
+between the display decision and the write cannot be followed by a stale date. `reset` SHALL clear
+the last-seen survey date along with the rest of locally owned survey history.
 
 #### Scenario: Showing a survey starts the wait period and it survives a restart
 - **GIVEN** a fresh SDK acceptance test harness

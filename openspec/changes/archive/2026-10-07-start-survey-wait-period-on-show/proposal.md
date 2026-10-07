@@ -32,8 +32,9 @@ earlier show already wrote the date.
 Adds one requirement to `surveys`:
 
 - The device-wide last-seen survey date is written when a survey is shown, not when it is submitted
-  or dismissed, and under whatever lock guards the active survey so a reset in between cannot write
-  a stale date.
+  or dismissed. Where the SDK serializes active-survey state, the write happens within it and is
+  skipped if a reset has occurred since the display decision, so a reset in between cannot be
+  followed by a stale date.
 - `seenSurveyWaitPeriodInDays` is evaluated against that date, so showing any survey starts the wait
   period for every survey that has one.
 - The per-survey seen key is unchanged: still written on submit or dismiss only.

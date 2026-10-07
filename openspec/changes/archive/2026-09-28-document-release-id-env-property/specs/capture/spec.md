@@ -10,7 +10,7 @@ When the value is set, the SDK SHALL stamp `$release_id` on the shared event pat
 
 The environment value SHALL act as a default, not an override: an explicit `$release_id` supplied in the call's properties, in super/registered properties, or in an ambient request context SHALL win. The SDK SHALL stamp `$release_id` before `before_send` runs, so a hook can inspect, replace, or remove it. The SDK SHALL NOT copy the value into `$set`, `$set_once`, or `$group_set`, because a release identifier is event context rather than a person or group property.
 
-Whether a minimized `$feature_flag_called` event carries `$release_id` is not specified here; the `feature-flag-called-tracker` allowlist requirement states its allowlist at the category level.
+`$release_id` is a static, low-cardinality runtime identity property in the sense of the `feature-flag-called-tracker` minimal-event allowlist, so a minimized `$feature_flag_called` event SHALL retain it when the SDK stamped it.
 
 #### Scenario: Release id from the environment lands on an ordinary event (@server)
 - **GIVEN** `POSTHOG_RELEASE_ID` is set to "rel-abc123" before the client is constructed
@@ -65,3 +65,10 @@ Whether a minimized `$feature_flag_called` event carries `$release_id` is not sp
 - **WHEN** the SDK sets person properties and group properties
 - **THEN** the enqueued event properties should have "$release_id" equal to "rel-abc123"
 - **AND** "$set", "$set_once", and "$group_set" should omit "$release_id"
+
+#### Scenario: A minimized flag-called event keeps the release id (@server)
+- **GIVEN** `POSTHOG_RELEASE_ID` is set to "rel-abc123" before the client is constructed
+- **AND** the server reports the minimal flag-called event gate for flag "beta-ui" with experiment linkage exactly `false`
+- **WHEN** get feature flag "beta-ui" is called
+- **THEN** the enqueued "$feature_flag_called" event should be minimized per the allowlist
+- **AND** it should have property "$release_id" equal to "rel-abc123"

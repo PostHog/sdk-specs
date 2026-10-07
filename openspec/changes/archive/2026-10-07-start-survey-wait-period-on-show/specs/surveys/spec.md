@@ -46,6 +46,23 @@ the last-seen survey date along with the rest of locally owned survey history.
 - **AND** survey display callback should not be invoked for survey "survey-2"
 - **AND** survey display callback should be invoked for survey "survey-3"
 
+#### Scenario: Dismissing a survey does not move the wait period
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and surveys enabled
+- **AND** cached surveys include an active survey "survey-1" eligible for the current user with a seen-survey wait period of 7 days
+- **WHEN** survey eligibility is evaluated
+- **THEN** survey display callback should be invoked for survey "survey-1"
+- **WHEN** the SDK clock advances by "2 days"
+- **AND** survey "survey-1" is dismissed
+- **AND** the SDK clock advances by "6 days"
+- **AND** the SDK is restarted against the same persistent storage
+- **AND** cached surveys include an active survey "survey-2" eligible for the current user with a seen-survey wait period of 7 days
+- **AND** survey eligibility is evaluated
+- **THEN** survey display callback should be invoked for survey "survey-2"
+
 #### Scenario: Showing a survey does not mark it seen
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"

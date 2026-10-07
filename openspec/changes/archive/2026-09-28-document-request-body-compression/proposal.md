@@ -6,9 +6,9 @@ That gap became visible when apps behind managed networks and Android work profi
 
 ## What Changes
 
-- Specify gzip as the default encoding for the request bodies an SDK compresses.
+- Specify gzip as the default encoding for the request bodies an SDK compresses and require compressed requests to declare gzip using the SDK transport's normal mechanism.
 - Require a configuration surface that turns compression off, allow both the enum and boolean shapes already shipped, and recommend the extensible enum shape for new surfaces.
-- Specify the observable result of opting out: a plain JSON body with no `Content-Encoding` header on every endpoint the SDK would otherwise compress.
+- Specify the observable result of opting out: a plain JSON body with no gzip declaration on every endpoint the SDK would otherwise compress.
 - Require the opt-out to be reachable through configuration rather than by overriding the reserved `Content-Encoding` header.
 - Permit sending an uncompressed body when compression itself fails locally, and forbid silently downgrading and resending after a server rejects a compressed body.
 

@@ -3,7 +3,7 @@
 - [posthog-android#793](https://github.com/PostHog/posthog-android/pull/793): adds `PostHogConfig.compression`, a `PostHogCompression` enum with `GZIP` (default) and `NONE`. Motivated by an Intune-managed work profile where gzipped bodies were altered in transit and `/batch` and `/flags` answered 400. No automatic fallback after a rejected body.
 - [posthog-ios#851](https://github.com/PostHog/posthog-ios/pull/851): the iOS counterpart. `PostHogCompression { gzip, none }`, `PostHogConfig.compression` defaulting to `.gzip`. With `.none`, `/batch`, `/s/`, `/i/v1/logs`, and `/api/push_subscriptions` send plain JSON with no `Content-Encoding`. Keeps the existing local fallback: if gzipping throws, the body goes out uncompressed. Notes that `content-encoding` is a reserved key, so `requestHeaders` cannot be used to opt out.
 - [posthog-flutter#603](https://github.com/PostHog/posthog-flutter/pull/603): exposes the same enum in the wrapper and forwards it to both native configs. Web is untouched because it uses the host page's posthog-js instance.
-- posthog-js has `disable_compression: boolean`, default `false`, documented as test-only; when set the browser SDK leaves `this.compression` undefined instead of `Compression.GZipJS`.
+- posthog-js has `disable_compression: boolean`, default `false`, documented as test-only; with compression enabled, the browser SDK declares gzip with the `compression=gzip-js` URL marker, and when `disable_compression` is true it leaves `this.compression` undefined instead of `Compression.GZipJS`.
 
 ## Decisions
 

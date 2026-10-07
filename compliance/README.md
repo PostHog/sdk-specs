@@ -149,7 +149,7 @@ All three were confirmed code-drifted, and heavily: posthog-go **+75 commits**
 
 | SDK | Overall | ✅ | 🟡 | ❌ | ➖ | ❓ | Last audited | Open gaps | File |
 |---|---|---|---|---|---|---|---|---|---|
-| posthog-js | 26/64 fully compliant (41%) | 26 | 21 | 12 | 5 | 0 | 2026-10-05 · `6538babc` | 33 | [posthog-js.md](posthog-js.md) |
+| posthog-js | 26/64 fully compliant (41%) | 26 | 21 | 12 | 5 | 0 | 2026-10-05 · `6538babc` (targeted re-audit; most of the 59 pre-existing rows carried from 2026-08-10, see file header) | 33 | [posthog-js.md](posthog-js.md) |
 | posthog-python | 14/62 fully compliant (23%; 29 contracts N/A on a server SDK; **needs +2: Session Replay Debug Properties, MCP Analytics**) | 14 | 12 | 7 | 29 | 0 | 2026-08-17 · `95c7f6e0` | 19 | [posthog-python.md](posthog-python.md) |
 | posthog-android | 31/59 fully compliant (53%; **59 rows, needs +5 new contracts**) | 31 | 16 | 9 | 3 | 0 | 2026-08-10 · `8659a7b4` | 25 | [posthog-android.md](posthog-android.md) |
 | posthog-ios | 32/62 fully compliant (52%; **needs +2: Session Replay Debug Properties, MCP Analytics**) | 32 | 18 | 7 | 5 | 0 | 2026-08-17 · `c0218386` | 25 | [posthog-ios.md](posthog-ios.md) |

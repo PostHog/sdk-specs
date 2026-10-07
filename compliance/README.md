@@ -137,13 +137,13 @@ All three were confirmed code-drifted, and heavily: posthog-go **+75 commits**
   and an unknown tool is not merely unreported but **misreported** as a failed `$mcp_tool_call` on
   both instrumentation paths — inflating the server's own tool error rate with names it never
   registered, which is the one rule in "Optional events" that applies to every SDK regardless of
-  capability tags. **Session Replay Debug Properties** 🟡, with a caveat for the reviewer: eight
-  required keys including `$recording_status` are attached to every event, but the supporting
-  `$sdk_debug_*` keys are rate-limited to one event per 30 seconds and restricted to `$`-prefixed
-  names — which the spec as merged does not permit, though sdk-specs PR
-  [#90](https://github.com/PostHog/sdk-specs/pull/90) is the still-open draft that would legitimize
-  exactly this. The second gap there is unambiguous and worth fixing regardless: with no replay
-  extension loaded, no `$recording_status: disabled` is attached at all. **Capture AI** and
+  capability tags. **Session Replay Debug Properties** 🟡, re-scored on 2026-10-07 against sdk-specs
+  `d078270` after PR [#96](https://github.com/PostHog/sdk-specs/pull/96) rewrote the contract. The
+  required-key tier, the `$`-prefix gate on the optional bundle, its 30-second throttle, and the
+  absence of any replay key without the session-recording extension all match the merged spec.
+  The one gap is narrower: after `stopSessionRecording()` on a loaded recorder, events keep
+  reporting `active` or `buffering` instead of `$recording_status: disabled`, confirmed by a runtime
+  check at `6538babc`. **Capture AI** and
   **Evaluate Flags** are ➖ on a client SDK, both by explicit spec scope text.
 
 ## Roll-up
@@ -346,7 +346,7 @@ Kotlin/JVM), which is what that audit evaluated — its audited commit (`8659a7b
 | posthog-dotnet | Get Feature Flags And Payloads | Backward-compatible | **Downgraded from ✅ this run on new spec text** — one malformed payload throws out of bulk-result construction and discards every healthy flag value and sibling payload with it — [posthog-dotnet.md#n17](posthog-dotnet.md) |
 | posthog-js | MCP Analytics | Backward-compatible | **New this run** — the richest implementation in the matrix, but an unknown tool is misreported as a failed `$mcp_tool_call` on both instrumentation paths (a rule the spec applies to every SDK), and neither `$mcp_unknown_tool` nor `$mcp_input_required` is emitted — [posthog-js.md#n37](posthog-js.md) |
 | posthog-js | Exception Event Metadata | Backward-compatible | **New this run** — the most complete producer envelope audited (full `exception_id`/`parent_id` linkage, canonical sources, correct nested-`handled` omission, spec-exact caps), missing only `$exception_source` and a capture category on the two global handlers, which fall back to `generic` — [posthog-js.md#n35](posthog-js.md) |
-| posthog-js | Session Replay Debug Properties | Backward-compatible | **New this run** — no `$recording_status: disabled` when the replay extension is absent; supporting `$sdk_debug_*` keys are rate-limited to one event per 30 s, which the merged spec does not permit (see the open draft PR [#90](https://github.com/PostHog/sdk-specs/pull/90)) — [posthog-js.md#n36](posthog-js.md) |
+| posthog-js | Session Replay Debug Properties | Backward-compatible | **New this run** — re-scored against `d078270` after #96; tiering, the `$`-prefix gate, and the 30 s throttle conform, but after `stopSessionRecording()` on a loaded recorder events keep `active`/`buffering` instead of `$recording_status: disabled` — [posthog-js.md#n36](posthog-js.md) |
 
 Full contract-by-contract detail (33 posthog-js, 19 posthog-python, 25 posthog-android, 25
 posthog-ios, 24 posthog-node, 34 posthog-flutter, 26 posthog-react-native, 20 posthog-php, 22
@@ -543,9 +543,4 @@ Prioritized for upcoming runs:
 At three SDKs per run the full rotation takes four weeks, which meets the ~4-week target. The
 previous run's warning about a five-week rotation at two per run is resolved by using the cap in
 full, and this run demonstrates that three thorough audits fit in one run when the spec delta is
-smaller than last cycle's. **One thing for a human to decide:** posthog-js's Session Replay Debug
-Properties row ([posthog-js.md#n36](posthog-js.md)) is scored 🟡 against the spec as merged, but the
-still-open draft PR [#90](https://github.com/PostHog/sdk-specs/pull/90) would legitimize the exact
-rate-limiting behavior it is marked down for. Scoring it ✅ today would pre-approve an unmerged spec
-change, so this matrix does not — but if #90 merges as drafted, that row should be re-scored without
-waiting for posthog-js's next rotation slot.
+smaller than last cycle's.

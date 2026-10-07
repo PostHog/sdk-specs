@@ -17,11 +17,10 @@ detail — evidence, code references, and remediation for every non-Pass cell �
 
 In-scope SDKs (referenced across `openspec/specs/`): posthog-js, posthog-python, posthog-node,
 posthog-android, posthog-ios, posthog-flutter, posthog-react-native, posthog-php, posthog-ruby,
-posthog-go, posthog-java, posthog-dotnet. **64 contracts** are now tracked per SDK: the 63
-capabilities listed in the root `README.md` table (including **MCP Analytics**, added this cycle by
-PR [#87](https://github.com/PostHog/sdk-specs/pull/87)), plus `bootstrap`, which has a canonical
-spec/acceptance file but is missing from that table — a documentation gap worth fixing separately,
-out of scope for this compliance-only PR.
+posthog-go, posthog-java, posthog-dotnet. **64 contracts** are now tracked per SDK: the 64
+capabilities listed in the root `README.md` table, including **MCP Analytics**, added this cycle by
+PR [#87](https://github.com/PostHog/sdk-specs/pull/87), and **Bootstrap**, added to the table by PR
+[#97](https://github.com/PostHog/sdk-specs/pull/97).
 
 Five contracts are newer than most per-SDK files. **Capture AI**, **Evaluate Flags**, and
 **Exception Event Metadata** were merged between 2026-08-10 and 2026-08-13; **Session Replay Debug

@@ -383,6 +383,8 @@ SDKs and Cymbal SHALL treat metadata ownership as follows:
 | `$debug_images` | SDK native image metadata | validates, consumes for symbolication, and preserves supported fields |
 | `$exception_fingerprint` | optional SDK/user override | selects the explicit or automatic fingerprint |
 | `$exception_handled` | legacy input only; not authoritative | derives from outermost `mechanism.handled` |
+| `$exception_type` | legacy input only; not authoritative | derives from the primary exception's `type` when needed for compatibility |
+| `$exception_message` | legacy input only; not authoritative | derives from the primary exception's `value` when needed for compatibility |
 | `$exception_types` | none | derives from the exception list |
 | `$exception_values` | none | derives from the exception list |
 | `$exception_sources` | none | derives from in-app stack-frame source-file paths |
@@ -400,6 +402,12 @@ First-party SDKs SHALL use the producer fields as their source of truth and SHAL
 - **WHEN** the SDK enqueues the raw event
 - **THEN** `$exception_source` should equal `django.middleware`
 - **AND** the SDK should omit `$exception_sources`
+
+#### Scenario: Primary exception summary is derived from the exception list (@both)
+- **GIVEN** the primary exception entry has `type` equal to `TypeError` and `value` equal to `boom`
+- **WHEN** compatibility metadata is needed for legacy flat fields
+- **THEN** `$exception_type` should be derived from the primary exception's `type`
+- **AND** `$exception_message` should be derived from the primary exception's `value`
 
 #### Scenario: Nested handled state is authoritative producer metadata (@both)
 - **GIVEN** the outermost exception contains `mechanism.handled`

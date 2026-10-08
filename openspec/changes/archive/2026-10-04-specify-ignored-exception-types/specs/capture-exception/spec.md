@@ -15,8 +15,9 @@ Where the option exists:
   wrapper SDKs such as the React Native and Flutter bridges report errors).
 - Dropping SHALL be silent apart from a debug log, and SHALL NOT throw.
 - Matching SHALL consider every exception in the chain (every `$exception_list` entry, or every
-  link of the cause chain the SDK would serialize), not only the outermost one, and SHALL be
-  case-sensitive.
+  link of the cause chain the SDK would serialize), not only the outermost one.
+- Where the SDK compares identifiers as strings, the comparison SHALL be case-sensitive. Matching a
+  live error object against a platform type (posthog-android's `Class` list) has no case to compare.
 - The identifier matched on is platform-idiomatic, and the SDK SHALL document which form it
   accepts. An SDK holding the live error object MAY match the platform error type, in which case
   a subtype of a listed type matches (posthog-android: `Class.isInstance` across the cause chain).
@@ -52,7 +53,9 @@ Where the option exists:
   `type` `MyNoisyError` is handed to the generic capture API
 - **THEN** no `$exception` event enters the capture pipeline
 
-#### Scenario: matching is case-sensitive
-- **GIVEN** the ignore list contains `mynoisyerror`
-- **WHEN** an exception of type `MyNoisyError` is captured
+#### Scenario: string identifiers are matched case-sensitively
+- **GIVEN** an SDK that matches identifiers as strings and an ignore list containing
+  `mynoisyerror`
+- **WHEN** an `$exception` event whose `$exception_list` entry has `type` `MyNoisyError` is
+  captured
 - **THEN** the `$exception` event is captured

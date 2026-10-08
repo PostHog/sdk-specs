@@ -23,15 +23,16 @@ Read from the shipped sources:
 | Autocapture / crash reports | dropped | dropped (same chokepoint) |
 | Generic `capture("$exception", …)` | dropped | dropped (`hasIgnoredTypeInExceptionList`) |
 | Chain | every `$exception_list` entry | bounded cause-chain walk |
-| Matched on | `$exception_list[*].type`, exact, case-sensitive | `Class.isInstance` when the throwable is in hand; `module` + `type` by name when only the payload is |
+| Matched on | `$exception_list[*].type`, exact, case-sensitive string | `Class.isInstance` when the throwable is in hand; `module` + `type` by name when only the payload is |
 
 ## What Changes
 
 - Add one requirement to `capture-exception`, **Ignored exception types**, stating: the option is
   optional; where it exists it defaults to empty; a non-empty list drops the matching `$exception`
   event on every path before it enters the capture pipeline; matching walks the whole exception
-  chain and is case-sensitive; and the identifier matched on is platform-idiomatic (live error type
-  including subtypes where the SDK has the error object, serialized `type` otherwise).
+  chain, with case-sensitive comparison wherever identifiers are strings; and the identifier matched
+  on is platform-idiomatic (live error type including subtypes where the SDK has the error object,
+  serialized `type` otherwise).
 
 ## Capabilities
 

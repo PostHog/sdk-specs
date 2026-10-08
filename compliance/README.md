@@ -157,7 +157,7 @@ All three were confirmed code-drifted, and heavily: posthog-go **+75 commits**
 | posthog-flutter | 20/59 fully compliant (34%; **59 rows, needs +5 new contracts**) | 20 | 22 | 6 | 5 | 6 | 2026-08-06 · `05b53dc` | 34 | [posthog-flutter.md](posthog-flutter.md) |
 | posthog-react-native | 31/59 fully compliant (53%; **59 rows, needs +5 new contracts**) | 31 | 23 | 2 | 2 | 1 | 2026-08-06 · `e1efa57` (posthog-js monorepo — now very stale, see below) | 26 | [posthog-react-native.md](posthog-react-native.md) |
 | posthog-php | 11/63 fully compliant (17%; 33 contracts N/A on a server SDK; **needs +1: MCP Analytics**) | 11 | 11 | 8 | 33 | 0 | 2026-09-28 · `5451f4e0` | 19 | [posthog-php.md](posthog-php.md) |
-| posthog-ruby | 8/63 fully compliant (13%; 33 contracts N/A on a server SDK; **needs +1: MCP Analytics**) | 8 | 14 | 8 | 33 | 0 | 2026-09-28 · `185060ab` | 22 | [posthog-ruby.md](posthog-ruby.md) |
+| posthog-ruby | 9/63 fully compliant (14%; 33 contracts N/A on a server SDK; **needs +1: MCP Analytics**) | 9 | 13 | 8 | 33 | 0 | 2026-09-28 · `185060ab` | 21 | [posthog-ruby.md](posthog-ruby.md) |
 | posthog-go | 8/64 fully compliant (13%; 33 contracts N/A on a server SDK) | 8 | 14 | 9 | 33 | 0 | 2026-10-05 · `08549f42` | 23 | [posthog-go.md](posthog-go.md) |
 | posthog-java | 12/59 fully compliant (20%; **59 rows, needs +5 new contracts**) | 12 | 13 | 6 | 28 | 0 | 2026-08-10 · `8659a7b4` (posthog-android monorepo) | 19 | [posthog-java.md](posthog-java.md) |
 | posthog-dotnet | 5/64 fully compliant (8%; 30 contracts N/A on a server SDK) | 5 | 19 | 10 | 30 | 0 | 2026-10-05 · `ae4d019c` | 29 | [posthog-dotnet.md](posthog-dotnet.md) |
@@ -190,7 +190,7 @@ why.
 "Overall" for posthog-python, posthog-node, posthog-php, posthog-ruby, posthog-go, posthog-java,
 and posthog-dotnet is computed against the contracts actually applicable to a server SDK
 (posthog-python: 14 Pass / 33 applicable = 42%; posthog-node: 10 Pass / 34 applicable = 29%;
-posthog-php: 11 Pass / 30 applicable = 37%; posthog-ruby: 8 Pass / 30 applicable = 27%;
+posthog-php: 11 Pass / 30 applicable = 37%; posthog-ruby: 9 Pass / 30 applicable = 30%;
 posthog-go: 8 Pass / 31 applicable = 26%; posthog-java: 12 Pass / 31 applicable = 39%;
 posthog-dotnet: 5 Pass / 34 applicable = 15%); shown above as raw Pass/(59, 62, 63 or 64) for
 comparability with client SDKs, which see N/A far less often. posthog-js's 26/64 is likewise 26 Pass

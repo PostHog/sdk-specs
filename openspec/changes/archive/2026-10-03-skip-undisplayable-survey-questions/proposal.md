@@ -44,9 +44,10 @@ Not a breaking change for applications: the affected surveys cannot be completed
   displayed and logs why; because the displayed questions now always match the full survey, the
   response's question id is read straight from the full survey. The same path covers its custom and
   Flutter UIs.
-- **posthog-android** does not conform: `toDisplaySurvey` drops questions it cannot display with
-  `mapIndexedNotNull` and shows the rest, the same partial display #887 removed on iOS. Conforming
-  is an SDK-side change.
+- **posthog-android** does not conform: `GsonSurveyQuestionAdapter` decodes a question with an
+  unknown `type` to `null`, the `null` stays in `Survey.questions`, and nothing filters it before
+  code that walks the questions (e.g. `SurveyProgressStore.questionOrder`) dereferences it.
+  Conforming is an SDK-side change.
 - **posthog-flutter** inherits the native behavior on each platform: it conforms on iOS through #887
   and follows posthog-android on Android.
 - **posthog-js** (browser and React Native) renders questions by type (a switch in the browser, a

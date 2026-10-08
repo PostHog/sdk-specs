@@ -14,10 +14,8 @@ Feature: Capture Exception
     And the test exception has stack information
     When capture exception is called for an exception with type "TypeError" and message "boom"
     Then one event named "$exception" should be enqueued
-    And the enqueued event properties should include:
-      | property           | value     |
-      | $exception_type    | TypeError |
-      | $exception_message | boom      |
+    And the enqueued event's exception list should have "TypeError" at index 0
+    And the enqueued event's primary exception message should be "boom"
     And the enqueued event should include exception stack information
 
   @both

@@ -7,9 +7,9 @@ contains a question whose type the SDK cannot display — typically a question t
 after that SDK version shipped — the SDK SHALL treat the whole survey as not displayable: it SHALL
 log the reason and return without displaying any part of the survey and without emitting `survey
 shown` or any other survey interaction event. A survey skipped this way SHALL NOT be marked seen,
-and skipping it SHALL NOT write a seen key or a last-seen timestamp, so a later SDK version that can
-display the question type is still able to show it. A skipped survey SHALL NOT prevent another
-eligible survey from being displayed.
+and skipping it SHALL NOT write a seen key or the device-wide last-seen survey date, so a later SDK
+version that can display the question type is still able to show it. A skipped survey SHALL NOT
+prevent another eligible survey from being displayed.
 
 The SDK SHALL NOT display only the subset of questions it can display. Question identity, branching,
 and response keys are computed against the survey's full question list, so a partial display
@@ -48,7 +48,7 @@ rather than in each renderer.
 - **AND** survey "survey-1" contains a question whose type the SDK cannot display
 - **WHEN** survey eligibility is evaluated
 - **THEN** survey "survey-1" should not be marked seen
-- **AND** no last-seen timestamp should be written
+- **AND** the device-wide last-seen survey date should not be written
 
 #### Scenario: A survey whose questions are all displayable is unaffected
 - **GIVEN** a fresh SDK acceptance test harness

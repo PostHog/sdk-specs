@@ -545,3 +545,82 @@ Feature: Evaluate Flags
     And no remote feature flag evaluation request should have been sent
     And no event named "$feature_flag_called" should be enqueued
     And snapshot only accessed should return no flags
+
+  @flag_event_default_capable
+  Scenario: Client-level default off silences snapshot reads
+    Given the SDK's client-level feature flag event default is disabled
+    And remote feature flag evaluation for distinct id "user-123" returns:
+      | key      | value |
+      | beta-ui  | true  |
+      | checkout | blue  |
+    When evaluate flags is called for distinct id "user-123"
+    And snapshot enablement is read for "beta-ui"
+    And snapshot value is read for "checkout"
+    Then the returned enabled value for "beta-ui" should be true
+    And the returned snapshot value for "checkout" should be "blue"
+    And no event named "$feature_flag_called" should be enqueued
+
+  @flag_event_default_capable
+  Scenario: Per-read option overrides a disabled client-level default
+    Given the SDK's client-level feature flag event default is disabled
+    And remote feature flag evaluation for distinct id "user-123" returns:
+      | key      | value |
+      | beta-ui  | true  |
+      | checkout | blue  |
+    When evaluate flags is called for distinct id "user-123"
+    And snapshot enablement is read for "beta-ui" with the feature flag event option enabled
+    And snapshot value is read for "checkout"
+    Then a "$feature_flag_called" event should be enqueued for flag "beta-ui" with value "true"
+    And no "$feature_flag_called" event should be enqueued for flag "checkout"
+
+  Scenario: Per-read option silences one read on a default-on client
+    Given remote feature flag evaluation for distinct id "user-123" returns:
+      | key      | value |
+      | beta-ui  | true  |
+      | checkout | blue  |
+    When evaluate flags is called for distinct id "user-123"
+    And snapshot enablement is read for "beta-ui" with the feature flag event option disabled
+    And snapshot value is read for "checkout"
+    Then the returned enabled value for "beta-ui" should be true
+    And no "$feature_flag_called" event should be enqueued for flag "beta-ui"
+    And a "$feature_flag_called" event should be enqueued for flag "checkout" with value "blue"
+
+  Scenario: Suppressed read leaves exposure dedupe untouched
+    Given remote feature flag evaluation for distinct id "user-123" returns:
+      | key     | value |
+      | beta-ui | true  |
+    When evaluate flags is called for distinct id "user-123"
+    And snapshot enablement is read for "beta-ui" with the feature flag event option disabled
+    Then no event named "$feature_flag_called" should be enqueued
+    When snapshot value is read for "beta-ui"
+    Then a "$feature_flag_called" event should be enqueued for flag "beta-ui" with value "true"
+    When snapshot enablement is read again for "beta-ui"
+    Then only one deduped "$feature_flag_called" event should be enqueued for flag "beta-ui" with value "true"
+
+  Scenario: Suppressed reads still count for only accessed
+    Given remote feature flag evaluation for distinct id "user-123" returns:
+      | key      | value |
+      | beta-ui  | true  |
+      | checkout | blue  |
+      | search   | false |
+    When evaluate flags is called for distinct id "user-123"
+    And snapshot enablement is read for "beta-ui" with the feature flag event option disabled
+    And snapshot value is read for "search" with the feature flag event option disabled
+    And snapshot only accessed is called
+    Then the filtered snapshot should contain flags:
+      | key     | value |
+      | beta-ui | true  |
+      | search  | false |
+    And the filtered snapshot should not contain "checkout"
+    And no event named "$feature_flag_called" should be enqueued
+
+  Scenario: Missing-key read with the option disabled reports no missing flag
+    Given remote feature flag evaluation for distinct id "user-123" returns:
+      | key     | value |
+      | beta-ui | true  |
+    When evaluate flags is called for distinct id "user-123"
+    And snapshot enablement is read for "missing-flag" with the feature flag event option disabled
+    And snapshot value is read for "missing-flag" with the feature flag event option disabled
+    Then the returned enabled value for "missing-flag" should be false
+    And the returned snapshot value for "missing-flag" should be absent
+    And no event named "$feature_flag_called" should be enqueued

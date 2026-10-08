@@ -8,7 +8,7 @@ It exists for cases where application code catches an error but still wants to r
 
 ## Applicability
 
-`client` — this is a client-side error-reporting API. The audited implementations live in client/mobile SDKs with ambient device/user/session context and local error-coercion helpers.
+`both` — this contract applies to client and server SDKs that expose manual exception reporting. Client SDKs may use ambient device/user/session context; server SDKs may accept an explicit distinct ID using their existing public signature.
 
 ## Public signatures
 
@@ -21,8 +21,23 @@ captureException(
 ): void | CaptureResult
 ```
 
+### Node server signature
+
+```ts
+captureException(
+  error: unknown,
+  distinctId?: string,
+  additionalProperties?: Record<string | number, any>,
+  uuid?: EventMessage['uuid'],
+  flags?: FeatureFlagEvaluations,
+): void
+```
+
+The explicit distinct ID selects the event identity. Omitting it retains the SDK's normal identity resolution. Server SDKs may adapt argument names and return types to their public APIs.
+
 ### Surface variants
 
+- **posthog-node:** `captureException(error, distinctId?, additionalProperties?, uuid?, flags?) => void`
 - **posthog-js browser:** `captureException(error, additionalProperties?) => CaptureResult | undefined`
 - **flutter:** `captureException({ error, stackTrace?, properties? }) => Future<void>`
 - **react-native:** `captureException(error, additionalProperties = {}) => void`
@@ -269,6 +284,48 @@ When the supplied error-like input already carries stack trace information (for 
 - **THEN** one "$exception" event should be received
 - **AND** its custom properties should equal JSON `{"nested":{},"items":["1",null,2]}`
 - **AND** the event should still include its SDK-generated exception data
+
+### Requirement: Server manual exception delivery
+
+For a server SDK exposing manual exception capture, reporting a valid native handled exception with an explicit distinct ID SHALL participate in the SDK's normal capture pipeline. After a public flush completes successfully against a healthy receiver, the receiver SHALL have exactly one corresponding `$exception` event.
+
+The event SHALL retain the supplied distinct ID. Its primary `$exception_list[0]` entry SHALL contain the native exception type and message, `mechanism.handled` equal to the JSON boolean `true`, and a nonempty `stacktrace.frames` array when the native fixture has a stack. Supplied scalar and nested JSON properties SHALL contribute to the payload under the existing capture serialization contract. Properties MAY be omitted without preventing exception delivery.
+
+#### Scenario: Server exception capture delivers a native handled exception with caller properties
+- **GIVEN** an isolated SDK instance
+- **AND** the SDK is initialized with token "test-token" and flush threshold 20
+- **WHEN** capture exception is called with JSON arguments:
+  ```json
+  {"error":{"type":"TypeError","message":"boom"},"distinct_id":"exception-user","properties":{"area":"checkout","retryable":false,"attempt":0,"context":{"operation":"charge","codes":[1,2],"success":false}}}
+  ```
+- **AND** pending captures are flushed
+- **THEN** exactly 1 capture request should have been received
+- **AND** the first request should contain exactly 1 parsed events
+- **AND** the first received event field "event" should equal "$exception"
+- **AND** the first received event field "distinct_id" should equal "exception-user"
+- **AND** the first received event's primary exception should have type "TypeError" and message "boom"
+- **AND** the first received event's primary exception should be handled
+- **AND** the first received event's primary exception should have stack frames
+- **AND** the first received event property "area" should equal "checkout"
+- **AND** the first received event property "retryable" should equal JSON false
+- **AND** the first received event property "attempt" should equal JSON 0
+- **AND** the first received event property "context" should equal JSON {"operation":"charge","codes":[1,2],"success":false}
+
+#### Scenario: Server exception capture delivers a native handled exception without caller properties
+- **GIVEN** an isolated SDK instance
+- **AND** the SDK is initialized with token "test-token" and flush threshold 20
+- **WHEN** capture exception is called with JSON arguments:
+  ```json
+  {"error":{"type":"TypeError","message":"boom without properties"},"distinct_id":"exception-user-no-properties"}
+  ```
+- **AND** pending captures are flushed
+- **THEN** exactly 1 capture request should have been received
+- **AND** the first request should contain exactly 1 parsed events
+- **AND** the first received event field "event" should equal "$exception"
+- **AND** the first received event field "distinct_id" should equal "exception-user-no-properties"
+- **AND** the first received event's primary exception should have type "TypeError" and message "boom without properties"
+- **AND** the first received event's primary exception should be handled
+- **AND** the first received event's primary exception should have stack frames
 
 ### Requirement: Ignored exception types
 

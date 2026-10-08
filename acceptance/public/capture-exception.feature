@@ -1,16 +1,52 @@
-@public @canonical_behavior @acceptance @capture_exception @both
+@public @canonical_behavior @acceptance @capture_exception
 Feature: Capture Exception
   Acceptance tests for the canonical capture exception behavior across PostHog SDKs.
 
-  Background:
+  @sdk:server
+  Scenario: Server exception capture delivers a native handled exception with caller properties
+    Given an isolated SDK instance
+    And the SDK is initialized with token "test-token" and flush threshold 20
+    When capture exception is called with JSON arguments:
+      """application/json
+      {"error":{"type":"TypeError","message":"boom"},"distinct_id":"exception-user","properties":{"area":"checkout","retryable":false,"attempt":0,"context":{"operation":"charge","codes":[1,2],"success":false}}}
+      """
+    And pending captures are flushed
+    Then exactly 1 capture request should have been received
+    And the first request should contain exactly 1 parsed events
+    And the first received event field "event" should equal "$exception"
+    And the first received event field "distinct_id" should equal "exception-user"
+    And the first received event's primary exception should have type "TypeError" and message "boom"
+    And the first received event's primary exception should be handled
+    And the first received event's primary exception should have stack frames
+    And the first received event property "area" should equal "checkout"
+    And the first received event property "retryable" should equal JSON false
+    And the first received event property "attempt" should equal JSON 0
+    And the first received event property "context" should equal JSON {"operation":"charge","codes":[1,2],"success":false}
+
+  @sdk:server
+  Scenario: Server exception capture delivers a native handled exception without caller properties
+    Given an isolated SDK instance
+    And the SDK is initialized with token "test-token" and flush threshold 20
+    When capture exception is called with JSON arguments:
+      """application/json
+      {"error":{"type":"TypeError","message":"boom without properties"},"distinct_id":"exception-user-no-properties"}
+      """
+    And pending captures are flushed
+    Then exactly 1 capture request should have been received
+    And the first request should contain exactly 1 parsed events
+    And the first received event field "event" should equal "$exception"
+    And the first received event field "distinct_id" should equal "exception-user-no-properties"
+    And the first received event's primary exception should have type "TypeError" and message "boom without properties"
+    And the first received event's primary exception should be handled
+    And the first received event's primary exception should have stack frames
+
+  @both
+  Scenario: Capturing a handled exception emits an exception event
     Given a fresh SDK acceptance test harness
     And the SDK clock is fixed at "2025-01-01T00:00:00Z"
     And persistent storage is empty
     And the mock PostHog server is reset
-
-  @both
-  Scenario: Capturing a handled exception emits an exception event
-    Given the SDK is initialized with token "test-token"
+    And the SDK is initialized with token "test-token"
     And the test exception has stack information
     When capture exception is called for an exception with type "TypeError" and message "boom"
     Then one event named "$exception" should be enqueued
@@ -20,7 +56,11 @@ Feature: Capture Exception
 
   @both
   Scenario: Exception capture includes caller properties
-    Given the SDK is initialized with token "test-token"
+    Given a fresh SDK acceptance test harness
+    And the SDK clock is fixed at "2025-01-01T00:00:00Z"
+    And persistent storage is empty
+    And the mock PostHog server is reset
+    And the SDK is initialized with token "test-token"
     When capture exception is called with properties:
       | property | value    |
       | handled  | true     |
@@ -33,7 +73,11 @@ Feature: Capture Exception
 
   @both
   Scenario: Exception capture drops null-valued custom properties on the wire
-    Given the SDK is initialized with token "test-token"
+    Given a fresh SDK acceptance test harness
+    And the SDK clock is fixed at "2025-01-01T00:00:00Z"
+    And persistent storage is empty
+    And the mock PostHog server is reset
+    And the SDK is initialized with token "test-token"
     And capture has a valid distinct id and no property-changing hooks or filters
     And a valid handled exception
     When capture exception is called for the exception with additional custom properties represented by JSON:
@@ -50,7 +94,11 @@ Feature: Capture Exception
 
   @both
   Scenario: Exception capture normalizes non-standard thrown values
-    Given the SDK is initialized with token "test-token"
+    Given a fresh SDK acceptance test harness
+    And the SDK clock is fixed at "2025-01-01T00:00:00Z"
+    And persistent storage is empty
+    And the mock PostHog server is reset
+    And the SDK is initialized with token "test-token"
     When capture exception is called with a non-standard thrown value
     Then the call should not throw
     And one event named "$exception" should be enqueued
@@ -58,7 +106,11 @@ Feature: Capture Exception
 
   @both
   Scenario: Frames are ordered entry point first, crash site last
-    Given the SDK is initialized with token "test-token"
+    Given a fresh SDK acceptance test harness
+    And the SDK clock is fixed at "2025-01-01T00:00:00Z"
+    And persistent storage is empty
+    And the mock PostHog server is reset
+    And the SDK is initialized with token "test-token"
     And the test exception is raised through the call chain "main" -> "handler" -> "boom"
     When capture exception is called for the exception
     Then one event named "$exception" should be enqueued
@@ -67,7 +119,11 @@ Feature: Capture Exception
 
   @both
   Scenario: Crash-first runtime stacks are reversed before sending
-    Given the SDK is initialized with token "test-token"
+    Given a fresh SDK acceptance test harness
+    And the SDK clock is fixed at "2025-01-01T00:00:00Z"
+    And persistent storage is empty
+    And the mock PostHog server is reset
+    And the SDK is initialized with token "test-token"
     And the platform runtime reports exception stacks innermost-first (crash site first)
     When capture exception is called for an exception with stack information
     Then one event named "$exception" should be enqueued
@@ -75,7 +131,11 @@ Feature: Capture Exception
 
   @both
   Scenario: Chained exceptions are listed caught-first, root cause last
-    Given the SDK is initialized with token "test-token"
+    Given a fresh SDK acceptance test harness
+    And the SDK clock is fixed at "2025-01-01T00:00:00Z"
+    And persistent storage is empty
+    And the mock PostHog server is reset
+    And the SDK is initialized with token "test-token"
     And the test exception "WrapperError" wraps a cause "RootError"
     When capture exception is called for the caught "WrapperError"
     Then one event named "$exception" should be enqueued
@@ -84,7 +144,11 @@ Feature: Capture Exception
 
   @both
   Scenario: Platforms without exception chaining send a single-element list
-    Given the SDK is initialized with token "test-token"
+    Given a fresh SDK acceptance test harness
+    And the SDK clock is fixed at "2025-01-01T00:00:00Z"
+    And persistent storage is empty
+    And the mock PostHog server is reset
+    And the SDK is initialized with token "test-token"
     And the platform has no exception cause/chain concept
     When capture exception is called for an exception
     Then one event named "$exception" should be enqueued
@@ -92,7 +156,11 @@ Feature: Capture Exception
 
   @both
   Scenario: Context arrays are in ascending file order
-    Given the SDK is initialized with token "test-token"
+    Given a fresh SDK acceptance test harness
+    And the SDK clock is fixed at "2025-01-01T00:00:00Z"
+    And persistent storage is empty
+    And the mock PostHog server is reset
+    And the SDK is initialized with token "test-token"
     And the SDK attaches source context with a 5-line window
     When capture exception is called for an exception raised at line 40 of a source file
     Then one event named "$exception" should be enqueued
@@ -102,7 +170,11 @@ Feature: Capture Exception
 
   @both
   Scenario: Frames without source context are valid
-    Given the SDK is initialized with token "test-token"
+    Given a fresh SDK acceptance test harness
+    And the SDK clock is fixed at "2025-01-01T00:00:00Z"
+    And persistent storage is empty
+    And the mock PostHog server is reset
+    And the SDK is initialized with token "test-token"
     And the SDK does not capture source context
     When capture exception is called for an exception with stack information
     Then one event named "$exception" should be enqueued

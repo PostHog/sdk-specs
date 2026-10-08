@@ -545,3 +545,98 @@ Feature: Evaluate Flags
     And no remote feature flag evaluation request should have been sent
     And no event named "$feature_flag_called" should be enqueued
     And snapshot only accessed should return no flags
+
+  @unresolved_flags_capable
+  Scenario: Local-only evaluation reports an experience continuity flag as unresolved
+    Given local feature flag definitions resolve "beta-ui" for distinct id "user-123" as true
+    And the local feature flag definition for "checkout" has experience continuity enabled
+    When evaluate flags is called for distinct id "user-123" with local-only evaluation enabled
+    Then the snapshot should contain "beta-ui" with value true
+    And the snapshot should not contain "checkout"
+    And the snapshot unresolved flags should contain "checkout" with reason "experience_continuity"
+    And no remote feature flag evaluation request should have been sent
+    And no event named "$feature_flag_called" should be enqueued
+    And snapshot only accessed should return no flags
+
+  @unresolved_flags_capable
+  Scenario: Loading a definition that local evaluation never resolves logs one warning
+    Given SDK logging is enabled
+    And the local feature flag definition for "checkout" has experience continuity enabled
+    When local feature flag definitions are refreshed successfully twice without changes
+    Then exactly one warning naming "checkout" and reason "experience_continuity" should be logged
+    And no remote feature flag evaluation request should have been sent
+
+  @unresolved_flags_capable
+  Scenario: Other inconclusive causes are reported as unresolved
+    Given local feature flag definitions include a flag "checkout" matching person property "plan" with operator "exact" and value "pro"
+    And the local feature flag definition for "checkout" has experience continuity disabled
+    When evaluate flags is called for distinct id "user-123" without person property "plan" and with local-only evaluation enabled
+    Then the snapshot should not contain "checkout"
+    And the snapshot unresolved flags should contain "checkout" with reason "missing_context"
+
+  @unresolved_flags_capable
+  Scenario: A flag resolved by remote fallback is not unresolved
+    Given the local feature flag definition for "checkout" has experience continuity enabled
+    And remote feature flag evaluation for distinct id "user-123" returns:
+      | key      | value |
+      | checkout | true  |
+    When evaluate flags is called for distinct id "user-123"
+    Then the snapshot should contain "checkout" with value true
+    And the snapshot unresolved flags should be empty
+
+  @unresolved_flags_capable
+  Scenario: A failed remote fallback leaves the flag unresolved
+    Given the local feature flag definition for "checkout" has experience continuity enabled
+    And the next remote feature flag evaluation request fails
+    When evaluate flags is called for distinct id "user-123"
+    Then the snapshot should not contain "checkout"
+    And the snapshot unresolved flags should contain "checkout" with reason "experience_continuity"
+
+  @unresolved_flags_capable
+  Scenario: A key without a local definition is missing, not unresolved
+    Given local feature flag definitions resolve "beta-ui" for distinct id "user-123" as true
+    And no local feature flag definition is loaded for "typo-flag"
+    When evaluate flags is called for distinct id "user-123" with local-only evaluation enabled
+    And snapshot enablement is read for "typo-flag"
+    Then the snapshot unresolved flags should be empty
+    And the "$feature_flag_called" event for flag "typo-flag" should report error "flag_missing"
+
+  @unresolved_flags_capable
+  Scenario: A flag outside the requested keys is not unresolved
+    Given local feature flag definitions resolve "beta-ui" for distinct id "user-123" as true
+    And the local feature flag definition for "checkout" has experience continuity enabled
+    When evaluate flags is called for distinct id "user-123" with flag keys:
+      | key     |
+      | beta-ui |
+    Then the snapshot should contain "beta-ui" with value true
+    And the snapshot unresolved flags should be empty
+    And no remote feature flag evaluation request should have been sent
+
+  @unresolved_flags_capable
+  Scenario: An inactive flag is resolved as false, not unresolved
+    Given the local feature flag definition for "checkout" has experience continuity enabled
+    And the local feature flag definition for "checkout" is inactive
+    When evaluate flags is called for distinct id "user-123" with local-only evaluation enabled
+    Then the snapshot should contain "checkout" with value false
+    And the snapshot unresolved flags should be empty
+
+  @unresolved_flags_capable
+  Scenario: Reading a flag the remote fallback resolved reports no inconclusive error
+    Given the local feature flag definition for "checkout" has experience continuity enabled
+    And remote feature flag evaluation for distinct id "user-123" returns:
+      | key      | value |
+      | checkout | true  |
+    When evaluate flags is called for distinct id "user-123"
+    And snapshot enablement is read for "checkout"
+    Then the returned enabled value for "checkout" should be true
+    And the "$feature_flag_called" event for flag "checkout" should not report error "local_evaluation_inconclusive"
+    And the "$feature_flag_called" event for flag "checkout" should not report error "flag_missing"
+
+  @unresolved_flags_capable
+  Scenario: Reading an unresolved flag reports an inconclusive local evaluation
+    Given the local feature flag definition for "checkout" has experience continuity enabled
+    When evaluate flags is called for distinct id "user-123" with local-only evaluation enabled
+    And snapshot enablement is read for "checkout"
+    Then the returned enabled value for "checkout" should be false
+    And the "$feature_flag_called" event for flag "checkout" should report error "local_evaluation_inconclusive"
+    And the "$feature_flag_called" event for flag "checkout" should not report error "flag_missing"

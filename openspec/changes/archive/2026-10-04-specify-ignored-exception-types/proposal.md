@@ -7,6 +7,8 @@ when local suppression/error-tracking rules say it should not be sent."
 - **posthog-ios** `PostHogErrorTrackingConfig.ignoredExceptionTypes`
 - **posthog-android** `PostHogErrorTrackingConfig.ignoredExceptionTypes`
 
+posthog-kmp exposes the same option and forwards it to these two native implementations.
+
 Until posthog-ios [#894](https://github.com/PostHog/posthog-ios/pull/894) the two disagreed on the
 one part of this that is observable without configuring anything: posthog-ios defaulted to
 `["RCTFatalException"]` while posthog-android defaulted to empty. posthog-ios now defaults to `[]`,
@@ -43,15 +45,21 @@ _None._
 
 ## Impact
 
-Not a breaking change, and no SDK has to move: it records what posthog-ios and posthog-android
-already do after posthog-ios #894. SDKs without the option stay conformant — the requirement is
-conditioned on exposing it.
+Not a breaking change: it records what posthog-ios and posthog-android already do after
+posthog-ios #894, and SDKs without the option stay conformant because the requirement is
+conditioned on exposing it. The SDKs that expose it still have the gaps listed below to close; none
+of them is a reason to change the requirement.
 
 - **posthog-ios** conforms as of #894 on iOS, macOS and tvOS. On watchOS and visionOS the matcher is
   compiled out with the crash reporter, so a non-empty list drops nothing on the manual and generic
   capture paths; that is an SDK gap to fix, not a reason for the spec to carve those platforms out.
 - **posthog-android** already conforms. Its server flavor gates `captureException` but not
   `$exception` events handed to the generic `capture`, the same kind of SDK gap as the watchOS one above.
+- **posthog-kmp** exposes `ErrorTrackingConfig(ignoredExceptionTypes)`, empty by default, and appends
+  it to the native list instead of matching itself. On Android that list starts empty. On Apple it
+  starts with whatever the pinned posthog-ios defaults to, and KMP pins posthog-ios exactly to a
+  release before #894, so a default KMP Apple setup still drops `RCTFatalException` until that pin
+  moves.
 - **posthog-js, posthog-flutter, posthog-react-native** expose no such option. The React Native
   plugin consumes it on Android, adding `JavascriptException` to posthog-android's list, and
   deduplicates with `beforeSend` on iOS. Unaffected.

@@ -2,11 +2,12 @@
 
 This change does not add a capability. It records an existing, previously unspecified error-tracking
 option on `capture-exception`, now that posthog-ios and posthog-android agree on its default.
+posthog-kmp exposes the same option by forwarding it to those two.
 
 ## Key Decisions
 
-- **Make the option optional, and condition the requirement on exposing it.** Only the two mobile
-  SDKs have it. Requiring it everywhere would invent work no one asked for; saying nothing leaves
+- **Make the option optional, and condition the requirement on exposing it.** Only posthog-ios and
+  posthog-android implement it, and posthog-kmp forwards to them. Requiring it everywhere would invent work no one asked for; saying nothing leaves
   the next SDK to pick its own default, which is how the posthog-ios default drifted in the first
   place.
 - **Specify the empty default as a SHALL.** It is the only part observable without configuration,

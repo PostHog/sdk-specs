@@ -756,9 +756,9 @@ Feature: Evaluate Flags
       """application/json
       {"identities":{"snapshot-user":{"beta-ui":{"value":true},"checkout":{"value":"control"}}}}
       """
-    And the snapshot SDK is initialized with JSON configuration:
+    And the SDK is initialized with token "test-token" and JSON configuration:
       """application/json
-      {}
+      {"flush_at":100,"flush_interval_ms":0}
       """
     When evaluate flags and read is called with JSON arguments:
       """application/json
@@ -781,9 +781,9 @@ Feature: Evaluate Flags
       """application/json
       {"identities":{"snapshot-user":{"disabled":{"value":false},"checkout":{"value":"control"}}}}
       """
-    And the snapshot SDK is initialized with JSON configuration:
+    And the SDK is initialized with token "test-token" and JSON configuration:
       """application/json
-      {}
+      {"flush_at":100,"flush_interval_ms":0}
       """
     When evaluate flags and read is called with JSON arguments:
       """application/json
@@ -806,9 +806,9 @@ Feature: Evaluate Flags
       """application/json
       {"identities":{"snapshot-user":{"checkout":{"value":"control"}}}}
       """
-    And the snapshot SDK is initialized with JSON configuration:
+    And the SDK is initialized with token "test-token" and JSON configuration:
       """application/json
-      {}
+      {"flush_at":100,"flush_interval_ms":0}
       """
     When evaluate flags and read is called with JSON arguments:
       """application/json
@@ -831,9 +831,9 @@ Feature: Evaluate Flags
       """application/json
       {"identities":{"snapshot-user":{"checkout":{"value":"control","payload":{"copy":"new","enabled":false,"attempt":0,"context":{"codes":[1,2],"success":false}}},"no-payload":{"value":true}}}}
       """
-    And the snapshot SDK is initialized with JSON configuration:
+    And the SDK is initialized with token "test-token" and JSON configuration:
       """application/json
-      {}
+      {"flush_at":100,"flush_interval_ms":0}
       """
     When evaluate flags and read is called with JSON arguments:
       """application/json
@@ -857,9 +857,9 @@ Feature: Evaluate Flags
       """application/json
       {"identities":{"snapshot-user":{"checkout":{"value":"control","payload":<payload>}}}}
       """
-    And the snapshot SDK is initialized with JSON configuration:
+    And the SDK is initialized with token "test-token" and JSON configuration:
       """application/json
-      {}
+      {"flush_at":100,"flush_interval_ms":0}
       """
     When evaluate flags and read is called with JSON arguments:
       """application/json
@@ -890,9 +890,9 @@ Feature: Evaluate Flags
       """application/json
       {"identities":{"snapshot-user-a":{"checkout":{"value":"control"}},"snapshot-user-b":{"checkout":{"value":"control"}}}}
       """
-    And the snapshot SDK is initialized with JSON configuration:
+    And the SDK is initialized with token "test-token" and JSON configuration:
       """application/json
-      {}
+      {"flush_at":100,"flush_interval_ms":0}
       """
     When evaluate flags and read is called with JSON arguments:
       """application/json
@@ -923,9 +923,9 @@ Feature: Evaluate Flags
       """application/json
       {"identities":{"snapshot-user":{"beta-ui":{"value":true}}}}
       """
-    And the snapshot SDK is initialized with JSON configuration:
+    And the SDK is initialized with token "test-token" and JSON configuration:
       """application/json
-      {}
+      {"flush_at":100,"flush_interval_ms":0}
       """
     When evaluate flags and read is called with JSON arguments:
       """application/json
@@ -948,9 +948,9 @@ Feature: Evaluate Flags
       """application/json
       {"identities":{"snapshot-user":{"beta-ui":{"value":true},"checkout":{"value":"control","payload":{"copy":"new"}},"search":{"value":false}}}}
       """
-    And the snapshot SDK is initialized with JSON configuration:
+    And the SDK is initialized with token "test-token" and JSON configuration:
       """application/json
-      {}
+      {"flush_at":100,"flush_interval_ms":0}
       """
     When evaluate flags and read is called with JSON arguments:
       """application/json
@@ -973,9 +973,9 @@ Feature: Evaluate Flags
       """application/json
       {"identities":{"snapshot-user":{"checkout":{"value":"control"}}}}
       """
-    And the snapshot SDK is initialized with JSON configuration:
+    And the SDK is initialized with token "test-token" and JSON configuration:
       """application/json
-      {}
+      {"flush_at":100,"flush_interval_ms":0}
       """
     When evaluate flags and read is called with JSON arguments:
       """application/json
@@ -998,9 +998,9 @@ Feature: Evaluate Flags
       """application/json
       {"identities":{"snapshot-user":{"beta-ui":{"value":true},"checkout":{"value":"control","payload":{"copy":"new"}},"search":{"value":false}}}}
       """
-    And the snapshot SDK is initialized with JSON configuration:
+    And the SDK is initialized with token "test-token" and JSON configuration:
       """application/json
-      {}
+      {"flush_at":100,"flush_interval_ms":0}
       """
     When evaluate flags and read is called with JSON arguments:
       """application/json
@@ -1023,9 +1023,9 @@ Feature: Evaluate Flags
       """application/json
       {"identities":{"snapshot-user":{"beta-ui":{"value":true},"checkout":{"value":"control","payload":{"copy":"new"}}}}}
       """
-    And the snapshot SDK is initialized with JSON configuration:
+    And the SDK is initialized with token "test-token" and JSON configuration:
       """application/json
-      {}
+      {"flush_at":100,"flush_interval_ms":0}
       """
     When evaluate flags and read is called with JSON arguments:
       """application/json
@@ -1048,9 +1048,9 @@ Feature: Evaluate Flags
       """application/json
       {"identities":{"snapshot-user":{"beta-ui":{"value":true},"checkout":{"value":"control","payload":{"copy":"new"}}}}}
       """
-    And the snapshot SDK is initialized with JSON configuration:
+    And the SDK is initialized with token "test-token" and JSON configuration:
       """application/json
-      {}
+      {"flush_at":100,"flush_interval_ms":0}
       """
     When evaluate flags and read is called with JSON arguments:
       """application/json
@@ -1073,9 +1073,9 @@ Feature: Evaluate Flags
       """application/json
       {"identities":{"snapshot-user":{"beta-ui":{"value":true},"checkout":{"value":"control","payload":{"copy":"new"}},"search":{"value":false}}}}
       """
-    And the snapshot SDK is initialized with JSON configuration:
+    And the SDK is initialized with token "test-token" and JSON configuration:
       """application/json
-      {}
+      {"flush_at":100,"flush_interval_ms":0}
       """
     When evaluate flags and read is called with JSON arguments:
       """application/json
@@ -1098,9 +1098,9 @@ Feature: Evaluate Flags
       """application/json
       {"identities":{"snapshot-user":{"beta-ui":{"value":true},"disabled":{"value":false},"checkout":{"value":"control"}}}}
       """
-    And the snapshot SDK is initialized with JSON configuration:
+    And the SDK is initialized with token "test-token" and JSON configuration:
       """application/json
-      {}
+      {"flush_at":100,"flush_interval_ms":0}
       """
     When evaluate flags and read is called with JSON arguments:
       """application/json
@@ -1123,9 +1123,9 @@ Feature: Evaluate Flags
       """application/json
       {"identities":{}}
       """
-    And the snapshot SDK is initialized with JSON configuration:
+    And the SDK is initialized with token "test-token" and JSON configuration:
       """application/json
-      {}
+      {"flush_at":100,"flush_interval_ms":0}
       """
     When evaluate flags and read is called with JSON arguments:
       """application/json
@@ -1148,9 +1148,9 @@ Feature: Evaluate Flags
       """application/json
       {"identities":{"snapshot-user":{"checkout":{"value":"control"}}}}
       """
-    And the snapshot SDK is initialized with JSON configuration:
+    And the SDK is initialized with token "test-token" and JSON configuration:
       """application/json
-      {"disabled":true}
+      {"flush_at":100,"flush_interval_ms":0,"disabled":true}
       """
     When evaluate flags and read is called with JSON arguments:
       """application/json
@@ -1173,9 +1173,9 @@ Feature: Evaluate Flags
       """application/json
       {"identities":{},"status":503}
       """
-    And the snapshot SDK is initialized with JSON configuration:
+    And the SDK is initialized with token "test-token" and JSON configuration:
       """application/json
-      {"feature_flags_request_max_retries":0}
+      {"flush_at":100,"flush_interval_ms":0,"feature_flags_request_max_retries":0}
       """
     When evaluate flags and read is called with JSON arguments:
       """application/json

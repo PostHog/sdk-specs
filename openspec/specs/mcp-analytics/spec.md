@@ -363,6 +363,14 @@ model), and `conversation_id`. The SDK SHALL:
 - remove injected arguments before the handler runs and keep them out of `$mcp_parameters`;
 - treat an argument a server's tool declares itself as the tool's data: pass it through, capture it in
   `$mcp_parameters`, and never read it as intent, model, or handle;
+- resolve ownership during `tools/call` from the tool registry or the original tool definition, even
+  when the server instance did not serve `tools/list`. If the framework exposes no readable registry,
+  automatic instrumentation SHALL provide a host callback that resolves the original tool by name.
+  The callback returns the original schema, before SDK injection, in the same form that the host
+  advertises it. Ownership learned from a listing on the current instance wins. A missing result or
+  callback failure leaves ownership unknown,
+  logs the failure, and does not change the MCP response. The SDK strips only arguments that it can
+  prove it owns;
 - preserve the order and content of the server's tool list otherwise, apart from the
   `_mcp_instructions` output-schema declaration of "Session identity".
 
@@ -384,6 +392,16 @@ describing people and entities by role ("a customer"), because pattern redaction
 - **THEN** the tool handler should receive arguments `{"query": "flags"}`
 - **AND** the "$mcp_tool_call" event's property "$mcp_intent" should be "find the flags docs"
 - **AND** its property "$mcp_intent_source" should be "context_parameter"
+
+#### Scenario: A fresh low-level server resolves injected argument ownership
+- **GIVEN** automatic instrumentation creates a fresh low-level server for `tools/call`
+- **AND** the tool "search_docs" has a strict schema that declares only "query"
+- **AND** that server instance has not served `tools/list`
+- **AND** a host callback resolves tool "search_docs" to its original schema before SDK injection
+- **WHEN** the MCP client calls tool "search_docs" with arguments `{"query": "flags", "context": "find docs", "llm_model": "model-a"}`
+- **THEN** the tool handler should receive arguments `{"query": "flags"}`
+- **AND** the "$mcp_tool_call" event's property "$mcp_intent" should be "find docs"
+- **AND** the "$mcp_tool_call" event's property "$mcp_llm_model" should be "model-a"
 
 ### Requirement: Payload capture
 

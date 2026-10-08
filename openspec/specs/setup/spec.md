@@ -38,7 +38,7 @@ Where `ClientSetupConfig` contains the project token plus runtime options such a
 - **Flutter:** `setup(config): Future<void>`
 - **Unity:** `PostHogSDK.Setup(config)` / `PostHog.Setup(config)`
 
-The configuration object names the project credential `projectToken` on iOS, Android, Flutter, and KMP, and `ProjectToken` on .NET. posthog-js has not adopted the name: browser takes the token positionally and React Native still calls the constructor parameter `apiKey`.
+The configuration object names the project credential `projectToken` on iOS, Android, Flutter, and KMP (and `ProjectToken` in the .NET server SDK's options). Two client SDKs have not adopted the name yet: React Native's `PostHogProvider` takes an `apiKey` prop, and Unity's `PostHogConfig` and `PostHogSettings` expose `ApiKey`. Browser `init(token, …)` and the React Native `new PostHog(apiKey, options?)` constructor take the token positionally, so their parameter name is not part of the contract.
 
 `setup` is the canonical name here because it is the dominant public naming across the native/mobile SDKs, even though browser uses `init(...)` and React Native commonly uses a constructor/provider surface.
 
@@ -46,7 +46,7 @@ The configuration object names the project credential `projectToken` on iOS, And
 
 1. **Validate required configuration.**
    - The SDK requires a project token and accepts a host plus optional runtime settings.
-   - The SDKs that renamed the option to `projectToken` trim leading and trailing whitespace from the configured value before storing it.
+   - iOS, Android, Flutter, and React Native trim leading and trailing whitespace from the configured value before storing it.
    - Invalid or missing config is handled SDK-specifically: some SDKs log and no-op, while others throw on obviously invalid input.
 2. **Prevent accidental double initialization.**
    - Most audited SDKs treat repeated setup of the same singleton/instance as a no-op with logging/warnings.
@@ -176,9 +176,9 @@ The project credential a client SDK is configured with is a PostHog project toke
 
 ### Requirement: Deprecated project credential alias
 
-An SDK that previously named the project token option `apiKey` SHALL keep the old name as a deprecated alias rather than removing it in the same release. The alias SHALL resolve to the same value, SHALL be marked deprecated in whatever way the platform expresses deprecation, and SHALL log a warning naming `projectToken` as the replacement. The alias MAY be removed in the SDK's next major version. When both names are supplied, `projectToken` SHALL win.
+An SDK whose public configuration still names the project token option `apiKey` (or `ApiKey`) SHALL add `projectToken` and keep the old name as a deprecated alias in the same release, so the rename does not require a major version. The alias SHALL resolve to the same value and SHALL be marked deprecated in whatever way the platform expresses deprecation, naming `projectToken` as the replacement: a compile-time deprecation where the platform has one, otherwise a logged warning. An SDK MAY additionally log a runtime warning when the alias is used. The alias MAY be removed only in a major version released after the one that added `projectToken`. Where the configuration surface accepts both names at once — an options object, a provider's props, or a manifest or `Info.plist` key — `projectToken` SHALL win.
 
-#### Scenario: Deprecated alias configures the same token and warns (@legacy_token_alias)
+#### Scenario: Deprecated alias configures the same token (@legacy_token_alias)
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
 - **AND** persistent storage is empty
@@ -186,12 +186,11 @@ An SDK that previously named the project token option `apiKey` SHALL keep the ol
 - **GIVEN** the SDK has not been initialized
 - **WHEN** setup is called with the deprecated project credential option set to "test-token" and host "https://mock.posthog.test"
 - **THEN** the SDK should be initialized
-- **AND** a deprecation warning naming the project token option should be logged
 - **WHEN** capture is called with event "Hello"
 - **AND** flush is called
 - **THEN** the mock server should have received a batch with API key "test-token"
 
-#### Scenario: Project token option wins over the deprecated alias (@legacy_token_alias)
+#### Scenario: Project token option wins over the deprecated alias (@both_token_names_capable)
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
 - **AND** persistent storage is empty
@@ -211,7 +210,7 @@ Renaming the option SHALL NOT change anything below the public configuration sur
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
 - **AND** the mock PostHog server is reset
-- **GIVEN** persistent storage contains a queued event named "Earlier" written before the rename
+- **GIVEN** persistent storage contains a queued event named "Earlier"
 - **WHEN** setup is called with the project token option set to "test-token" and host "https://mock.posthog.test"
 - **AND** flush is called
 - **THEN** the mock server should have received a batch with API key "test-token"

@@ -5,9 +5,10 @@ Five SDKs have renamed the project credential configuration option from `apiKey`
 ## What Changes
 
 - Add a requirement naming `projectToken` the canonical configuration option for the project credential, in each platform's casing.
-- Require the previous name to keep working as a deprecated alias that resolves to the same value and logs a warning, until the SDK's next major version.
+- Require every SDK that still names the option `apiKey` — including those not yet renamed — to add `projectToken` and keep the old name as a deprecated alias that resolves to the same value, so the rename ships in a minor release. The alias may be dropped only in a later major version.
+- Accept a compile-time deprecation as the deprecation signal; a runtime warning is optional. Android, KMP, and Flutter's Dart getter shipped compile-time deprecation only.
 - State that the rename does not touch wire fields (`api_key`, `token`), stored queue or preference paths, or positional first-argument constructors.
-- Note in the narrative that posthog-js (browser, React Native, Node) has not adopted the name, and that the renamed SDKs trim the configured value.
+- Note in the narrative that React Native's `PostHogProvider` `apiKey` prop and Unity's `ApiKey` have not adopted the name, and which SDKs trim the configured value.
 
 ## Capabilities
 
@@ -21,4 +22,4 @@ None.
 
 ## Impact
 
-posthog-js is the only audited SDK that still names the option `apiKey`; [posthog-js #5221](https://github.com/PostHog/posthog-js/pull/5221) deliberately kept the name and changed only the documentation and the missing-token error message. Adopting `projectToken` there is a follow-up in that repo, not a prerequisite for this spec change. Every renamed SDK shipped the alias, so no existing caller breaks.
+React Native and Unity still name the option `apiKey`/`ApiKey`; [posthog-js #5221](https://github.com/PostHog/posthog-js/pull/5221) deliberately kept the React Native name and changed only the documentation and the missing-token error message. This change makes both non-conforming until they add `projectToken` with a deprecated `apiKey` alias, which they can do in a minor release. That work happens in those repos and is not a prerequisite for this spec change. Every renamed SDK shipped the alias, so no existing caller breaks.

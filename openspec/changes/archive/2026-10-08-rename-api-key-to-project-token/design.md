@@ -12,12 +12,16 @@ The credential a client SDK is configured with is a PostHog **project token** (`
 
 **Canonical name is `projectToken`, in platform casing.** Shipped as `projectToken` (iOS, Android, Flutter, KMP), `ProjectToken` (.NET), and `com.posthog.posthog.PROJECT_TOKEN` for Flutter's native auto-init manifest and `Info.plist` keys. The spec names the concept and allows the casing, matching how it treats other option names.
 
-**The old name is a deprecated alias, not a removal.** Every renamed SDK kept `apiKey` (`ProjectApiKey` on .NET, `com.posthog.posthog.API_KEY` for auto-init) reading and writing the same value, emitting a deprecation warning that names `projectToken`, slated for removal in the next major. Requiring the alias is what makes the rename a minor release everywhere.
+**The old name is a deprecated alias, not a removal.** Every renamed SDK kept `apiKey` (`ProjectApiKey` on .NET, `com.posthog.posthog.API_KEY` for auto-init) resolving to the same value and deprecated in favor of `projectToken`, slated for removal in the next major. Requiring the alias is what makes the rename a minor release everywhere, including for the SDKs that have not renamed yet: they add `projectToken` and the alias together, and only dropping the alias waits for a major.
 
-**The rename stops at the public config surface.** Wire payload fields (`api_key`, `token`), stored queue and preference paths, and the server-side builder parameter names are unchanged, so stored queues and in-flight payloads carry over. Positional constructors — browser `init(token, …)`, `PostHogAndroidConfig("phc_…")` — were never affected, because the parameter name is not part of the call.
+**Deprecation signal is compile-time or runtime.** iOS, .NET, and Flutter's native auto-init keys log a runtime warning. Android, KMP, and Flutter's Dart `apiKey` getter rely on `@Deprecated` alone. The requirement accepts either, so the acceptance scenario checks the resolved value rather than a log line.
 
-**Trimming is narrative, not a requirement.** iOS, Flutter, and Android all trim the configured value, but trimming predates the rename and is not what this change is about. It is recorded in the narrative rather than asserted as a scenario.
+**"projectToken wins" applies only where both names can be supplied.** iOS, Android, KMP, and Flutter's Dart config take the token through separate constructors, so a caller cannot pass both. The precedence rule and its scenario (`@both_token_names_capable`) apply to options objects, provider props, and manifest or `Info.plist` keys.
+
+**The rename stops at the public config surface.** Wire payload fields (`api_key`, `token`), stored queue and preference paths, and the server-side builder parameter names are unchanged, so stored queues and in-flight payloads carry over. Positional constructors — browser `init(token, …)`, React Native `new PostHog(apiKey, …)`, `PostHogAndroidConfig("phc_…")` — were never affected, because the parameter name is not part of the call.
+
+**Trimming is narrative, not a requirement.** iOS, Flutter, Android, and React Native all trim the configured value, but trimming predates the rename and is not what this change is about. It is recorded in the narrative rather than asserted as a scenario.
 
 ## Open questions
 
-Whether posthog-js adopts `projectToken` for the browser and React Native surfaces, and on what release. That is tracked in posthog-js; this spec records the name the other SDKs settled on.
+When React Native (`PostHogProvider`'s `apiKey` prop) and Unity (`PostHogConfig.ApiKey`, `PostHogSettings.ApiKey`) add `projectToken`. The spec now requires it; the release is tracked in those repos.

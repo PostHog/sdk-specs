@@ -186,6 +186,7 @@ Feature: MCP analytics
     Given automatic instrumentation creates a fresh low-level server for "tools/call"
     And the tool "search_docs" has a strict schema that declares only "query"
     And that server instance has not served "tools/list"
+    And a host callback resolves tool "search_docs" to its original schema before SDK injection
     When the MCP client calls tool "search_docs" with JSON arguments:
       """application/json
       {"query":"flags","context":"find docs","llm_model":"model-a"}

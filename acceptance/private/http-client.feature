@@ -49,6 +49,13 @@ Feature: HTTP Client
       | key     | value |
       | beta-ui | true  |
 
+  Scenario: Flags request does not retry a refused connection
+    Given the SDK is initialized with token "test-token"
+    And the current distinct id is "user-123"
+    And the next feature flag request will fail with connection refused before any HTTP response
+    When feature flags are loaded from the remote flags endpoint
+    Then exactly 1 feature flag request should be sent
+
   Scenario Outline: Flags request retries transient gateway HTTP status errors by default
     Given the SDK is initialized with token "test-token"
     And the current distinct id is "user-123"

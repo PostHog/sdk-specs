@@ -36,7 +36,7 @@ captureException(
 
 1. **Guard / no-op if unavailable.** Disabled, uninitialized, or opted-out SDK instances do nothing.
 2. **Accept a handled exception-like input plus optional event properties.**
-3. **Normalize the input into PostHog exception properties.** The SDK converts the supplied error/exception into its error-tracking payload format, typically including exception type/value, handled metadata, stack trace information, and exception-list style structured data. When the input already carries stack trace information, normalization preserves it rather than discarding it for a synthesized stack (see "Stack trace preservation over synthesis").
+3. **Normalize the input into PostHog exception properties.** The SDK converts the supplied error/exception into its error-tracking payload format. The canonical exception type and message live on the primary `$exception_list[0].type` / `$exception_list[0].value` entry, alongside handled metadata, stack trace information, and other structured exception data. Legacy top-level `$exception_type` / `$exception_message` properties are not required for standard capture paths; SDKs that still emit them for compatibility MUST treat `$exception_list` as the source of truth. When the input already carries stack trace information, normalization preserves it rather than discarding it for a synthesized stack (see "Stack trace preservation over synthesis").
 4. **Mark the exception as handled.** This public manual-capture API represents caught/handled failures, not uncaught crashes.
 5. **Merge caller-supplied properties into the `$exception` payload.** The final precedence of generated vs caller-supplied keys is implementation-specific, but both sources contribute to the event payload.
 6. **Send a `$exception` event through the normal capture/error-reporting pipeline.** The event is then enriched and delivered using the SDK's usual distinct-id, session, batching, and transport behavior.
@@ -84,10 +84,14 @@ captureException(
 - **Error-tracking processors/builders** — these convert raw errors/exceptions into the structured PostHog exception property format.
 - **Event batcher / retry queue** — `$exception` events are delivered through the same batching/retry infrastructure as other events.
 - **Autocaptured exception systems** — this is the manual companion to automatic exception capture; both typically produce the same event family.
+
 ## Requirements
+
 ### Requirement: Canonical capture-exception behavior
 
 The SDK SHALL implement the canonical `capture-exception` behavior described by this spec. Implementations MAY adapt method names, parameter casing, type syntax, and lifecycle hooks to platform idioms where this spec explicitly allows variation, but MUST preserve the observable outcomes in the scenarios below.
+
+The canonical exception type and message for a standard captured exception SHALL be represented by the primary exception entry at `$exception_list[0].type` and `$exception_list[0].value`. Legacy top-level `$exception_type` and `$exception_message` properties are not required for standard capture paths. SDKs MAY continue to emit them for compatibility, but SDKs and consumers MUST treat `$exception_list` as the source of truth when it is present.
 
 #### Scenario: Capturing a handled exception emits an exception event (@both)
 - **GIVEN** a fresh SDK acceptance test harness
@@ -98,10 +102,8 @@ The SDK SHALL implement the canonical `capture-exception` behavior described by 
 - **AND** the test exception has stack information
 - **WHEN** capture exception is called for an exception with type "TypeError" and message "boom"
 - **THEN** one event named "$exception" should be enqueued
-- **AND** the enqueued event properties should include:
-  | property           | value     |
-  | $exception_type    | TypeError |
-  | $exception_message | boom      |
+- **AND** the enqueued event's exception list should have "TypeError" at index 0
+- **AND** the enqueued event's primary exception message should be "boom"
 - **AND** the enqueued event should include exception stack information
 
 #### Scenario: Exception capture includes caller properties (@both)
@@ -267,3 +269,63 @@ When the supplied error-like input already carries stack trace information (for 
 - **THEN** one "$exception" event should be received
 - **AND** its custom properties should equal JSON `{"nested":{},"items":["1",null,2]}`
 - **AND** the event should still include its SDK-generated exception data
+
+### Requirement: Ignored exception types
+
+Where an SDK exposes an option that drops `$exception` events by exception type, it SHALL honor
+the rules below (`errorTrackingConfig.ignoredExceptionTypes` on posthog-ios and posthog-android).
+The option is optional: an SDK that does not expose it is conformant.
+
+Where the option exists:
+
+- It SHALL default to empty, so a default-configured SDK drops nothing.
+- A non-empty list SHALL drop the matching `$exception` event before it enters the capture
+  pipeline, on **every** path that produces one: manual `capture-exception`, exception
+  autocapture and crash reports, and `$exception` events handed to the generic capture API (how
+  wrapper SDKs such as the React Native and Flutter bridges report errors).
+- Dropping SHALL be silent apart from a debug log, and SHALL NOT throw.
+- Matching SHALL consider every exception in the chain (every `$exception_list` entry, or every
+  link of the cause chain the SDK would serialize), not only the outermost one.
+- Where the SDK compares identifiers as strings, the comparison SHALL be case-sensitive. Matching a
+  live error object against a platform type (posthog-android's `Class` list) has no case to compare.
+- The identifier matched on is platform-idiomatic, and the SDK SHALL document which form it
+  accepts. An SDK holding the live error object MAY match the platform error type, in which case
+  a subtype of a listed type matches (posthog-android: `Class.isInstance` across the cause chain).
+  An SDK matching the serialized payload SHALL compare each `$exception_list[*].type` for exact
+  equality in its documented form: posthog-ios compares the bare `type`; posthog-android rejoins
+  `module` and `type` into the qualified class name for events handed to the generic capture API.
+
+#### Scenario: default configuration drops nothing
+- **GIVEN** an SDK configured with defaults
+- **WHEN** the app captures any exception
+- **THEN** the ignore list is empty and an `$exception` event is captured
+
+#### Scenario: a listed type is dropped
+- **GIVEN** the ignore list contains `MyNoisyError`
+- **WHEN** the app calls `captureException(MyNoisyError("boom"))`
+- **THEN** no `$exception` event enters the capture pipeline
+
+#### Scenario: a listed type nested in the chain is dropped
+- **GIVEN** the ignore list contains `MyNoisyError`
+- **WHEN** an exception whose cause chain contains `MyNoisyError` is captured
+- **THEN** no `$exception` event enters the capture pipeline
+
+#### Scenario: an externally built exception event is dropped
+- **GIVEN** the ignore list contains `MyNoisyError`
+- **WHEN** a wrapper SDK calls the generic capture API with `$exception` and an `$exception_list`
+  entry whose `type` is `MyNoisyError`
+- **THEN** no `$exception` event enters the capture pipeline
+
+#### Scenario: a qualified type is matched in the SDK's documented form
+- **GIVEN** an SDK that documents its identifiers as qualified class names and an ignore list
+  containing `com.example.MyNoisyError`
+- **WHEN** an `$exception` event whose `$exception_list` entry has `module` `com.example` and
+  `type` `MyNoisyError` is handed to the generic capture API
+- **THEN** no `$exception` event enters the capture pipeline
+
+#### Scenario: string identifiers are matched case-sensitively
+- **GIVEN** an SDK that matches identifiers as strings and an ignore list containing
+  `mynoisyerror`
+- **WHEN** an `$exception` event whose `$exception_list` entry has `type` `MyNoisyError` is
+  captured
+- **THEN** the `$exception` event is captured

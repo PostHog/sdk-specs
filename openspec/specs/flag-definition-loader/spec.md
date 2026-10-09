@@ -43,7 +43,7 @@ clear(): void
 4. **Update in-memory definition state on success.** Successful fetches replace the currently loaded definitions and derived indexes/maps.
 5. **Preserve prior definitions on non-modified responses.** A `304` keeps current definitions but may still update the stored ETag.
 6. **Optionally integrate with shared/external caches.** Some SDKs let only one worker fetch definitions while others read the latest definitions from a distributed cache provider.
-7. **Start and maintain a poll loop.** Once enabled, the loader periodically refreshes definitions in the background.
+7. **Start and maintain a poll loop.** Once enabled, the loader periodically refreshes definitions in the background. Some SDKs let the caller disable the recurring refresh and drive it manually instead; see the polling-opt-out requirement below.
 8. **Handle quota or auth errors specially.** Some implementations clear definitions or back off polling when the API key is invalid, quota limited, or not authorized.
 9. **Expose readiness to higher layers.** Callers can ask whether local evaluation is ready and then use the loaded definitions in the evaluator.
 10. **Clear definitions on explicit reset/clear.** When local evaluation is disabled, quota limited, or reset, the loader drops the in-memory definitions and associated ETag state.
@@ -69,7 +69,7 @@ clear(): void
 ### Lifecycle behavior
 
 - Loader is usually initialized with the SDK but may stay inactive until local evaluation is requested.
-- First load often kicks off background polling.
+- First load often kicks off background polling, unless the caller has disabled automatic polling.
 - Poll loops run until shutdown/disposal.
 - Shutdown clears timers/tasks and may release distributed-cache coordination resources.
 - Wrapper SDKs may have no definition-loader lifecycle of their own. Flutter forwards setup config to native SDKs over the method channel, and Flutter Web attaches to an already-initialized `posthog-js` instance plus `onFeatureFlags` callback wiring rather than starting a Dart-owned definition poller.
@@ -310,3 +310,59 @@ The definition loader SHALL preserve `filters.holdout.id` and `filters.holdout.e
 - **WHEN** a replacement definition snapshot omits that flag's holdout configuration
 - **THEN** subsequent local evaluations should use ordinary release conditions rather than the previous holdout
 
+### Requirement: Automatic definition polling can be disabled
+
+A server SDK that polls for local-evaluation flag definitions MAY let the caller turn the recurring refresh off while keeping local evaluation. An SDK that offers it SHALL express it as an explicit disabled setting on the polling-interval configuration option, distinct from omitting the option. Omitting the option SHALL keep the SDK's documented default interval, and an explicit interval SHALL keep polling at that interval.
+
+When polling is disabled, the loader SHALL still perform its initial definition load, SHALL still evaluate flags locally from the loaded definitions, and SHALL NOT schedule a recurring refresh timer or task. Disabling polling SHALL NOT disable local evaluation, clear loaded definitions, or force remote evaluation for flags the definitions can resolve.
+
+The loaded definitions SHALL remain unchanged until the caller refreshes them through the SDK's manual refresh surface (for example `reloadFeatureFlags()`), which SHALL fetch fresh definitions as it does when polling is enabled. Keeping the definitions current is the caller's responsibility while polling is disabled; the SDK SHALL NOT compensate by refreshing on evaluation.
+
+A failed refresh SHALL preserve the loader's existing failure behavior without scheduling a recurring timer that the disabled setting suppressed. Existing rules for preserving prior definitions on failure, conditional requests, quota or auth errors, and backoff apply unchanged to the refresh paths where the SDK already applies them. An explicit manual refresh surface that force-reloads definitions MAY bypass existing backoff.
+
+This setting SHALL affect only definition polling. Other SDK timers, such as event-flush and request-timeout timers, SHALL be unaffected.
+
+#### Scenario: Omitted polling interval keeps the default
+- **GIVEN** the SDK is initialized with token "test-token" and local evaluation enabled
+- **AND** no flag definition polling interval is configured
+- **AND** the SDK's documented default flag definition polling interval is known
+- **WHEN** the SDK clock advances by the documented default flag definition polling interval
+- **THEN** the flag definition loader should request fresh definitions
+
+#### Scenario: Disabled polling still loads definitions once
+- **GIVEN** the SDK is initialized with token "test-token" and local evaluation enabled
+- **AND** flag definition polling is explicitly disabled
+- **AND** the mock server will return flag definitions:
+  | key     | active | rollout |
+  | beta-ui | true   | 100     |
+- **WHEN** the SDK finishes its initial flag definition load
+- **THEN** local feature flag definitions should include flag "beta-ui"
+- **AND** the flag "beta-ui" should evaluate locally without a remote feature flag evaluation request
+
+#### Scenario: Disabled polling schedules no recurring refresh
+- **GIVEN** the SDK is initialized with token "test-token" and local evaluation enabled
+- **AND** flag definition polling is explicitly disabled
+- **AND** the SDK has finished its initial flag definition load
+- **WHEN** the SDK clock advances by "30 minutes"
+- **THEN** the flag definition loader should not request fresh definitions
+- **AND** no flag definition refresh timer should be pending
+
+#### Scenario: Manual refresh updates definitions while polling is disabled
+- **GIVEN** the SDK is initialized with token "test-token" and local evaluation enabled
+- **AND** flag definition polling is explicitly disabled
+- **AND** local feature flag definitions include flag "beta-ui"
+- **AND** the mock server will return flag definitions:
+  | key      | active | rollout |
+  | beta-ui  | true   | 100     |
+  | new-flag | true   | 100     |
+- **WHEN** the flag definition loader refreshes
+- **THEN** local feature flag definitions should include flag "new-flag"
+
+#### Scenario: A failed manual refresh preserves definitions without starting a timer
+- **GIVEN** the SDK is initialized with token "test-token" and local evaluation enabled
+- **AND** flag definition polling is explicitly disabled
+- **AND** local feature flag definitions include flag "beta-ui"
+- **AND** the mock server will fail the next flag definition request with status 503
+- **WHEN** the flag definition loader refreshes
+- **THEN** local feature flag definitions should still include flag "beta-ui"
+- **AND** no flag definition refresh timer should be pending

@@ -90,6 +90,7 @@ means set whenever the SDK can determine the value. Events: "call" is `$mcp_tool
 | `$mcp_is_error` | call | JSON boolean | required |
 | `$mcp_duration_ms` | call, `$mcp_input_required` | JSON number, milliseconds | required |
 | `$mcp_source` | call | `"posthog_mcp_analytics"` | required |
+| `$mcp_interface` | all, `$exception` | `"mcp"` for an MCP server; `"webmcp"` is reserved for in-page browser tools | required |
 | `$session_id` | all | non-empty string | required |
 | `$mcp_resource_name` | call, report | string, the tool name (on a report, the virtual tool's), at most 256 characters | should |
 | `$mcp_tool_description`, `$mcp_tool_category` | call | string, at most 2,048 characters | known |
@@ -540,6 +541,26 @@ can only relabel the whole client, the SDK SHALL document that MCP analytics nee
 - **WHEN** an MCP client calls tool "search_docs"
 - **AND** the SDK is flushed
 - **THEN** the "$mcp_tool_call" event's property "$lib" should end with "-mcp"
+
+### Requirement: Interface identity
+
+Every MCP analytics event, and the `$exception` captured next to a failed call, SHALL carry
+`$mcp_interface` naming the interface the call arrived through, set before any before-send hook
+runs. Server instrumentation, the scope of this spec, SHALL send `"mcp"`. `"webmcp"` is reserved for
+in-page browser tools instrumented by a client SDK and SHALL NOT be sent by an MCP server. `$lib`
+("Library identity") names the runtime, not the interface, and SHALL NOT be used in its place.
+
+#### Scenario: Server events name the mcp interface
+- **GIVEN** an MCP server instrumented by the SDK
+- **WHEN** an MCP client calls tool "search_docs"
+- **AND** the SDK is flushed
+- **THEN** the "$mcp_tool_call" event's property "$mcp_interface" should be "mcp"
+
+#### Scenario: A failed call's exception names the same interface
+- **GIVEN** an MCP server instrumented by the SDK with exception autocapture enabled and a tool "search_docs" whose handler throws
+- **WHEN** an MCP client calls tool "search_docs"
+- **AND** the SDK is flushed
+- **THEN** the "$exception" event's property "$mcp_interface" should be "mcp"
 
 ### Requirement: Optional events
 

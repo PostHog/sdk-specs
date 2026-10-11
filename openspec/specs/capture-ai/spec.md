@@ -56,6 +56,8 @@ and an immediate/awaitable variant exactly where the host SDK has one for
 
 ## Configuration
 
+### Content capture
+
 One public flag, named per platform convention (`enable_full_ai_capture` in
 Python — constructor kwarg and module attribute; `enableFullAiCapture` in
 Node — client option), default false. When true, PostHog's AI wrapper
@@ -70,6 +72,21 @@ libraries:
 
 Privacy mode always takes precedence: with it on, content properties are
 stripped regardless of this flag.
+
+### AI lane delivery
+
+The AI lane carries its own delivery configuration, separate from the analytics
+lane's: compression mode, queue capacity, and upload timeout, named per platform
+convention (`capture_ai_compression`, `capture_ai_max_queue_size`,
+`capture_ai_timeout` in Python; `CaptureAICompression`, `CaptureAIMaxQueueSize`,
+`CaptureAIBatchUploadTimeout` in Go). The defaults are no compression, 1000
+events, and 30 seconds — a longer timeout than analytics, because AI payloads
+are much larger. Analytics settings never reach the AI lane, so an analytics
+compression environment variable does not start compressing multi-MB AI uploads.
+
+The per-event size cap is optionally exposed (`capture_ai_max_event_bytes` in
+Python; an internal constant in Go) and can only be lowered. The batch-size
+target is an internal constant.
 
 ## Behavior
 
@@ -115,12 +132,14 @@ promise. Reference forms (e.g. `phaiblob://`) may join the schema additively.
 
 These are current operational values, explicitly NOT part of this contract,
 and may change without notice: endpoint `/i/v0/ai/batch/` (v0 batch wire
-shape), 8 MiB per-event cap, ~5 MiB batch target, compression per SDK default
-(Node: transport gzip on unless disabled; Python: gzip opt-in), bounded
-retries with backoff. Capture v1 re-implements the same contract on
+shape), the 8 MiB per-event cap's value and the ~5 MiB batch target, analytics
+compression per SDK default (Node: transport gzip on unless disabled; Python:
+gzip opt-in), bounded retries with backoff. Capture v1 re-implements the same contract on
 `/i/v1/ai/...` with per-event outcomes; that cutover must not change anything
 in the Requirements below.
+
 ## Requirements
+
 ### Requirement: Canonical capture_ai behavior
 
 Server SDKs that support AI capture SHALL implement `capture_ai` as described
@@ -215,3 +234,37 @@ SDK's AI wrapper libraries capture. It SHALL NOT alter payloads passed to
 - **AND** its custom properties should equal JSON `{"nested":{},"items":["1",null,2]}`
 - **AND** the analytics batch endpoint should receive no events
 
+### Requirement: AI lane configuration is scoped to the AI lane
+
+Server SDKs that support AI capture SHALL expose the AI lane's compression mode,
+queue capacity, and upload timeout as public options, defaulting to no
+compression, 1000 events, and 30 seconds, and SHALL reject invalid values at
+construction. Analytics configuration, including environment variables, SHALL
+NOT change AI uploads, and the reverse. The per-event size cap MAY be exposed
+and then only lowered; the batch-size target SHALL NOT be configurable.
+
+#### Scenario: analytics compression does not reach the AI lane (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK is initialized with token "test-token" and gzip compression configured for analytics capture through the environment
+- **AND** no AI lane compression is configured
+- **WHEN** capture is called with distinct id "user-123" and event "button_clicked"
+- **AND** capture_ai is called with distinct id "user-123" and event "$ai_generation"
+- **AND** the SDK is flushed
+- **THEN** the request received on the analytics batch endpoint should be gzip encoded
+- **AND** the request received on the AI batch endpoint should be uncompressed
+
+#### Scenario: the per-event cap can be lowered but not raised (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK exposes a per-event size cap for the AI lane
+- **WHEN** the SDK is initialized with a per-event cap below the SDK's default
+- **AND** capture_ai is called with an event whose serialized size exceeds the configured cap but not the default
+- **AND** the SDK is flushed
+- **THEN** no event should reach the AI batch endpoint
+- **WHEN** the SDK is initialized with a per-event cap above the SDK's default
+- **THEN** the client construction should be rejected
+
+#### Scenario: invalid AI lane configuration is rejected at construction (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **WHEN** the SDK is initialized with an AI lane queue capacity of zero
+- **THEN** the client construction should be rejected
+- **AND** no AI events should be enqueued

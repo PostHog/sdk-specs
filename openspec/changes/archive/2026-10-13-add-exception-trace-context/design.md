@@ -18,7 +18,7 @@ Alternative: also require the SDK's own active span (`traces` capability). It is
 
 ### Server SDKs only
 
-Browser and mobile SDKs have no ambient OpenTelemetry API, so they omit the properties. The requirement says so, because the capability spec is marked `both` and a delta cannot edit its applicability prose.
+Browser and mobile SDKs have no ambient OpenTelemetry API, so they do not derive the properties. The requirement says so, because the capability spec is marked `both` and a delta cannot edit its applicability prose.
 
 ### No hard dependency on OpenTelemetry
 
@@ -48,7 +48,7 @@ An earlier draft said a caller-supplied `$trace_id` or `$span_id` must win. It w
 
 - A span that was sampled out or not exported means the ID points at a trace PostHog never received. The product should show "trace not kept" instead of a dead link. This is a product concern, not an SDK one.
 - Reading the ambient span adds a small cost to every exception capture. The read is a local lookup.
-- Reading the ambient span can fail (for example, a broken OpenTelemetry install). The spec says capture continues without the properties. That case is in the spec, but not in the acceptance feature, because an adapter cannot cause the failure through public behavior.
+- Reading the ambient span can fail (for example, a broken OpenTelemetry install). The spec says capture continues without SDK-derived trace properties. That case is in the spec, but not in the acceptance feature, because an adapter cannot cause the failure through public behavior.
 
 ## Open questions
 

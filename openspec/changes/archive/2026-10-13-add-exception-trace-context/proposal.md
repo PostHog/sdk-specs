@@ -32,7 +32,7 @@ None.
 
 ## Impact
 
-`posthog-python` already conforms. `posthog-node` does not conform until it reads the ambient OpenTelemetry span at capture time. SDKs for platforms without an OpenTelemetry API are not affected, because they omit the properties.
+`posthog-python` already conforms. `posthog-node` does not conform until it reads the ambient OpenTelemetry span at capture time. SDKs for platforms without an ambient tracing API are not affected, because they do not derive the properties.
 
 The PostHog tracing and error tracking UI already read `$trace_id` and `$span_id` from exception events. No backend change is needed.
 

@@ -128,3 +128,42 @@ Feature: Exception Event Metadata
     Then the generated event should omit "$exception_level", "$exception_source", "$exception_fingerprint", and "$debug_images"
     And the generated mechanism should have "exception_id" equal to 0
     And the generated mechanism should omit "type", "handled", "source", "synthetic", and "parent_id"
+
+  @server
+  Scenario: Exception inside an active span carries trace and span IDs
+    Given an OpenTelemetry span with trace ID "4bf92f3577b34da6a3ce929d0e0e4736" and span ID "00f067aa0ba902b7" is active
+    When capture exception is called for a caught exception without explicit overrides
+    Then one event named "$exception" should be enqueued
+    And the enqueued event property "$trace_id" should equal "4bf92f3577b34da6a3ce929d0e0e4736"
+    And the enqueued event property "$span_id" should equal "00f067aa0ba902b7"
+
+  @server
+  Scenario: Exception outside any span omits trace context
+    Given no OpenTelemetry span is active
+    When capture exception is called for a caught exception without explicit overrides
+    Then one event named "$exception" should be enqueued
+    And the enqueued event should omit "$trace_id"
+    And the enqueued event should omit "$span_id"
+
+  @server
+  Scenario: Invalid span context omits trace context
+    Given the active span context has an all-zero trace ID and an all-zero span ID
+    When capture exception is called for a caught exception without explicit overrides
+    Then the enqueued event should omit "$trace_id"
+    And the enqueued event should omit "$span_id"
+
+  @server
+  Scenario: Caller-supplied trace context is preserved
+    Given an OpenTelemetry span with trace ID "4bf92f3577b34da6a3ce929d0e0e4736" and span ID "00f067aa0ba902b7" is active
+    When capture exception is called with caller properties "$trace_id" equal to "custom-trace" and "$span_id" equal to "custom-span"
+    Then the enqueued event property "$trace_id" should equal "custom-trace"
+    And the enqueued event property "$span_id" should equal "custom-span"
+
+  @server
+  Scenario: Failure to read trace context does not drop the event
+    Given reading the active span context raises an error
+    When capture exception is called for a caught exception without explicit overrides
+    Then one event named "$exception" should be enqueued
+    And the enqueued event should omit "$trace_id"
+    And the enqueued event should omit "$span_id"
+    And event creation should not throw

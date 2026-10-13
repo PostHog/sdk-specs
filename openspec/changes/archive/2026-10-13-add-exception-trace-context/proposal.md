@@ -6,16 +6,18 @@ Today `posthog-python` adds `$trace_id` and `$span_id` to every `$exception` eve
 
 ## What Changes
 
-- Add a requirement to `exception-event-metadata`: when an OpenTelemetry span is active at capture time, the `$exception` event carries `$trace_id` and `$span_id`.
-- Define the ID format (lowercase hexadecimal, 32 and 16 characters) so every SDK writes the same text form.
-- Define when the properties are omitted: no active span, an invalid span, or no OpenTelemetry API on the platform.
-- Define that a caller-supplied value for either property is kept.
-- Define that a failure to read the trace context never drops the event.
+- Add a requirement to `exception-event-metadata` (server SDKs): when a valid span from the ambient OpenTelemetry API is active at capture time, the `$exception` event carries `$trace_id` and `$span_id`.
+- Define the ID format: lowercase hexadecimal, exactly 32 and 16 characters, leading zeros kept.
+- Define that the IDs are set whether or not the span is sampled.
+- Add a second requirement for the absent and failure cases: omit both properties when there is no valid span or no OpenTelemetry API; never make OpenTelemetry a required dependency; never drop the event if reading the trace context fails.
+- Allow platforms whose ambient tracing API is built on OpenTelemetry under another name (for example .NET `Activity`) to read that API.
+- Add acceptance scenarios and one canonical example event.
 
 Not in this change, because no shipped SDK implements them yet (see `design.md`):
 
 - Trace IDs from an SDK's own span API (`traces` capability) on exception events.
 - Trace IDs on other events (`capture`). `posthog-python` has an opt-in option for this; it is not a common contract yet.
+- Precedence between caller-supplied properties and the ambient span. It stays implementation-specific, as in `capture-exception`.
 - Browser-created trace IDs, W3C baggage, or `tracestate` propagation.
 
 ## Capabilities
@@ -26,7 +28,7 @@ None.
 
 ### Modified Capabilities
 
-- `exception-event-metadata`: add the active trace context requirement for server SDKs that run inside OpenTelemetry spans.
+- `exception-event-metadata`: add the active trace context requirement and the absent-or-unreadable requirement for server SDKs.
 
 ## Impact
 

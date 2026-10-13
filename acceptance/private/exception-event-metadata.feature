@@ -160,15 +160,20 @@ Feature: Exception Event Metadata
     And the enqueued event should omit "$span_id"
 
   @server
-  Scenario: Invalid span context omits trace context
-    Given the active span context has an all-zero trace ID and an all-zero span ID
+  Scenario Outline: Invalid span context omits trace context
+    Given an active span context with trace ID "<trace_id>" and span ID "<span_id>"
     When capture exception is called for a caught exception without explicit overrides
     Then the enqueued event should omit "$trace_id"
     And the enqueued event should omit "$span_id"
 
+    Examples:
+      | trace_id                         | span_id          |
+      | 00000000000000000000000000000000 | 00f067aa0ba902b7 |
+      | 4bf92f3577b34da6a3ce929d0e0e4736 | 0000000000000000 |
+
   @server
-  Scenario: An application without OpenTelemetry still captures exceptions
-    Given the application does not provide an OpenTelemetry API
+  Scenario: An application without an ambient tracing API still captures exceptions
+    Given the application provides neither an OpenTelemetry API nor a permitted native tracing API
     When capture exception is called for a caught exception without explicit overrides
     Then one event named "$exception" should be enqueued
     And the enqueued event should omit "$trace_id"

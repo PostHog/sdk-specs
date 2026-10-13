@@ -9,8 +9,8 @@ Today `posthog-python` adds `$trace_id` and `$span_id` to every `$exception` eve
 - Add a requirement to `exception-event-metadata` (server SDKs): when a valid span from the ambient OpenTelemetry API is active at capture time, the `$exception` event carries `$trace_id` and `$span_id`.
 - Define the ID format: lowercase hexadecimal, exactly 32 and 16 characters, leading zeros kept.
 - Define that the IDs are set whether or not the span is sampled.
-- Add a second requirement for the absent and failure cases: omit both properties when there is no valid span or no OpenTelemetry API; never make OpenTelemetry a required dependency; never drop the event if reading the trace context fails.
-- Allow platforms whose ambient tracing API is built on OpenTelemetry under another name (for example .NET `Activity`) to read that API.
+- Add a second requirement for the absent and failure cases: do not derive the IDs when there is no valid span or ambient tracing API; never make OpenTelemetry a required dependency; never drop the event if reading the trace context fails.
+- Allow SDKs to read a platform-native tracing API used by OpenTelemetry (for example .NET `Activity`).
 - Add acceptance scenarios and one canonical example event.
 
 Not in this change, because no shipped SDK implements them yet (see `design.md`):

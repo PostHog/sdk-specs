@@ -26,7 +26,7 @@ An SDK must not require OpenTelemetry to be installed. It looks the API up only 
 
 ### Allowed variation for non-OpenTelemetry names
 
-.NET builds OpenTelemetry spans on `System.Diagnostics.Activity`. The requirement lets such a platform read its own ambient API instead of the OpenTelemetry package.
+.NET OpenTelemetry uses `System.Diagnostics.Activity`. The requirement lets such a platform read its own ambient API instead of the OpenTelemetry package.
 
 ### One text form for IDs
 
@@ -34,7 +34,7 @@ Other PostHog stores keep trace IDs in other encodings (for example base64 in th
 
 ### Omit, never invent
 
-When there is no valid span, the properties are absent. An all-zero ID is the OpenTelemetry marker for "no span", so it is treated as invalid. This keeps a missing link visible as a missing link.
+When there is no valid span, the SDK does not derive the properties. Caller-supplied properties can still be present. An all-zero ID is the OpenTelemetry marker for "no span", so it is treated as invalid. This keeps a missing SDK-derived link visible as a missing link.
 
 ### Stamp spans that are not sampled
 

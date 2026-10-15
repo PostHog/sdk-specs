@@ -154,6 +154,7 @@ Feature: Exception Event Metadata
   @server
   Scenario: Exception outside any span omits trace context
     Given no OpenTelemetry span is active
+    And no span from the SDK's own span API is active
     When capture exception is called for a caught exception without explicit overrides
     Then one event named "$exception" should be enqueued
     And the enqueued event should omit "$trace_id"
@@ -174,6 +175,7 @@ Feature: Exception Event Metadata
   @server
   Scenario: An application without an ambient tracing API still captures exceptions
     Given the application provides neither an OpenTelemetry API nor a permitted native tracing API
+    And no span from the SDK's own span API is active
     When capture exception is called for a caught exception without explicit overrides
     Then one event named "$exception" should be enqueued
     And the enqueued event should omit "$trace_id"

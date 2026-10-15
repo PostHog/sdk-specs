@@ -23,10 +23,11 @@ This requirement applies to server SDKs. When a valid span from the ambient Open
 
 ### Requirement: Absent or unreadable trace context on exception events
 
-The SDK SHALL NOT derive `$trace_id` or `$span_id` when no span is active, when the active span context is invalid, or when neither an OpenTelemetry API nor a permitted native tracing API is available. This rule does not remove caller-supplied properties. The SDK SHALL NOT take OpenTelemetry as a required dependency for this behavior: it SHALL look the API up only when the application already provides it. The SDK SHALL NOT infer trace context from request headers or from any source other than the active span. If reading the trace context fails, the SDK SHALL still enqueue the exception event without SDK-derived trace properties and SHALL NOT throw to application code. Client SDKs, which have no ambient OpenTelemetry API, do not derive these properties.
+This requirement covers only ambient tracing context. The SDK SHALL NOT derive `$trace_id` or `$span_id` from ambient tracing context when no ambient span is active, when the active span context is invalid, or when neither an OpenTelemetry API nor a permitted native tracing API is available. This requirement does not forbid deriving the properties from a span that the SDK's own span API has made active, as the `traces` capability recommends. That behavior is out of scope for this change. This rule does not remove caller-supplied properties. The SDK SHALL NOT take OpenTelemetry as a required dependency for this behavior: it SHALL look the API up only when the application already provides it. The SDK SHALL NOT infer trace context from request headers or from any source other than an active span. If reading the trace context fails, the SDK SHALL still enqueue the exception event without SDK-derived trace properties and SHALL NOT throw to application code. Client SDKs, which have no ambient OpenTelemetry API, do not derive these properties.
 
 #### Scenario: Exception outside any span omits both properties (@server)
 - **GIVEN** no OpenTelemetry span is active
+- **AND** no span from the SDK's own span API is active
 - **WHEN** the SDK captures an exception
 - **THEN** the enqueued event should omit `$trace_id`
 - **AND** the enqueued event should omit `$span_id`
@@ -39,6 +40,7 @@ The SDK SHALL NOT derive `$trace_id` or `$span_id` when no span is active, when 
 
 #### Scenario: An application without an ambient tracing API still captures exceptions (@server)
 - **GIVEN** the application provides neither an OpenTelemetry API nor a permitted native tracing API
+- **AND** no span from the SDK's own span API is active
 - **WHEN** the SDK captures an exception
 - **THEN** one event named `$exception` should be enqueued
 - **AND** the enqueued event should omit `$trace_id`

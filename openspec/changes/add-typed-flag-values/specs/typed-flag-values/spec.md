@@ -165,10 +165,10 @@ The config version 2 rows are the public contract's OpenFeature mapping. The con
 
 `error_code` SHALL be one of the OpenFeature codes `FLAG_NOT_FOUND`, `PARSE_ERROR`, `TYPE_MISMATCH`, `INVALID_CONTEXT`, `PROVIDER_NOT_READY` or `GENERAL`. The SDK SHALL NOT add PostHog-specific error codes; the fine-grained cause stays in `flag_metadata.reason_code`.
 
-`flag_metadata` SHALL contain each of these keys that the record carries, with its wire name in every language: `id`, `version`, `config_version`, `reason_code`, `condition_index`, `rule_type`, `rule_id`, `experiment_id`, `variant_key`, `holdout_id`. `reason_code` and `condition_index` come from the record's `reason`; the others come from its `metadata`. Absent or `null` fields SHALL be omitted. The map SHALL be present, possibly empty, on every details object. It SHALL NOT contain the payload, assignment seeds or the human-readable reason description.
+`flag_metadata` SHALL contain each of these keys that the record carries, with its wire name in every language: `id`, `version`, `config_version`, `reason_code`, `condition_index`, `rule_type`, `rule_id`, `variant_key`, `holdout_id`. `reason_code` and `condition_index` come from the record's `reason`; the others come from its `metadata`. Absent or `null` fields SHALL be omitted. The map SHALL be present, possibly empty, on every details object. It SHALL NOT contain the payload, assignment seeds or the human-readable reason description.
 
 #### Scenario: Details of an experiment split
-- **GIVEN** the record for "checkout-flow" has value true, reason code `experiment_split`, condition index 1, and metadata id 123, version 8, config version 2, rule type `experiment`, rule id "6bb788aa-df76-4a77-8bed-9f247e279ccd", experiment id 456 and variant key "test"
+- **GIVEN** the record for "checkout-flow" has value true, reason code `experiment_split`, condition index 1, and metadata id 123, version 8, config version 2, rule type `experiment`, rule id "6bb788aa-df76-4a77-8bed-9f247e279ccd" and variant key "test"
 - **WHEN** the boolean details accessor is called for "checkout-flow" with caller default false
 - **THEN** the details are:
   | field         | value         |
@@ -177,7 +177,7 @@ The config version 2 rows are the public contract's OpenFeature mapping. The con
   | variant       | test          |
   | reason        | SPLIT         |
   | error_code    | absent        |
-- **AND** `flag_metadata` contains `reason_code` "experiment_split", `condition_index` 1, `id` 123, `version` 8, `config_version` 2, `rule_type` "experiment", `rule_id` "6bb788aa-df76-4a77-8bed-9f247e279ccd", `experiment_id` 456 and `variant_key` "test"
+- **AND** `flag_metadata` contains `reason_code` "experiment_split", `condition_index` 1, `id` 123, `version` 8, `config_version` 2, `rule_type` "experiment", `rule_id` "6bb788aa-df76-4a77-8bed-9f247e279ccd" and `variant_key` "test"
 
 #### Scenario: Details of a null flag default
 - **GIVEN** the record for "banner-copy" has value `null`, reason code `no_rule_match` and config version 2

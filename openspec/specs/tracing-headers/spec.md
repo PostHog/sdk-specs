@@ -273,12 +273,17 @@ With the documented child-span integration installed, recording spans started in
 
 ### Requirement: Span attributes take precedence over request headers
 
-The bridge SHALL preserve explicit span attributes. Header-derived identity SHALL remain fallback analytics context and SHALL NOT replace stronger application identity. It SHALL omit missing or empty IDs, without generating IDs or creating a recording. The SDK SHALL document which application identity attributes its integration recognizes.
+The bridge SHALL preserve existing span attributes, including at the span's attribute limit. It SHALL omit enrichment that would evict existing attributes. Header-derived identity SHALL remain fallback analytics context and SHALL NOT replace stronger application identity. It SHALL omit missing or empty IDs without generating IDs or creating a recording. The SDK SHALL document which application identity attributes its integration recognizes.
 
 #### Scenario: explicit span attributes win
 - **GIVEN** a request span already has explicit `sessionId` and `posthogDistinctId` attributes
 - **WHEN** middleware extracts different IDs from the request headers
 - **THEN** the explicit attributes remain unchanged
+
+#### Scenario: span has no capacity for enrichment
+- **GIVEN** a recording span already contains its maximum number of attributes
+- **WHEN** request context offers a missing session or distinct ID
+- **THEN** enrichment does not evict any existing attribute
 
 #### Scenario: no session is available
 - **WHEN** span enrichment runs with no session ID in request context

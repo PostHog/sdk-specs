@@ -135,6 +135,14 @@ Feature: Tracing headers
     Then the span should have no "sessionId" or "posthogDistinctId" attributes
 
   @server
+  Scenario: Span at its attribute limit preserves application attributes
+    Given the documented server tracing integration is installed
+    And a recording span already contains its maximum number of attributes
+    When request context supplies a missing session or distinct id
+    And the span is exported
+    Then all its original attributes should remain unchanged
+
+  @server
   Scenario: Concurrent child spans use only their own request context
     Given the documented child span integration is installed
     When two concurrent requests with different session ids each start and export a child span

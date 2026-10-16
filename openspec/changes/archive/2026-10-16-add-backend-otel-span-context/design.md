@@ -14,6 +14,7 @@ The bridge reads the same request context used for analytics capture. It does no
 - Enrich an existing request span after extraction, and use a documented optional processor or platform listener for future children. A start-only processor misses incoming spans that precede middleware.
 - Keep setup specific to each platform. SDKs must not replace application-owned tracing infrastructure to make enrichment work.
 - Preserve explicit attributes and context snapshots. Do not enrich at export time from whichever request is active then.
+- Preserve existing attributes when span capacity is exhausted. Do not restore attributes after an eviction, because that changes drop counts and can race with application writes.
 - Treat inherited execution context as insufficient after the original scope ends. A scope lifetime marker can prevent detached tasks from leaking stale identity while preserving attributes on spans that started during the request.
 - Keep new Gherkin scenarios descriptive until the shared harness has real adapter bindings. Do not add integration selection tags based on local SDK tests alone.
 

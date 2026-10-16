@@ -93,3 +93,72 @@ Feature: Tracing headers
     Then one event named "Sanitized Work" should be enqueued
     And the enqueued event should use sanitized tracing context values
     And empty or invalid tracing header values should be omitted
+
+  @server
+  Scenario: Request span started before middleware receives PostHog context
+    Given the documented server tracing integration is installed
+    And an application-owned recording request span is active before header extraction
+    When the middleware extracts distinct id "user-one" and session id "session-one"
+    And the request span is exported
+    Then its span attributes should include:
+      | attribute         | value       |
+      | posthogDistinctId | user-one    |
+      | sessionId         | session-one |
+
+  @server
+  Scenario: Child span keeps context after request cleanup
+    Given the documented child span integration is installed
+    And a child span starts inside request context with session id "session-one"
+    When that request context ends
+    And another request uses session id "session-two"
+    And the original child span is exported
+    Then its span attribute "sessionId" should be "session-one"
+
+  @server
+  Scenario Outline: Explicit span attributes override request context
+    Given the documented server tracing integration is installed
+    And an active recording request span has attribute "<attribute>" with value "explicit-value"
+    When the middleware extracts distinct id "header-user" and session id "header-session"
+    And the request span is exported
+    Then its span attribute "<attribute>" should be "explicit-value"
+
+    Examples:
+      | attribute         |
+      | posthogDistinctId |
+      | sessionId         |
+
+  @server
+  Scenario: Missing request IDs do not create span identity
+    Given the documented server tracing integration is installed
+    When a request without valid PostHog identity headers is handled
+    And its recording request span is exported
+    Then the span should have no "sessionId" or "posthogDistinctId" attributes
+
+  @server
+  Scenario: Concurrent child spans use only their own request context
+    Given the documented child span integration is installed
+    When two concurrent requests with different session ids each start and export a child span
+    Then each exported child span should carry only its own request session id
+
+  @server
+  Scenario: Detached work does not use ended request context
+    Given the documented child span integration is installed
+    And detached async work inherited a request execution context
+    And that request scope has ended
+    When the work starts and exports a span without establishing a new PostHog context
+    Then the span should have no IDs from the ended request scope
+
+  @server
+  Scenario Outline: Optional tracing enrichment preserves request handling
+    Given server request context middleware is installed
+    And <condition>
+    When an application request completes or raises its normal error
+    Then its normal result or error should be preserved
+    And existing analytics context behavior should be preserved
+    And PostHog should not create a replacement span or change application tracing setup
+
+    Examples:
+      | condition                                  |
+      | no tracing runtime is installed            |
+      | the tracing context lookup fails           |
+      | application sampling drops the request span |

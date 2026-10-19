@@ -16,13 +16,27 @@ The `acceptance/` directory contains Gherkin feature files for cross-SDK accepta
 shared internal SDK behavior such as batching, storage, feature flags, sessions, and replay.
 Tags on each feature indicate whether scenarios apply to client SDKs, server SDKs, or both.
 
-The server cases in `acceptance/public/identify.feature` and
-`acceptance/public/alias.feature` call the SDK, flush, and inspect mock-server
-traffic using the draft2 harness. They check delivery rather than private queue
-state. Migrated server scenarios use `@sdk:server` for adapter-declared SDK type
+Use `@sdk:server` and `@sdk:client` only after verifying the scenarios end to end
+through the shared harness with a real SDK adapter. Controlled hosts alone do not
+qualify. These tags opt scenarios into the integration suite; legacy `@server`,
+`@client`, and `@both` describe applicability without opting scenarios in.
+
+The server cases in `acceptance/public/identify.feature`,
+`acceptance/public/alias.feature`, and `acceptance/public/group-identify.feature`
+call the SDK, flush, and inspect mock-server traffic using the draft2 harness.
+They check delivery rather than private queue state. Group-identify cases check
+group identity and supplied scalar or nested properties under `$group_set`. Server cases in
+`acceptance/public/capture-exception.feature` report a native handled exception,
+flush, and check the received structured exception summary, handled state, stack
+frames, identity and caller properties. Migrated server scenarios use `@sdk:server` for adapter-declared SDK type
 selection; the parameterized examples have per-row `@case:` labels. An ordinary
 single-case scenario needs no authored case ID. Unmigrated client and negative
 scenarios retain their preconditions and are not selected by the opt-in tags.
+Server cases in `acceptance/public/evaluate-flags.feature` evaluate once per request,
+then call public getters and filters on the native snapshot. They compare documented
+scalar/rich values and decoded/serialized payloads, and inspect remote context and
+flushed exposure delivery. Integration tags identify executable coverage, not a
+passing conformance verdict: non-compliant SDK results remain failing assertions.
 The YAML-parity scenarios use the same Gherkin harness but retain their own
 capability-driven selection.
 

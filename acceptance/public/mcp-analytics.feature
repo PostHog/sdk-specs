@@ -290,6 +290,7 @@ Feature: MCP analytics
     Then the "$mcp_tool_call" event field "distinct_id" should equal "user-123"
     And the "$mcp_tool_call" event property "$set" should equal JSON {"plan":"pro"}
     And the "$mcp_tool_call" event property "$process_person_profile" should not equal JSON false
+    And no event named "$identify" should be enqueued
 
   @server
   Scenario: A 2026-07-28 request identifies its client from _meta

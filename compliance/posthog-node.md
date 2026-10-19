@@ -3,7 +3,12 @@
 **Repo:** [PostHog/posthog-js](https://github.com/PostHog/posthog-js) (`packages/node` + `packages/core` — the standalone `posthog-node` repo is archived and its code now lives in this monorepo)
 **Audited commit:** `4f590b367e415fccf85a5f7a895e0f1f454ad25a` ([commit](https://github.com/PostHog/posthog-js/commit/4f590b367e415fccf85a5f7a895e0f1f454ad25a)) — audited on 2026-10-12
 **Audited against sdk-specs commit:** `513d94c`
-**Summary:** 9 ✅ · 21 🟡 · 5 ❌ · 29 ➖ · 0 ❓ (64 rows)
+**Summary:** 9 ✅ · 21 🟡 · 4 ❌ · 29 ➖ · 1 ❓ (64 rows)
+
+**2026-10-19 correction (not a re-audit):** the Traces row moved ❌→❓. The 2026-10-12 audit recorded
+"no OTLP `/i/v1/traces` pipeline anywhere in the monorepo"; the pipeline had in fact merged on
+2026-09-10 and posthog-node is the package that wires it. See [n2](#n2). Every other row on this
+page is unchanged and still reflects the 2026-10-12 audit at `4f590b36`.
 
 **Previous audit:** 2026-08-17 at `fbdb6c7b` (62 rows, 10 ✅ · 16 🟡 · 8 ❌ · 28 ➖ · 0 ❓). This run adds the two
 missing contracts (**Session Replay Debug Properties**, **MCP Analytics**) and re-verifies the rows the
@@ -15,7 +20,7 @@ audits.
 | # | Contract | Status | Note |
 |---|----------|--------|------|
 | 1 | Logs | 🟡 | [n1] |
-| 2 | Traces | ❌ | [n2] |
+| 2 | Traces | ❓ | [n2] |
 | 3 | Tracing Headers | 🟡 | [n3] |
 | 4 | Alias | 🟡 | [n4] |
 | 5 | Capture | 🟡 | [n5] |
@@ -87,11 +92,12 @@ audits.
 - **Backwards compatibility:** Backward-compatible — instantiating `PostHogLogs` and exposing it via a new lazy getter/method on `PostHogBackendClient`, mirroring the existing `metrics` getter pattern, is purely additive.
 - **Remediation:** Add a `captureLog()` method or `logger`/`logs` getter to `packages/node/src/client.ts` that constructs `PostHogLogs` against the already-present `_sendLogsBatch` transport, the same way `metrics` is wired up today.
 
-### n2 — Traces (❌ Fail)
+### n2 — Traces (❓ Unknown) — *corrected 2026-10-19; the previous ❌ was a false negative*
 - **Spec requires:** A `startSpan`/`withSpan` API producing OTLP spans shipped to `POST {host}/i/v1/traces`, explicitly distinct from LLM-analytics-as-events, requiring no OpenTelemetry runtime dependency.
-- **SDK currently:** Exhaustive grep for `startSpan`/`withSpan`/`i/v1/traces`/`traceparent`/`getActiveSpan` across `packages/core/src`, `packages/browser/src`, `packages/react-native/src`, and `packages/node/src` returns zero matches anywhere in the monorepo. What exists instead is exactly the substitute the spec explicitly excludes: LLM analytics captured as `$ai_generation`/`$ai_trace_id` ordinary analytics events, plus `packages/ai/src/otel/{exporter,processor}.ts`, which posts OTel spans to `${host}/i/v0/ai/otel` (not `/i/v1/traces`), only for `gen_ai.*` AI-semantic-convention spans, and depends on real `@opentelemetry/sdk-trace-base`/`@opentelemetry/exporter-trace-otlp-http` packages — the exact OTel runtime dependency the spec says the canonical implementation must avoid. This bridge lives in the separate `packages/ai` package, which `packages/node`'s `package.json` does not depend on. No SDK in this monorepo implements the canonical contract yet — this is a monorepo-wide gap, not a node-specific regression, and is unchanged since the last audit.
-- **Backwards compatibility:** Backward-compatible — a net-new subsystem; no removal needed.
-- **Remediation:** Implement a dependency-free `startSpan`/`withSpan` API shipping OTLP spans to `/i/v1/traces` in `@posthog/core`, wired into `packages/node` (and browser/react-native), independent of the `packages/ai` OTel bridge.
+- **Correction.** The 2026-10-12 audit recorded this row as ❌ on the finding that an "exhaustive grep for `startSpan`/`withSpan`/`i/v1/traces`/`traceparent`/`getActiveSpan`" across the monorepo "returns zero matches anywhere". **That was wrong.** The 2026-10-19 posthog-react-native audit, reading the same monorepo, found the implementation: `packages/core/src/traces/` (`span.ts`, `otlp.ts`, `traceparent.ts`, `ids.ts`, `config.ts`, `context.ts`, `sanitize.ts`, `live-spans`), exported as `PostHogTraces` from `packages/core/src/index.ts:91`, with the transport `_sendTracesBatch` posting to the `traces` path on `PostHogCoreStateless` (`posthog-core-stateless.ts:1866-1874`). It is wired up in **posthog-node specifically**: `packages/node/src/client.ts:21` imports `PostHogTraces`, `:155` holds it, and `:698-703` constructs it lazily. It landed in [posthog-js#4579](https://github.com/PostHog/posthog-js/pull/4579) on **2026-09-10**, four weeks *before* the audit that recorded it as absent, with follow-up fixes in #4908 and #5018. posthog-node is the only package in the monorepo that wires it.
+- **SDK currently:** Not scored. The implementation demonstrably exists, so ❌ is not defensible; but it has **not** been evaluated against the traces spec's configuration knobs, defaults, W3C `traceparent`/`tracestate` interop, payload bounds, or retry classification, so ✅ or 🟡 would be a guess. The row is ❓ pending that evaluation. This is the only Unknown cell in the matrix.
+- **Backwards compatibility:** Unknown — the evidence needed is a read of `packages/core/src/traces/` against `openspec/specs/traces/spec.md`, which this run did not have the budget for.
+- **Remediation:** Score this row at posthog-node's next audit, which should be prioritized for it. The posthog-python Traces audit (2026-10-12, the matrix's first ✅ on this contract) is the reference for what a full evaluation of this capability covers. Note that the related finding in [posthog-react-native.md#n31](posthog-react-native.md#n31) — react-native has the shared engine and transport but never constructs `PostHogTraces` — stands independently and is unaffected.
 
 ### n3 — Tracing Headers (🟡 Partial)
 - **Spec requires:** `both` applicability. Request-scoped middleware extracting `X-POSTHOG-DISTINCT-ID`/`X-POSTHOG-SESSION-ID` case-insensitively; sanitize (trim/strip control chars/cap length); explicit call-site values take precedence over context; personless-capture fallback unless the caller explicitly supplied `$process_person_profile`; flag-evaluation APIs no-op/return-empty when no identity is resolvable; per-request isolation; headers never used for auth.

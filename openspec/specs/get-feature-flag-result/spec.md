@@ -78,7 +78,7 @@ type FeatureFlagResult = {
 ### Surface variants
 
 - **posthog-js core / browser / react-native:** `getFeatureFlagResult(key, options?)`
-- **flutter:** `getFeatureFlagResult(key, { sendFeatureFlagEvent = true }): Future<PostHogFeatureFlagResult?>` (6.0+)
+- **flutter:** `getFeatureFlagResult(key, { sendEvent = true }): Future<PostHogFeatureFlagResult?>` (released 5.x); Flutter 6.0 (unreleased) renames the option to `sendFeatureFlagEvent`
 - **Node:** `await getFeatureFlagResult(key, distinctId, options?)`
 - **Python:** `get_feature_flag_result(key, distinct_id, *, ...)`
 - **Ruby:** `get_feature_flag_result(key, distinct_id, groups: {}, person_properties: {}, group_properties: {}, only_evaluate_locally: false, send_feature_flag_events: true)`
@@ -259,7 +259,7 @@ Structured feature flag results SHALL follow the serialized-payload decoding con
 
 ### Requirement: Per-call feature flag event option name
 
-A flag-reading API that lets the caller suppress `$feature_flag_called` for that call SHALL name the option `sendFeatureFlagEvent` on client SDKs and `sendFeatureFlagEvents` on server SDKs, adapted to platform casing (for example `send_feature_flag_event`). The singular form governs one call's event; the plural form governs event sending across a server-side evaluation that may emit several. The option SHALL default to sending the event.
+A flag-reading API that lets the caller suppress `$feature_flag_called` for that call SHALL name the option `sendFeatureFlagEvent` on client SDKs and `sendFeatureFlagEvents` on server SDKs, adapted to platform casing (for example `send_feature_flag_event`). The singular form governs one call's event; the plural form governs event sending across a server-side evaluation that may emit several. The option SHALL default to sending the event. Per-call names that shipped before this requirement are recorded divergences and are not required to change: posthog-js core and react-native take a per-call `sendEvent` option (`FeatureFlagResultOptions`); their `sendFeatureFlagEvent` is the instance-level client option, not a per-call one. posthog-js browser takes a per-call `send_event` option (`FeatureFlagOptions`). Released Flutter (5.x, latest 5.56.0) takes `getFeatureFlagResult(key, sendEvent:)`; the rename to `sendFeatureFlagEvent` is merged for Flutter 6.0 (unreleased).
 
 #### Scenario: Suppressing the per-call option skips the flag called event (@both)
 - **GIVEN** a fresh SDK acceptance test harness

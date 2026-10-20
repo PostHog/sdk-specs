@@ -1,17 +1,17 @@
 ## Narrative alignment
 
-When syncing this delta, correct the Flutter surface variant to `getFeatureFlagResult(key, { sendFeatureFlagEvent = true }): Future<PostHogFeatureFlagResult?>` (6.0+).
+When syncing this delta, note on the Flutter surface variant that released Flutter (5.x) takes `getFeatureFlagResult(key, { sendEvent = true })` and that Flutter 6.0 (unreleased) renames the option to `sendFeatureFlagEvent`.
 
-Two other specs carry the same stale facts and SHALL be corrected in the same sync:
+Two other specs carry related Flutter facts and SHALL be updated in the same sync:
 
-- `feature-flag-called-tracker`, Behavior step 6: Flutter's per-call suppression flag is `getFeatureFlagResult(sendFeatureFlagEvent: ...)`, not `sendEvent`.
-- `opt-in`, Surface variants: add `**Flutter:** optIn() / optOut()`, noting that `enable()` / `disable()` were deprecated in 5.x and removed in 6.0.
+- `feature-flag-called-tracker`, Behavior step 6: Flutter's per-call suppression flag is `getFeatureFlagResult(sendEvent: ...)` in released 5.x, renamed `sendFeatureFlagEvent` in Flutter 6.0 (unreleased).
+- `opt-in`, Surface variants: add `**Flutter:** optIn() / optOut()` (since 5.51.0), noting that `enable()` / `disable()` are deprecated since 5.51.0 and their removal is merged for Flutter 6.0 (unreleased).
 
 ## ADDED Requirements
 
 ### Requirement: Per-call feature flag event option name
 
-A flag-reading API that lets the caller suppress `$feature_flag_called` for that call SHALL name the option `sendFeatureFlagEvent` on client SDKs and `sendFeatureFlagEvents` on server SDKs, adapted to platform casing (for example `send_feature_flag_event`). The singular form governs one call's event; the plural form governs event sending across a server-side evaluation that may emit several. The option SHALL default to sending the event.
+A flag-reading API that lets the caller suppress `$feature_flag_called` for that call SHALL name the option `sendFeatureFlagEvent` on client SDKs and `sendFeatureFlagEvents` on server SDKs, adapted to platform casing (for example `send_feature_flag_event`). The singular form governs one call's event; the plural form governs event sending across a server-side evaluation that may emit several. The option SHALL default to sending the event. Per-call names that shipped before this requirement are recorded divergences and are not required to change: posthog-js core and react-native take a per-call `sendEvent` option (`FeatureFlagResultOptions`); their `sendFeatureFlagEvent` is the instance-level client option, not a per-call one. posthog-js browser takes a per-call `send_event` option (`FeatureFlagOptions`). Released Flutter (5.x, latest 5.56.0) takes `getFeatureFlagResult(key, sendEvent:)`; the rename to `sendFeatureFlagEvent` is merged for Flutter 6.0 (unreleased).
 
 #### Scenario: Suppressing the per-call option skips the flag called event (@both)
 - **GIVEN** a fresh SDK acceptance test harness

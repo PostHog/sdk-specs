@@ -29,7 +29,7 @@ optOut(): void | Promise<void>
 - **posthog-js core / react-native:** `optIn()` / `optOut()`
 - **iOS:** `optIn()` / `optOut()`
 - **Android:** `optIn()` / `optOut()`
-- **Flutter:** `optIn()` / `optOut()` — `enable()` / `disable()` were deprecated in 5.x and removed in 6.0
+- **Flutter:** `optIn()` / `optOut()` (since 5.51.0) — `enable()` / `disable()` are deprecated since 5.51.0; their removal is merged for Flutter 6.0 (unreleased)
 - **Unity:** `OptIn()` / `OptOut()` static methods
 - **browser:** `opt_in_capturing(options?)` / `opt_out_capturing()`
 

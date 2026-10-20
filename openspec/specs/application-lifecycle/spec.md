@@ -29,13 +29,13 @@ When enabled, the SDK installs platform lifecycle observers during setup and emi
 1. **Install/update detection**
    - On startup, read the current app version and build from the platform package/bundle/runtime metadata.
    - Read the previously persisted version/build values from SDK/platform storage.
-   - If there is no previously stored build/version marker, emit `Application Installed` with current `version` and/or `build` when available.
-   - If the stored build/version marker differs from the current value, emit `Application Updated` with current `version`/`build` plus `previous_version` and/or `previous_build` when available.
+   - If there is no previously stored build/version marker, emit `Application Installed`.
+   - If the stored build/version marker differs from the current value, emit `Application Updated` with `previous_version` and/or `previous_build` when available.
+   - The current version and build reach these events through the common `$app_version` and `$app_build` properties. Lifecycle events should not add un-prefixed `version` / `build`; SDKs that send them today may keep them until their next major version.
    - Persist the current version/build marker after checking so subsequent launches are not reported as fresh installs.
 2. **Open/foreground detection**
    - On first launch or foreground transition, emit `Application Opened`.
    - Include a `from_background` boolean where the platform can distinguish cold start from foreground-from-background.
-   - Include current `version` and/or `build` on initial open when the platform implementation has those values readily available.
 3. **Background detection**
    - On background/stop/pause/focus-loss lifecycle transitions, emit `Application Backgrounded`.
 4. **Delivery path**
@@ -76,6 +76,8 @@ If lifecycle capture is disabled, lifecycle callbacks may still be observed for 
 
 The SDK SHALL implement the canonical `application-lifecycle` behavior described by this spec. Implementations MAY adapt method names, parameter casing, type syntax, and lifecycle hooks to platform idioms where this spec explicitly allows variation, but MUST preserve the observable outcomes in the scenarios below.
 
+Lifecycle events SHALL carry the current app version and build through the common `$app_version` and `$app_build` event properties. They SHOULD NOT also send un-prefixed `version` and `build` properties. An SDK that sends `version` and `build` on lifecycle events today MAY keep sending them until its next major version. `Application Updated` SHALL send `previous_version` and `previous_build` when available.
+
 #### Scenario: First app start captures install and open events
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
@@ -99,8 +101,8 @@ The SDK SHALL implement the canonical `application-lifecycle` behavior described
 - **THEN** one event named "Application Updated" should be enqueued
 - **AND** the enqueued event properties should include:
   | property         | value |
-  | version          | 1.1.0 |
-  | build            | 110   |
+  | $app_version     | 1.1.0 |
+  | $app_build       | 110   |
   | previous_version | 1.0.0 |
   | previous_build   | 100   |
 

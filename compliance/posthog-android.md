@@ -437,7 +437,8 @@ shared core, audited fresh below). All file paths below are relative to
 
 ### n22 — HTTP Client (🟡 Partial) — *downgraded from ✅ Pass this cycle*
 - **Spec requires:** transport-layer retry classification treats transient network failures
-  (timeouts, connection resets, DNS/TLS transient failures) as retryable.
+  (timeouts, connection resets, DNS/TLS transient failures) as retryable. A connection refused by
+  the destination is not retried and is surfaced as the flag error immediately.
 - **SDK currently:** Core ingestion transport (`/batch` POST, gzip, `User-Agent`,
   `Retry-After`-aware `PostHogApiError`) is solid and correctly implemented. However, the
   feature-flags request retry classifier (`internal/PostHogApi.kt:291-297`,
@@ -450,15 +451,18 @@ shared core, audited fresh below). All file paths below are relative to
           error is EOFException ||
           (error is SocketException && error.message?.contains("reset", ignoreCase = true) == true)
   ```
-  `UnknownHostException` (DNS), `SSLException`/`SSLHandshakeException` (TLS), and generic
-  `ConnectException` (connection refused) fall through unretried, despite the http-client spec's
-  broader "transport failure or equivalent" language. This is a real but narrowly-scoped gap
+  `UnknownHostException` (DNS) and `SSLException`/`SSLHandshakeException` (TLS) fall through
+  unretried, despite the http-client spec's "DNS/socket/TLS transport failure" language.
+  `ConnectException` (connection refused) also falls through, which is correct: the requirement
+  keeps connection refused fail-fast. This is a real but narrowly-scoped gap
   (limited to one specific retry path, not the core batch-transport path), hence 🟡 Partial rather
   than ❌ Fail.
 - **Backwards compatibility:** Backward-compatible — widening this `IOException` branch only
   grants extra bounded retries to previously-unretried cases; no signature/config change.
-- **Remediation:** Broaden `isRetryableFlagsError` to cover `UnknownHostException`,
-  `SSLException`, and `ConnectException`.
+- **Remediation:** Broaden `isRetryableFlagsError` to cover `UnknownHostException` (DNS) and
+  `SSLException` (TLS). [PostHog/posthog-android#828](https://github.com/PostHog/posthog-android/pull/828)
+  adds both and is approved but not merged as of 2026-10-08, so this row stays 🟡 until it ships.
+  Keep `ConnectException` (connection refused) fail-fast, as the requirement says.
 
 ### n23 — Local Feature Flag Evaluator (➖ N/A) — *includes new starts_with/ends_with sub-check*
 - **Spec requires:** local (in-process) rule-based flag evaluation using flag definitions fetched

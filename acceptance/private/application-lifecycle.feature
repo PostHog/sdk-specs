@@ -23,8 +23,8 @@ Feature: Application Lifecycle
     Then one event named "Application Updated" should be enqueued
     And the enqueued event properties should include:
       | property         | value |
-      | version          | 1.1.0 |
-      | build            | 110   |
+      | $app_version     | 1.1.0 |
+      | $app_build       | 110   |
       | previous_version | 1.0.0 |
       | previous_build   | 100   |
 

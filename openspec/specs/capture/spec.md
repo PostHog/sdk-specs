@@ -96,13 +96,13 @@ The following steps are the canonical flow for a single capture call. Client and
    - Client: use the caller-provided override, else the SDK's current distinct id (set by `identify` or by the anonymous device id generated at first init).
    - Server: use the caller-provided `distinct_id`. If the SDK supports a "context" abstraction (Python), fall back to the context's current distinct id.
 4. **Enrich properties.** A new properties dictionary is constructed by merging in this order (later values win):
-   1. Caller-supplied `properties`.
-   2. SDK environment properties (client-side: `$current_url`, `$host`, `$pathname`, `$browser`, `$os`, `$screen_height`, `$device_type`, etc.; mobile adds `$screen_name`, `$app_version`, `$device_manufacturer`; all: `$lib`, `$lib_version`).
-   3. Super/registered properties (client-side only).
-   4. Feature flag properties (`$feature/<key>`, `$active_feature_flags`) if `send_feature_flags` is truthy and flags are known locally or can be fetched.
-   5. Person-processing hints (`$process_person_profile`, `$is_identified`) based on current identity state.
-   6. Session properties (`$session_id`, `$window_id`) on client SDKs that support session replay.
-   7. `$groups` if the event was called with group info or the client has registered groups.
+   - **Client:**
+     1. Super/registered properties.
+     2. SDK environment properties (`$current_url`, `$host`, `$pathname`, `$browser`, `$os`, `$screen_height`, `$device_type`, etc.; mobile adds `$screen_name`, `$app_version`, `$device_manufacturer`; all: `$lib`, `$lib_version`), feature flag properties (`$feature/<key>`, `$active_feature_flags`) when enabled and flags are known, and `$groups` from registered groups merged with the event's groups (the event's group wins per group type).
+     3. Caller-supplied `properties`. These win over everything above (see **Caller-supplied event properties take precedence**).
+     4. Person-processing state (`$process_person_profile`, `$is_identified`) based on current identity state. The SDK sets these after the caller's properties, so a caller can't override them.
+     5. SDK-owned per-event keys that the SDK MAY set after the caller's properties: session properties (`$session_id`, `$window_id`) on client SDKs that support session replay, the session replay debug properties, and `$geoip_disable` when GeoIP is disabled.
+   - **Server:** request-context properties, then caller-supplied `properties`, then SDK-stamped properties. Most server SDKs stamp `$lib` and `$lib_version` over the caller's values, and SDKs with SDK-level default properties (python `super_properties`, go `DefaultEventProperties`, dotnet `SuperProperties`, elixir `global_properties`) apply them after the caller's properties too. `$groups` comes from the `groups` option.
 5. **Attach envelope fields.** Assign `timestamp` (caller override or `now()`, serialized in ISO 8601 and normalized to its equivalent UTC instant regardless of the input's original timezone/offset, preserving sub-second precision when the input carries it), `uuid` (caller override or a freshly generated UUIDv7), `distinct_id`, and `event` to the message. Server SDKs additionally stamp `$lib` / `$lib_version` onto properties here if not already present.
 6. **Run `before_send` hook.** If the SDK has been configured with a `before_send` callback (Python, Go, posthog-js, .NET), invoke it with the fully-assembled message. The callback may return a modified message, or return `null`/`None` to drop the event. If the callback throws, log a warning, stop the hook chain, and drop the event. Never enqueue the original or partially processed message after a hook failure.
 7. **Deliver.**
@@ -143,7 +143,9 @@ The following steps are the canonical flow for a single capture call. Client and
 - **Autocapture / pageview / heatmaps** — these features internally call capture with reserved event names (`$autocapture`, `$pageview`, `$pageleave`, `$heatmap`, `$web_vitals`).
 - **Exception capture** — `captureException` wraps `capture` with event name `$exception` and a normalized stacktrace property. Calling `capture('$exception', ...)` directly produces a warning in SDKs that ship `captureException` (posthog-js, posthog-python).
 - **Before-send hook / privacy filters** — capture is the integration point for drop/mutate hooks; see the before-send hook spec.
+
 ## Requirements
+
 ### Requirement: Canonical capture behavior
 
 The SDK SHALL implement the canonical `capture` behavior described by this spec. Implementations MAY adapt method names, parameter casing, type syntax, and lifecycle hooks to platform idioms where this spec explicitly allows variation, but MUST preserve the observable outcomes in the scenarios below.
@@ -305,3 +307,131 @@ This requirement concerns custom event property values, not a missing/null prope
 - **AND** no network request should have been sent
 - **WHEN** the persisted event is restored and delivered
 - **THEN** the received event's custom properties should equal JSON `{"nested":{},"items":["1",null,null,2],"literal":"undefined"}`
+
+### Requirement: Environment-sourced release identifier
+
+A server SDK that can read its process environment SHALL resolve a release identifier from the `POSTHOG_RELEASE_ID` environment variable and report it as the `$release_id` event property.
+
+The SDK SHALL read the variable once, while the client is constructed, and reuse that value for the client's lifetime. The raw value SHALL be trimmed of surrounding whitespace, and a missing, empty, or whitespace-only value SHALL count as unset. When the value is unset, the SDK SHALL omit `$release_id` rather than sending an empty string.
+
+When the value is set, the SDK SHALL stamp `$release_id` on the shared event path that its public event-producing methods pass through, so ordinary captures, exception captures, person-property events (`$identify`, or `$set`/`$set_once` on SDKs without `identify`), `alias`, and `group_identify` events all carry it. Low-level passthrough APIs that deliberately bypass that shared path are outside this requirement.
+
+The environment value SHALL act as a default, not an override: an explicit `$release_id` supplied in the call's properties, in super/registered properties, or in an ambient request context SHALL win. The SDK SHALL stamp `$release_id` before `before_send` runs, so a hook can inspect, replace, or remove it. The SDK SHALL NOT copy the value into `$set`, `$set_once`, or `$group_set`, because a release identifier is event context rather than a person or group property.
+
+`$release_id` is a static, low-cardinality runtime identity property in the sense of the `feature-flag-called-tracker` minimal-event allowlist, so a minimized `$feature_flag_called` event SHALL retain it when the SDK stamped it.
+
+#### Scenario: Release id from the environment lands on an ordinary event (@server)
+- **GIVEN** `POSTHOG_RELEASE_ID` is set to "rel-abc123" before the client is constructed
+- **WHEN** capture is called with event "Save"
+- **THEN** the enqueued "Save" event should have property "$release_id" equal to "rel-abc123"
+
+#### Scenario: An empty environment value is treated as unset (@server)
+- **GIVEN** `POSTHOG_RELEASE_ID` is set to the empty string before the client is constructed
+- **WHEN** capture is called with event "Save"
+- **THEN** the enqueued "Save" event should omit "$release_id"
+
+#### Scenario: A whitespace-only environment value is treated as unset (@server)
+- **GIVEN** `POSTHOG_RELEASE_ID` is set to a value containing only spaces before the client is constructed
+- **WHEN** capture is called with event "Save"
+- **THEN** the enqueued "Save" event should omit "$release_id"
+
+#### Scenario: Surrounding whitespace is trimmed (@server)
+- **GIVEN** `POSTHOG_RELEASE_ID` is set to " rel-abc123 " before the client is constructed
+- **WHEN** capture is called with event "Save"
+- **THEN** the enqueued "Save" event should have property "$release_id" equal to "rel-abc123"
+
+#### Scenario: Every shared-path event type carries the release id (@server)
+- **GIVEN** `POSTHOG_RELEASE_ID` is set to "rel-abc123" before the client is constructed
+- **WHEN** the SDK produces an event of type "<event>"
+- **THEN** the enqueued event should have property "$release_id" equal to "rel-abc123"
+  Examples:
+  | event          |
+  | $exception     |
+  | $create_alias  |
+  | $groupidentify |
+
+#### Scenario: The person-properties event carries the release id (@server)
+- **GIVEN** `POSTHOG_RELEASE_ID` is set to "rel-abc123" before the client is constructed
+- **WHEN** the SDK sets person properties for distinct id "user-1" with "plan" equal to "pro"
+- **THEN** the enqueued person-properties event ("$identify", or "$set" on SDKs without `identify`) should have property "$release_id" equal to "rel-abc123"
+
+#### Scenario: An explicit release id wins over the environment (@server)
+- **GIVEN** `POSTHOG_RELEASE_ID` is set to "rel-from-env" before the client is constructed
+- **WHEN** capture is called with event "Save" and property "$release_id" equal to "rel-explicit"
+- **THEN** the enqueued "Save" event should have property "$release_id" equal to "rel-explicit"
+
+#### Scenario: An ambient context release id wins over the environment (@server)
+- **GIVEN** `POSTHOG_RELEASE_ID` is set to "rel-from-env" before the client is constructed
+- **AND** the SDK's ambient context (registered properties where supported, otherwise the request context) carries "$release_id" equal to "rel-context"
+- **WHEN** capture is called with event "Save"
+- **THEN** the enqueued "Save" event should have property "$release_id" equal to "rel-context"
+
+#### Scenario: before_send can remove the release id (@server)
+- **GIVEN** `POSTHOG_RELEASE_ID` is set to "rel-abc123" before the client is constructed
+- **AND** a before_send hook that deletes "$release_id" from the event properties
+- **WHEN** capture is called with event "Save"
+- **THEN** the delivered "Save" event should omit "$release_id"
+
+#### Scenario: The release id stays out of person properties (@server)
+- **GIVEN** `POSTHOG_RELEASE_ID` is set to "rel-abc123" before the client is constructed
+- **WHEN** the SDK sets person properties for distinct id "user-1" with "plan" equal to "pro"
+- **THEN** the enqueued event properties should have "$release_id" equal to "rel-abc123"
+- **AND** "$set" and "$set_once" should omit "$release_id"
+
+#### Scenario: The release id stays out of group properties (@server)
+- **GIVEN** `POSTHOG_RELEASE_ID` is set to "rel-abc123" before the client is constructed
+- **WHEN** group identify is called for group type "company" and key "id:5" with "name" equal to "Acme"
+- **THEN** the enqueued "$groupidentify" event should have property "$release_id" equal to "rel-abc123"
+- **AND** "$group_set" should omit "$release_id"
+
+#### Scenario: A minimized flag-called event keeps the release id (@server)
+- **GIVEN** `POSTHOG_RELEASE_ID` is set to "rel-abc123" before the client is constructed
+- **AND** the server reports the minimal flag-called event gate for flag "beta-ui" with experiment linkage exactly `false`
+- **WHEN** get feature flag "beta-ui" is called
+- **THEN** the enqueued "$feature_flag_called" event should be minimized per the allowlist
+- **AND** it should have property "$release_id" equal to "rel-abc123"
+
+### Requirement: Caller-supplied event properties take precedence
+
+On client SDKs, a property the caller passes on an event SHALL win over a registered (super) property with the same key and over an SDK context property with the same key, such as `$lib`, `$lib_version`, `$os`, `$app_version`, `$screen_width`, `$current_url`, `$screen_name`, `$feature/<key>` or `$active_feature_flags`. A group the caller passes for the event SHALL win over a registered group of the same type.
+
+The SDK SHALL set `$is_identified` and `$process_person_profile` after merging the caller's properties, so a caller can't override the SDK's identity or person-processing state for a single event.
+
+The SDK MAY also set these SDK-owned per-event keys after merging the caller's properties:
+
+- the session replay debug properties (`$recording_status` and the `$sdk_debug_*` keys), as defined by `session-replay-debug-properties`
+- `$session_id` and `$window_id`. posthog-js and `@posthog/core`-based SDKs set the current session; posthog-ios and posthog-android keep a non-empty caller-supplied `$session_id`.
+- `$geoip_disable`, when the SDK is configured to disable GeoIP
+- posthog-js page and session bookkeeping, such as `token`, `$config_defaults`, `$duration` and the `$session_entry_*` and pageview properties
+
+This requirement does not apply to server SDKs. Most server SDKs set `$lib` and `$lib_version` after the caller's properties, and python, go, dotnet and elixir apply their SDK-level default properties after the caller's properties as well.
+
+#### Scenario: Caller property overrides an SDK context property (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **WHEN** capture is called with event "Signed Up" and properties:
+  | property | value      |
+  | $lib     | custom-lib |
+- **THEN** one event named "Signed Up" should be enqueued
+- **AND** the enqueued event properties should include:
+  | property | value      |
+  | $lib     | custom-lib |
+
+#### Scenario: Caller can't override person-processing state (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and person profiles mode "never"
+- **WHEN** capture is called with event "Signed Up" and properties:
+  | property                | value |
+  | $process_person_profile | true  |
+  | $is_identified          | true  |
+- **THEN** one event named "Signed Up" should be enqueued
+- **AND** the enqueued event properties should include:
+  | property                | value |
+  | $process_person_profile | false |
+  | $is_identified          | false |

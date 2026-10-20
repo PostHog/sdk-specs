@@ -26,7 +26,8 @@ Specs now cover three groups of canonical SDK behavior:
   correlation.
 - **Product pipelines** such as logs, whose records are enriched, batched, and shipped as
   OpenTelemetry Logs (OTLP/HTTP JSON) at `POST {host}/i/v1/logs`, and traces, whose spans are
-  shipped as OpenTelemetry Traces (OTLP/HTTP JSON) at `POST {host}/i/v1/traces`.
+  shipped as OpenTelemetry Traces (OTLP/HTTP JSON) at `POST {host}/i/v1/traces`, and MCP analytics,
+  whose add-on packages turn an MCP server's tool calls into `$mcp_*` events.
 
 Add a new sibling under `specs/<capability>/` for each genuinely distinct capability. One
 capability per folder.

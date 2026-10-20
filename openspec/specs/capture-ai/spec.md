@@ -220,12 +220,13 @@ SDK's AI wrapper libraries capture. It SHALL NOT alter payloads passed to
 
 ### Requirement: AI instrumentation attributes events to the active context
 
-Where an SDK ships AI instrumentation that emits AI events from OpenTelemetry spans (the
-`PostHogSpanProcessor` / `SpanProcessor` bridge in posthog-js `@posthog/ai`, posthog-python, and
-posthog-go `otel`) **and** the SDK has an ambient or request context primitive, that
-instrumentation SHALL attribute the AI events it exports to the active context. The requirement
-is conditioned on both: an SDK with no AI bridge, or an AI bridge on a platform with no context
-primitive, is conformant.
+AI instrumentation that emits AI events from OpenTelemetry spans SHALL attribute the events it
+exports to the active context where the SDK has an ambient or request context primitive. This
+covers the `PostHogSpanProcessor` / `SpanProcessor` bridge in posthog-js `@posthog/ai`,
+posthog-python, and posthog-go `otel`. The requirement is conditioned on both: an SDK with no AI
+bridge, or an AI bridge on a platform with no context primitive, is conformant. Where the bridge
+takes the SDK client as an option to reach the context (posthog-js `@posthog/ai` reads it only
+when `PostHogSpanProcessor` is given `client`), the requirement applies once that option is set.
 
 Where it applies:
 
@@ -240,9 +241,10 @@ Where it applies:
   from the context or from a context property. The identity attributes recognized for this are
   `posthog.distinct_id`, `user.id`, and the instrumentation's own distinct-id metadata keys
   (`ai.telemetry.metadata.posthog_distinct_id`, `ai.settings.context.posthog_distinct_id`).
-- The snapshot SHALL be taken when the span starts and applied when it ends, so concurrent
-  requests each export their own values and a span outliving its context keeps the context it
-  started in.
+- The active context SHALL be captured when the span starts and applied when it ends, so
+  concurrent requests each export their own values and a span outliving its context keeps the
+  context it started in. Whether a context property mutated in place while the span is open is
+  seen at export is platform-specific.
 - The instrumentation SHALL NOT mutate the live span: the attributes SHALL be merged into the
   exported copy only, so other processors and exporters on the same tracer provider never observe
   the context. Spans the bridge does not export as AI events SHALL be left untouched.

@@ -12,7 +12,7 @@ scenarios and unrelated sections unchanged.
 
 ### Requirement: Event uuid is sent in canonical form
 
-The SDK SHALL serialize the event `uuid` in canonical lowercase hyphenated form
+A server SDK SHALL serialize the event `uuid` in canonical lowercase hyphenated form
 (`8-4-4-4-12`, no braces, no `urn:uuid:` prefix). A caller-supplied uuid in
 another form the SDK accepts — uppercase, unhyphenated, brace-wrapped, or
 `urn:uuid:`-prefixed — SHALL be normalized to that form before the event is
@@ -21,8 +21,9 @@ that was sent. The normalization SHALL be applied after the `before_send` hook,
 so a uuid the hook sets is normalized too.
 
 A caller-supplied value the SDK cannot parse as a uuid SHALL NOT fail or drop
-the capture call: the SDK SHALL replace it with a freshly generated UUIDv7 and
-report the discarded value through its logging surface.
+the capture call: the SDK SHALL replace it with a freshly generated UUIDv7 and SHOULD log a
+warning. The warning SHOULD NOT include the discarded value, because callers
+can put their own data in the uuid field.
 
 Capture v1 keys the per-event `results` map in a 2xx response by the canonical
 uuid while parsing the request's uuid leniently, so an event sent under a

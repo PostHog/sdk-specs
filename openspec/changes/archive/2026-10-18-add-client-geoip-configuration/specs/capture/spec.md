@@ -4,16 +4,25 @@
 
 A server SDK SHALL expose a client-level GeoIP option (`disableGeoip`, `disable_geoip`, or the
 platform's casing) that controls whether the events it sends ask the backend to skip GeoIP
-enrichment, and that option SHALL default to disabling enrichment. Server SDKs send events from
+enrichment. That option SHOULD default to disabling enrichment: server SDKs send events from
 their own network, so enriching them would attribute every event to the server's location.
-Client SDKs SHALL NOT require the option: they run in the end user's network context, where
-GeoIP enrichment is the intended behavior.
+posthog-php and posthog-rs currently default to enabling enrichment. Changing a shipped default
+is a breaking change, so each SDK makes it, if at all, in its next major release. Client SDKs
+SHALL NOT require the option: they run in the end user's network context, where GeoIP
+enrichment is the intended behavior.
 
 Event-producing APIs that accept options — at least `capture`, `identify`, `alias`, and
-`group_identify` — SHALL accept the same option per call. An explicitly supplied boolean SHALL
-win over the client-level setting in both directions: an explicit `false` SHALL re-enable GeoIP
-enrichment for that call even when the client-level setting disables it. An omitted or null
-per-call value SHALL inherit the client-level setting and SHALL NOT be read as `false`.
+`group_identify` — SHALL accept the same option per call. A per-call value that is not set
+(omitted or null) SHALL inherit the client-level setting and SHALL NOT be read as `false`. An
+explicitly set per-call value SHALL override the client-level setting in both directions: an
+explicit `false` SHALL re-enable GeoIP enrichment for that call even when the client-level
+setting disables it.
+
+An SDK whose shipped per-call option can't represent "not set", such as posthog-go's
+non-nullable `DisableGeoIP` message field, conforms by keeping the client-level setting
+authoritative for that API until a major release lets it tell an unset value from an explicit
+one. It SHALL NOT read the zero value as an explicit `false`. Scenarios that need an explicit
+per-call override on an event API are tagged `@geoip_per_call_unset_capable`.
 
 When the effective value disables GeoIP, the SDK SHALL mark the event with
 `$geoip_disable: true` among the event's ordinary properties and SHALL stamp it before
@@ -35,7 +44,7 @@ event SHALL retain it when the SDK stamped it.
 - **WHEN** capture is called with event "Save" and no per-call GeoIP option
 - **THEN** the enqueued "Save" event should have property "$geoip_disable" equal to true
 
-#### Scenario: An explicit per-call false re-enables enrichment for one call (@server)
+#### Scenario: An explicit per-call false re-enables enrichment for one call (@server @geoip_per_call_unset_capable)
 - **GIVEN** the client is constructed with the GeoIP option set to disable enrichment
 - **WHEN** capture is called with event "Save" and the per-call GeoIP option set to false
 - **THEN** the enqueued "Save" event should omit "$geoip_disable"

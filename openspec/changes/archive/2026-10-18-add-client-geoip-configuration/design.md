@@ -13,15 +13,21 @@ event-producing API (`capture`, `identify`, `alias`, `group_identify`, `$excepti
 pass through, in the same way as the "Environment-sourced release identifier" requirement.
 `setup` describes initialization rather than an inventory of config options.
 
-**Null inherits, false overrides.** Three of the four SDKs with a client-level setting resolve
-the effective value as `per-call ?? client`. Treating an omitted argument as `false` would make
-the client-level setting unusable from any wrapper that passes its optional argument through.
-Go currently resolves it the other way (config always wins) and is listed as needing a change.
+**Null inherits, false overrides.** Node, Python, PHP, and Rust (on the APIs where it has a
+per-call option) resolve the effective value as `per-call ?? client`. Treating an omitted
+argument as `false` would make the client-level setting unusable from any wrapper that passes
+its optional argument through. Go's per-message `DisableGeoIP` on events is a plain `bool`, so
+it can't tell an omitted value from an explicit `false` without an API break; `Enqueue`
+overwrites it from config. Rather than force a major release, the requirement lets such an SDK
+keep the client setting authoritative until it can make the distinction, and tags the
+explicit-override scenario `@geoip_per_call_unset_capable`. The rule it may not break is
+reading the zero value as an explicit `false`.
 
-**State a default rather than leaving it open.** Node, Python, and Go all default to disabling
-GeoIP on the server. Leaving the default unspecified is what let PHP's and .NET's defaults
-drift apart, so the requirement states the majority behavior and the proposal records the
-two known divergences for a human to confirm.
+**Recommend a default rather than leaving it open.** Node, Python, and Go default to disabling
+GeoIP on the server; PHP and Rust default to enabling it. Server events come from the server's
+network, so disabling is the better default, but changing a shipped default is a breaking
+change. The requirement makes the default a SHOULD, records the PHP and Rust divergence, and
+leaves any change to each SDK's next major release.
 
 **Marker placement is normative.** PHP's change had to decide whether `$geoip_disable` goes
 alongside `$group_set` or inside it on `$groupidentify`. It is event context, not a group
@@ -30,7 +36,6 @@ property, so it sits among the ordinary event properties — the same reasoning 
 
 ## Open questions
 
-- Should PHP's compatibility default be recorded as a sanctioned temporary divergence with a
-  target release, or treated as a bug?
+- Should PHP and Rust switch to disabling GeoIP by default in their next major releases?
 - .NET defaults the event property to disabled but defaults flag-request GeoIP control to
   enabled. Which of the two is intended?

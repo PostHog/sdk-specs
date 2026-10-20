@@ -14,9 +14,14 @@ change closes.
 ## What Changes
 
 - Add a `capture` requirement for the client-level GeoIP setting: server SDKs expose one, it
-  defaults to disabling backend GeoIP enrichment, and client SDKs do not expose it.
+  SHOULD default to disabling backend GeoIP enrichment, and client SDKs do not need it. The
+  default is a SHOULD because posthog-php and posthog-rs ship the opposite default and changing
+  it is a breaking change left to each SDK's next major release.
 - Define per-call inheritance: an explicit boolean wins in both directions, and an omitted or
-  null per-call value inherits the client setting rather than meaning `false`.
+  null per-call value inherits the client setting rather than meaning `false`. An SDK whose
+  shipped per-call option can't represent "not set" (posthog-go) conforms by keeping the
+  client setting authoritative until a major release can tell the two apart; the scenario
+  that needs an explicit per-call override is tagged `@geoip_per_call_unset_capable`.
 - Define the marker: `$geoip_disable: true` sits among the event's ordinary properties, never
   inside `$set`, `$set_once`, or `$group_set`, is stamped before `before_send`, and is absent
   when the effective value does not disable GeoIP. A caller-supplied `$geoip_disable` property
@@ -42,8 +47,9 @@ Audited server SDK behavior at the time of writing:
 |---|---|---|---|---|
 | Node (`posthog-node` / core stateless) | yes, `disableGeoip` | disables GeoIP | yes, `?? client setting` | none |
 | Python | yes, `disable_geoip` | disables GeoIP | yes, `None` inherits | none |
-| Go | yes, `Config.DisableGeoIP` (`nil` means disable) | disables GeoIP | no — `Enqueue` overwrites the per-message field from config | honour an explicitly supplied per-message value |
-| PHP | yes, `disableGeoip` (added in #263) | **does not** disable GeoIP, a deliberate compatibility default | yes, explicit `false` wins, null inherits | align the default in its next major release |
+| Go | yes, `Config.DisableGeoIP` (`nil` means disable) | disables GeoIP | events: no — the per-message `DisableGeoIP` is a plain `bool` and `Enqueue` overwrites it from config; flags: yes, `*bool` | none now (client setting stays authoritative); add an unset-capable per-message option in its next major release |
+| PHP | yes, `disableGeoip` (added in #263) | **does not** disable GeoIP, a deliberate compatibility default | yes, explicit `false` wins, null inherits | none now; may change the default in its next major release |
+| Rust | yes, `disable_geoip` | **does not** disable GeoIP (builder default `false`) | flags and `$feature_flag_called`: yes, `Option<bool>` inherits; events: no per-call option, and a caller-supplied `$geoip_disable` property wins over the client setting | none now; may change the default in its next major release |
 | Ruby | no | n/a | per-call only, omitted sends nothing | add a client-level setting |
 | .NET | no | event path defaults the property to true; flag options default to `false` | property-level override only | add a client-level setting and reconcile the two defaults |
 | Elixir | no | n/a | per-call only | add a client-level setting |
@@ -51,6 +57,8 @@ Audited server SDK behavior at the time of writing:
 Client SDKs are unaffected: they run in the end user's network context, so GeoIP enrichment
 stays on and no option is required.
 
-The default value is the part of this contract SDKs disagree on most. The requirement states
-the majority server behavior (disable by default); PHP's compatibility default and .NET's
-split defaults are called out above rather than treated as settled.
+The default value is the part of this contract SDKs disagree on most: Node, Python, and Go
+disable GeoIP by default, while PHP and Rust enable it. The requirement therefore recommends
+disabling by default (SHOULD) rather than requiring it, so no SDK has to break its shipped
+default to conform. .NET's split event/flag defaults are called out above rather than treated
+as settled.

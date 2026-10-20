@@ -42,15 +42,18 @@ count grew by five, and ❌ rows **9→5**.
   (`PostHog.kt:536-545`, "flush pending events before tearing down so queued data isn't lost") and
   `PostHogStateless.close()` calls `queue?.flushForShutdown()` (`PostHogStateless.kt:115-126`). This
   also fixes the native half of posthog-flutter's Shutdown finding — see
-  [posthog-flutter.md#n30](posthog-flutter.md#n30).
+  [posthog-flutter.md#n32](posthog-flutter.md#n32).
 - **HTTP Client 🟡→✅.** The previous 🟡 was explicitly provisional: it recorded that
   [posthog-android#828](https://github.com/PostHog/posthog-android/pull/828) was approved but not
   merged, and said the row stays 🟡 until it ships. **It has shipped.** `isRetryableFlagsError`
   (`internal/PostHogApi.kt:305-316`) now retries `SocketTimeoutException`, `EOFException`,
-  `UnknownHostException` (DNS), `SSLException` (TLS), and a reset `SocketException`, and still
-  excludes `ConnectException`. Retry delay is genuinely exponential from a 300 ms base, capped at
-  30 s (`:344-352`, `FLAGS_INITIAL_RETRY_DELAY_MS = 300L`). That satisfies both the http-client
-  spec's transport-failure language **and**, on first contact, PR
+  `UnknownHostException` (DNS), `SSLException` (TLS), and a reset `SocketException`.
+  `ConnectException` (connection refused) still falls through, which is correct: since
+  [#110](https://github.com/PostHog/sdk-specs/pull/110) the spec says a connection refused by the
+  destination is not retried and is surfaced as the flag error immediately, so the requirement
+  keeps connection refused fail-fast. Retry delay is genuinely exponential from a 300 ms base,
+  capped at 30 s (`:344-352`, `FLAGS_INITIAL_RETRY_DELAY_MS = 300L`). That satisfies both the
+  http-client spec's transport-failure language **and**, on first contact, PR
   [#110](https://github.com/PostHog/sdk-specs/pull/110)'s refused-connection rule — and it is the
   only SDK in the matrix that gets the 300 ms→600 ms backoff schedule right, where posthog-js,
   posthog-node, and posthog-react-native all use a fixed delay.

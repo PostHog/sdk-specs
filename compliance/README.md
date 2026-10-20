@@ -146,7 +146,7 @@ the single most widely-shared non-compliance in the matrix.
 | posthog-android | 35/64 fully compliant (55%) | 35 | 18 | 5 | 6 | 0 | 2026-10-19 · `c5e788bd` (targeted re-audit — see file header) | 23 | [posthog-android.md](posthog-android.md) |
 | posthog-ios | 38/64 fully compliant (59%) | 38 | 16 | 4 | 6 | 0 | 2026-10-08 · `f5cbe87c` + PostHog/posthog-ios#924–#934 (out-of-cycle refresh, see below) | 20 | [posthog-ios.md](posthog-ios.md) |
 | posthog-node | 9/64 fully compliant (14%; 29 contracts N/A on a server SDK) | 9 | 21 | 4 | 29 | 1 | 2026-10-12 · `4f590b36` (posthog-js monorepo; Traces row corrected 2026-10-19) | 25 (+1 ❓) | [posthog-node.md](posthog-node.md) |
-| posthog-flutter | 19/64 fully compliant (30%) | 19 | 31 | 6 | 8 | 0 | 2026-10-19 · `1032c102` | 37 | [posthog-flutter.md](posthog-flutter.md) |
+| posthog-flutter | 22/64 fully compliant (34%) | 22 | 28 | 6 | 8 | 0 | 2026-10-19 · `1032c102` | 34 | [posthog-flutter.md](posthog-flutter.md) |
 | posthog-react-native | 28/64 fully compliant (44%) | 28 | 28 | 3 | 5 | 0 | 2026-10-19 · `3ddaa654` (posthog-js monorepo) | 31 | [posthog-react-native.md](posthog-react-native.md) |
 | posthog-php | 11/63 fully compliant (17%; 33 contracts N/A on a server SDK; **needs +1: MCP Analytics**) | 11 | 11 | 8 | 33 | 0 | 2026-09-28 · `5451f4e0` | 19 | [posthog-php.md](posthog-php.md) |
 | posthog-ruby | 9/63 fully compliant (14%; 33 contracts N/A on a server SDK; **needs +1: MCP Analytics**) | 9 | 13 | 8 | 33 | 0 | 2026-09-28 · `185060ab` | 21 | [posthog-ruby.md](posthog-ruby.md) |
@@ -182,9 +182,11 @@ Metadata, Session Replay Debug Properties, and MCP Analytics added from scratch 
 grew by five, so its headline moved 53%→55% on genuine repository progress. posthog-react-native's
 ✅ count fell 31→28 and its percentage 53%→44%, but **not one of those moves is a code regression**:
 one row improved, five new rows landed (three ➖, one 🟡, one ❌), and four ✅ rows were downgraded
-purely by spec text that merged after its last audit. posthog-flutter's ✅ count slipped
-(20→19) while its 🟡 count jumped 22→31. Most of that is the six Unknowns resolving to 🟡, which is a
-gain in knowledge, not a loss of compliance. The rest is two spec-driven downgrades: Get Feature Flag
+purely by spec text that merged after its last audit. posthog-flutter's ✅ count rose
+(20→22) and its 🟡 count went 22→28. Most of the 🟡 growth is the six Unknowns resolving to 🟡, which is
+a gain in knowledge, not a loss of compliance; three rows (Capture Exception, Screen, Set Person
+Properties) were re-scored ✅ because their recorded gaps were fixed or retired. The rest is two
+spec-driven downgrades: Get Feature Flag
 Payload and Get Feature Flag Result are correct in the Dart core, but iOS/macOS inherit posthog-ios's
 raw-string payload fallback. Percentages that move because the
 denominator grew, or because an Unknown became a known Partial, are not regressions; the per-SDK
@@ -365,7 +367,7 @@ stalest pointer and its only 59-row file.
 | posthog-js | Session Replay Debug Properties | Backward-compatible | **New this run** — re-scored against `d078270` after #96; tiering, the `$`-prefix gate, and the 30 s throttle conform, but after `stopSessionRecording()` on a loaded recorder events keep `active`/`buffering` instead of `$recording_status: disabled` — [posthog-js.md#n36](posthog-js.md) |
 
 Full contract-by-contract detail (33 posthog-js, 21 posthog-python, 23 posthog-android, 20
-posthog-ios, 26 posthog-node, 37 posthog-flutter, 31 posthog-react-native, 19 posthog-php, 21
+posthog-ios, 26 posthog-node, 34 posthog-flutter, 31 posthog-react-native, 19 posthog-php, 21
 posthog-ruby, 23 posthog-go, 19 posthog-java, and 29 posthog-dotnet non-Pass/non-N/A cells) is in
 the respective per-SDK files.
 

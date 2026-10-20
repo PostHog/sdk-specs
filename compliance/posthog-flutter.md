@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-flutter](https://github.com/PostHog/posthog-flutter)
 **Audited commit:** `1032c102934c4b0338282a0fd3dcff94f7c2db00` ([commit](https://github.com/PostHog/posthog-flutter/commit/1032c102934c4b0338282a0fd3dcff94f7c2db00)) — audited on 2026-10-19
 **Audited against sdk-specs commit:** `c72e367`
-**Summary:** 19 ✅ · 31 🟡 · 6 ❌ · 8 ➖ · 0 ❓ (64 rows; previous audit 2026-08-06 at `05b53dc` scored 20/22/6/5/6 on 59 rows)
+**Summary:** 22 ✅ · 28 🟡 · 6 ❌ · 8 ➖ · 0 ❓ (64 rows; previous audit 2026-08-06 at `05b53dc` scored 20/22/6/5/6 on 59 rows)
 
 **Why this run:** rotation priority 2 — equally stale with react-native (2026-08-06) and the holder of
 **six of the seven ❓ Unknown cells the matrix carried** (posthog-react-native held the seventh).
@@ -69,6 +69,11 @@ the case.
 **Resolved Unknowns (6):** Event Batcher ❓→🟡, Feature Flag Called Tracker ❓→🟡, HTTP Client ❓→🟡,
 Persistent Storage ❓→🟡, Remote Config ❓→🟡, **Retry Queue ❓→✅**.
 
+**Re-scored to ✅ (3):** **Capture Exception 🟡→✅** ([n5](#n5); the flat-property finding was retired by
+sdk-specs [#103](https://github.com/PostHog/sdk-specs/pull/103)), **Screen 🟡→✅** ([n27](#n27); fixed in
+[#614](https://github.com/PostHog/posthog-flutter/pull/614)), and **Set Person Properties 🟡→✅** ([n30](#n30); every
+downstream path no-ops on empty input).
+
 **Improvement (1):** **Shutdown ❌→🟡** ([n32](#n32)). The Dart layer still does not flush before
 delegating, but two of the three paths now flush anyway: desktop `close()` makes a bounded send
 attempt, and the embedded `posthog-android` `PostHog.close()` **now calls `flush()`**
@@ -95,7 +100,7 @@ Debug Properties 🟡** ([n28](#n28)).
 | 5 | Bootstrap | 🟡 | [n4] |
 | 6 | Capture | ✅ | |
 | 7 | Capture AI | ➖ | |
-| 8 | Capture Exception | 🟡 | [n5] |
+| 8 | Capture Exception | ✅ | [n5] |
 | 9 | Consent Gating | 🟡 | [n6] |
 | 10 | Create Person Profile | ➖ | |
 | 11 | Debug | 🟡 | [n7] |
@@ -136,13 +141,13 @@ Debug Properties 🟡** ([n28](#n28)).
 | 46 | Reset Group Properties For Flags | ✅ | |
 | 47 | Reset Person Properties For Flags | ✅ | |
 | 48 | Retry Queue | ✅ | |
-| 49 | Screen | 🟡 | [n27] |
+| 49 | Screen | ✅ | [n27] |
 | 50 | Session Manager | ✅ | |
 | 51 | Session Replay Debug Properties | 🟡 | [n28] |
 | 52 | Session Replay Ingestion Controls | ✅ | |
 | 53 | Session Replay Privacy | 🟡 | [n29] |
 | 54 | Set Group Properties For Flags | ✅ | |
-| 55 | Set Person Properties | 🟡 | [n30] |
+| 55 | Set Person Properties | ✅ | [n30] |
 | 56 | Set Person Properties For Flags | ✅ | |
 | 57 | Setup | 🟡 | [n31] |
 | 58 | Shutdown | 🟡 | [n32] |
@@ -160,8 +165,8 @@ Notes [n1](#n1)–[n7](#n7), [n11](#n11)–[n13](#n13), [n16](#n16)–[n18](#n18
 [n33](#n33)–[n37](#n37) carry forward the findings of the 2026-08-06 audit, re-verified against this
 commit. Each says which earlier findings still hold, which are fixed (with the posthog-flutter PR that
 fixed them), and which a spec change has retired. Three of them, [n5](#n5), [n27](#n27), and
-[n30](#n30), no longer have a verified remaining gap: their 🟡 is carried forward and should be
-re-scored at the next audit. Notes [n8](#n8), [n9](#n9), [n10](#n10), [n14](#n14), [n15](#n15),
+[n30](#n30), no longer have a remaining gap and are re-scored ✅ this run (they keep their notes
+as the record of what was fixed). Notes [n8](#n8), [n9](#n9), [n10](#n10), [n14](#n14), [n15](#n15),
 [n19](#n19), [n24](#n24), [n26](#n26), [n28](#n28), and [n32](#n32) are new or substantially
 rewritten this run.
 
@@ -189,11 +194,11 @@ rewritten this run.
 - **Backwards compatibility:** Backward-compatible — an optional `sessionID` field and an always-on web warning are both additive; wiring bootstrap into web is impractical because posthog-js is initialized before Dart `setup()` runs.
 - **Remediation:** Add optional `sessionID` bootstrap support, forwarded to native and the Dart core; on web, log the "bootstrap not applied" warning outside debug builds.
 
-### n5 — Capture Exception (🟡 Partial)
+### n5 — Capture Exception (✅ Pass)
 - **Spec requires:** `captureException` emits a handled `$exception` whose type and message live on `$exception_list[0].type`/`.value`, with caller properties merged, non-standard thrown values normalized, frames and `$exception_list` outermost-first, an existing stack preserved over a synthesized one, and null-valued custom properties dropped. The flat `$exception_type`/`$exception_message` requirement was retired by PR [#103](https://github.com/PostHog/sdk-specs/pull/103).
-- **SDK currently:** **The previously-recorded finding is retired.** The old note recorded that `DartExceptionProcessor.processException` never stamps top-level `$exception_type`/`$exception_message` and that both bridges route through generic `capture("$exception")`; that is still true, but PR #103 made those properties optional, so it no longer counts against the row. Everything else checks out at this commit: `Posthog().captureException(...)` (`lib/src/posthog.dart:816`) and `captureRunZonedGuardedError(...)` (`:839`) build the payload through `DartExceptionProcessor.processException` (`lib/src/error_tracking/dart_exception_processor.dart:23-131`), which sets `type`/`value` per entry, prefers the supplied stack before synthesizing one ([#626](https://github.com/PostHog/posthog-flutter/pull/626)), reverses frames to outermost-first, and lists causes outermost-first (`:107-118`); `PropertyNormalizer.normalize` (`lib/src/utils/property_normalizer.dart:9-40`) drops null-valued custom properties recursively before the channel. The envelope defects (no `exception_id`/`parent_id`, inherited `handled`, hardcoded `$exception_level`, caller override of reserved keys, chain cap of 10) are scored separately under [n9](#n9). No capture-exception-specific gap remains, so **this row's 🟡 is carried forward unverified and should be re-scored (likely ✅) at the next audit**, as posthog-android and posthog-react-native were on the same withdrawal.
+- **SDK currently:** **The previously-recorded finding is retired.** The old note recorded that `DartExceptionProcessor.processException` never stamps top-level `$exception_type`/`$exception_message` and that both bridges route through generic `capture("$exception")`; that is still true, but PR #103 made those properties optional, so it no longer counts against the row. Everything else checks out at this commit: `Posthog().captureException(...)` (`lib/src/posthog.dart:816`) and `captureRunZonedGuardedError(...)` (`:839`) build the payload through `DartExceptionProcessor.processException` (`lib/src/error_tracking/dart_exception_processor.dart:23-131`), which sets `type`/`value` per entry, prefers the supplied stack before synthesizing one ([#626](https://github.com/PostHog/posthog-flutter/pull/626)), reverses frames to outermost-first, and lists causes outermost-first (`:107-118`); `PropertyNormalizer.normalize` (`lib/src/utils/property_normalizer.dart:9-40`) drops null-valued custom properties recursively before the channel. The envelope defects (no `exception_id`/`parent_id`, inherited `handled`, hardcoded `$exception_level`, caller override of reserved keys, chain cap of 10) are scored separately under [n9](#n9). No capture-exception-specific gap remains, so **this row is re-scored ✅ this run**, as posthog-android and posthog-react-native were on the same withdrawal.
 - **Backwards compatibility:** Backward-compatible — no capture-exception-scoped change is required.
-- **Remediation:** None in this capability beyond [n9](#n9); re-score at the next audit.
+- **Remediation:** None in this capability beyond [n9](#n9).
 
 ### n6 — Consent Gating (🟡 Partial)
 - **Spec requires:** When opted out, event-producing APIs return early without enqueueing or sending, and consent gating runs before the before-send hook (`openspec/specs/before-send-hook/spec.md:80`, "opted-out events are typically blocked before the hook is invoked"); wrapper-managed integrations and session replay are gated too.
@@ -321,11 +326,11 @@ rewritten this run.
 - **Backwards compatibility:** Backward-compatible — adding a config fetch at startup is additive; clients that currently see no remote gating would start honouring it, which is the intended behaviour.
 - **Remediation:** Add a remote-config fetch to the Dart core's startup path and apply it to the same switches the native SDKs gate on.
 
-### n27 — Screen (🟡 Partial)
+### n27 — Screen (✅ Pass)
 - **Spec requires:** Emit `$screen` with `$screen_name`, with the explicit name argument winning over a caller-supplied `$screen_name` in `properties`.
-- **SDK currently:** **The previously-recorded Dart-layer bug is fixed.** The old finding was that `PosthogFlutterIO.screen` built `{screenName: …, ...?properties}`, so a caller's `$screen_name` overwrote the argument. [#614](https://github.com/PostHog/posthog-flutter/pull/614) reversed the order: `posthog_flutter_io.dart:359-364` now spreads `...?properties` first and sets `$screen_name: screenName` last, before `beforeSend` runs. Web (`posthog_flutter_web_handler.dart:258-265`) and desktop (`posthog_flutter_desktop.dart:285-325`) also let the argument win, and the embedded native SDKs' own Screen rows are ✅ (`compliance/posthog-android.md`, `compliance/posthog-ios.md`). No remaining Screen-specific gap was found at this commit; the opt-out ordering of the Dart `beforeSend` on mobile/web is a Consent Gating concern ([n6](#n6)). **This row's 🟡 is carried forward unverified and should be re-scored (likely ✅) at the next audit.**
+- **SDK currently:** **The previously-recorded Dart-layer bug is fixed.** The old finding was that `PosthogFlutterIO.screen` built `{screenName: …, ...?properties}`, so a caller's `$screen_name` overwrote the argument. [#614](https://github.com/PostHog/posthog-flutter/pull/614) reversed the order: `posthog_flutter_io.dart:359-364` now spreads `...?properties` first and sets `$screen_name: screenName` last, before `beforeSend` runs. Web (`posthog_flutter_web_handler.dart:258-265`) and desktop (`posthog_flutter_desktop.dart:285-325`) also let the argument win, and the embedded native SDKs' own Screen rows are ✅ (`compliance/posthog-android.md`, `compliance/posthog-ios.md`). No remaining Screen-specific gap was found at this commit; the opt-out ordering of the Dart `beforeSend` on mobile/web is a Consent Gating concern ([n6](#n6)). **This row is re-scored ✅ this run.**
 - **Backwards compatibility:** Backward-compatible — the #614 fix changed observable behavior only for callers who relied on `properties['$screen_name']` overriding the argument.
-- **Remediation:** None outstanding for this contract; re-score at the next audit.
+- **Remediation:** None outstanding for this contract.
 
 ### n28 — Session Replay Debug Properties (🟡 Partial)
 - **Spec requires:** `client`. Four required keys on **every** captured event except `$snapshot` on all platforms — `$recording_status`, `$sdk_debug_replay_event_trigger_status`, `$sdk_debug_replay_linked_flag_trigger_status`, `$sdk_debug_replay_internal_buffer_length` — plus a throttled optional `$sdk_debug_*` bundle on SDK events, with all of them stripped from the minimal `$feature_flag_called` envelope. An SDK with no replay integration produces only `$recording_status: disabled`.
@@ -339,11 +344,11 @@ rewritten this run.
 - **Backwards compatibility:** Backward-compatible for a no-capture widget that unmask cannot override (net-new API). Turning canvas masking on by default on Flutter Web when `maskAllTexts`/`maskAllImages` are set changes what web replays show, so it should ship with a changelog note.
 - **Remediation:** Add a `PostHogNoCaptureWidget`-style marker that always masks its full subtree and ignores nested `PostHogUnmaskWidget`; consider enabling web canvas masking by default when global masking is on.
 
-### n30 — Set Person Properties (🟡 Partial)
+### n30 — Set Person Properties (✅ Pass)
 - **Spec requires:** Set person properties without identify, emitting the `$set`/`$set_once` shape; calling with both maps null/empty is a no-op (no event/call emitted) and does not throw.
-- **SDK currently:** `Posthog().setPersonProperties(...)` (`lib/src/posthog.dart:187-194`) and `PosthogFlutterIO.setPersonProperties` (`posthog_flutter_io.dart:263-289`) still have no Dart-side empty-input guard — with both maps null the Dart layer still calls `invokeMethod('setPersonProperties', {})` rather than short-circuiting, unlike the sibling `setPersonPropertiesForFlags` (`lib/src/posthog.dart:522`). The previous audit could not verify the native side; it now can, and every downstream path no-ops on empty input: posthog-android's `setPersonProperties` returns when both are null/empty (Set Person Properties ✅ in `compliance/posthog-android.md`), posthog-ios is ✅, posthog-js returns early on web, and the desktop core returns early (`core/posthog_core.dart:963-967`). So nothing observable happens; the missing Dart guard is hygiene, not a contract gap. **This row's 🟡 is carried forward unverified and should be re-scored (likely ✅) at the next audit.**
+- **SDK currently:** `Posthog().setPersonProperties(...)` (`lib/src/posthog.dart:187-194`) and `PosthogFlutterIO.setPersonProperties` (`posthog_flutter_io.dart:263-289`) still have no Dart-side empty-input guard — with both maps null the Dart layer still calls `invokeMethod('setPersonProperties', {})` rather than short-circuiting, unlike the sibling `setPersonPropertiesForFlags` (`lib/src/posthog.dart:522`). The previous audit could not verify the native side; it now can, and every downstream path no-ops on empty input: posthog-android's `setPersonProperties` returns when both are null/empty (Set Person Properties ✅ in `compliance/posthog-android.md`), posthog-ios is ✅, posthog-js returns early on web, and the desktop core returns early (`core/posthog_core.dart:963-967`). So nothing observable happens; the missing Dart guard is hygiene, not a contract gap. **This row is re-scored ✅ this run.**
 - **Backwards compatibility:** Backward-compatible.
-- **Remediation:** Optional: add the same empty-input early return used by `setPersonPropertiesForFlags` to skip the useless channel call; re-score at the next audit.
+- **Remediation:** Optional: add the same empty-input early return used by `setPersonPropertiesForFlags` to skip the useless channel call.
 
 ### n31 — Setup (🟡 Partial)
 - **Spec requires:** `openspec/specs/setup/spec.md:163`, `:179` — name the project credential `projectToken`, with any legacy `apiKey` retained as a deprecated alias; plus lifecycle hygiene on re-initialization.

@@ -389,11 +389,12 @@ Where the option exists:
 
 ### Requirement: Fatal exception payloads keep their exception data
 
-Where an SDK builds the `$exception` event for a fatal or crash boundary through a different
-serializer than the one handled exceptions go through — typically a size-bounded, strictly
-JSON-safe payload handed to a native layer that persists it synchronously inside the dying process
-— that serializer SHALL emit the same SDK-owned exception data as the handled path would for the
-same exception: every `$exception_list` entry it was given, each with its `stacktrace` and frames.
+A separate fatal-path exception serializer SHALL emit the same SDK-owned exception data as the
+handled path would for the same exception: every `$exception_list` entry it was given, each with
+its `stacktrace` and frames. This applies where an SDK builds the `$exception` event for a fatal or
+crash boundary through a different serializer than the one handled exceptions go through —
+typically a size-bounded, strictly JSON-safe payload handed to a native layer that persists it
+synchronously inside the dying process.
 
 An optional field whose value is unset SHALL be omitted from the serialized event, the way JSON
 serialization omits an absent object member. It SHALL NOT make its containing object
@@ -404,8 +405,10 @@ serialized, without `chunk_id`.
 
 Where the serializer enforces a size budget, `$exception_list` SHOULD be budgeted separately from
 caller-supplied custom properties, so a large property set cannot evict the exception data.
-Truncating within the exception data — dropping trailing frames, or trailing chained
-`$exception_list` entries under the limits in `exception-event-metadata` — stays allowed.
+Truncating within the exception data to fit that budget — dropping trailing frames, trailing chained
+`$exception_list` entries under the limits in `exception-event-metadata`, or a `stacktrace` that
+alone exceeds the budget — stays allowed; the rules above forbid dropping data only for being
+unset, not for size.
 
 #### Scenario: An unset optional frame field does not drop the stack trace
 - **GIVEN** an SDK whose fatal path serializes the exception payload separately

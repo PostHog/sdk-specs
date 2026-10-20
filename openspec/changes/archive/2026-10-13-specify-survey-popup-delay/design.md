@@ -48,5 +48,5 @@ eligibility rules, branching, or event shapes.
 
 ## Open Questions
 
-- Whether posthog-react-native reserves the survey before its wait, and whether its provider should
-  adopt the same report-back contract as the native delegates, is left to that SDK.
+- posthog-react-native does not implement the delay yet; when it does, it should keep reserving the
+  survey (`activeSurvey`) before the wait, as its provider already does before rendering.

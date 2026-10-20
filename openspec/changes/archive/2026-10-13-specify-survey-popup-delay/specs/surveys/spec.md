@@ -2,7 +2,8 @@
 
 ### Requirement: Survey popup delay
 
-A survey definition's appearance MAY carry a popup delay (`surveyPopupDelaySeconds`, in seconds).
+The SDK SHALL honor a survey's popup delay (`appearance.surveyPopupDelaySeconds`, in seconds)
+when the survey definition carries one.
 When the delay is a positive number, the SDK SHALL wait that long after deciding to display the
 survey before the survey reaches the screen. When the delay is missing, zero, or negative, the SDK
 SHALL display the survey immediately; a negative value is clamped to zero and never means "never

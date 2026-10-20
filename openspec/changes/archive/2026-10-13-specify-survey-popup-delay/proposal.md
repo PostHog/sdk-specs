@@ -1,11 +1,11 @@
 ## Why
 
-Every surveys-capable SDK reads `appearance.surveyPopupDelaySeconds` off the survey definition and
-waits before showing the prompt, but the `surveys` spec never mentions the delay. The spec's only
-nearby rules are "allow only one active prompt" and "a survey should be marked active before its
-shown/response/closed callbacks can mutate response state" — both written for a survey that is
-already on screen, which leaves the window between "we decided to show this survey" and "the survey
-is on screen" unspecified.
+Every surveys-capable SDK except posthog-react-native reads `appearance.surveyPopupDelaySeconds` off
+the survey definition and waits before showing the prompt, but the `surveys` spec never mentions
+the delay. The spec's only nearby rules are "allow only one active prompt" and "a survey should be
+marked active before its shown/response/closed callbacks can mutate response state" — both written
+for a survey that is already on screen, which leaves the window between "we decided to show this
+survey" and "the survey is on screen" unspecified.
 
 That gap produced a real divergence. posthog-android
 [#849](https://github.com/PostHog/posthog-android/pull/849) found that Android marked a survey
@@ -59,8 +59,10 @@ three SDKs already shipped.
 - **posthog-android** conforms as of #849 (`pendingPresentation` reserved before `renderSurvey`).
 - **posthog-flutter** conforms as of #627 for its own bottom sheet; it relies on the native
   integration for the reservation.
-- **posthog-react-native** reads `surveyPopupDelaySeconds` in its survey provider; whether it
-  reserves the survey before the wait was not verified for this change.
+- **posthog-react-native** does not implement the delay yet: `PostHogSurveyProvider` only mentions
+  `surveyPopupDelaySeconds` in commented-out code (`TODO: sort by appearance delay, implement
+  delay`) and shows a positive-delay survey immediately, so it does not conform to the delay rule.
+  It already reserves the survey (`activeSurvey`) before rendering.
 
 Re-checking eligibility when the delay elapses is stated as SHOULD rather than SHALL: the browser
 does it, and the native SDKs do not, so this change does not declare either side non-conforming.

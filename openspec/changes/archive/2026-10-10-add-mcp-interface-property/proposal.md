@@ -28,6 +28,6 @@ _None._
 
 ## Impact
 
-Additive. SDKs that do not set the property today (posthog-python, posthog-go) gain one constant
+Additive. posthog-js (`@posthog/mcp`) and posthog-python (`posthog.mcp`) already send it; posthog-go gains one constant
 string property on each MCP event; no existing property changes. Queries that filter on
 `$mcp_source` or `$lib` keep working.

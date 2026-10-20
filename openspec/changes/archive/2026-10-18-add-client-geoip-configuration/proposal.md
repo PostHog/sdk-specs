@@ -49,10 +49,11 @@ Audited server SDK behavior at the time of writing:
 | Python | yes, `disable_geoip` | disables GeoIP | yes, `None` inherits | none |
 | Go | yes, `Config.DisableGeoIP` (`nil` means disable) | disables GeoIP | events: no — the per-message `DisableGeoIP` is a plain `bool` and `Enqueue` overwrites it from config; flags: yes, `*bool` | none now (client setting stays authoritative); add an unset-capable per-message option in its next major release |
 | PHP | yes, `disableGeoip` (added in #263) | **does not** disable GeoIP, a deliberate compatibility default | yes, explicit `false` wins, null inherits | none now; may change the default in its next major release |
-| Rust | yes, `disable_geoip` | **does not** disable GeoIP (builder default `false`) | flags and `$feature_flag_called`: yes, `Option<bool>` inherits; events: no per-call option, and a caller-supplied `$geoip_disable` property wins over the client setting | none now; may change the default in its next major release |
-| Ruby | no | n/a | per-call only, omitted sends nothing | add a client-level setting |
-| .NET | no | event path defaults the property to true; flag options default to `false` | property-level override only | add a client-level setting and reconcile the two defaults |
-| Elixir | no | n/a | per-call only | add a client-level setting |
+| Rust | yes, `disable_geoip` | **does not** disable GeoIP (builder default `false`) | flags and `$feature_flag_called`: yes, `Option<bool>` inherits; events: no per-call option, and a caller-supplied `$geoip_disable` property wins over the client setting (`insert_prop_default`) | stamp `$geoip_disable: true` over a caller value when GeoIP is disabled; may change the default in its next major release |
+| Ruby | no | n/a | flags requests only (`geoip_disable` when set); events never carry `$geoip_disable` — a `disable_geoip` passed to `capture` is ignored | add a client-level setting and stamp events |
+| .NET | no | event path defaults the property to true; flag options default to `false` | property-level override only; a caller-supplied `$geoip_disable` is kept as is | add a client-level setting and reconcile the two defaults |
+| Elixir | no | n/a | flags requests only (`:disable_geoip` sent as `geoip_disable`); events never carry `$geoip_disable` | add a client-level setting and stamp events |
+| Java | no | n/a | none — no GeoIP option anywhere | add a client-level setting and per-call option |
 
 Client SDKs are unaffected: they run in the end user's network context, so GeoIP enrichment
 stays on and no option is required.

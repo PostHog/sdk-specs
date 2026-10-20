@@ -131,7 +131,7 @@ Lifecycle events SHALL carry the current app version and build through the commo
 
 ### Requirement: Build-invariant context properties
 
-A property whose value changes only when the app binary is rebuilt — the wrapper runtime version, or the build toolchain — SHALL ride `Application Installed` and `Application Updated`, and SHALL NOT be added to the common event context. It SHALL be omitted when the platform reports no value. Where the runtime has no lifecycle events, or lifecycle capture is disabled, it is not sent at all. `$lib`, `$lib_version`, `$app_version` and `$app_build` are exempt and SHALL stay on every event.
+A property whose value changes only when the app binary is rebuilt — the wrapper runtime version, or the build toolchain — SHALL ride `Application Installed` and `Application Updated`, and SHALL NOT be added to the common event context. It SHALL be omitted when the platform reports no value. Where the runtime has no lifecycle events, or lifecycle capture is disabled, it is not sent at all. `$lib`, `$lib_version`, `$app_version` and `$app_build` are exempt and SHALL stay on every event, as do other properties SDKs already send on every event, such as `$app_name` and `$app_namespace`.
 
 #### Scenario: A build-invariant property rides install and update only
 - **GIVEN** a fresh SDK acceptance test harness

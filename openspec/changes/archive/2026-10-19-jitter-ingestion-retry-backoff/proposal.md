@@ -11,8 +11,8 @@ are converging on the same answer without one:
 
 | SDK | Jitter on ingestion retry waits | Where |
 |---|---|---|
-| posthog-js (browser retry queue) | yes, ±50% of the computed delay | `packages/browser/src/retry-queue.ts` |
-| posthog-js (browser-next capture v1) | yes, factor in `[0.5, 1.5]`, clamped to the 30s ceiling, `Retry-After` applied as a floor afterwards | `packages/browser-next/src/capture-v1.ts` (`retryDelay`) |
+| posthog-js (browser retry queue) | yes, about ±25% of the computed delay; near the 30-minute cap the jittered wait can exceed the cap, and `Retry-After` is an unclamped floor | `packages/browser/src/retry-queue.ts` |
+| posthog-js (browser-next capture v1, unreleased) | yes, factor in `[0.5, 1.5]`, clamped to the 30s ceiling, `Retry-After` applied as a floor afterwards | `packages/browser-next/src/capture-v1.ts` (`retryDelay`) |
 | posthog-rs | yes, factor in `[0.75, 1.25]`, capped at `retry_max_backoff_ms`, `Retry-After` still the minimum | [posthog-rs#290](https://github.com/PostHog/posthog-rs/pull/290) (merged 2026-10-18) |
 | posthog-go | `Backoff` takes a jitter ratio; `DefaultBackoff()` passes `0` | `backoff.go` |
 | posthog-python, posthog-node, posthog-ios, posthog-android | no | — |
@@ -41,8 +41,8 @@ _None._
 
 ## Impact
 
-- The requirement is a SHOULD, matching the `logs` and `traces` wording. posthog-js and posthog-rs
-  already satisfy it; posthog-go has the mechanism and would only change a default; the remaining
+- The requirement is a SHOULD, matching the `logs` and `traces` wording. posthog-rs already satisfies it;
+  the posthog-js browser retry queue jitters but would need to keep the jittered wait under its cap; posthog-go has the mechanism and would only change a default; the remaining
   SDKs are unaffected until they choose to adopt it.
 - The base delay schedule is deliberately left alone. Ingestion backoff bases still differ across
   SDKs (posthog-python 1s doubling, posthog-go and posthog-rs 100ms, posthog-js capture v1 3s) and

@@ -19,7 +19,8 @@ their own repos (`posthog-android`, `posthog-ios`, `posthog-js`, `posthog-flutte
 Specs now cover three groups of canonical SDK behavior:
 
 - **Public SDK APIs** such as capture, capture_ai, identify, groups, feature-flag getters,
-  opt-in/out, session-replay controls, setup, flush, shutdown, and property registration.
+  opt-in/out, session-replay controls, setup, flush, shutdown, property registration, and
+  server-side AI datasets, AI scorers, and offline evaluation uploads.
 - **Internal SDK components** such as lifecycle handling, autocapture, batching, retry queues,
   persistent storage, remote config, feature-flag caches/evaluators, exception-event metadata,
   session management, surveys, consent gating, replay privacy, and client/server tracing-header

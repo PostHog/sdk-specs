@@ -24,7 +24,8 @@ path does to stay small, it does not cost the exception its stack trace.
 
 - New `capture-exception` requirement **Fatal exception payloads keep their exception data**:
   - A fatal/crash serializer emits the same SDK-owned exception data as the handled path for the
-    same exception — every `$exception_list` entry with its `stacktrace` and frames.
+    same exception — every `$exception_list` entry with its `stacktrace` and frames. Boundary-specific
+    `mechanism` metadata (`handled`, `type`) still follows `exception-event-metadata`.
   - An optional field whose value is unset is omitted from the serialized event and SHALL NOT make
     its containing object unserializable or cause the frame, the `stacktrace`, or the
     `$exception_list` entry to be dropped.

@@ -391,8 +391,10 @@ Where the option exists:
 
 A separate fatal-path exception serializer SHALL emit the same SDK-owned exception data as the
 handled path would for the same exception: every `$exception_list` entry it was given, each with
-its `stacktrace` and frames. This applies where an SDK builds the `$exception` event for a fatal or
-crash boundary through a different serializer than the one handled exceptions go through —
+its `stacktrace` and frames. Capture-boundary metadata that `exception-event-metadata` sets
+per boundary, such as the outermost `mechanism.handled` and `mechanism.type`, is not part of this
+parity and follows that capability. This applies where an SDK builds the `$exception` event for a
+fatal or crash boundary through a different serializer than the one handled exceptions go through —
 typically a size-bounded, strictly JSON-safe payload handed to a native layer that persists it
 synchronously inside the dying process.
 
@@ -421,7 +423,7 @@ unset, not for size.
 - **GIVEN** an SDK whose fatal path serializes the exception payload separately
 - **WHEN** the same exception is reported once as fatal and once as handled
 - **THEN** both `$exception` events carry the same `$exception_list` entries, each with its
-  `stacktrace` and frames
+  `stacktrace` and frames, apart from the outermost entry's boundary-specific `mechanism` fields
 - **AND** neither event is delivered with only `type`, `value` and `mechanism`
 
 #### Scenario: Custom properties cannot evict the exception data

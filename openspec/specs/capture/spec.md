@@ -103,12 +103,12 @@ The following steps are the canonical flow for a single capture call. Client and
      4. Person-processing state (`$process_person_profile`, `$is_identified`) based on current identity state. The SDK sets these after the caller's properties, so a caller can't override them.
      5. SDK-owned per-event keys that the SDK MAY set after the caller's properties: session properties (`$session_id`, `$window_id`) on client SDKs that support session replay, the session replay debug properties, and `$geoip_disable` when GeoIP is disabled.
    - **Server:** request-context properties, then caller-supplied `properties`, then SDK-stamped properties. Most server SDKs stamp `$lib` and `$lib_version` over the caller's values, and SDKs with SDK-level default properties (python `super_properties`, go `DefaultEventProperties`, dotnet `SuperProperties`, elixir `global_properties`) apply them after the caller's properties too. `$groups` comes from the `groups` option.
-5. **Attach envelope fields.** Assign `timestamp` (caller override or `now()`, serialized in ISO 8601 and normalized to its equivalent UTC instant regardless of the input's original timezone/offset, preserving sub-second precision when the input carries it), `uuid` (caller override or a freshly generated UUIDv7), `distinct_id`, and `event` to the message. Server SDKs additionally stamp `$lib` / `$lib_version` onto properties here if not already present.
-6. **Run `before_send` hook.** If the SDK has been configured with a `before_send` callback (Python, Go, posthog-js, .NET), invoke it with the fully-assembled message. The callback may return a modified message, or return `null`/`None` to drop the event. If the callback throws, log a warning, stop the hook chain, and drop the event. Never enqueue the original or partially processed message after a hook failure.
+5. **Attach envelope fields.** Assign `timestamp` (caller override or `now()`, serialized in ISO 8601 and normalized to its equivalent UTC instant regardless of the input's original timezone/offset, preserving sub-second precision when the input carries it), `uuid` (caller override or a freshly generated UUIDv7; server SDKs normalize it to canonical lowercase hyphenated form), `distinct_id`, and `event` to the message. Server SDKs additionally stamp `$lib` / `$lib_version` onto properties here if not already present.
+6. **Run `before_send` hook.** If the SDK has been configured with a `before_send` callback (Python, Go, posthog-js, .NET), invoke it with the fully-assembled message. The callback may return a modified message, or return `null`/`None` to drop the event. If the callback throws, log a warning, stop the hook chain, and drop the event. Never enqueue the original or partially processed message after a hook failure. Server SDKs re-normalize the message `uuid` after the hook returns, because the hook may have replaced it with another accepted form.
 7. **Deliver.**
    - **Server (and `posthog-node`, `posthog-js/core` stateless):** push onto an in-memory queue (`max_queue_size` default 10,000). If the queue is full, drop the oldest element and log a warning (posthog-js core; `posthog-python` drops the new element). If queue size ≥ `flush_at` (default 20 client/core, 100 python-server), kick off a background flush. A periodic timer (`flush_interval`, typically 10s client / 10s–30s server) also triggers flushes.
    - **Client (browser):** forward to the request queue (`_requestQueue.enqueue`) unless `send_instantly` is set or batching is disabled, in which case send directly via `_send_retriable_request`. Flushes are opportunistic and aligned with network availability / page lifecycle (e.g. `sendBeacon` on `pagehide`).
-8. **Return.** Client SDKs return a `CaptureResult` object containing the event data (or `undefined` if dropped). Server SDKs return the generated UUID string (or `null`/`None` if dropped).
+8. **Return.** Client SDKs return a `CaptureResult` object containing the event data (or `undefined` if dropped). Server SDKs return the UUID string that was sent — the normalized, canonical form (or `null`/`None` if dropped).
 
 ## State & lifecycle
 
@@ -123,6 +123,7 @@ The following steps are the canonical flow for a single capture call. Client and
 - **Log and drop** when `before_send` throws. The SDK must not enqueue a fallback event because the failed hook may have been responsible for removing sensitive data.
 - **Log and swallow** other internal exceptions such as property enrichment or feature-flag-fetch failures. A failure to enqueue must not surface as an exception to the caller — the contract is that `capture` is fire-and-forget.
 - **Return sentinel** (`null`/`None`/`undefined`) when a drop occurs and the SDK's signature lets it express that. Some SDKs (Go, Java) lack a return value and communicate failure only via logging.
+- **Log and replace** (server SDKs) a caller-supplied `uuid` that cannot be parsed as a uuid, substituting a freshly generated UUIDv7. An unusable uuid override must not cost the caller the event.
 - **Never throw** to the caller under normal operation. Capture is latency-sensitive and lives on the hot path of application code; SDKs are expected to absorb all I/O and serialization errors internally.
 
 ## Concurrency & ordering
@@ -435,3 +436,35 @@ This requirement does not apply to server SDKs. Most server SDKs set `$lib` and 
   | property                | value |
   | $process_person_profile | false |
   | $is_identified          | false |
+
+### Requirement: Event uuid is sent in canonical form
+
+A server SDK SHALL serialize the event `uuid` in canonical lowercase hyphenated form (`8-4-4-4-12`, no braces, no `urn:uuid:` prefix). A caller-supplied uuid in another form the SDK accepts — uppercase, unhyphenated, brace-wrapped, or `urn:uuid:`-prefixed — SHALL be normalized to that form before the event is enqueued, and the uuid the capture call returns SHALL be the normalized value that was sent. The normalization SHALL be applied after the `before_send` hook, so a uuid the hook sets is normalized too.
+
+A caller-supplied value the SDK cannot parse as a uuid SHALL NOT fail or drop the capture call: the SDK SHALL replace it with a freshly generated UUIDv7 and SHOULD log a warning. The warning SHOULD NOT include the discarded value, because callers can put their own data in the uuid field.
+
+Capture v1 keys the per-event `results` map in a 2xx response by the canonical uuid while parsing the request's uuid leniently, so an event sent under a non-canonical uuid cannot be correlated with its own verdict: a retryable verdict is never retried and a drop verdict never reaches the SDK's error reporting.
+
+#### Scenario: Non-canonical caller uuid is normalized before send (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **WHEN** capture is called with distinct id "user-123", event "Signed Up", and uuid "0199C3E8-4C7B-7E2E-9F21-2B6D5A1C9E04"
+- **THEN** one event named "Signed Up" should be enqueued
+- **AND** the enqueued event uuid should be "0199c3e8-4c7b-7e2e-9f21-2b6d5a1c9e04"
+- **AND** the call should return the enqueued event's uuid
+
+#### Scenario: Unparseable caller uuid falls back to a generated uuid (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **WHEN** capture is called with distinct id "user-123", event "Signed Up", and uuid "not-a-uuid"
+- **THEN** the capture call should not throw
+- **AND** one event named "Signed Up" should be enqueued
+- **AND** the enqueued event uuid should not equal "not-a-uuid"
+- **AND** the enqueued event should include an event uuid
+- **AND** the call should return the enqueued event's uuid

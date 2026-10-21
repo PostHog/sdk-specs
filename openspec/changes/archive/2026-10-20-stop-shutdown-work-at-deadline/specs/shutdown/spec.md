@@ -2,7 +2,7 @@
 
 ### Requirement: Shutdown stops work when its timeout elapses
 
-Where `shutdown` takes or defaults to a timeout, that timeout SHALL bound the whole teardown drain, not each delivery attempt within it. Once the budget is gone the SDK SHALL return and SHALL NOT start another flush of the queue. The SDK SHOULD also check the remaining budget before each further delivery attempt within a flush — the next batch, a retry, or the next request of a size-split send — and stop rather than prepare a request it cannot complete. A stopped drain SHALL still return normally and SHALL be reported once, not once per abandoned request.
+Where `shutdown` takes or defaults to a timeout, that timeout SHALL bound the whole teardown drain, not each delivery attempt within it. Once the budget is gone the SDK SHALL stop draining, SHALL NOT start another flush of the queue, and SHALL return. A bounded cleanup grace that a surface variant documents after the drain budget — Ruby's up to one second stopping workers and transports — MAY run before the call returns; it SHALL NOT deliver further queued events. The SDK SHOULD also check the remaining budget before each further delivery attempt within a flush — the next batch, a retry, or the next request of a size-split send — and stop rather than prepare a request it cannot complete. A stopped drain SHALL still return normally and SHALL be reported once, not once per abandoned request.
 
 #### Scenario: Shutdown stops the drain once its timeout elapses (@both)
 - **GIVEN** a fresh SDK acceptance test harness

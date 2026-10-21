@@ -9,7 +9,8 @@ timeout — and report a failure per request.
 [posthog-rs#298](https://github.com/PostHog/posthog-rs/pull/298) (merged 2026-10-20) fixed exactly
 that: shutdown now checks its deadline before each byte-split request and drops the rest with one
 warning, matching what the buffer drain in that SDK already did. posthog-js core and
-posthog-ruby bound their drains more coarsely: they return at the deadline and start no further
+posthog-ruby bound their drains more coarsely: they stop draining at the deadline (Ruby then
+spends its documented cleanup grace of up to one second stopping workers) and start no further
 drain round, but do not re-check the budget before each batch or retry already under way. The
 round-level rule is therefore a SHALL and the per-attempt check a SHOULD.
 

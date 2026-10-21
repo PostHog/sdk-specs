@@ -19,8 +19,8 @@ Which captures reach PostHog is the capture contract, so this is worth closing i
 - New requirement in `capture`, **Client-side capture rate limiting never loses tokens to a clock
   change**: the limiter is a persisted token bucket; its refill counts elapsed time as zero when the
   clock is behind the stored instant, stores the later of the two instants, caps the balance at the
-  burst limit, and never lets it go below zero. Dropping is a function of capture volume, not of the
-  direction the clock moved.
+  burst limit, and never lets it go below zero. A backward clock change only pauses refill; it never takes away
+  tokens the bucket already held.
 - Two `@client` scenarios: a rollback does not drop the next capture, and a rollback followed by the
   clock catching up does not refill the bucket twice.
 

@@ -10,7 +10,7 @@ The bucket is refilled from the device's wall clock, which can move backward —
 - The SDK SHALL store the later of the stored instant and the current instant, so the bucket does not refill again until the clock passes the latest instant it has seen. A rollback followed by the clock catching up SHALL NOT refill the bucket twice for the same stretch of real time.
 - An admitted capture SHALL consume one token and the balance SHALL NOT go below zero. A capture is rate limited when fewer than one token is available.
 
-Whether a capture is dropped SHALL be a function of how many events the client captured, never of the direction the device clock moved.
+A backward clock change SHALL only pause refill until the clock catches up. It SHALL NOT take away tokens the bucket already held, so a capture that had a token available before the change is still admitted after it.
 
 #### Scenario: A backward clock change does not drop the next capture (@client)
 - **GIVEN** a fresh SDK acceptance test harness

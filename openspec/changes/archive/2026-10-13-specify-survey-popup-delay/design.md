@@ -26,7 +26,9 @@ eligibility rules, branching, or event shapes.
 - **Make the delegate's report-back a requirement, not an implementation note.** Once the
   reservation gates later surveys, a host UI layer that silently drops a survey blocks every
   subsequent one until reset. iOS and Android both work this way, and #849's KDoc change says so for
-  Android; stating it here is what makes the reservation safe to require.
+  Android; stating it here is what makes the reservation safe to require. Reporting "closed" is only
+  safe once the core treats a close for a survey that was never shown as a silent release; iOS does
+  not yet, which is why Flutter's cancelled delay stays silent today (see Open Questions).
 - **Eligibility re-check on elapse is SHOULD.** The browser re-checks the full display predicate
   when the timer fires, because an `identify()` mid-delay can flip a targeting flag or the person
   can opt out. The native SDKs do not. Both readings are defensible and no SDK is currently wrong
@@ -50,3 +52,8 @@ eligibility rules, branching, or event shapes.
 
 - posthog-react-native does not implement the delay yet; when it does, it should keep reserving the
   survey (`activeSurvey`) before the wait, as its provider already does before rendering.
+- posthog-ios marks a survey seen and emits `survey dismissed` when its delegate closes it before
+  `onSurveyShown` ran (`PostHogSurveyIntegration.handleSurveyClosed` does not track whether the
+  active survey was shown). This is an implementation gap against the dropped-before-shown rule.
+- posthog-flutter's cancelled delay reports neither shown nor closed, so the native reservation is
+  held until native reset or teardown. It can report closed once the iOS gap above is fixed.

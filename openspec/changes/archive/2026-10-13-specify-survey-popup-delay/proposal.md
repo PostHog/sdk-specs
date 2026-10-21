@@ -49,16 +49,27 @@ _None._
 
 ## Impact
 
-No application-visible change for SDKs that already behave this way; this writes down the behavior
-three SDKs already shipped.
+No application-visible change for SDKs that already behave this way; this writes down the delay and
+reservation behavior three SDKs already shipped. Two gaps against the dropped-before-shown and
+report-back rules remain, recorded below as implementation work.
 
 - **posthog-js** (browser) conforms: `handlePopoverSurvey` claims focus before arming the timer,
   re-checks eligibility when the timer fires, and releases focus when the survey is dropped.
-- **posthog-ios** conforms: `scheduleSurveyDisplay` sets `pendingSurvey` before the delay and
-  `dismissPendingSurveyIfNeeded` releases it through the closed handler without marking it seen.
+- **posthog-ios** conforms to the reservation and delay rules: `scheduleSurveyDisplay` sets
+  `pendingSurvey` before the delay. It does not yet conform to the dropped-before-shown rule: when
+  the delegate closes a survey it never showed (`dismissPendingSurveyIfNeeded`, or the
+  cannot-render path in `renderSurvey`), `PostHogSurveyIntegration.handleSurveyClosed` marks the
+  still-active survey seen and emits `survey dismissed`, because it does not track whether
+  `onSurveyShown` ran. Ordinary teardown avoids this only because it clears the active survey
+  first. Fix: skip the seen mark and the dismissal event when the active survey was never shown.
 - **posthog-android** conforms as of #849 (`pendingPresentation` reserved before `renderSurvey`).
-- **posthog-flutter** conforms as of #627 for its own bottom sheet; it relies on the native
-  integration for the reservation.
+- **posthog-flutter** conforms to the delay rules as of #627 for its own bottom sheet and relies on
+  the native integration for the reservation. It does not yet conform to the report-back rule: a
+  cancelled delay (`_cancelPopupDelay`, from `hideSurvey` or a newer survey) deliberately calls
+  neither `onShown` nor `onClosed`, because the native closed handler would mark the survey seen
+  and dismissed (the iOS gap above). The native reservation is then released only by native
+  reset or teardown. Fix: report the cancelled survey closed once the native side treats an
+  unshown close as a silent release.
 - **posthog-react-native** does not implement the delay yet: `PostHogSurveyProvider` only mentions
   `surveyPopupDelaySeconds` in commented-out code (`TODO: sort by appearance delay, implement
   delay`) and shows a positive-delay survey immediately, so it does not conform to the delay rule.

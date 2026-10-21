@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-react-native](https://github.com/PostHog/posthog-react-native) (archived; code lives in `packages/react-native` + `packages/react-native-plugin` of the `posthog-js` monorepo)
 **Audited commit:** `3ddaa65402896c91dcb7b04cfe433e0b1d2f3313` ([commit](https://github.com/PostHog/posthog-js/commit/3ddaa65402896c91dcb7b04cfe433e0b1d2f3313)) — audited on 2026-10-19
 **Audited against sdk-specs commit:** `c72e367`
-**Summary:** 28 ✅ · 28 🟡 · 3 ❌ · 5 ➖ · 0 ❓ (64 rows; previous audit 2026-08-06 at `e1efa57` scored 31/23/2/2/1 on 59 rows)
+**Summary:** 29 ✅ · 27 🟡 · 3 ❌ · 5 ➖ · 0 ❓ (64 rows; previous audit 2026-08-06 at `e1efa57` scored 31/23/2/2/1 on 59 rows)
 
 **Repo layout (unchanged, re-confirmed):** `PostHog/posthog-react-native` is archived; the SDK lives at
 `packages/react-native/src` (`PostHog extends PostHogCore`, `posthog-rn.ts`, now 3,345 lines — up from
@@ -25,7 +25,11 @@ four new downgrades come from.
 
 ## Movement this run
 
-**Improvements (2):**
+**Improvements (3):**
+
+- **Feature Flag Called Tracker 🟡→✅.** The previous audit said the client never persisted the
+  server's `minimalFlagCalledEvents` gate. At this commit `PostHogCore` stores it and reads it back,
+  so the minimal envelope is produced — see [n8](#n8).
 
 - **Capture Exception 🟡→✅.** The previous audit's sole finding was "no flat
   `$exception_type`/`$exception_message`, only `$exception_list`". sdk-specs PR
@@ -80,7 +84,7 @@ on its pre-existing empty-event-name gap.
 | 15 | Exception Event Metadata | 🟡 | [n7] |
 | 16 | Exception Steps | ✅ | |
 | 17 | Feature Flag Cache | ✅ | |
-| 18 | Feature Flag Called Tracker | 🟡 | [n8] |
+| 18 | Feature Flag Called Tracker | ✅ | [n8] |
 | 19 | Flag Definition Loader | ➖ | |
 | 20 | Flush | 🟡 | [n9] |
 | 21 | Get Anonymous ID | ✅ | |
@@ -144,9 +148,9 @@ on its pre-existing empty-event-name gap.
 
 ### n3 — Autocapture (🟡 Partial)
 - **Spec requires:** Walk element ancestry on a touch/click, build a sanitized `$elements` array, emit `$autocapture` with `$event_type` and screen context; respect no-capture markers; never capture sensitive control values.
-- **SDK currently:** `packages/react-native/src/autocapture.tsx` (273 lines), dispatched from `PostHogProvider`'s `onTouchEndCapture` into `posthog.autocapture(eventType, elements, …)` (`:267`). `ph-no-capture` is correctly honoured per ancestor (`:177`, configurable via `noCaptureProp`). **Improved since the last audit:** `eventType` is no longer a hardcoded literal — it is now a typed `'touch' | 'click'` parameter (`:127`, `:143`), though it still **defaults to `'touch'`** rather than the cross-SDK `'click'` vocabulary, so the default-path deviation stands. **Unchanged gap:** no defence-in-depth for secure/password inputs — grep for `secure`/`password` across `autocapture.tsx` still returns zero hits; only the generic `propsToCapture` allowlist (`:150`) gates capture, with no explicit exclusion for a `TextInput` with `secureTextEntry`.
-- **Backwards compatibility:** Backward-compatible — the parameter already exists, so changing the default is a value change warranting a changelog note; a `secureTextEntry` skip is purely additive.
-- **Remediation:** Consider flipping the `eventType` default to `'click'` with a changelog note; add an unconditional skip for `secureTextEntry`/password-like props regardless of `propsToCapture`.
+- **SDK currently:** `packages/react-native/src/autocapture.tsx` (273 lines), dispatched from `PostHogProvider`'s `onTouchEndCapture` into `posthog.autocapture(eventType, elements, …)` (`:267`). `ph-no-capture` is correctly honoured per ancestor (`:177`, configurable via `noCaptureProp`). **Improved since the last audit:** `eventType` is no longer a hardcoded literal — it is now a typed `'touch' | 'click'` parameter (`:127`, `:143`). Its `'touch'` default is correct: `autocapture/spec.md:98` requires `$event_type: touch` for mobile taps and reserves `click` for browser clicks, including React Native Web. **Unchanged gap:** no defence-in-depth for secure/password inputs — grep for `secure`/`password` across `autocapture.tsx` still returns zero hits; only the generic `propsToCapture` allowlist (`:150`) gates capture, with no explicit exclusion for a `TextInput` with `secureTextEntry`.
+- **Backwards compatibility:** Backward-compatible — a `secureTextEntry` skip is purely additive.
+- **Remediation:** Keep the `'touch'` default for native taps. Add an unconditional skip for `secureTextEntry`/password-like props regardless of `propsToCapture`.
 
 ### n4 — Bootstrap (🟡 Partial)
 - **Spec requires:** Apply bootstrap identity only when no persisted identity exists; reconcile explicitly on conflict; bootstrapped flags/payloads SHALL take precedence over flags persisted from a previous session; SDKs owning a session manager MAY accept a bootstrapped `sessionID`.
@@ -172,11 +176,11 @@ on its pre-existing empty-event-name gap.
 - **Backwards compatibility:** Backward-compatible for (1) and (2) — adding a property and deriving a level from the boundary are additive. **Needs deprecation path** for (3): callers may today rely on passing `$exception_level` through the property bag, and the spec itself asks for documented *typed* overrides instead, so the typed channel has to land before the generic one is ignored.
 - **Remediation:** Emit `$exception_source` from the capture boundary; derive `$exception_level` from the boundary (fatal/error) rather than a literal; add typed `level`/`source`/`mechanism` override parameters, then stop letting the generic property bag win for the reserved keys. One fix in `@posthog/core` covers react-native, browser, and node.
 
-### n8 — Feature Flag Called Tracker (🟡 Partial)
+### n8 — Feature Flag Called Tracker (✅ Pass)
 - **Spec requires:** Dedupe `$feature_flag_called` per (flag, value), re-fire on value change, clear on `reset()` and shutdown, and honour the minimal-envelope allowlist.
-- **SDK currently:** Re-read at this commit. The tracker (`flagCallReported`, `packages/core/src/posthog-core.ts:62`, read at `:1047`, written at `:1079-1080`) dedupes per `(flag, value)` correctly and is cleared on both `reset()` (`:151`) and `_shutdown()` (`:209`, in a `finally`). The minimal-envelope path is implemented in the stateless base (`minimizeFlagCalledEventProperties`, applied at `posthog-core-stateless.ts:569-575`). **Gap, unchanged:** the client never persists the server's `minimalFlagCalledEvents` gate, so `isMinimalFlagCalledEventsEnabled()` (`posthog-core-stateless.ts:645-647`) returns the fail-safe `false` for react-native and the minimal envelope is never produced, even when the project is gated into it.
-- **Backwards compatibility:** Backward-compatible — persisting a flag from the `/flags` response and overriding one protected method is internal.
-- **Remediation:** Persist `minimalFlagCalledEvents` from the v2 `/flags` response in `PostHogCore` and override `isMinimalFlagCalledEventsEnabled()` to read it, as the browser package does.
+- **SDK currently:** Re-read at this commit. The tracker (`flagCallReported`, `packages/core/src/posthog-core.ts:62`, read at `:1047`, written at `:1079-1080`) dedupes per `(flag, value)` correctly and is cleared on both `reset()` (`:151`) and `_shutdown()` (`:209`, in a `finally`). The minimal-envelope path is implemented in the stateless base (`minimizeFlagCalledEventProperties`, applied at `posthog-core-stateless.ts:569-575`). The gate is wired on the client too: the `/flags` handler stores `minimalFlagCalledEvents: res.minimalFlagCalledEvents === true` with the flag details (`packages/core/src/posthog-core.ts:894-900`), and `PostHogCore` overrides `isMinimalFlagCalledEventsEnabled()` to read that persisted field (`:967-968`), so react-native produces the minimal envelope when the project is gated into it. The previous audit's "gate never persisted" finding no longer holds at this commit. **Re-scored ✅ this run.**
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.
 
 ### n9 — Flush (🟡 Partial)
 - **Spec requires:** `both`. No-op on an empty queue; bypass batching timers; **on delivery failure the failed batch must remain queued for a later retry, not silently dropped** (the acceptance scenario simulates an HTTP 503 explicitly).

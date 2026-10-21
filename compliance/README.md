@@ -63,11 +63,12 @@ scored across all three.
 
 Two things in that Dart core are **ahead of every other SDK in this matrix**:
 
-- **Retry Queue ❓→✅.** `_doFlush` removes a batch from the queue **only when the error is not
+- **Retry Queue on desktop.** `_doFlush` removes a batch from the queue **only when the error is not
   transient**, honours `Retry-After`, and re-arms the flush timer so an offline failure cannot
   strand the queue. A persistent 503 stays queued — exactly what the spec requires and precisely
   what posthog-js, posthog-node, and posthog-react-native all get wrong through the same shared
-  catch handler.
+  catch handler. The Flutter row is still 🟡 (❓→🟡) because Flutter Web uses posthog-js's retry
+  queue, which drops a 429.
 - **Malformed feature-flag payloads.** `feature_flags.dart` documents and implements the rule
   verbatim: a payload that is not valid JSON (empty string included) is *no* payload — `null` is
   returned and the error is reported. That is **both halves** of the requirement, the correct
@@ -80,22 +81,23 @@ Two things in that Dart core are **ahead of every other SDK in this matrix**:
 
 ### posthog-android: the largest net improvement of any SDK so far
 
-✅ rows **31→35** while the row count grew by five, and ❌ rows **9→5**. Four rows cleared outright:
+✅ rows **31→37** while the row count grew by five, and ❌ rows **9→5**. Six rows cleared outright:
 **Screen ❌→✅** (the explicit `screenTitle` now wins over a caller-supplied `$screen_name`, with the
 *cached* screen name correctly still overridable), **Shutdown ❌→✅** (`close()` now flushes before
 tearing down — which also fixes the native half of posthog-flutter's Shutdown finding), **HTTP
 Client 🟡→✅** (posthog-android#828 shipped; android is now the **only** SDK in the matrix with a
 correct 300 ms→600 ms exponential flags backoff, and it passes the refused-connection rule), and
 **Capture Exception ❌→✅** on the PR [#103](https://github.com/PostHog/sdk-specs/pull/103)
-withdrawal the previous run predicted. **Autocapture ❌→🟡** — `$autocapture` for View and Compose
-taps now genuinely exists (plus `$rageclick`), but ships off by default.
+withdrawal the previous run predicted, plus **Autocapture ❌→✅** (`$autocapture` for View and Compose
+taps now genuinely exists, plus `$rageclick`; off by default, which the spec allows) and **Before Send
+Hook 🟡→✅** (hooks now chain, and a throwing hook drops the event as the spec requires).
 
 Android also turns out to have **by far the most complete Session Replay Debug Properties
 implementation outside the browser** — all four required keys, a real tri-state `$recording_status`,
 a correct `$snapshot` exclusion, and a `disabled` fallback when no replay handler is installed. It
-is 🟡 on two deviations: no required/optional tiering and no 30-second throttle (so the whole bundle
-rides every event, including custom ones), and a crash-time `$exception` from a previous launch is
-stamped with an **empty** map where the spec requires a persisted crash-context snapshot.
+is 🟡 on one deviation: no required/optional tiering and no 30-second throttle (so the whole bundle
+rides every event, including custom ones). A crash-time `$exception` from a previous launch carries
+no debug keys, which is what the spec requires when no crash-time snapshot was persisted.
 
 ### posthog-react-native: 802 commits of drift, two improvements, four spec-driven downgrades
 
@@ -143,11 +145,11 @@ the single most widely-shared non-compliance in the matrix.
 |---|---|---|---|---|---|---|---|---|---|
 | posthog-js | 26/64 fully compliant (41%) | 26 | 21 | 12 | 5 | 0 | 2026-10-05 · `6538babc` (targeted re-audit; most of the 59 pre-existing rows carried from 2026-08-10, see file header) | 33 | [posthog-js.md](posthog-js.md) |
 | posthog-python | 13/64 fully compliant (20%; 30 contracts N/A on a server SDK) | 13 | 16 | 5 | 30 | 0 | 2026-10-12 · `509c8525` | 21 | [posthog-python.md](posthog-python.md) |
-| posthog-android | 35/64 fully compliant (55%) | 35 | 18 | 5 | 6 | 0 | 2026-10-19 · `c5e788bd` (targeted re-audit — see file header) | 23 | [posthog-android.md](posthog-android.md) |
+| posthog-android | 37/64 fully compliant (58%) | 37 | 16 | 5 | 6 | 0 | 2026-10-19 · `c5e788bd` (targeted re-audit — see file header) | 21 | [posthog-android.md](posthog-android.md) |
 | posthog-ios | 38/64 fully compliant (59%) | 38 | 16 | 4 | 6 | 0 | 2026-10-08 · `f5cbe87c` + PostHog/posthog-ios#924–#934 (out-of-cycle refresh, see below) | 20 | [posthog-ios.md](posthog-ios.md) |
 | posthog-node | 9/64 fully compliant (14%; 29 contracts N/A on a server SDK) | 9 | 21 | 4 | 29 | 1 | 2026-10-12 · `4f590b36` (posthog-js monorepo; Traces row corrected 2026-10-19) | 25 (+1 ❓) | [posthog-node.md](posthog-node.md) |
-| posthog-flutter | 22/64 fully compliant (34%) | 22 | 28 | 6 | 8 | 0 | 2026-10-19 · `1032c102` | 34 | [posthog-flutter.md](posthog-flutter.md) |
-| posthog-react-native | 28/64 fully compliant (44%) | 28 | 28 | 3 | 5 | 0 | 2026-10-19 · `3ddaa654` (posthog-js monorepo) | 31 | [posthog-react-native.md](posthog-react-native.md) |
+| posthog-flutter | 21/64 fully compliant (33%) | 21 | 29 | 6 | 8 | 0 | 2026-10-19 · `1032c102` | 35 | [posthog-flutter.md](posthog-flutter.md) |
+| posthog-react-native | 29/64 fully compliant (45%) | 29 | 27 | 3 | 5 | 0 | 2026-10-19 · `3ddaa654` (posthog-js monorepo) | 30 | [posthog-react-native.md](posthog-react-native.md) |
 | posthog-php | 11/63 fully compliant (17%; 33 contracts N/A on a server SDK; **needs +1: MCP Analytics**) | 11 | 11 | 8 | 33 | 0 | 2026-09-28 · `5451f4e0` | 19 | [posthog-php.md](posthog-php.md) |
 | posthog-ruby | 9/63 fully compliant (14%; 33 contracts N/A on a server SDK; **needs +1: MCP Analytics**) | 9 | 13 | 8 | 33 | 0 | 2026-09-28 · `185060ab` | 21 | [posthog-ruby.md](posthog-ruby.md) |
 | posthog-go | 8/64 fully compliant (13%; 33 contracts N/A on a server SDK) | 8 | 14 | 9 | 33 | 0 | 2026-10-05 · `08549f42` | 23 | [posthog-go.md](posthog-go.md) |
@@ -178,12 +180,12 @@ own applicability table lists Ruby as "not yet" and does not mention PHP). **pos
 only SDK still at 59 rows** and needs all five of Capture AI, Evaluate Flags, Exception Event
 Metadata, Session Replay Debug Properties, and MCP Analytics added from scratch at its next audit.
 
-**Reading this run's numbers.** posthog-android gained four ✅ rows outright while its denominator
-grew by five, so its headline moved 53%→55% on genuine repository progress. posthog-react-native's
-✅ count fell 31→28 and its percentage 53%→44%, but **not one of those moves is a code regression**:
-one row improved, five new rows landed (three ➖, one 🟡, one ❌), and four ✅ rows were downgraded
+**Reading this run's numbers.** posthog-android gained six ✅ rows outright while its denominator
+grew by five, so its headline moved 53%→58% on genuine repository progress. posthog-react-native's
+✅ count fell 31→29 and its percentage 53%→45%, but **not one of those moves is a code regression**:
+two rows improved (one of them Feature Flag Called Tracker, whose recorded gap no longer holds), five new rows landed (three ➖, one 🟡, one ❌), and four ✅ rows were downgraded
 purely by spec text that merged after its last audit. posthog-flutter's ✅ count rose
-(20→22) and its 🟡 count went 22→28. Most of the 🟡 growth is the six Unknowns resolving to 🟡, which is
+(20→21) and its 🟡 count went 22→29. Most of the 🟡 growth is the six Unknowns resolving to 🟡, which is
 a gain in knowledge, not a loss of compliance; three rows (Capture Exception, Screen, Set Person
 Properties) were re-scored ✅ because their recorded gaps were fixed or retired. The rest is two
 spec-driven downgrades: Get Feature Flag
@@ -313,11 +315,10 @@ stalest pointer and its only 59-row file.
 | posthog-node | Local Feature Flag Evaluator | Backward-compatible | Holdouts **are** implemented in `@posthog/core`, and the acceptance-asset sync gap is unchanged; new this run, a non-scalar group key buckets on `"true"` / `"[object Object]"` instead of going inconclusive — [posthog-node.md#n24](posthog-node.md) |
 | posthog-ios | Exception Event Metadata | Backward-compatible | Chain linkage, 50-entry cap, `$exception_source`, empty `value` and UUID-less image filtering land in PostHog/posthog-ios#931; caller properties can still override `$exception_level`/`$exception_source` on purpose (no typed level parameter yet, and Android/JS behave the same) — [posthog-ios.md#n19](posthog-ios.md) |
 | posthog-android | Consent Gating | Backward-compatible | `optOut()` never stops an active replay session, and session-replay start/stop never check `isOptedOut()`, despite session replay being named in this spec's own scope — [posthog-android.md#n5](posthog-android.md#n5) |
-| posthog-android | Session Replay Debug Properties | Backward-compatible | **New this run** — the most complete implementation outside the browser, but no required/optional tiering and no 30s throttle (the whole bundle rides every event), and a crash-time `$exception` from a previous launch is stamped with an **empty** map where the spec requires a persisted crash-context snapshot — [posthog-android.md#n17](posthog-android.md#n17) |
+| posthog-android | Session Replay Debug Properties | Backward-compatible | **New this run** — the most complete implementation outside the browser, but no required/optional tiering and no 30s throttle (the whole bundle rides every event) — [posthog-android.md#n17](posthog-android.md#n17) |
 | posthog-android | Exception Event Metadata | Needs deprecation path | **New this run** — linkage, 50-cap and cycle detection are all correct, but `synthetic` is a hardcoded `false` (the spec's explicit "MUST NOT represent unknown with false"), causes inherit `handled`, no `mechanism.source`/`$exception_source`, and `$exception_level` is a *documented* caller override — [posthog-android.md#n7](posthog-android.md#n7) |
 | posthog-android | Session Replay Privacy | Needs deprecation path | `ph-no-capture` ignored outside screenshot mode; default capture mode can leak tagged views — [posthog-android.md#n19](posthog-android.md#n19) |
 | posthog-android | Surveys | Needs deprecation path | Web-only `url`/`selector`-targeted surveys aren't excluded on Android as the spec requires — [posthog-android.md#n22](posthog-android.md#n22) |
-| posthog-android | Autocapture | Backward-compatible (except the default) | **Upgraded from ❌** — `$autocapture` for View and Compose taps now exists, with `$rageclick` and a no-capture tag, but `captureElementInteractions` defaults to `false` — [posthog-android.md#n2](posthog-android.md#n2) |
 | posthog-ios | Capture | Backward-compatible | **Downgraded from ✅ on new spec text** — `NSNull`-valued properties are serialized as JSON `null` instead of dropped; empty event names are not dropped — [posthog-ios.md#n4](posthog-ios.md) |
 | posthog-ios | Session Replay Debug Properties | Backward-compatible | **New row** — tiers, 30 s window and crash-context snapshot conform; gaps on caller-supplied `$session_id`, backdated events, and `active` status after a background session timeout — [posthog-ios.md#n26](posthog-ios.md) |
 | posthog-node | Flush / Retry Queue (v1 pipeline) | Needs deprecation path | `V1CaptureSender` never throws on exhausted retry, so failed batches are evicted from the queue as if delivered — [posthog-node.md#n8](posthog-node.md) |
@@ -327,6 +328,7 @@ stalest pointer and its only 59-row file.
 | posthog-flutter | HTTP Client | Backward-compatible | **Resolved from ❓** — the Dart core retries a refused `/flags` connection (every transport exception is wrapped into one retryable type), and `retriable` has no backoff multiplier — [posthog-flutter.md#n19](posthog-flutter.md#n19) |
 | posthog-flutter | Session Replay Debug Properties | Backward-compatible | **New this run** — none of the three `$sdk_debug_replay_*` required keys exist on any platform, and `$recording_status` is emitted only on desktop, where replay does not run — [posthog-flutter.md#n28](posthog-flutter.md#n28) |
 | posthog-flutter | Get Feature Flag Payload / Result | Backward-compatible | **Downgraded on new spec text** — the Dart core returns no payload for malformed JSON, but on iOS/macOS the value comes from posthog-ios, which returns the raw string; the fix is in posthog-ios — [posthog-flutter.md#n14](posthog-flutter.md#n14) |
+| posthog-flutter | Retry Queue | Needs deprecation path (inherited) | **Resolved from ❓** — desktop and mobile keep failed batches queued, but Flutter Web uses posthog-js's `RetryQueue`, which drops a 429; clears with posthog-js n28 — [posthog-flutter.md#n38](posthog-flutter.md#n38) |
 | posthog-react-native | Bootstrap | Backward-compatible | Flag-merge spread order is inverted — previously-persisted flags win over a fresh bootstrap value, the opposite of the spec's required precedence — [posthog-react-native.md#n4](posthog-react-native.md) |
 | posthog-react-native | Flush / Retry Queue | Backward-compatible | Shared-core catch handler evicts an exhausted-retry HTTP failure as if delivered instead of preserving it — same defect class as posthog-node, and precisely what posthog-flutter's new Dart core gets right — [posthog-react-native.md#n9](posthog-react-native.md#n9) |
 | posthog-react-native | Session Replay Privacy | Backward-compatible | **Resolved from ❓** — RN's own layer is correct and privacy-safe-by-default; the residual non-compliance is posthog-ios n24's confirmed container-children defect inherited through the pass-through — [posthog-react-native.md#n26](posthog-react-native.md#n26) |
@@ -386,12 +388,10 @@ posthog-php, posthog-ruby, posthog-go, posthog-java, and posthog-dotnet. It was 
 posthog-js, posthog-node, and posthog-react-native (all three share `@posthog/core`, so it's the
 same fix inherited three times, not three independent fixes). **Updated 2026-10-19:**
 posthog-flutter's status is no longer ❓ — its new Dart core implements the tracker directly for
-desktop (a value-keyed dedup map, cleared on reset) but has **no minimal-envelope allowlist
-handling at all**, which follows from its other new finding that the Dart core never fetches remote
-config and so never learns the gate. posthog-react-native's own row also remains 🟡 on a related
-point: it inherits the correct shared allowlist code but never persists the server's
-`minimalFlagCalledEvents` gate, so `isMinimalFlagCalledEventsEnabled()` fails safe to `false` and
-the minimal envelope is never produced. The 2026-08-10 re-audits of posthog-android and posthog-java independently
+desktop (a value-keyed dedup map, cleared on reset), and also the minimal envelope: it persists the
+`minimalFlagCalledEvents` gate from `/flags` and applies the allowlist to non-experiment
+`$feature_flag_called` events. Its row stays 🟡 only on the embedded Android tracker.
+posthog-react-native persists the same gate in `PostHogCore` and reads it back, so its row is ✅. The 2026-08-10 re-audits of posthog-android and posthog-java independently
 re-confirmed the gap is still present in both, unaffected by the intervening code drift. The
 2026-10-05 re-audits of posthog-go and posthog-dotnet did the same: `grep -niE
 'referring_domain|utm_source|gclid|fbclid'` returns zero matches in either SDK's non-test source
@@ -546,7 +546,7 @@ from, so the `@posthog/core` fix has a worked reference rather than needing a de
 **2026-10-19 — Session Replay Debug Properties is the newest contract and already splits three
 ways.** Of the four client SDKs that own replay: posthog-js is the reference; **posthog-android has
 all four required keys** plus a real tri-state `$recording_status`, a correct `$snapshot` exclusion
-and a `disabled` fallback, deviating only on tiering/throttling and the crash-context snapshot;
+and a `disabled` fallback, deviating only on tiering/throttling;
 **posthog-flutter has none of the three `$sdk_debug_replay_*` keys** and emits `$recording_status`
 only on the one platform where replay does not run; and **posthog-react-native has nothing at all**
 despite owning a real replay integration and already computing most of the state. Since both
@@ -577,8 +577,8 @@ reference for what a full evaluation covers.
 because the premise behind them — "a thin Dart wrapper that cannot verify its own transport" — is no
 longer true: the new Dart core implements Event Batcher, Feature Flag Called Tracker, HTTP Client,
 Persistent Storage, and Retry Queue directly for the desktop platform, and Remote Config resolved by
-reading the mobile path against `compliance/posthog-android.md`. Five became 🟡 and **Retry Queue
-became ✅**. posthog-react-native's single Unknown (Session Replay Privacy) resolved to 🟡 once this
+reading the mobile path against `compliance/posthog-android.md`. All six became 🟡; Retry Queue passes
+on desktop and mobile but Flutter Web inherits posthog-js's 429 gap. posthog-react-native's single Unknown (Session Replay Privacy) resolved to 🟡 once this
 run had `posthog-android` cloned and could pair it with posthog-ios's existing confirmed finding.
 
 **No Unknown cells in the other eleven SDKs.** Every one of the fifteen contracts audited from

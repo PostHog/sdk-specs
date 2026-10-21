@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-android](https://github.com/PostHog/posthog-android)
 **Audited commit:** `c5e788bd603d3bdda77ac4d213538b9db637299a` ([commit](https://github.com/PostHog/posthog-android/commit/c5e788bd603d3bdda77ac4d213538b9db637299a)) — audited on 2026-10-19
 **Audited against sdk-specs commit:** `c72e367`
-**Summary:** 35 ✅ · 18 🟡 · 5 ❌ · 6 ➖ · 0 ❓ (64 rows; previous audit 2026-08-10 at `8659a7b4` scored 31/16/9/3/0 on 59 rows)
+**Summary:** 37 ✅ · 16 🟡 · 5 ❌ · 6 ➖ · 0 ❓ (64 rows; previous audit 2026-08-10 at `8659a7b4` scored 31/16/9/3/0 on 59 rows)
 
 **Why this run:** rotation priority 3 — the pointer was ten weeks old, and android carries the
 mobile reference for Session Replay Debug Properties. It was also the cheapest third slot available:
@@ -23,10 +23,10 @@ matrix. It is now a single alphabetical 64-row table.
 
 ## Movement this run
 
-This is the largest net improvement of any SDK in the matrix so far: ✅ rows **31→35** while the row
+This is the largest net improvement of any SDK in the matrix so far: ✅ rows **31→37** while the row
 count grew by five, and ❌ rows **9→5**.
 
-**Four rows cleared (❌/🟡 → ✅):**
+**Six rows cleared (❌/🟡 → ✅):**
 
 - **Screen ❌→✅.** The previous finding was that a caller-supplied `$screen_name` silently overrode
   the explicit `screenTitle` argument, with the SDK's own doc comment documenting the wrong
@@ -62,8 +62,12 @@ count grew by five, and ❌ rows **9→5**.
   sdk-specs PR [#103](https://github.com/PostHog/sdk-specs/pull/103) retired. The 2026-10-12 run
   predicted this would most likely clear at android's next audit; it does. Same clearance as
   posthog-python and posthog-react-native.
-
-**One row improved (❌→🟡):** **Autocapture** ([n2](#n2)) — `$autocapture` now genuinely exists.
+- **Autocapture ❌→✅** ([n2](#n2)). `$autocapture` now genuinely exists for View and Compose taps,
+  with `$event_type: touch`, an allowlisted `$elements`/`$elements_chain`, text inputs excluded, and a
+  no-capture tag. It is off by default, which the spec allows (option names and defaults vary by
+  platform).
+- **Before Send Hook 🟡→✅** ([n3](#n3)). The chain now passes each hook the previous hook's output,
+  and a throwing hook drops the event, which is what the spec requires.
 
 **New rows (5):** Capture AI ➖, Evaluate Flags ➖, MCP Analytics ➖ (all `server`-scoped; android
 appears in none of their applicability tables), **Exception Event Metadata 🟡** ([n7](#n7)),
@@ -76,8 +80,8 @@ complete implementation of that contract outside the browser.
 |---|----------|--------|------|
 | 1 | Alias | ❌ | [n1] |
 | 2 | Application Lifecycle | ✅ |  |
-| 3 | Autocapture | 🟡 | [n2] |
-| 4 | Before Send Hook | 🟡 | [n3] |
+| 3 | Autocapture | ✅ | [n2] |
+| 4 | Before Send Hook | ✅ | [n3] |
 | 5 | Bootstrap | 🟡 | [n4] |
 | 6 | Capture | ✅ |  |
 | 7 | Capture AI | ➖ |  |
@@ -161,29 +165,26 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
   `PostHog.kt:~1176` is purely additive to the event payload.
 - **Remediation:** Set `distinct_id` alongside `alias` in the `$create_alias` properties map.
 
-### n2 — Autocapture (🟡 Partial)
+### n2 — Autocapture (✅ Pass)
 - **Spec requires:** Walk element ancestry on a UI interaction, build a sanitized `$elements` array, emit `$autocapture` with an `$event_type` and screen context; respect no-capture markers; never capture sensitive control values.
-- **SDK currently:** **Improved from ❌ Fail — `$autocapture` now genuinely exists.** The previous audit found no generic UI-interaction autocapture at all. `PostHogElementInteractionIntegration` (`posthog-android/src/main/java/com/posthog/android/internal/PostHogElementInteractionIntegration.kt:186`) now captures `$autocapture` for actionable View and Compose taps, carries `$touch_x`/`$touch_y`, and additionally detects and emits `$rageclick` (`:178-182`). A no-capture marker is honoured per subtree via the `com.posthog.android.R.id.posthog_autocapture_no_capture` tag (`internal/InteractionTarget.kt:179`), documented at `PostHogAndroidConfig.kt:77-82`. **Why 🟡 rather than ✅:** the feature is **off by default** — `captureElementInteractions` defaults to `false` (`PostHogAndroidConfig.kt:77`, "Default: false"), so an app that does nothing gets no autocapture, unlike the browser SDK where it is the default-on behaviour the contract describes.
-- **Backwards compatibility:** Backward-compatible for everything except the default. Flipping `captureElementInteractions` to `true` would start sending a new event family for every existing app on upgrade, which is a volume and billing change; it should be a deliberate, announced default change in a minor or major release rather than a quiet flip.
-- **Remediation:** Confirm the `$elements` shape and `$event_type` vocabulary match the cross-SDK contract, then decide the default deliberately — either flip `captureElementInteractions` to `true` with a release note, or record a spec carve-out that mobile autocapture is opt-in.
+- **SDK currently:** **Improved from ❌ Fail — `$autocapture` now genuinely exists.** The previous audit found no generic UI-interaction autocapture at all. `PostHogElementInteractionIntegration` (`posthog-android/src/main/java/com/posthog/android/internal/PostHogElementInteractionIntegration.kt:186`) now captures `$autocapture` for actionable View and Compose taps, carries `$touch_x`/`$touch_y`, and additionally detects and emits `$rageclick` (`:178-182`). A no-capture marker is honoured per subtree via the `com.posthog.android.R.id.posthog_autocapture_no_capture` tag (`internal/InteractionTarget.kt:179`), documented at `PostHogAndroidConfig.kt:77-82`. The payload matches the contract: `$event_type` is `touch` (`internal/InteractionTarget.kt:55`), as `autocapture/spec.md` requires for mobile taps; `$elements` and `$elements_chain` are built from an allowlist of tag name, class, id and `nth-child`/`nth-of-type` only, with the explicit rule "Never add labels, values or arbitrary attributes" (`InteractionTarget.kt:14-60`); and `EditText`, `AbsSeekBar` and `NumberPicker` are not captured as targets (`:146`), so control values never leave the device. The feature is **off by default** — `captureElementInteractions` defaults to `false` (`PostHogAndroidConfig.kt:77`) — but `autocapture/spec.md` says option names and defaults vary by platform and its behaviour applies when autocapture is enabled, so default-off is not a gap. **Re-scored ✅ this run.**
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.
 
-### n3 — Before Send Hook (🟡 Partial)
+### n3 — Before Send Hook (✅ Pass)
 - **Spec requires:** multiple registered hooks run in a chain, each receiving the **previous**
-  hook's mutated output; an exception in one hook should not silently drop the event (fall back to
-  original/last-good value).
+  hook's output; if a hook throws, the SDK records a warning, stops the chain, and drops the event
+  rather than sending the original or last-good value (`before-send-hook/spec.md:89`).
 - **SDK currently:** Multi-hook support is real (`PostHogBeforeSend.kt:8-16`,
-  `PostHogConfig.kt:484-516` stores hooks in a lock-guarded `MutableList`). Two bugs reconfirmed by
-  direct read this cycle in `posthog/src/main/java/com/posthog/PostHogStateless.kt`, method
-  `buildEvent` (lines 289-322): (1) **line 310** — `eventChecked = beforeSend.run(postHogEvent)`
-  passes the original, pristine `postHogEvent` to every hook in the loop, never the previous hook's
-  output — hook #2 never sees hook #1's mutation, for chains of 2+ hooks; (2) **lines 315-317** —
-  `catch (e: Throwable) { config?.logger?.log(...); return null }` drops the event entirely on any
-  hook exception rather than falling back to the original/last-good value.
-- **Backwards compatibility:** Backward-compatible for both — (1) only changes behavior for
-  callers with 2+ hooks where an earlier hook mutates the event (untested case today); (2)
-  returning the last-good value on exception is strictly less destructive than the current drop.
-- **Remediation:** Fix the chain-passing bug at `PostHogStateless.kt:310` and change the exception
-  branch to return the last-good value instead of `null`.
+  `PostHogConfig.kt:484-516` stores hooks in a lock-guarded `MutableList`). Neither of the two bugs the
+  previous audit recorded holds at `c5e788bd`: `buildEvent` (`posthog/src/main/java/com/posthog/PostHogStateless.kt:322-335`)
+  calls `beforeSend.run(eventChecked)` and assigns the result back to `eventChecked`, so each hook
+  sees the previous hook's mutation; a `null` result drops the event; and `catch (e: Throwable)` logs
+  and returns `null`, which stops the chain and drops the event exactly as the spec requires. The previous
+  audit's advice to fall back to the last-good value would have broken that rule, which exists so a
+  failed privacy filter cannot leak data. **Re-scored ✅ this run.**
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.
 
 ### n4 — Bootstrap (🟡 Partial)
 - **Spec requires:** (optional — "MAY") a client SDK that owns a session id MAY accept a
@@ -398,10 +399,10 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
 ### n17 — Session Replay Debug Properties (🟡 Partial)
 - **Spec requires:** `client`. Four required keys on **every** captured event except `$snapshot` — `$recording_status`, `$sdk_debug_replay_event_trigger_status`, `$sdk_debug_replay_linked_flag_trigger_status`, `$sdk_debug_replay_internal_buffer_length`. Everything else is an **optional bundle** that goes **only on SDK events** (names starting with `$`, excluding `$feature_flag_called`, `$snapshot`, and the browser's `$$heatmap`) and **at most once every 30 seconds per SDK instance**. The queue-depth key sits outside both tiers and stays on every non-`$snapshot` event. `$snapshot` carries none of them. An SDK with no replay integration produces only `$recording_status: disabled`. **On mobile, a crash-time `$exception` reported on a later launch is stamped from a crash-context snapshot that always carries the full bundle.**
 - **SDK currently:** Audited from scratch, and this is the most complete implementation of the contract outside `posthog-js`. `PostHogReplayIntegration.debugProperties()` (`posthog-android/src/main/java/com/posthog/android/replay/PostHogReplayIntegration.kt:2591-2643`) produces all three cross-platform `$sdk_debug_replay_*` required keys plus a genuine tri-state `$recording_status` (`disabled`/`buffering`/`active`) derived from a real buffering snapshot, and adds a thoughtful optional set: `$sdk_debug_replay_flush_hold_reason` (distinguishing `awaiting_remote_config` from `below_minimum_duration`), `$sdk_debug_replay_pending_trigger_conditions`, `$sdk_debug_replay_capture_mode`, and `$sdk_debug_replay_throttle_delay_ms`. The trigger statuses use a shared `triggerStatus()` helper with a correct `trigger_disabled`/`trigger_pending`/`trigger_activated` vocabulary. The wiring in `PostHog.sdkDebugProperties()` (`PostHog.kt:782-810`) is careful: it is applied only inside the `appendSharedProps` block, which `$snapshot` events skip (`:918-919`), so **the `$snapshot` exclusion is correct**; it is merged **after** the caller's properties so SDK-computed values win, with a comment citing posthog-js's `extend(properties, sdkDebugProperties)` as the model; the replay handler's contribution is guarded separately from the session and queue keys so a throwing handler cannot suppress them, surfacing `$sdk_debug_error_capturing_properties` instead; and it falls back to `$recording_status: disabled` when no replay handler is installed, exactly as the spec's no-integration case requires. `$sdk_debug_pending_queue_size` is attached as the queue-depth key.
-  **Two real deviations.** (1) **No tiering and no throttle.** The spec puts everything beyond the four required keys into an optional bundle restricted to SDK events and rate-limited to once per 30 seconds per instance. Android attaches the *entire* set — `$sdk_debug_replay_capture_mode`, `$sdk_debug_replay_throttle_delay_ms`, `$sdk_debug_replay_pending_trigger_conditions`, `$sdk_debug_replay_flush_hold_reason`, `$sdk_debug_session_start`, `$sdk_debug_current_session_duration` — to **every** event with shared props, including custom (non-`$`) events, with no throttle window anywhere. There is no `REQUIRED_REPLAY_PROPERTIES`-equivalent split. That is a per-event payload cost on every customer event, which is the cost the tiering exists to avoid.
-  (2) **The crash-context case does the opposite of what the spec says.** `sdkDebugProperties()` opens with an early return of an **empty** map when an explicit timestamp predates the current session start (`PostHog.kt:787-791`, "An explicit timestamp from before this session started (a previous-process crash reported on this launch) did not occur here"). That is precisely the mobile crash-time `$exception` the spec singles out — and the spec says it SHALL be stamped from a crash-context snapshot carrying the full bundle, not left bare. The code's reasoning is sound in isolation (today's live state is not the crash's state), but the spec's answer is to persist the snapshot at crash time and replay it, not to omit the keys.
-- **Backwards compatibility:** Backward-compatible both ways. (1) removes properties from events, which only shrinks payloads — a consumer reading an optional key off a custom event would lose it, so it warrants a changelog note. (2) requires persisting a small snapshot at crash time and reading it back on the next launch; it is additive on the wire.
-- **Remediation:** Introduce the required/optional split — keep the four required keys plus the queue-depth key on every non-`$snapshot` event, and gate the rest behind an SDK-event check and a 30-second per-instance throttle, mirroring `packages/browser/src/posthog-core.ts`'s `REQUIRED_REPLAY_PROPERTIES`. Then persist a crash-context debug snapshot alongside the crash record and stamp the deferred `$exception` from it instead of returning an empty map. Because `posthog-flutter` and `posthog-react-native` embed this SDK, fixing the tiering here improves all three.
+  **One real deviation: no tiering and no throttle.** The spec puts everything beyond the four required keys into an optional bundle restricted to SDK events and rate-limited to once per 30 seconds per instance. Android attaches the *entire* set — `$sdk_debug_replay_capture_mode`, `$sdk_debug_replay_throttle_delay_ms`, `$sdk_debug_replay_pending_trigger_conditions`, `$sdk_debug_replay_flush_hold_reason`, `$sdk_debug_session_start`, `$sdk_debug_current_session_duration` — to **every** event with shared props, including custom (non-`$`) events, with no throttle window anywhere. There is no `REQUIRED_REPLAY_PROPERTIES`-equivalent split. That is a per-event payload cost on every customer event, which is the cost the tiering exists to avoid.
+  **The previous-process crash case conforms.** `sdkDebugProperties()` returns an empty map when an explicit timestamp predates the current session start (`PostHog.kt:787-791`). `session-replay-debug-properties/spec.md:965-977` says such an event SHALL carry the state persisted at the time if the platform captured one, and otherwise none of these keys, and that this takes precedence over the every-event rule; its scenario "A previous-process crash carries no live debug state" expects exactly that omission. Android persists no crash-time snapshot today, so omitting the keys is the required outcome. Persisting one (as iOS does through `customData`) would be an improvement, not a compliance fix.
+- **Backwards compatibility:** Backward-compatible — the fix removes properties from events, which only shrinks payloads; a consumer reading an optional key off a custom event would lose it, so it warrants a changelog note.
+- **Remediation:** Introduce the required/optional split — keep the four required keys plus the queue-depth key on every non-`$snapshot` event, and gate the rest behind an SDK-event check and a 30-second per-instance throttle, mirroring `packages/browser/src/posthog-core.ts`'s `REQUIRED_REPLAY_PROPERTIES`. Because `posthog-flutter` and `posthog-react-native` embed this SDK, fixing the tiering here improves all three.
 
 ### n18 — Session Replay Ingestion Controls (🟡 Partial)
 - **Spec requires:** event-trigger gating for session replay must observe the final (post-

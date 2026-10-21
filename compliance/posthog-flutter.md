@@ -3,12 +3,12 @@
 **Repo:** [PostHog/posthog-flutter](https://github.com/PostHog/posthog-flutter)
 **Audited commit:** `1032c102934c4b0338282a0fd3dcff94f7c2db00` ([commit](https://github.com/PostHog/posthog-flutter/commit/1032c102934c4b0338282a0fd3dcff94f7c2db00)) — audited on 2026-10-19
 **Audited against sdk-specs commit:** `c72e367`
-**Summary:** 22 ✅ · 28 🟡 · 6 ❌ · 8 ➖ · 0 ❓ (64 rows; previous audit 2026-08-06 at `05b53dc` scored 20/22/6/5/6 on 59 rows)
+**Summary:** 21 ✅ · 29 🟡 · 6 ❌ · 8 ➖ · 0 ❓ (64 rows; previous audit 2026-08-06 at `05b53dc` scored 20/22/6/5/6 on 59 rows)
 
 **Why this run:** rotation priority 2 — equally stale with react-native (2026-08-06) and the holder of
 **six of the seven ❓ Unknown cells the matrix carried** (posthog-react-native held the seventh).
 Draining those was the stated reason to spend a slot here. **All six are now resolved to a definite
-status** ([n8](#n8), [n10](#n10), [n19](#n19), [n24](#n24), [n26](#n26), and Retry Queue to ✅), so
+status** ([n8](#n8), [n10](#n10), [n19](#n19), [n24](#n24), [n26](#n26), and Retry Queue, [n38](#n38)), so
 this file has **zero Unknown cells**. The matrix is not Unknown-free: this run also moved
 posthog-node's Traces row to ❓ as a correction (see [posthog-node.md#n2](posthog-node.md#n2)).
 
@@ -37,12 +37,13 @@ the two paths disagree the row is 🟡 and the note says which platform fails.
 
 **The Dart core is strong work.** Two places it is ahead of every other SDK in this matrix:
 
-- **Retry Queue (❓→✅).** `_doFlush` (`posthog_core_stateless.dart:491-552`) removes a batch from
+- **Retry Queue on desktop.** `_doFlush` (`posthog_core_stateless.dart:491-552`) removes a batch from
   the queue **only when the error is not transient** (`if (!_isTransientFetchError(e)) queue.remove(...)`),
   honours `Retry-After` by pausing the flush timer, and re-arms the periodic flush so an offline
   failure does not strand the queue until the next capture. A persistent 503 stays queued — exactly
   what the spec requires, and exactly what posthog-js, posthog-node, and posthog-react-native all
-  get wrong (see posthog-react-native [n9](posthog-react-native.md#n9)).
+  get wrong (see posthog-react-native [n9](posthog-react-native.md#n9)). The row as a whole is still
+  🟡 because Flutter Web uses posthog-js's retry queue, which drops a 429 ([n38](#n38)).
 - **Malformed feature-flag payloads.** `feature_flags.dart:9-12` documents and implements the rule
   verbatim: "A payload that is not valid JSON (an empty string included) is no payload: null is
   returned and the error goes to `onMalformed`." That is **both halves** of the requirement — the
@@ -67,7 +68,7 @@ the case.
 ## Movement this run
 
 **Resolved Unknowns (6):** Event Batcher ❓→🟡, Feature Flag Called Tracker ❓→🟡, HTTP Client ❓→🟡,
-Persistent Storage ❓→🟡, Remote Config ❓→🟡, **Retry Queue ❓→✅**.
+Persistent Storage ❓→🟡, Remote Config ❓→🟡, Retry Queue ❓→🟡 ([n38](#n38); desktop and mobile pass, web inherits posthog-js's 429 gap).
 
 **Re-scored to ✅ (3):** **Capture Exception 🟡→✅** ([n5](#n5); the flat-property finding was retired by
 sdk-specs [#103](https://github.com/PostHog/sdk-specs/pull/103)), **Screen 🟡→✅** ([n27](#n27); fixed in
@@ -140,7 +141,7 @@ Debug Properties 🟡** ([n28](#n28)).
 | 45 | Reset | ✅ | |
 | 46 | Reset Group Properties For Flags | ✅ | |
 | 47 | Reset Person Properties For Flags | ✅ | |
-| 48 | Retry Queue | ✅ | |
+| 48 | Retry Queue | 🟡 | [n38] |
 | 49 | Screen | ✅ | [n27] |
 | 50 | Session Manager | ✅ | |
 | 51 | Session Replay Debug Properties | 🟡 | [n28] |
@@ -226,13 +227,13 @@ rewritten this run.
 
 ### n10 — Feature Flag Called Tracker (🟡 Partial)
 - **Spec requires:** Dedupe `$feature_flag_called` per (flag, value), re-fire on value change, clear on `reset()`, and honour the minimal-envelope allowlist.
-- **SDK currently:** **Resolved from ❓ Unknown.** The Dart core implements the tracker directly: `_flagCallReported` is a `Map<String, Set<PostHogFeatureFlagValue?>>` (`posthog_core.dart:25-26`), the dedup check is `!(_flagCallReported[key]?.contains(flagValue) ?? false)` (`:780`) — keyed on the value, so a changed value correctly re-fires — the set is populated after reporting (`:815`), `$feature_flag_called` is captured at `:838`, and the whole map is cleared on reset (`:82`). Failure cases are recorded for the event (`:888`). **Why 🟡:** desktop only; the mobile path is the embedded native tracker, which `compliance/posthog-android.md` n8 records as 🟡 (posthog-ios is ✅), and no minimal-envelope allowlist handling is visible on the Dart path.
+- **SDK currently:** **Resolved from ❓ Unknown.** The Dart core implements the tracker directly: `_flagCallReported` is a `Map<String, Set<PostHogFeatureFlagValue?>>` (`posthog_core.dart:25-26`), the dedup check is `!(_flagCallReported[key]?.contains(flagValue) ?? false)` (`:780`) — keyed on the value, so a changed value correctly re-fires — the set is populated after reporting (`:815`), `$feature_flag_called` is captured at `:838`, and the whole map is cleared on reset (`:82`). Failure cases are recorded for the event (`:888`). The Dart core also implements the minimal envelope on desktop: `core/feature_flag_utils.dart:25` parses the server's `minimalFlagCalledEvents` gate from the `/flags` response, `posthog_core.dart:652` persists it with the flag details and `:120-121` reads it back, and `posthog_core_stateless.dart:229-236` keeps only `minimalFeatureFlagCalledProperties` (`feature_flag_utils.dart:70`) on non-experiment `$feature_flag_called` events, so desktop passes. **Why 🟡:** the mobile path is the embedded native tracker, which `compliance/posthog-android.md` n8 records as 🟡 (posthog-ios is ✅).
 - **Backwards compatibility:** Backward-compatible.
-- **Remediation:** Add minimal-envelope allowlist handling to the Dart core's capture path; track the Android half under posthog-android n8.
+- **Remediation:** None in the Dart core; track the Android half under posthog-android n8.
 
 ### n11 — Flush (🟡 Partial)
 - **Spec requires:** `both`. No-op on an empty queue; drain immediately; a failed batch stays queued.
-- **SDK currently:** `Posthog().flush()` (`lib/src/posthog.dart:804`) dispatches to the platform instance. Desktop's `flush()` (`posthog_flutter_desktop.dart:479`) routes into the Dart core's correct implementation (see Retry Queue above). On mobile it is `invokeMethod('flush')` (`posthog_flutter_io.dart:743-752`). **The previously-recorded gap is unchanged and is on Web:** `posthog_flutter_web_handler.dart:400-402` has `case 'flush':` with the delegating call **commented out**, so `flush()` on Flutter Web is a silent no-op that resolves successfully while delivering nothing.
+- **SDK currently:** `Posthog().flush()` (`lib/src/posthog.dart:804`) dispatches to the platform instance. Desktop's `flush()` (`posthog_flutter_desktop.dart:479`) routes into the Dart core's correct implementation (see [n38](#n38)). On mobile it is `invokeMethod('flush')` (`posthog_flutter_io.dart:743-752`). **The previously-recorded gap is unchanged and is on Web:** `posthog_flutter_web_handler.dart:400-402` has `case 'flush':` with the delegating call **commented out**, so `flush()` on Flutter Web is a silent no-op that resolves successfully while delivering nothing.
 - **Backwards compatibility:** Backward-compatible — making a no-op actually call through only delivers events that the caller already asked to deliver.
 - **Remediation:** Uncomment/implement the `window.posthog` flush delegation in the web handler, or make the no-op log a warning so it is not silent.
 
@@ -322,7 +323,7 @@ rewritten this run.
 
 ### n26 — Remote Config (🟡 Partial)
 - **Spec requires:** Fetch and apply the project's remote configuration, gating replay and surveys from it.
-- **SDK currently:** **Resolved from ❓ Unknown.** On mobile the native SDK handles it and `compliance/posthog-android.md` records Remote Config ✅, so that path is satisfied. **On desktop it is absent:** grep for `remote_config`, `remoteConfig`, and `/array/` across `posthog_flutter/lib/src/` returns **zero** hits, so the Dart core never fetches remote config and desktop clients run on local configuration only — no server-side replay or survey gating, and no `minimalFlagCalledEvents` signal (which is also why [n10](#n10) has no allowlist handling).
+- **SDK currently:** **Resolved from ❓ Unknown.** On mobile the native SDK handles it and `compliance/posthog-android.md` records Remote Config ✅, so that path is satisfied. **On desktop it is absent:** grep for `remote_config`, `remoteConfig`, and `/array/` across `posthog_flutter/lib/src/` returns **zero** hits, so the Dart core never fetches remote config and desktop clients run on local configuration only — no server-side replay or survey gating. (The `minimalFlagCalledEvents` gate is unaffected: it arrives on the `/flags` response, which the Dart core does read — see [n10](#n10).)
 - **Backwards compatibility:** Backward-compatible — adding a config fetch at startup is additive; clients that currently see no remote gating would start honouring it, which is the intended behaviour.
 - **Remediation:** Add a remote-config fetch to the Dart core's startup path and apply it to the same switches the native SDKs gate on.
 
@@ -391,3 +392,9 @@ rewritten this run.
 - **SDK currently:** Re-confirmed at this commit — zero hits for `traceparent` or `tracestate` anywhere in `posthog_flutter/lib/`. The previous audit's reasoning still holds: Flutter has no Dart-side HTTP client of its own through which app traffic flows, so there is nothing to intercept without the app opting in.
 - **Backwards compatibility:** Backward-compatible — any solution is opt-in.
 - **Remediation:** Ship an opt-in `package:http` interceptor (and a Dio interceptor) that stamps the headers, rather than attempting transparent interception.
+
+### n38 — Retry Queue (🟡 Partial)
+- **Spec requires:** Keep a failed batch queued on retryable failures — network errors, server errors, and `429` — and honour `Retry-After`.
+- **SDK currently:** **Resolved from ❓ Unknown.** Desktop and mobile pass. On Windows/Linux, `_doFlush` (`posthog_core_stateless.dart:491-552`) removes a batch only when the error is not transient, honours `Retry-After` by pausing the flush timer, and re-arms the periodic flush, so a persistent 503 stays queued. On iOS/Android/macOS the embedded native SDKs handle it, and both `compliance/posthog-android.md` and `compliance/posthog-ios.md` record Retry Queue ✅. **Gap on Web:** Flutter Web forwards captures to `window.posthog`, so it uses posthog-js's `RetryQueue`, whose retry condition (`packages/browser/src/retry-queue.ts:94` at `6538babc`) is `statusCode !== 200 && (statusCode < 400 || statusCode >= 500)`. A 429 falls outside it and the event is dropped rather than retried — the same gap as `compliance/posthog-js.md` n28.
+- **Backwards compatibility:** Inherits posthog-js n28's verdict (Needs deprecation path).
+- **Remediation:** None in this repo; it clears when posthog-js n28 is fixed and Flutter Web picks up that posthog-js release.

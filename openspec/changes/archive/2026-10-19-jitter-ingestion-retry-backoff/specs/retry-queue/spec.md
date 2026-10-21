@@ -6,7 +6,7 @@ The SDK SHOULD apply random jitter to each ingestion retry wait, so that clients
 
 Jitter SHALL scale the delay the SDK computed for that attempt rather than replace the schedule: the exponential or linear progression, the retry budget, and the backoff ceiling are unchanged, and a jittered wait SHALL NOT exceed the ceiling the SDK configured for its own backoff. The jittered wait SHALL stay within a bounded factor of the computed delay — the SDKs that implement this use a factor drawn uniformly from a window around 1, such as `[0.75, 1.25]` or `[0.5, 1.5]` — so spreading a fleet neither retries far earlier than the schedule intends nor leaves a recovered endpoint idle.
 
-A `Retry-After` the endpoint sent SHALL remain a floor applied after jitter. Spreading a fleet SHALL NOT move a retry earlier than the endpoint asked for. Where the SDK clamps `Retry-After` to its backoff ceiling, that clamp still applies.
+A `Retry-After` the endpoint sent SHALL remain a floor applied after jitter. Spreading a fleet SHALL NOT move a retry earlier than the endpoint asked for. Where the SDK clamps `Retry-After` to its backoff ceiling, that clamp still applies and the clamped value is the floor.
 
 Jitter is an availability measure, not a correctness one. An SDK whose platform offers no usable source of randomness, or whose randomness call fails, SHALL use the unjittered computed delay rather than skipping the wait.
 
@@ -26,7 +26,8 @@ Jitter is an availability measure, not a correctness one. An SDK whose platform 
 - **GIVEN** a retryable ingestion response carrying `Retry-After: 10` seconds
 - **AND** the SDK's jittered delay for that attempt is 4 seconds
 - **WHEN** the SDK schedules the retry
-- **THEN** it waits at least 10 seconds
+- **THEN** it waits at least 10 seconds, or at least its backoff ceiling where the SDK clamps
+  `Retry-After` to a ceiling below 10 seconds
 - **AND** where the SDK clamps `Retry-After`, the wait is still at most its backoff ceiling
 
 #### Scenario: No randomness available falls back to the computed delay

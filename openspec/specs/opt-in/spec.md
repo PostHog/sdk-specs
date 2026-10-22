@@ -42,14 +42,14 @@ Browser-specific opt-in accepts extra options such as a custom capture event nam
 2. **Persist opted-out state.** Store a local flag indicating capture is disabled.
 3. **Block future capture.** Subsequent `capture(...)`, `identify(...)`, `group(...)`, and related APIs short-circuit while opted out.
 4. **Keep the decision across restarts.** The opted-out state is persisted locally in audited SDKs so it survives app restarts.
-5. **Apply SDK-specific cleanup if needed.** Some SDKs also clear in-flight data or stop auxiliary systems such as session replay.
+5. **Apply SDK-specific cleanup if needed.** Some SDKs also clear in-flight data or stop auxiliary systems such as session replay. Client SDKs that stop session replay also record there and then whether the app wanted it, because that decides what opt-in restarts.
 
 ### `optIn`
 
 1. **Guard / no-op if unavailable.** Disabled or uninitialized SDKs no-op.
 2. **Persist opted-in state.** Clear the local opt-out flag so capture becomes allowed again.
 3. **Re-enable future capture.** Subsequent analytics APIs are processed normally.
-4. **Re-enable SDK subsystems if needed.** Some SDKs restart paused integrations or queues.
+4. **Re-enable SDK subsystems if needed.** Some SDKs restart paused integrations or queues. Where session replay restarts, a new session starts first.
 5. **Keep the decision across restarts.** The opted-in state is persisted locally in audited SDKs.
 
 ## State & lifecycle
@@ -87,7 +87,11 @@ Browser-specific opt-in accepts extra options such as a custom capture event nam
 
 - **`capture` / `identify` / `group` / `alias`** — all are gated by the opt-out state in audited client SDKs.
 - **`reset`** — in several audited SDKs, reset clears the persisted opt-out state, so opt-out should not be treated as stronger-than-reset privacy state.
-- **Session replay / integrations** — some SDKs stop or restart them when opt state changes.
+- **Session replay / integrations** — some SDKs stop or restart them when opt state changes. Where replay
+  restarts on opt-in, the requirements below govern the new session and the restart decision. The SDKs still
+  diverge when replay is enabled but held off at opt-out by sampling, a linked flag, an event trigger, or remote
+  config that has not loaded: posthog-ios and posthog-react-native leave it stopped on opt-in, while posthog-android
+  restarts it and lets the normal gates decide. That case is not specified here.
 - **Browser consent APIs** — browser uses richer consent semantics than the mobile/core SDKs and maps opt-in/out to persistence and cookieless-mode behavior.
 
 ## Requirements
@@ -131,3 +135,64 @@ The SDK SHALL implement the canonical `opt-in` behavior described by this spec. 
 - **WHEN** opt out is called with local data clearing enabled
 - **THEN** persisted identity and super properties should be cleared
 - **AND** analytics capture should be opted out
+
+### Requirement: Opt-in restarts session replay in a new session
+
+A client SDK that stops session replay while opted out SHALL start a new session before replay restarts on opt-in, so that no frame recorded after consent is attributed to the session that was active while the user was opted out. The requirement is on the observable outcome: after opt-in restarts replay, the current session id SHALL differ from the one in use at opt-out. Where a wrapper owns the session id rather than the native SDK, the wrapper SHALL perform the rotation.
+
+#### Scenario: Opt in restarts replay in a new session
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** session replay is configured and eligible to start
+- **AND** the current session id is "session-123"
+- **AND** session recording is active
+- **WHEN** opt out is called
+- **AND** opt in is called
+- **THEN** session recording should be active
+- **WHEN** get session id is called
+- **THEN** the returned session id should not be "session-123"
+
+### Requirement: Opt-in does not restart a recording the app stopped
+
+The SDK SHALL decide at opt-out whether opt-in may restart session replay, and SHALL NOT restart a recording the app had stopped before opting out. Consent does not undo an explicit `stopSessionRecording()`. A start or stop call made while opted out SHALL NOT change that decision, because replay is stopped or uninstalled then. `reset()` SHALL clear it back to the default, so an application that launches opted out still gets replay on its first opt-in.
+
+#### Scenario: Opt in keeps a recording the app stopped stopped
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** session replay is configured and eligible to start
+- **AND** session recording is active
+- **WHEN** stop session recording is called
+- **AND** opt out is called
+- **AND** opt in is called
+- **THEN** session recording should remain inactive
+- **AND** is session replay active should return false
+
+#### Scenario: Stopping a recording while opted out does not block the restart
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** session replay is configured and eligible to start
+- **AND** session recording is active
+- **WHEN** opt out is called
+- **AND** stop session recording is called
+- **AND** opt in is called
+- **THEN** session recording should be active
+
+#### Scenario: An application that launched opted out records on its first opt in
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** session replay is configured and eligible to start
+- **AND** analytics capture is opted out
+- **WHEN** opt in is called
+- **THEN** session recording should be active

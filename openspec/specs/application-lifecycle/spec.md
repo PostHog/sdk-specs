@@ -29,13 +29,14 @@ When enabled, the SDK installs platform lifecycle observers during setup and emi
 1. **Install/update detection**
    - On startup, read the current app version and build from the platform package/bundle/runtime metadata.
    - Read the previously persisted version/build values from SDK/platform storage.
-   - If there is no previously stored build/version marker, emit `Application Installed` with current `version` and/or `build` when available.
-   - If the stored build/version marker differs from the current value, emit `Application Updated` with current `version`/`build` plus `previous_version` and/or `previous_build` when available.
+   - If there is no previously stored build/version marker, emit `Application Installed`.
+   - If the stored build/version marker differs from the current value, emit `Application Updated` with `previous_version` and/or `previous_build` when available.
+   - The current version and build reach these events through the common `$app_version` and `$app_build` properties. Lifecycle events should not add un-prefixed `version` / `build`; SDKs that send them today may keep them until their next major version.
+   - Properties that can only change when the app binary is rebuilt, such as the wrapper runtime version or the build toolchain, ride these two events rather than the common event context.
    - Persist the current version/build marker after checking so subsequent launches are not reported as fresh installs.
 2. **Open/foreground detection**
    - On first launch or foreground transition, emit `Application Opened`.
    - Include a `from_background` boolean where the platform can distinguish cold start from foreground-from-background.
-   - Include current `version` and/or `build` on initial open when the platform implementation has those values readily available.
 3. **Background detection**
    - On background/stop/pause/focus-loss lifecycle transitions, emit `Application Backgrounded`.
 4. **Delivery path**
@@ -76,6 +77,8 @@ If lifecycle capture is disabled, lifecycle callbacks may still be observed for 
 
 The SDK SHALL implement the canonical `application-lifecycle` behavior described by this spec. Implementations MAY adapt method names, parameter casing, type syntax, and lifecycle hooks to platform idioms where this spec explicitly allows variation, but MUST preserve the observable outcomes in the scenarios below.
 
+Lifecycle events SHALL carry the current app version and build through the common `$app_version` and `$app_build` event properties. They SHOULD NOT also send un-prefixed `version` and `build` properties. An SDK that sends `version` and `build` on lifecycle events today MAY keep sending them until its next major version. `Application Updated` SHALL send `previous_version` and `previous_build` when available.
+
 #### Scenario: First app start captures install and open events
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
@@ -99,8 +102,8 @@ The SDK SHALL implement the canonical `application-lifecycle` behavior described
 - **THEN** one event named "Application Updated" should be enqueued
 - **AND** the enqueued event properties should include:
   | property         | value |
-  | version          | 1.1.0 |
-  | build            | 110   |
+  | $app_version     | 1.1.0 |
+  | $app_build       | 110   |
   | previous_version | 1.0.0 |
   | previous_build   | 100   |
 
@@ -125,3 +128,36 @@ The SDK SHALL implement the canonical `application-lifecycle` behavior described
 - **WHEN** the application lifecycle integration starts
 - **AND** the application moves to the background
 - **THEN** no lifecycle analytics events should be enqueued
+
+### Requirement: Build-invariant context properties
+
+A property whose value changes only when the app binary is rebuilt — the wrapper runtime version, or the build toolchain — SHALL ride `Application Installed` and `Application Updated`, and SHALL NOT be added to the common event context. It SHALL be omitted when the platform reports no value. Where the runtime has no lifecycle events, or lifecycle capture is disabled, it is not sent at all. `$lib`, `$lib_version`, `$app_version` and `$app_build` are exempt and SHALL stay on every event, as do other properties SDKs already send on every event, such as `$app_name` and `$app_namespace`.
+
+#### Scenario: A build-invariant property rides install and update only
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and application lifecycle capture enabled
+- **AND** the platform reports this SDK's build-invariant property, such as `$flutter_version` on Flutter, `$react_native_version` on React Native, or `$app_build_xcode` on iOS
+- **WHEN** the application lifecycle integration starts
+- **AND** the app captures an event named "custom event"
+- **THEN** the enqueued "Application Installed" event properties should include that property
+- **AND** the enqueued "custom event" properties should not include that property
+
+#### Scenario: Missing platform metadata omits the property
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and application lifecycle capture enabled
+- **AND** the platform reports no value for this SDK's build-invariant property
+- **WHEN** the application lifecycle integration starts
+- **THEN** one event named "Application Installed" should be enqueued
+- **AND** that event's properties should not include the property key
+
+#### Scenario: Common context properties are unaffected
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and application lifecycle capture enabled
+- **WHEN** the app captures an event named "custom event"
+- **THEN** the enqueued "custom event" properties should include `$lib`, `$lib_version`, `$app_version` and `$app_build`

@@ -202,3 +202,27 @@ Feature: Capture
     And no event named "Sensitive Event" should be enqueued
     And no network request should be sent
     And the SDK should record a before-send warning
+
+  @client
+  Scenario: Caller property overrides an SDK context property
+    Given the SDK is initialized with token "test-token"
+    When capture is called with event "Signed Up" and properties:
+      | property | value      |
+      | $lib     | custom-lib |
+    Then one event named "Signed Up" should be enqueued
+    And the enqueued event properties should include:
+      | property | value      |
+      | $lib     | custom-lib |
+
+  @client
+  Scenario: Caller can't override person-processing state
+    Given the SDK is initialized with token "test-token" and person profiles mode "never"
+    When capture is called with event "Signed Up" and properties:
+      | property                | value |
+      | $process_person_profile | true  |
+      | $is_identified          | true  |
+    Then one event named "Signed Up" should be enqueued
+    And the enqueued event properties should include:
+      | property                | value |
+      | $process_person_profile | false |
+      | $is_identified          | false |

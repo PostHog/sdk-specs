@@ -94,7 +94,9 @@ clear(): void
 - **feature-flag-cache** is separate: it stores evaluated values, not the definition documents themselves.
 - **remote-config** may influence whether local evaluation is enabled, but definition loading is a separate flow.
 - **wrapper setup / preload surfaces** can look similar while being semantically different. Flutter's `preloadFeatureFlags` and `onFeatureFlags` settings relate to ordinary feature-flag value loading/callbacks, not to a Dart-owned privileged definition-loader for local evaluation.
+
 ## Requirements
+
 ### Requirement: Canonical flag-definition-loader behavior
 
 The SDK SHALL implement the canonical `flag-definition-loader` behavior described by this spec. Implementations MAY adapt method names, parameter casing, type syntax, and lifecycle hooks to platform idioms where this spec explicitly allows variation, but MUST preserve the observable outcomes in the scenarios below.
@@ -136,16 +138,20 @@ The SDK SHALL implement the canonical `flag-definition-loader` behavior describe
 
 ### Requirement: External flag definition cache providers
 
-The SDK SHALL treat an external flag definition cache provider as the canonical extension point for sharing local-evaluation flag definitions across distributed or stateless SDK instances. Implementations MAY adapt provider type names, method names, return types, and field casing to platform idioms, but the provider contract SHALL preserve these operations and outcomes:
+The SDK SHALL treat an external flag definition cache provider as the canonical extension point for sharing local-evaluation flag definitions across distributed or stateless SDK instances. Implementations MAY adapt provider type names, method names, and return types to platform idioms, but the provider contract SHALL preserve these operations and outcomes:
 
 - retrieve cached flag definition data, returning data or an absent value when the shared cache is empty
 - decide whether the current SDK instance should fetch fresh definitions from PostHog
 - receive freshly fetched definitions after a successful PostHog API load so they can be stored in the shared cache
 - clean up provider resources during SDK shutdown
 
-The cached data SHALL contain the complete local-evaluation definition set: feature flag definitions, group type mapping, cohort definitions, and the top-level `property_matching_version` associated with that snapshot. Older cached data omitting the version SHALL load as legacy; freshly hydrated data omitting it SHALL NOT inherit a previous v2 selector. Every supported provider representation, API projection, on-disk cache, or database-backed definition store SHALL retain the version together with the rules on serialization and hydration. This requirement does not require adding a new cache backend. SDKs MAY expose this as typed data, JSON-compatible maps, or equivalent structures, and MAY use idiomatic casing such as `groupTypeMapping` or `group_type_mapping`.
+The cached data SHALL contain the complete local-evaluation definition set: feature flag definitions, group type mapping, cohort definitions, and the top-level `property_matching_version` associated with that snapshot. Older cached data omitting the version SHALL load as legacy; freshly hydrated data omitting it SHALL NOT inherit a previous v2 selector. Every supported provider representation, API projection, on-disk cache, or database-backed definition store SHALL retain the version together with the rules on serialization and hydration. This requirement does not require adding a new cache backend. SDKs MAY expose this as typed data, JSON-compatible maps, or equivalent structures. Shared cache payload field names SHALL use snake_case, matching the flag-definitions endpoint, including `flags`, `group_type_mapping`, `cohorts`, `minimal_flag_called_events`, and `property_matching_version`. SDKs SHALL write and read these canonical field names so that definitions can be shared across SDKs without renaming payload fields.
 
-On each loader refresh with a provider configured, the SDK SHALL call the provider's fetch-decision operation before making a direct flag-definition API request. If the provider says this instance should fetch, the SDK SHALL fetch from PostHog, update in-memory definitions, and then call the provider's store operation with the fetched data. If the provider says this instance should not fetch, the SDK SHALL try to load definitions from the provider cache and update in-memory definitions from that data without making a direct API request. If the provider cache is empty or unavailable while previous definitions are loaded, the SDK SHALL keep using the previous in-memory definitions rather than clearing local evaluation. If no definitions are loaded and privileged local-evaluation auth is configured, the SDK MAY bypass the negative fetch decision and fetch directly so local evaluation can recover from an empty shared cache.
+A configured provider is an alternative source of local-evaluation definitions to privileged auth. The SDK SHALL NOT refuse to load definitions, clear loaded definitions, or fall back to remote per-user evaluation solely because no personal/admin/secret key is configured, when a provider is configured. A provider SHALL NOT by itself enable local evaluation: an explicit local-evaluation opt-out, or a disabled client, remains effective.
+
+On each loader refresh with a provider and privileged local-evaluation auth configured, the SDK SHALL call the provider's fetch-decision operation before making a direct flag-definition API request. If the provider says this instance should fetch, the SDK SHALL fetch from PostHog, update in-memory definitions, and then call the provider's store operation with the fetched data. If the provider says this instance should not fetch, the SDK SHALL try to load definitions from the provider cache and update in-memory definitions from that data without making a direct API request. If the provider cache is empty or unavailable while previous definitions are loaded, the SDK SHALL keep using the previous in-memory definitions rather than clearing local evaluation. If no definitions are loaded and privileged local-evaluation auth is configured, the SDK MAY bypass the negative fetch decision and fetch directly so local evaluation can recover from an empty shared cache.
+
+On each loader refresh with a provider configured and no privileged local-evaluation auth, the SDK SHALL read definitions directly from the provider cache. Such a keyless consumer cannot act on a positive fetch decision, so the SDK SHALL NOT call the fetch-decision operation, SHALL NOT call the store operation, and SHALL NOT send a direct flag-definition API request. A keyless cache miss or provider read failure SHALL leave any previously loaded definitions in place and SHALL NOT be reported as an authentication, authorization, or HTTP failure; a genuine provider error is still recorded as a cache warning.
 
 Provider methods MAY be synchronous or asynchronous where appropriate for the language/runtime. SDKs that expose or accept asynchronous provider methods SHALL wait for provider results before deciding the refresh, store, or shutdown outcome, and SHALL bound or otherwise contain asynchronous waits so a misbehaving provider cannot hang the SDK indefinitely. SDKs MAY expose a synchronous/blocking convenience provider surface in runtimes where that is idiomatic, including by adapting blocking methods into the asynchronous provider contract.
 
@@ -235,6 +241,43 @@ Provider errors, rejected asynchronous results, malformed cache data, and provid
 - **AND** shutdown should not throw because of the cache provider failure
 - **AND** the SDK should record a flag definition cache warning
 
+#### Scenario: Shared payloads are readable across SDKs
+- **GIVEN** one SDK has fetched definitions containing `flags`, `group_type_mapping`, `cohorts`, `minimal_flag_called_events`, and `property_matching_version`
+- **WHEN** that SDK publishes the definitions through its external cache provider
+- **THEN** the shared payload should retain those field names and values
+- **WHEN** another SDK with local evaluation enabled reads that payload through its external cache provider with the fetch-decision operation returning false
+- **THEN** it should load the definitions and metadata without renaming payload fields
+- **AND** no direct flag definition API request should be sent
+
+#### Scenario: Keyless consumer reads the shared cache without a decision or a fetch
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token", local evaluation enabled, an external flag definition cache provider, and no privileged local evaluation auth
+- **AND** the cache provider returns cached flag definitions:
+  | key     | active | rollout |
+  | beta-ui | true   | 100     |
+- **WHEN** the flag definition loader refreshes
+- **THEN** local feature flag definitions should include flag "beta-ui"
+- **AND** the cache provider fetch-decision operation should not have been called
+- **AND** the cache provider should not receive flag definition cache data
+- **AND** no direct flag definition API request should be sent
+
+#### Scenario: Keyless cache miss is not reported as an auth failure
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token", local evaluation enabled, an external flag definition cache provider, and no privileged local evaluation auth
+- **AND** local feature flag definitions include flag "beta-ui"
+- **AND** the cache provider read operation returns no cached data
+- **WHEN** the flag definition loader refreshes
+- **THEN** local feature flag definitions should still include flag "beta-ui"
+- **AND** no direct flag definition API request should be sent
+- **AND** the SDK should not record a flag definition authorization error
+- **AND** the refresh should not throw
+
 ### Requirement: Definition snapshots retain the property matching version
 
 The loader SHALL deserialize the definitions response's top-level `property_matching_version` and retain it with the complete definition snapshot, including flags, group type mapping, cohorts, and derived indexes. Exactly numeric `2` SHALL select explicit property matching. Missing or `1` SHALL select released service legacy semantics. Other versions SHALL NOT enable v2; the evaluator SHALL use legacy fallback unless it has an existing safe-inconclusive policy for unsupported versions. Ordinary older responses and cached snapshots SHALL load without throwing. This selector SHALL NOT be inferred from individual flag `version` or the `/flags?v=2` evaluated-response format.
@@ -301,7 +344,6 @@ The definition loader SHALL preserve `filters.holdout.id` and `filters.holdout.e
 - **GIVEN** cached definitions contain an active flag with a 100 percent holdout
 - **WHEN** a replacement definition snapshot omits that flag's holdout configuration
 - **THEN** subsequent local evaluations should use ordinary release conditions rather than the previous holdout
-
 ### Requirement: Automatic definition polling can be disabled
 
 A server SDK that polls for local-evaluation flag definitions MAY let the caller turn the recurring refresh off while keeping local evaluation. An SDK that offers it SHALL express it as an explicit disabled setting on the polling-interval configuration option, distinct from omitting the option. Omitting the option SHALL keep the SDK's documented default interval, and an explicit numeric interval SHALL keep the SDK's existing interval validation and normalization.

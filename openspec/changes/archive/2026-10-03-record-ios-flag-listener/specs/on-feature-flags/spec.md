@@ -7,7 +7,9 @@ When syncing this delta, add posthog-ios to the **Surface variants** list:
   Objective-C as `onFeatureFlags:`.
 
 In **Behavior** item 4, group iOS with browser as a payload-carrying surface rather than a
-readiness-only one. In item 5, add iOS alongside browser as an SDK that invokes a late-registered
+readiness-only one, and define the two listener classes the failed-load scenario uses: **error-aware**
+(browser, iOS: carry an error indication) and **payload-carrying** (browser, iOS, js-core / React
+Native: carry flag values). In item 5, add iOS alongside browser as an SDK that invokes a late-registered
 listener once with the current values. In item 7, note that quota-limited flag responses are outside
 the failed-load scenario until the cross-SDK contract is settled. Leave the readiness-only
 description of Android, Flutter, and Unity unchanged.
@@ -78,4 +80,4 @@ The SDK SHALL implement the canonical `on-feature-flags` behavior described by t
 - **AND** payload-carrying feature flag listeners should receive flags:
   | key     | value |
   | beta-ui | true  |
-- **AND** payload-carrying feature flag listeners should be told that loading flags errored
+- **AND** error-aware feature flag listeners should be told that loading flags errored

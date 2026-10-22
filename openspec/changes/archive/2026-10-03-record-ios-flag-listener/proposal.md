@@ -41,6 +41,9 @@ and pins an observable the canonical signature already names.
   failed loads. [posthog-js #5045](https://github.com/PostHog/posthog-js/pull/5045) is still relevant
   to making non-error paths an explicit boolean and to quota-limited responses, which are outside this
   change.
+- **posthog-js core / React Native** invoke the listener with the last known flags on a failed load,
+  but the callback carries no error indication yet. The error assertion is scoped to error-aware
+  listeners (browser, iOS), so js-core and React Native conform without a follow-up.
 - SDKs whose listener is a payload-free readiness signal (Android, Flutter, Unity) are unaffected by
   the payload assertion: the scenario requires invocation on a non-quota failed load, while carrying
-  flags and error context applies only to payload-carrying surfaces.
+  flags applies only to payload-carrying surfaces and error context only to error-aware ones.

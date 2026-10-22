@@ -54,7 +54,10 @@ The exact callback shape varies by SDK:
    - The callback is not one-shot; it is intended to react to future flag changes as well.
 4. **Pass callback data according to SDK style.**
    - Browser and iOS pass enabled flag keys, variants, and an error indication like `errorsLoading`.
-   - js-core / React Native expose a simpler callback shape centered on the latest feature-flag values.
+     These are the **error-aware** listeners.
+   - js-core / React Native expose a simpler callback shape centered on the latest feature-flag values,
+     with no error indication.
+   - Browser, iOS, and js-core / React Native are the **payload-carrying** listeners.
    - Android, Flutter, and Unity primarily expose a readiness signal with no direct payload; callers re-read flags through getter APIs when notified.
 5. **Support immediate invocation when state is already loaded in some SDKs.**
    - Browser and iOS call the callback once with the current values if flags were already loaded.
@@ -166,4 +169,4 @@ The SDK SHALL implement the canonical `on-feature-flags` behavior described by t
 - **AND** payload-carrying feature flag listeners should receive flags:
   | key     | value |
   | beta-ui | true  |
-- **AND** payload-carrying feature flag listeners should be told that loading flags errored
+- **AND** error-aware feature flag listeners should be told that loading flags errored

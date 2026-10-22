@@ -2,7 +2,7 @@
 
 ### Requirement: Automatic definition polling can be disabled
 
-A server SDK that polls for local-evaluation flag definitions MAY let the caller turn the recurring refresh off while keeping local evaluation. An SDK that offers it SHALL express it as an explicit disabled setting on the polling-interval configuration option, distinct from omitting the option. Omitting the option SHALL keep the SDK's documented default interval, and an explicit interval SHALL keep polling at that interval.
+A server SDK that polls for local-evaluation flag definitions MAY let the caller turn the recurring refresh off while keeping local evaluation. An SDK that offers it SHALL express it as an explicit disabled setting on the polling-interval configuration option, distinct from omitting the option. Omitting the option SHALL keep the SDK's documented default interval, and an explicit numeric interval SHALL keep the SDK's existing interval validation and normalization.
 
 When polling is disabled, the loader SHALL still perform its initial definition load, SHALL still evaluate flags locally from the loaded definitions, and SHALL NOT schedule a recurring refresh timer or task. Disabling polling SHALL NOT disable local evaluation, clear loaded definitions, or force remote evaluation for flags the definitions can resolve.
 

@@ -69,6 +69,7 @@ table is the one place defaults are stated.
 | identify | none | Resolves `distinct_id`, `$set`, and `$groups` per request |
 | exception autocapture | on | Emits `$exception` next to failed calls |
 | initialize capture | on | Sends `$mcp_initialize` for each legacy `initialize`; off sends none and changes nothing else |
+| tools list capture | on | Sends `$mcp_tools_list` for each `tools/list`; off sends none and changes nothing else |
 | parameter capture | on | Sends `$mcp_parameters` |
 | response capture | on | Sends `$mcp_response` on `$mcp_tool_call`, including successful calls, where a wrong or empty result is the failure no error flag shows |
 | before-send hook | none | Modifies or drops each MCP event before capture |
@@ -588,6 +589,9 @@ whether it observes task stores ("Tool call event") as `@mcp_task_store_capable`
   theirs. Its `$mcp_response` SHALL keep only the result envelope (such as `nextCursor`, `ttlMs`,
   `cacheScope`, `_meta`), never the `tools` array, and is omitted when the envelope is empty; the
   response capture option does not apply to it.
+  With the tools list capture option off (see "Configuration"), the SDK SHALL NOT send
+  `$mcp_tools_list`, nor the `$exception` of a failed listing, and SHALL change nothing else: the
+  listing keeps its injected arguments and virtual tools.
 - `$mcp_input_required` for each `input_required` result a client receives: `$mcp_tool_name`,
   `$mcp_duration_ms` for that round, and `$mcp_input_request_methods`, never the requests' or answers'
   content. It records every round, including rounds whose call never completes. Not rounds: a round a
@@ -646,3 +650,12 @@ every enabled injected argument except `context`, whose place its own report arg
 - **AND** the SDK is flushed
 - **THEN** no "$mcp_initialize" event should be sent
 - **AND** the "$mcp_tool_call" event's "$session_id" should equal the session in that token
+
+#### Scenario: With tools list capture off, a listing sends no $mcp_tools_list and keeps injected arguments (@mcp_tools_list_capable)
+- **GIVEN** an MCP server instrumented by the SDK with the tools list capture option off and a tool "search_docs"
+- **WHEN** an MCP client lists tools
+- **AND** calls tool "search_docs" with arguments `{"query": "flags", "context": "find flag docs"}`
+- **AND** the SDK is flushed
+- **THEN** no "$mcp_tools_list" event should be sent
+- **AND** the listed "search_docs" input schema should include `context`
+- **AND** the "$mcp_tool_call" event's property "$mcp_intent" should be "find flag docs"

@@ -6,7 +6,7 @@ The agreed canonical order is simpler: global properties, then the properties th
 
 ## What Changes
 
-- **Caller-supplied event properties take precedence** states the three layers. Everything the SDK sets itself, including `$is_identified`, `$process_person_profile`, `$geoip_disable`, `$session_id`/`$window_id` and the session replay debug properties, is a global property that the caller's event properties override.
+- **Caller-supplied event properties take precedence** states the three layers. Everything the SDK sets itself is a global property, so no key is listed as an exception.
 - The "caller can't override person-processing state" scenario becomes "caller overrides SDK-set properties".
 - Capture's Behavior step 4 lists the two client layers to match.
 - Server SDKs are unchanged by this requirement.

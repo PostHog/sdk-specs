@@ -4,7 +4,7 @@
 
 On client SDKs, an event's properties SHALL be merged in this order, each layer overwriting the one before:
 
-1. Global properties: registered (super) properties and every property the SDK sets itself, such as SDK context (`$lib`, `$lib_version`, `$os`, `$app_version`, `$screen_width`, `$current_url`, `$screen_name`, `$feature/<key>`, `$active_feature_flags`), `$is_identified`, `$process_person_profile`, `$geoip_disable`, `$session_id`, `$window_id` and the session replay debug properties.
+1. Global properties: registered (super) properties and the properties the SDK sets itself.
 2. The properties the caller passes on the event.
 3. `before_send`.
 

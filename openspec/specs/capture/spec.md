@@ -97,8 +97,9 @@ The following steps are the canonical flow for a single capture call. Client and
    - Server: use the caller-provided `distinct_id`. If the SDK supports a "context" abstraction (Python), fall back to the context's current distinct id.
 4. **Enrich properties.** A new properties dictionary is constructed by merging in this order (later values win):
    - **Client:**
-     1. Global properties: super/registered properties and the properties the SDK sets itself, such as SDK environment and feature flag properties, `$groups` from registered groups (the event's group wins per group type), `$is_identified` and `$process_person_profile`.
-     2. Caller-supplied `properties`. These win over everything above, and `before_send` (step 6) can change the result (see **Caller-supplied event properties take precedence**).
+     1. Properties the SDK sets itself, such as SDK environment and feature flag properties, `$groups` from registered groups (the event's group wins per group type), `$is_identified` and `$process_person_profile`.
+     2. Super/registered properties.
+     3. Caller-supplied `properties`. These win over everything above, and `before_send` (step 6) can change the result (see **Caller-supplied event properties take precedence**).
    - **Server:** request-context properties, then caller-supplied `properties`, then SDK-stamped properties. Most server SDKs stamp `$lib` and `$lib_version` over the caller's values, and SDKs with SDK-level default properties (python `super_properties`, go `DefaultEventProperties`, dotnet `SuperProperties`, elixir `global_properties`) apply them after the caller's properties too. `$groups` comes from the `groups` option.
 5. **Attach envelope fields.** Assign `timestamp` (caller override or `now()`, serialized in ISO 8601 and normalized to its equivalent UTC instant regardless of the input's original timezone/offset, preserving sub-second precision when the input carries it), `uuid` (caller override or a freshly generated UUIDv7; server SDKs normalize it to canonical lowercase hyphenated form), `distinct_id`, and `event` to the message. Server SDKs additionally stamp `$lib` / `$lib_version` onto properties here if not already present.
 6. **Run `before_send` hook.** If the SDK has been configured with a `before_send` callback (Python, Go, posthog-js, .NET), invoke it with the fully-assembled message. The callback may return a modified message, or return `null`/`None` to drop the event. If the callback throws, log a warning, stop the hook chain, and drop the event. Never enqueue the original or partially processed message after a hook failure. Server SDKs re-normalize the message `uuid` after the hook returns, because the hook may have replaced it with another accepted form.
@@ -391,9 +392,10 @@ The environment value SHALL act as a default, not an override: an explicit `$rel
 
 On client SDKs, an event's properties SHALL be merged in this order, each layer overwriting the one before:
 
-1. Global properties: registered (super) properties and the properties the SDK sets itself.
-2. The properties the caller passes on the event.
-3. `before_send`.
+1. Properties the SDK sets itself.
+2. Registered (super) properties.
+3. The properties the caller passes on the event.
+4. `before_send`.
 
 A group the caller passes for the event SHALL win over a registered group of the same type.
 
@@ -412,6 +414,21 @@ This requirement does not apply to server SDKs. Most server SDKs set `$lib` and 
 - **AND** the enqueued event properties should include:
   | property | value      |
   | $lib     | custom-lib |
+
+#### Scenario: Registered property overrides an SDK-set property (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and person profiles mode "never"
+- **AND** registered properties are:
+  | property       | value |
+  | $is_identified | true  |
+- **WHEN** capture is called with event "Signed Up"
+- **THEN** one event named "Signed Up" should be enqueued
+- **AND** the enqueued event properties should include:
+  | property       | value |
+  | $is_identified | true  |
 
 #### Scenario: Caller property overrides an SDK-set property (@client)
 - **GIVEN** a fresh SDK acceptance test harness

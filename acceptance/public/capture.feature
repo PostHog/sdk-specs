@@ -215,6 +215,18 @@ Feature: Capture
       | $lib     | custom-lib |
 
   @client
+  Scenario: Registered property overrides an SDK-set property
+    Given the SDK is initialized with token "test-token" and person profiles mode "never"
+    And registered properties are:
+      | property       | value |
+      | $is_identified | true  |
+    When capture is called with event "Signed Up"
+    Then one event named "Signed Up" should be enqueued
+    And the enqueued event properties should include:
+      | property       | value |
+      | $is_identified | true  |
+
+  @client
   Scenario: Caller property overrides an SDK-set property
     Given the SDK is initialized with token "test-token" and person profiles mode "never"
     When capture is called with event "Signed Up" and properties:

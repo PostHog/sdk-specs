@@ -56,5 +56,4 @@ Spec-only. The four SDK branches already implement these rules; their migration 
 
 - #140: keep Go's local drop of a non-finite event as an allowed variation, or require `null` everywhere (Go's owners declined the sanitizing pass on cost grounds)?
 - #81: scope the gzip-by-default requirement to client SDKs, or record the v1 server default of no compression as an exception?
-- Node 6's AI compression default (`gzip`) differs from the Python, Go and Rust default (`none`); decided in `add-capture-ai-v1`.
 - Whether capture v1 SDKs should retry 404 or 429 is under review on the PostHog side; today both are terminal.

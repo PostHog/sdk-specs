@@ -21,8 +21,11 @@ from the harness's step bindings, not a separate operation inventory.
 
 Capture API declarations are independent of client/server SDK type:
 
-- `capture_ai_v0`: AI capture delivery, including the ordinary-capture no-reroute
-  case. That case accepts either legacy batch or analytics-v1 ordinary traffic.
+- `capture_ai_v0`: AI capture delivery on the legacy `/i/v0/ai/batch/` route, including
+  the ordinary-capture no-reroute case. That case accepts either legacy batch or
+  analytics-v1 ordinary traffic.
+- `capture_ai_v1`: AI capture delivery on the capture v1 `/i/v1/ai/events` route; its
+  no-reroute case expects analytics-v1 ordinary traffic.
 - `capture_v1`: analytics-v1 delivery through ordinary capture.
 - `capture_v0`: legacy capture; `capture_v0_batch` additionally selects the batch
   format checks, while `capture_v0_event` selects the event format checks.

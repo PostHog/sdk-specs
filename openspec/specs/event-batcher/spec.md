@@ -37,11 +37,11 @@ startFlushTimer(): void
 4. **Trigger flush by timer.** If the threshold is not met quickly, a periodic timer / interval flush sends pending events after `flushInterval`.
 5. **Cap each outgoing batch.** A flush may send only up to `maxBatchSize` items at once, leaving remaining queued events for subsequent batches.
 6. **Preserve FIFO batch slicing.** Batches are typically taken from the front of the queue in arrival order.
-7. **Respect request-size constraints where implemented.** Some SDKs also stop building a batch once the serialized size approaches a limit, even if the item count limit has not been reached.
+7. **Respect request-size constraints.** On legacy capture some SDKs stop building a batch once the serialized size approaches a limit, even if the item count limit has not been reached. On capture v1 this is required: every lane is byte-aware, with a target of at most 5 MiB of event bytes checked before each append (see **Capture v1 batches are byte-aware and never shrink after a 413**).
 8. **Allow explicit flushes.** Public `flush()` or shutdown paths bypass the normal timer/threshold waiting and drain what is pending.
 9. **Run on background workers/timers where appropriate.** Native/server SDKs commonly use dedicated threads, executors, coroutines, or async handlers to batch without blocking callers.
 10. **Allow wrapper SDKs to delegate batching to an underlying platform SDK instead of owning a second batcher.** Flutter exposes batching knobs like `flushAt`, `maxQueueSize`, `maxBatchSize`, and `flushInterval`, forwards them to the native mobile SDKs during setup, and otherwise delegates event batching to the underlying native/browser implementation.
-11. **Adapt batch size when necessary.** Some SDKs reduce effective batch size after oversized-payload errors (`413`) so future flushes use smaller chunks.
+11. **Adapt batch size when necessary (legacy capture).** Some SDKs on legacy capture reduce effective batch size after oversized-payload errors (`413`) so future flushes use smaller chunks. On capture v1 a `413` is terminal and the batch is never split or resent.
 
 ## State & lifecycle
 
@@ -58,7 +58,7 @@ startFlushTimer(): void
 
 - queued/pending events
 - active flush timer / scheduled work state
-- adjusted batch size in SDKs that shrink after `413`
+- adjusted batch size in SDKs that shrink after `413` (legacy capture only)
 - worker/channel state in async batch handlers
 
 ### Lifecycle behavior
@@ -72,7 +72,7 @@ startFlushTimer(): void
 ## Error handling
 
 - Batch construction itself should not throw in normal operation.
-- Individual oversized or corrupt events may be dropped/skipped before upload in some SDKs.
+- Individual oversized or corrupt events may be dropped/skipped before upload in some SDKs. On capture v1 the batcher drops no analytics event for size below capture's own per-event limit; only an event larger than the request body limit, which capture can never accept, may be dropped locally.
 - Upload failures are handed off to retry logic rather than being handled by the batcher itself.
 - If the queue is full before batching, events may be dropped according to the surrounding queue policy.
 
@@ -90,9 +90,7 @@ startFlushTimer(): void
 - **persistent-storage** — may back the pending event queue that the batcher slices into batches.
 - **shutdown/flush** — forces the batcher to drain immediately.
 - **wrapper setup/config** — Flutter's config object acts as a pass-through surface for native batching settings rather than implementing a separate Dart batch queue.
-
 ## Requirements
-
 ### Requirement: Canonical event-batcher behavior
 
 The SDK SHALL implement the canonical `event-batcher` behavior described by this spec. Implementations MAY adapt method names, parameter casing, type syntax, and lifecycle hooks to platform idioms where this spec explicitly allows variation, but MUST preserve the observable outcomes in the scenarios below.
@@ -187,3 +185,49 @@ This requirement applies to replay requests, including those sent by underlying 
 - **WHEN** the SDK constructs a replay upload request
 - **THEN** the SDK may include both snapshots in the same request
 - **AND** both snapshots retain their recorded session ID and distinct ID
+
+### Requirement: Capture v1 batches are byte-aware and never shrink after a 413
+
+An SDK that delivers events through capture v1 SHALL size each event by the bytes it will actually send (UTF-8 of the serialized event, exact or an upper bound, never a character count) and SHALL keep every analytics request at or under a byte target of at most 5 MiB of event bytes. The check SHALL run before appending: when the batch is non-empty and the next event would exceed the target, the batch is sent first and the event starts the next batch, so order is kept and an event larger than the target ships alone. The count thresholds (`flushAt`, `maxBatchSize`) still apply. Serializing each event once and building the body from those bytes is the preferred implementation; SDKs that already measure by a second serialization MAY keep it.
+
+The SDK SHALL NOT impose a per-event analytics size cap below capture's own per-event limit (capture drops an event too large to store and reports it per event); an SDK MAY drop locally only an event larger than the request body limit, which capture can never accept. A `413` response SHALL be terminal: the SDK SHALL NOT halve, split or resend the batch.
+
+Legacy capture: several SDKs batched by count only, enforced per-event caps inherited from older forks (32 KB to 900 KB), and shrank the batch after a `413`.
+
+#### Scenario: A batch closes before it would exceed the byte target (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 10
+- **WHEN** capture is called sequentially 3 times with an event named "big-{index}" whose serialized size is about 2 MiB
+- **AND** pending captures are flushed
+- **THEN** at least 2 capture request should have been received
+- **AND** no received request body should exceed the SDK's byte target plus envelope overhead
+- **AND** the events "big-0", "big-1" and "big-2" should have been received in that order across the requests
+
+#### Scenario: An event larger than the target ships alone and in order (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 10
+- **WHEN** capture is called with distinct id "user-123" and event "small-before"
+- **AND** capture is called with an event named "huge" whose serialized size is about 6 MiB
+- **AND** capture is called with distinct id "user-123" and event "small-after"
+- **AND** pending captures are flushed
+- **THEN** exactly 3 capture request should have been received
+- **AND** the second request should contain only the event "huge"
+- **AND** the events should have been received in the order "small-before", "huge", "small-after"
+
+#### Scenario: A 413 is terminal and the batch is not split (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 2
+- **AND** the mock serves these ordered analytics responses:
+  | status | body                               |
+  | 413    | {"error":"payload_too_large"}      |
+  | 200    | {"results":{"*":{"result":"ok"}}}  |
+- **WHEN** capture is called with distinct id "user-123" and event "one"
+- **AND** capture is called with distinct id "user-123" and event "two"
+- **AND** pending captures are flushed
+- **AND** 2000 milliseconds elapse without a public SDK call
+- **THEN** exactly 1 capture request should have been received
+- **AND** the SDK should report the events "one" and "two" as not delivered with status 413
+

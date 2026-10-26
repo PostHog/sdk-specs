@@ -6,9 +6,9 @@ The agreed canonical order is simpler: properties the SDK sets itself, then regi
 
 ## What Changes
 
-- **Caller-supplied event properties take precedence** states the four layers, so no key is listed as an exception.
-- The "caller can't override person-processing state" scenario becomes "caller overrides SDK-set properties".
-- Capture's Behavior step 4 lists the two client layers to match.
+- **Caller-supplied event properties take precedence** states three merge layers plus `before_send`, so no key is listed as an exception. A registered or caller value changes that event only, and the project token stays request routing outside the layers.
+- The "caller can't override person-processing state" scenario becomes "caller overrides SDK-set properties", and a second scenario checks a later event carries the SDK's value again.
+- Capture's Behavior step 4 lists the three client layers to match.
 - Server SDKs are unchanged by this requirement.
 
 ## Capabilities
@@ -27,4 +27,4 @@ _None._
 - **posthog-js (browser)**, **posthog-android**, **posthog-react-native** and **posthog-js-lite** (via `@posthog/core`): set `$is_identified`, `$process_person_profile` and, where they set them, `$geoip_disable`, the session properties and the replay debug properties before registered and caller properties instead of after. posthog-android also merges registered properties before SDK context, so SDK context wins over them today.
 - **posthog-flutter**: no change; follows the native SDK on iOS and Android, and posthog-js on web.
 - **Server SDKs**: no change.
-- **Acceptance adapters**: the changed scenario reuses existing steps.
+- **Acceptance adapters**: the changed scenario reuses existing steps; the second-event scenario needs a step that asserts on a named enqueued event.

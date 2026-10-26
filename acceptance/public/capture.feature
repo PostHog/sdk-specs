@@ -238,3 +238,17 @@ Feature: Capture
       | property                | value |
       | $process_person_profile | true  |
       | $is_identified          | true  |
+
+  @client
+  Scenario: Caller property changes that event only
+    Given the SDK is initialized with token "test-token" and person profiles mode "never"
+    When capture is called with event "Signed Up" and properties:
+      | property                | value |
+      | $process_person_profile | true  |
+      | $is_identified          | true  |
+    And capture is called with event "Viewed Dashboard"
+    Then one event named "Viewed Dashboard" should be enqueued
+    And the enqueued "Viewed Dashboard" event properties should include:
+      | property                | value |
+      | $process_person_profile | false |
+      | $is_identified          | false |

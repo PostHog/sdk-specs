@@ -1,6 +1,6 @@
 ## 1. Spec delta
 
-- [x] 1.1 Modify **Caller-supplied event properties take precedence** in `capture` to the three-layer order, replacing the person-processing scenario
+- [x] 1.1 Modify **Caller-supplied event properties take precedence** in `capture` to three merge layers plus `before_send`, replacing the person-processing scenario
 - [x] 1.2 Rewrite Behavior step 4 in `capture` to match
 - [x] 1.3 Update the matching scenario in `acceptance/public/capture.feature`
 

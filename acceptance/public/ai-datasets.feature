@@ -130,3 +130,15 @@ Feature: AI Datasets
     When the caller converts the case twice with different execution outputs and trace IDs
     Then the declarations have different execution IDs and the same case key and dataset-item version ID
     And each declaration contains its caller-supplied output and application trace ID
+
+  Scenario: One dataset case produces executions for two models
+    Given an active dataset case from a pinned snapshot
+    When the caller converts it twice with model_version "model-b" and "model-c" and their respective execution outputs
+    Then the declarations have distinct execution UUIDs and the same case key and exact dataset-item version ID
+    And each declaration retains its caller-supplied model and output through serialization and upload
+
+  Scenario: Dataset metadata does not supply an execution model
+    Given an active dataset case with metadata containing model_version "source-model"
+    When the caller converts the case without a model override or with model_version null
+    Then the converted item's model remains unset for experiment fallback
+    And the source metadata is copied as payload metadata without becoming execution attribution

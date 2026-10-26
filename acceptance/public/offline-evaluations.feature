@@ -200,3 +200,87 @@ Feature: Offline Evaluations
     Given an isolated evaluation client and an experiment linked to dataset revision 3
     When the caller uploads a new item linked to a version introduced only in revision 4
     Then the caller receives the backend's structured validation error and the upload commits no new items or results
+
+  # Requirement: Per-item model attribution with experiment fallback
+
+  Scenario: One experiment contains executions from different models
+    Given an isolated offline evaluation client and an experiment with model_version "model-a"
+    And two evaluation items declaring model_version "model-b" and "model-c"
+    When the caller uploads results for both items in one request
+    Then each received item declaration contains its respective model_version beside its UUID
+    And results reference those item UUIDs and scorer versions without a model field
+    And no request changes the experiment's model_version
+
+  Scenario: Omitted and null item models inherit the experiment default
+    Given an isolated offline evaluation client and an experiment with model_version "model-a"
+    When the caller uploads one item with an omitted model and another with model_version null
+    Then neither received declaration contains a non-null item model
+    And the experiment creation request retains model_version "model-a" as the default
+
+  Scenario: An experiment can have no default model
+    Given an isolated offline evaluation client and an experiment without a model_version
+    When the caller uploads an item declaring "model-b" and another without a model
+    Then the received first item declares model_version "model-b" and the second contains no non-null model
+    And the experiment creation request contains no non-null model
+
+  Scenario: Invalid item model identifiers fail locally
+    When the caller constructs an evaluation item with an empty string, a non-string non-null value, or a string longer than 255 characters as model_version
+    Then the caller receives a validation error before any upload is sent
+
+  Scenario: Valid model identifiers retain their exact text
+    Given evaluation items with a 255-character model identifier and a model identifier containing leading and trailing spaces
+    When the caller serializes and uploads the items
+    Then the received model identifiers exactly match the supplied strings
+
+  Scenario: A resumed handle needs no experiment model lookup
+    Given an isolated offline evaluation client and a locally resumed experiment handle
+    When the caller uploads one item with an explicit model and another without one
+    Then the request retains the explicit model and leaves the other model unset
+    And no experiment or model read precedes the upload
+
+  # Requirement: Model attribution survives declaration replay and recovery
+
+  Scenario: Saved item models survive reconstruction and detached mutation
+    Given an evaluation item with model_version "model-b" and two results using different scorer versions
+    When the caller serializes and restores the declarations, then changes model_version in the saved item dictionary
+    Then the original and restored items retain "model-b" and their original execution UUID
+    And both restored results still reference that execution item
+
+  Scenario: Legacy saved declarations retain replay compatibility
+    Given an accepted item whose saved declaration has no model_version key and whose experiment has model_version "model-a"
+    When the caller restores and replays that declaration with the same result
+    Then the upload does not insert a non-null item model
+    And the acknowledgment retains the original identities and acceptance times with created false
+
+  Scenario: Explicit item models replay without duplication
+    Given an acknowledged item and result with item model_version "model-b"
+    When the caller replays the same item and result in the same experiment
+    Then the received declaration still contains "model-b"
+    And the acknowledgment retains the original identities and acceptance times with created false
+
+  Scenario: Changing an accepted item's model is a content conflict
+    Given an acknowledged item with model_version "model-b"
+    When the caller redeclares the same item UUID with model_version "model-c" or without its explicit model
+    Then the backend rejects the changed declaration and the caller receives a structured content_conflict error
+
+  Scenario: An explicit default is not an inherited declaration
+    Given an acknowledged item with no explicit model in an experiment with model_version "model-a"
+    When the caller redeclares the same item UUID with explicit model_version "model-a"
+    Then the caller receives a structured content_conflict error despite the equal effective model
+
+  Scenario: Conflicting models in one bulk call send no partial work
+    Given two results with distinct scorer versions whose attached declarations use the same item UUID but models "model-b" and "model-c"
+    When the caller uploads both results as one bulk operation
+    Then the caller receives a local validation error and the service receives no upload
+
+  Scenario: Repeated chunk declarations retain the model through recovery
+    Given 1001 results for one item declaring model_version "model-b" with distinct scorer versions
+    And the service acknowledges the first chunk but loses the second chunk's response
+    When the caller receives the bulk error and retries its pending results
+    Then every chunk declaring the item includes "model-b"
+    And failed_chunk retains that model and the retry reproduces the failed chunk's identities and content
+
+  Scenario: Another scorer can reference an accepted item without its model
+    Given an accepted evaluation item with model_version "model-b"
+    When the caller uploads another scorer's result using only that item's UUID
+    Then the result references the accepted item without redeclaring or looking up its model

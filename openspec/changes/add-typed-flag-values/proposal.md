@@ -1,6 +1,6 @@
 ## Why
 
-The `/flags?v=3` response gives every flag one typed `value` (boolean, string, number, object or `null`) plus a structured `reason` and rule metadata ([PostHog/posthog#107732](https://github.com/PostHog/posthog/pull/107732), wire contract in [posthog-sdk-test-harness 1.13.1](https://github.com/PostHog/posthog-sdk-test-harness/releases/tag/1.13.1), `contracts/feature_flag_rules_v2`). Flags can now return string, number and object values directly ([PostHog/posthog#107733](https://github.com/PostHog/posthog/pull/107733)). The SDK specs only describe the older `enabled` / variant / payload surface, so there is no shared contract for how an application reads a typed value, learns why it got that value, or handles a missing or failed flag. [posthog-python#1031](https://github.com/PostHog/posthog-python/pull/1031) is the first SDK to add typed accessors. Other SDKs need the same contract before they follow.
+The `/flags?v=4` response gives every flag one typed `value` (boolean, string, number, object or `null`) plus a structured `reason` and rule metadata ([PostHog/posthog#107732](https://github.com/PostHog/posthog/pull/107732), wire contract in [posthog-sdk-test-harness 1.13.1](https://github.com/PostHog/posthog-sdk-test-harness/releases/tag/1.13.1), `contracts/feature_flag_rules_v2`). Flags can now return string, number and object values directly ([PostHog/posthog#107733](https://github.com/PostHog/posthog/pull/107733)). The SDK specs only describe the older `enabled` / variant / payload surface, so there is no shared contract for how an application reads a typed value, learns why it got that value, or handles a missing or failed flag. [posthog-python#1031](https://github.com/PostHog/posthog-python/pull/1031) is the first SDK to add typed accessors. Other SDKs need the same contract before they follow.
 
 ## What Changes
 
@@ -30,7 +30,7 @@ No breaking changes. No existing accessor changes its return value or events.
 ## Impact
 
 - Specs and decisions only. No SDK code changes in this repository.
-- Server SDKs with `evaluateFlags()` (Node, Python, Ruby, PHP, Go, .NET, JVM) add snapshot accessors. Client SDKs (browser, React Native, iOS, Android, Flutter) add client accessors. SDKs must read `/flags?v=3` and keep each flag's details to implement them.
+- Server SDKs with `evaluateFlags()` (Node, Python, Ruby, PHP, Go, .NET, JVM) add snapshot accessors. Client SDKs (browser, React Native, iOS, Android, Flutter) add client accessors. SDKs must read `/flags?v=4` and keep each flag's details to implement them.
 - The OpenFeature providers for Python, Node, web and Elixir can move onto the details accessors.
 - posthog-python#1031 is the reference implementation. Its details type differs from this proposal in a few places, listed in `design.md`.
 - `$experiment_exposure`, the rule and experiment attribution properties on `$feature_flag_called`, local evaluation of config version 2 flags and the wire contract are out of scope.

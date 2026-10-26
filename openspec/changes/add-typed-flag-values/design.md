@@ -1,6 +1,6 @@
 ## Context
 
-The server can answer `/flags?v=3` ([PostHog/posthog#107732](https://github.com/PostHog/posthog/pull/107732)). A v3 record has five members: `key`, `value`, `failed`, `reason` and `metadata`. `value` is the flag's typed application value: a boolean, a non-empty string, a number, an object, or `null` when the flag default is `null`. `enabled` and `variant` no longer exist at v3; readers derive them from `value`. The public wire contract is `contracts/feature_flag_rules_v2` in [posthog-sdk-test-harness 1.13.1](https://github.com/PostHog/posthog-sdk-test-harness/releases/tag/1.13.1) (contract 2.3.1): the producer schema, the reader fixtures, the OpenFeature mapping in `registries/literals.json`, and the legacy rendering table of the typed value corpus. This change does not touch the wire. It defines what an application calls and sees.
+The server can answer `/flags?v=4` ([PostHog/posthog#107732](https://github.com/PostHog/posthog/pull/107732), [PostHog/posthog#123366](https://github.com/PostHog/posthog/pull/123366)). Clients already send `v=3` and arbitrary `v` values, so only an exact `v=4` selects the typed record; every other version keeps the older record. A v4 record has five members: `key`, `value`, `failed`, `reason` and `metadata`. `value` is the flag's typed application value: a boolean, a non-empty string, a number, an object, or `null` when the flag default is `null`. `enabled` and `variant` no longer exist at v4; readers derive them from `value`. The public wire contract is `contracts/feature_flag_rules_v2` in [posthog-sdk-test-harness 1.13.1](https://github.com/PostHog/posthog-sdk-test-harness/releases/tag/1.13.1) (contract 2.3.1): the producer schema, the reader fixtures, the OpenFeature mapping in `registries/literals.json`, and the legacy rendering table of the typed value corpus. This change does not touch the wire. It defines what an application calls and sees.
 
 Today's SDK surface is built on `enabled`, a variant key and a payload:
 
@@ -9,7 +9,7 @@ Today's SDK surface is built on `enabled`, a variant key and a payload:
 
 PostHog ships OpenFeature providers for Python (in `posthog-python`), Node and web (in `posthog-js`) and Elixir (in `posthog-elixir`). All four call `getFeatureFlagResult` and map it the same way: boolean reads return `enabled` (so a multivariate flag reads as `true`), string reads return the variant, number reads parse the variant string (Python and Elixir also accept hexadecimal), object reads return the payload, and a disabled flag read as a non-boolean type returns the caller default without an error. Reasons are `TARGETING_MATCH` when enabled, `DISABLED` for `flag_disabled`, otherwise `DEFAULT`; the PostHog reason text goes into flag metadata as `posthog_reason`.
 
-[posthog-python#1031](https://github.com/PostHog/posthog-python/pull/1031) (draft) is the reference implementation. It requests `v=3`, keeps each record's value, reason and metadata, adds `get_boolean_value` / `get_boolean_details` and the string, number and object pairs to the `evaluate_flags()` snapshot, and keeps every legacy getter and `$feature_flag_called` unchanged.
+[posthog-python#1031](https://github.com/PostHog/posthog-python/pull/1031) (draft) is the reference implementation. It requests `v=4`, keeps each record's value, reason and metadata, adds `get_boolean_value` / `get_boolean_details` and the string, number and object pairs to the `evaluate_flags()` snapshot, and keeps every legacy getter and `$feature_flag_called` unchanged.
 
 This design is a starting point for iteration. Each decision below states the assumption the specs take, the main alternative, and how the choice scores on three lenses: developer experience (DX), OpenFeature compatibility (OF) and migration from today's API (Migration).
 
@@ -58,8 +58,8 @@ The existing `evaluate-flags` and `is-feature-enabled` specs say a present `fals
 | value `null` | `false` (renders as `false`) | `true`, no error | `"x"`, no error |
 | failed | `false` (existing rendering) | `true`, `GENERAL` | `"x"`, `GENERAL` |
 
-**Alternative.** Make legacy enablement treat a v3 `null` as "no value" and return the caller default.
-**Why.** Legacy accessors must return the same thing whether the server sent a v3 record or an older one, and an older server renders `null` as `enabled: false`. The typed boolean accessor follows the contract and OpenFeature. The one visible difference is a `null` default read through `isEnabled(key, { defaultValue: true })` versus `getBooleanValue(key, true)`. The specs state it and add a scenario for it.
+**Alternative.** Make legacy enablement treat a v4 `null` as "no value" and return the caller default.
+**Why.** Legacy accessors must return the same thing whether the server sent a v4 record or an older one, and an older server renders `null` as `enabled: false`. The typed boolean accessor follows the contract and OpenFeature. The one visible difference is a `null` default read through `isEnabled(key, { defaultValue: true })` versus `getBooleanValue(key, true)`. The specs state it and add a scenario for it.
 **Lenses.** DX: the typed accessor does the safe thing; the legacy difference needs a docs note. OF: exact. Migration: no legacy change.
 
 ### D4. Snapshot value projection for number, object and null
@@ -99,7 +99,7 @@ The existing `evaluate-flags` and `is-feature-enabled` specs say a present `fals
 
 ### D9. Payloads
 
-**Assumption.** The payload accessor stays and is the legacy home: version 1 payloads as today, and for config version 2 number and object flags the value itself (the SDK supplies it, because v3 sends `metadata.payload: null` for them). Typed accessors are the recommended way to read number and object values. Users who model configuration as variant plus payload keep using `getFeatureFlag` plus `getFeatureFlagPayload` on those flags. To move, they recreate the flag as a config version 2 object flag whose rule or variant values are the configurations, and read it with `getObjectValue`.
+**Assumption.** The payload accessor stays and is the legacy home: version 1 payloads as today, and for config version 2 number and object flags the value itself (the SDK supplies it, because v4 sends `metadata.payload: null` for them). Typed accessors are the recommended way to read number and object values. Users who model configuration as variant plus payload keep using `getFeatureFlag` plus `getFeatureFlagPayload` on those flags. To move, they recreate the flag as a config version 2 object flag whose rule or variant values are the configurations, and read it with `getObjectValue`.
 **Alternative.** Make the payload accessor legacy-only, returning nothing for config version 2 flags, or have typed object reads fall back to a version 1 payload.
 **Why.** Legacy payload readers keep working when a flag's type changes to number or object, and typed reads never coerce.
 **Lenses.** DX: new code needs one call instead of two, and the value cannot disagree with the variant. OF: n/a. Migration: payload users keep working; moving needs a flag change, not just a code change.

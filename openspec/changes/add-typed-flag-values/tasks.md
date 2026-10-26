@@ -1,6 +1,6 @@
 ## 1. Evidence
 
-- [x] 1.1 Read the `/flags?v=3` wire contract and reader fixtures in posthog-sdk-test-harness 1.13.1 (`contracts/feature_flag_rules_v2`), including the OpenFeature mapping and the legacy rendering table.
+- [x] 1.1 Read the `/flags?v=4` wire contract and reader fixtures in posthog-sdk-test-harness 1.13.1 (`contracts/feature_flag_rules_v2`), including the OpenFeature mapping and the legacy rendering table.
 - [x] 1.2 Compare the reference implementation in posthog-python#1031 and record where it differs.
 - [x] 1.3 Survey the shipped OpenFeature providers (Python, Node, web, Elixir) and how they map values, reasons and errors today.
 - [x] 1.4 Survey the existing legacy accessors, the `evaluateFlags()` snapshot and the `$feature_flag_called` tracker contracts.

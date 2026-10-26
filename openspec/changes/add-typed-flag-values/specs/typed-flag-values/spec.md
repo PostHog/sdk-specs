@@ -194,11 +194,11 @@ The config version 2 rows are the public contract's OpenFeature mapping. The con
 - **AND** the details have no variant
 - **AND** `flag_metadata` contains `config_version` 1 and `reason_code` "condition_match"
 
-### Requirement: Typed values come from the v3 flags response
+### Requirement: Typed values come from the v4 flags response
 
-An SDK that implements typed accessors SHALL request the `/flags` response version that carries typed values (`v=3`) and SHALL read each record by the reader rules of the public wire contract (`contracts/feature_flag_rules_v2` in `posthog-sdk-test-harness`). It SHALL keep each flag's typed value, structured reason and metadata with the evaluated flag state instead of reducing the record to a legacy value.
+An SDK that implements typed accessors SHALL request the `/flags` response version that carries typed values (`v=4`; the server selects it only for an exact `v=4`, because clients already send `v=3` and arbitrary `v` values) and SHALL read each record by the reader rules of the public wire contract (`contracts/feature_flag_rules_v2` in `posthog-sdk-test-harness`). It SHALL keep each flag's typed value, structured reason and metadata with the evaluated flag state instead of reducing the record to a legacy value.
 
-A record without a `value` member comes from a server that does not send typed values. The SDK SHALL then use the record's `variant` as the value, or its `enabled` boolean when there is no variant, SHALL read the config version as 1, and SHALL ignore any rule or experiment metadata in that record. It SHALL NOT mix this reading with v3 fields in one record. Consequences the SDK SHALL document:
+A record without a `value` member comes from a server that does not send typed values. The SDK SHALL then use the record's `variant` as the value, or its `enabled` boolean when there is no variant, SHALL read the config version as 1, and SHALL ignore any rule or experiment metadata in that record. It SHALL NOT mix this reading with v4 fields in one record. Consequences the SDK SHALL document:
 
 - Number and object values reach such a server's records only as a payload, so the number and object accessors return the caller default with `TYPE_MISMATCH`. The error message SHALL say that the value may need a server that sends typed values.
 - A `null` flag default reaches such a server's records as `enabled: false`, so the boolean accessor returns `false`, not the caller default.
@@ -227,7 +227,7 @@ A client SDK that persists flag state SHALL persist the typed value and details 
 
 ### Requirement: Legacy accessors keep their return values
 
-Every accessor that existed before typed values SHALL return what it returned for the same flag before `v=3`, regardless of whether the SDK read a v3 record or an older record. The SDK SHALL derive this legacy rendering from the typed value in one place:
+Every accessor that existed before typed values SHALL return what it returned for the same flag before `v=4`, regardless of whether the SDK read a v4 record or an older record. The SDK SHALL derive this legacy rendering from the typed value in one place:
 
 | Typed value | Enablement | Legacy value (`getFeatureFlag`, `getFlag`) | Payload accessor |
 | --- | --- | --- | --- |
@@ -239,7 +239,7 @@ Every accessor that existed before typed values SHALL return what it returned fo
 
 A `failed` record SHALL keep its existing legacy rendering. The same rendering SHALL feed every legacy surface: `isFeatureEnabled`, `getFeatureFlag`, `getFeatureFlagPayload`, `getFeatureFlagResult`, the bulk getters, the snapshot's enablement, value and payload accessors, `$feature/<key>` and `$active_feature_flags` on captured events, `onFeatureFlags` callbacks and bootstrap export.
 
-A v3 record leaves `metadata.payload` `null` for a config version 2 number or object flag. The SDK SHALL supply the value itself to the payload accessors, in the same representation the platform uses for a decoded payload. Config version 1 payloads keep their existing source and decoding.
+A v4 record leaves `metadata.payload` `null` for a config version 2 number or object flag. The SDK SHALL supply the value itself to the payload accessors, in the same representation the platform uses for a decoded payload. Config version 1 payloads keep their existing source and decoding.
 
 Documentation SHALL present the typed accessors as the recommended way to read flag values in new code and the only way to read config version 2 number and object values without the payload accessor. This capability does not deprecate any legacy accessor.
 
@@ -258,7 +258,7 @@ Documentation SHALL present the typed accessors as the recommended way to read f
 - **AND** the payload accessor returns the platform's no-payload value
 
 #### Scenario: Legacy results do not depend on the response version
-- **GIVEN** a server returns the same evaluation once as a v3 record and once as an older record
+- **GIVEN** a server returns the same evaluation once as a v4 record and once as an older record
 - **WHEN** every legacy accessor is called for that flag after each response
 - **THEN** both responses give the same legacy results and the same `$feature_flag_called` properties
 

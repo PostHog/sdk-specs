@@ -346,6 +346,17 @@ Feature: MCP analytics
     And the "$mcp_tool_call" event property "$mcp_response" should not contain "hunter2"
 
   @server
+  Scenario: A PostHog token is redacted only as a whole word
+    Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
+    When the MCP client calls tool "search_docs" with JSON arguments:
+      """application/json
+      {"note":"key phc_AbCdEfGhIjKlMnOpQrStUvWx for graphs_per_dashboard_and_insight"}
+      """
+    And pending captures are flushed
+    Then the "$mcp_tool_call" event property "$mcp_parameters" should not contain "phc_AbCdEfGhIjKlMnOpQrStUvWx"
+    And the "$mcp_tool_call" event property "$mcp_parameters" should contain "graphs_per_dashboard_and_insight"
+
+  @server
   Scenario: A successful call's response is captured by default
     Given an instrumented MCP server with a tool "search_docs" that returns the text "Found 3 results"
     When the MCP client calls tool "search_docs" with JSON arguments:

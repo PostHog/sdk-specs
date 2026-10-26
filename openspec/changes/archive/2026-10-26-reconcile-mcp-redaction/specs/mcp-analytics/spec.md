@@ -20,17 +20,21 @@ sending, the SDK SHALL:
   number, boolean, or flat array of those; a string may be cut off at a line end or the text's end,
   even after a trailing `\`. Values that nest objects, and JSON inside a JSON string, are out of scope;
 - replace with the placeholder `[binary data redacted - not supported by PostHog MCP analytics]` a
-  string of 10,240 or more characters whose first and last 1,024 characters, once any trailing run of
-  `=` is set aside, are all base64 or base64url characters, `\r`, or `\n`, because MIME and PEM base64
-  break lines; or a `data:` URL whose header ends in `;base64,`;
+  string of 10,240 or more characters that is a `data:` URL whose header ends in `;base64,`, or that,
+  once any trailing run of `=` is set aside, is not empty and has first and last 1,024 characters all
+  from one alphabet: base64 with `\r` and `\n`, because MIME and PEM base64 break lines, or base64url;
 - redact email addresses, IP addresses, Luhn-valid card numbers, US social security numbers, and phone
   numbers from `$mcp_intent` and every property "Property reference" marks sanitized as free text.
 
-Object keys inside `$mcp_parameters` and `$mcp_response` are captured strings too: each SHALL get every
-pass that property's string values get, with the key limit of "Property reference" in place of the
-string limit, because a result keyed by data (a link check keyed by signed URL) carries the credential
-in the key. The key list is matched against the key as received. When cutting or redaction makes two
-keys of one object equal, the SDK SHALL keep exactly one of their entries.
+Object keys inside `$mcp_parameters` and `$mcp_response` are captured strings too, because a result
+keyed by data (a link check keyed by signed URL) carries the credential in the key. The key list is
+matched against each key as received; the key then SHALL get the PostHog token, URL, JSON member, and
+binary passes, with the key limit of "Property reference" in place of the string limit. The SHOULD on
+other credential-shaped values below does not extend to keys, because entropy detectors read field names
+such as `Get_Organization_Memberships` as credentials. When cutting or redaction makes keys of one object
+equal, the SDK SHALL keep the entry whose key as received sorts first by Unicode code point.
+`$mcp_input_keys` SHALL count a name the PostHog token or URL pass would change as a name that was not
+recorded.
 
 These passes SHALL cost in proportion to the property limits, not to the payload. The SDK SHALL first
 apply the entry and nesting limits of "Property reference" and the key-based redaction. For each
@@ -78,7 +82,7 @@ drops its `$exception`.
 - **AND** the "$mcp_parameters" should contain "graphs_per_dashboard_and_insight"
 
 #### Scenario: Line-wrapped base64 in a result is replaced
-- **GIVEN** an MCP server instrumented by the SDK with a tool "export" that returns a text block of 12,000 base64 characters broken by `\r\n` every 76 characters and ending in "=="
+- **GIVEN** an MCP server instrumented by the SDK with a tool "export" that returns a text block of 157 lines of 76 base64 characters joined by `\r\n`, the last line ending in "=="
 - **WHEN** an MCP client calls tool "export"
 - **AND** the SDK is flushed
 - **THEN** the first text block in "$mcp_response" should be "[binary data redacted - not supported by PostHog MCP analytics]"

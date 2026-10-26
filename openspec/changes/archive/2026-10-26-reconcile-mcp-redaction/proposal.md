@@ -11,10 +11,11 @@ that every SDK fails in the same way does not tell a new SDK what to build, so e
 - Applicability lists `posthog-rs | posthog_rs::mcp` (feature `mcp`, rmcp adapter), and "Library
   identity" names `posthog-rs-mcp` with `$lib_version` from `posthog-rs`.
 - The binary check accepts `\r` and `\n` in its edge windows and ignores any trailing run of `=`. The
-  spec follows the SDKs.
+  spec follows the SDKs, keeping the two alphabets separate.
 - The PostHog token pattern matches only between ASCII word boundaries. The spec follows the SDKs.
 - Object keys in `$mcp_parameters` and `$mcp_response` get the same passes as that property's string
-  values. The spec keeps this rule, states it outright, and the SDKs change.
+  values (PostHog token, URL, JSON member, binary), with a deterministic rule for keys that become equal.
+  The spec keeps this rule, states it outright, and the SDKs change.
 - Scenarios for each of the three rules.
 
 ## Capabilities
@@ -29,8 +30,8 @@ _None._
 
 ## Impact
 
-Line-wrapped base64 and tokens are already handled this way by every SDK, so events do not change for
-those two rules. Keys that carry a credential or a signed URL stop reaching PostHog once
-posthog-js, posthog-python, posthog-go, and posthog-rs redact keys. posthog-js, posthog-python, and
-posthog-go also need the binary check read from the edges, and posthog-python needs an ASCII word
-boundary; design.md lists each change.
+Events change only as the SDKs listed in design.md adopt the rules. Keys that carry a signed URL or a
+PostHog token stop reaching PostHog once each SDK redacts keys. posthog-js, posthog-python, and posthog-go
+read the binary check from the edges, posthog-python also starts replacing base64url blobs and `data:`
+URLs and stops missing tokens next to non-ASCII letters, and posthog-rs stops replacing long
+newline-separated lists of UUIDs and snake_case names.

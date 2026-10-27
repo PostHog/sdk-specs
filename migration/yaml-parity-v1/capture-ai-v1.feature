@@ -42,6 +42,7 @@ Feature: AI capture v1 YAML parity
       | /i/v1/analytics/events |
     And no capture request should use "/i/v1/ai/events"
 
+  @requires:capture_ai_returns_uuid
   Scenario: AI capture returns the generated wire UUID
     When capture_ai is called with JSON arguments:
       """application/json
@@ -52,6 +53,7 @@ Feature: AI capture v1 YAML parity
     Then the first received event UUID should be valid
     And the AI capture return should equal the first received event UUID
 
+  @requires:capture_ai_returns_uuid @requires:event_uuid_override
   Scenario: AI capture preserves a supplied UUID in its return and on the wire
     When capture_ai is called with JSON arguments:
       """application/json

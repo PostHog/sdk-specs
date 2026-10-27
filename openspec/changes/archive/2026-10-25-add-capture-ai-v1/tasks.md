@@ -15,6 +15,6 @@
 - [x] 3.1 Run `openspec validate add-capture-ai-v1 --type change --strict`.
 - [x] 3.2 Archive the change on this branch (`openspec archive add-capture-ai-v1 --yes`), then apply the "Narrative alignment" notes to the canonical spec by hand.
 - [x] 3.3 Run `openspec validate --specs --strict --no-interactive` and compare the totals with `main` (67 passed, 0 failed on 2026-10-25).
-- [ ] 3.4 Close or rebase draft #118, which this change supersedes.
+- [x] 3.4 Close or rebase draft #118, which this change supersedes (closed 2026-10-27).
 
 Validation note: the harness feature reuses phrases registered for `capture-ai.feature`, except the property-absence step, which the harness capture v1 suite update binds; no adapter declares `capture_ai_v1` yet, so the cases are discoverable but unselected until an SDK adapter adds the capability.

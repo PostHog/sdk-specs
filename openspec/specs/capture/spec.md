@@ -97,11 +97,9 @@ The following steps are the canonical flow for a single capture call. Client and
    - Server: use the caller-provided `distinct_id`. If the SDK supports a "context" abstraction (Python), fall back to the context's current distinct id.
 4. **Enrich properties.** A new properties dictionary is constructed by merging in this order (later values win):
    - **Client:**
-     1. Super/registered properties.
-     2. SDK environment properties (`$current_url`, `$host`, `$pathname`, `$browser`, `$os`, `$screen_height`, `$device_type`, etc.; mobile adds `$screen_name`, `$app_version`, `$device_manufacturer`; all: `$lib`, `$lib_version`), feature flag properties (`$feature/<key>`, `$active_feature_flags`) when enabled and flags are known, and `$groups` from registered groups merged with the event's groups (the event's group wins per group type).
-     3. Caller-supplied `properties`. These win over everything above (see **Caller-supplied event properties take precedence**).
-     4. Person-processing state (`$process_person_profile`, `$is_identified`) based on current identity state. The SDK sets these after the caller's properties, so a caller can't override them.
-     5. SDK-owned per-event keys that the SDK MAY set after the caller's properties: session properties (`$session_id`, `$window_id`) on client SDKs that support session replay, the session replay debug properties, and `$geoip_disable` when GeoIP is disabled.
+     1. Properties the SDK sets itself, such as SDK environment and feature flag properties, `$groups` from registered groups (the event's group wins per group type), `$is_identified` and `$process_person_profile`.
+     2. Super/registered properties.
+     3. Caller-supplied `properties`. These win over everything above, and `before_send` (step 6) can change the result (see **Caller-supplied event properties take precedence**).
    - **Server:** request-context properties, then caller-supplied `properties`, then SDK-stamped properties. Most server SDKs stamp `$lib` and `$lib_version` over the caller's values, and SDKs with SDK-level default properties (python `super_properties`, go `DefaultEventProperties`, dotnet `SuperProperties`, elixir `global_properties`) apply them after the caller's properties too. `$groups` comes from the `groups` option.
 5. **Attach envelope fields.** Assign `timestamp` (caller override or `now()`, serialized in ISO 8601 and normalized to its equivalent UTC instant regardless of the input's original timezone/offset, preserving sub-second precision when the input carries it), `uuid` (caller override or a freshly generated UUIDv7; server SDKs normalize it to canonical lowercase hyphenated form), `distinct_id`, and `event` to the message. Server SDKs additionally stamp `$lib` / `$lib_version` onto properties here if not already present.
 6. **Run `before_send` hook.** If the SDK has been configured with a `before_send` callback (Python, Go, posthog-js, .NET), invoke it with the fully-assembled message. The callback may return a modified message, or return `null`/`None` to drop the event. If the callback throws, log a warning, stop the hook chain, and drop the event. Never enqueue the original or partially processed message after a hook failure. Server SDKs re-normalize the message `uuid` after the hook returns, because the hook may have replaced it with another accepted form.
@@ -144,9 +142,7 @@ The following steps are the canonical flow for a single capture call. Client and
 - **Autocapture / pageview / heatmaps** — these features internally call capture with reserved event names (`$autocapture`, `$pageview`, `$pageleave`, `$heatmap`, `$web_vitals`).
 - **Exception capture** — `captureException` wraps `capture` with event name `$exception` and a normalized stacktrace property. Calling `capture('$exception', ...)` directly produces a warning in SDKs that ship `captureException` (posthog-js, posthog-python).
 - **Before-send hook / privacy filters** — capture is the integration point for drop/mutate hooks; see the before-send hook spec.
-
 ## Requirements
-
 ### Requirement: Canonical capture behavior
 
 The SDK SHALL implement the canonical `capture` behavior described by this spec. Implementations MAY adapt method names, parameter casing, type syntax, and lifecycle hooks to platform idioms where this spec explicitly allows variation, but MUST preserve the observable outcomes in the scenarios below.
@@ -394,16 +390,19 @@ The environment value SHALL act as a default, not an override: an explicit `$rel
 
 ### Requirement: Caller-supplied event properties take precedence
 
-On client SDKs, a property the caller passes on an event SHALL win over a registered (super) property with the same key and over an SDK context property with the same key, such as `$lib`, `$lib_version`, `$os`, `$app_version`, `$screen_width`, `$current_url`, `$screen_name`, `$feature/<key>` or `$active_feature_flags`. A group the caller passes for the event SHALL win over a registered group of the same type.
+On client SDKs, an event's properties SHALL be merged in this order, each layer overwriting the one before:
 
-The SDK SHALL set `$is_identified` and `$process_person_profile` after merging the caller's properties, so a caller can't override the SDK's identity or person-processing state for a single event.
+1. Properties the SDK sets itself.
+2. Registered (super) properties.
+3. The properties the caller passes on the event.
 
-The SDK MAY also set these SDK-owned per-event keys after merging the caller's properties:
+`before_send` (Behavior step 6) then runs over the assembled message and can change any of them.
 
-- the session replay debug properties (`$recording_status` and the `$sdk_debug_*` keys), as defined by `session-replay-debug-properties`
-- `$session_id` and `$window_id`. posthog-js and `@posthog/core`-based SDKs set the current session; posthog-ios and posthog-android keep a non-empty caller-supplied `$session_id`.
-- `$geoip_disable`, when the SDK is configured to disable GeoIP
-- posthog-js page and session bookkeeping, such as `token`, `$config_defaults`, `$duration` and the `$session_entry_*` and pageview properties
+A registered or caller value for a key the SDK sets itself changes that event only. It SHALL NOT change the SDK's own state: a later event without that key carries the SDK's value again, and a caller `$process_person_profile` does not turn person processing on or off for the SDK.
+
+The project token is request routing, not an event property. Where an SDK carries it on the event (posthog-js stamps `token` on every event and takes the batch `api_key` from it), the SDK SHALL set the configured token on every event, and a registered or caller `token` SHALL NOT replace it.
+
+A group the caller passes for the event SHALL win over a registered group of the same type.
 
 This requirement does not apply to server SDKs. Most server SDKs set `$lib` and `$lib_version` after the caller's properties, and python, go, dotnet and elixir apply their SDK-level default properties after the caller's properties as well.
 
@@ -421,7 +420,22 @@ This requirement does not apply to server SDKs. Most server SDKs set `$lib` and 
   | property | value      |
   | $lib     | custom-lib |
 
-#### Scenario: Caller can't override person-processing state (@client)
+#### Scenario: Registered property overrides an SDK-set property (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and person profiles mode "never"
+- **AND** registered properties are:
+  | property       | value |
+  | $is_identified | true  |
+- **WHEN** capture is called with event "Signed Up"
+- **THEN** one event named "Signed Up" should be enqueued
+- **AND** the enqueued event properties should include:
+  | property       | value |
+  | $is_identified | true  |
+
+#### Scenario: Caller property overrides an SDK-set property (@client)
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
 - **AND** persistent storage is empty
@@ -433,6 +447,23 @@ This requirement does not apply to server SDKs. Most server SDKs set `$lib` and 
   | $is_identified          | true  |
 - **THEN** one event named "Signed Up" should be enqueued
 - **AND** the enqueued event properties should include:
+  | property                | value |
+  | $process_person_profile | true  |
+  | $is_identified          | true  |
+
+#### Scenario: Caller property changes that event only (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and person profiles mode "never"
+- **WHEN** capture is called with event "Signed Up" and properties:
+  | property                | value |
+  | $process_person_profile | true  |
+  | $is_identified          | true  |
+- **AND** capture is called with event "Viewed Dashboard"
+- **THEN** one event named "Viewed Dashboard" should be enqueued
+- **AND** the enqueued "Viewed Dashboard" event properties should include:
   | property                | value |
   | $process_person_profile | false |
   | $is_identified          | false |

@@ -21,7 +21,7 @@ The current spec predates all four: it names only Python and Node, ties wrapper 
 **Non-Goals:**
 - The analytics wire, headers, retries and layer order, which `add-capture-v1` covers and this change references.
 - The OpenTelemetry AI bridge requirement, unchanged.
-- Client-SDK AI capture (posthog-ios 4.0 adds `captureAi` in review; not covered here).
+- The client-SDK persistence model beyond the "Client SDKs:" notes (durable queue, disk cap); posthog-ios 4.0, posthog-android 4.0 and posthog-flutter 6.0 are in scope through those notes.
 
 ## Decisions
 

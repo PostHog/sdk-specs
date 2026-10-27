@@ -47,4 +47,4 @@ Spec-only. Archive on this branch after review. SDK adapters declare `capture_ai
 
 ## Open Questions
 
-- Whether capture v1 SDKs should retry `404` on the AI endpoint (a deployment without the AI lane) is under review on the PostHog side; today it is terminal, like analytics.
+- Resolved 2026-10-27: capture v1 SDKs retry `404` on the AI endpoint (a deployment without the AI lane) the same way as on analytics, per `retry-queue`.

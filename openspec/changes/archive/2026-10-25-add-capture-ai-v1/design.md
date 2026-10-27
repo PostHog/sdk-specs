@@ -33,7 +33,7 @@ The current spec predates all four: it names only Python and Node, ties wrapper 
 
 **Size is measured where the server measures it, or with headroom.** Capture measures `properties` only. posthog-rs and posthog-node measure `properties` exactly; posthog-python and posthog-go measure the whole event and add 64 KiB of headroom. The requirement fixes the observable rule (never refuse an event capture accepts; never send one it refuses) and allows either mechanism.
 
-**The harness feature mirrors the v0 one.** `capture-ai-v1.feature` reuses the registered step phrases of `capture-ai.feature` with the v1 path, so no new bindings are needed. It is selected by `@requires:capture_ai_v1`; the v0 feature keeps `capture_ai_v0`.
+**The harness feature mirrors the v0 one.** `capture-ai-v1.feature` reuses the registered step phrases of `capture-ai.feature` with the v1 path; its one new phrase, property absence, is bound in the harness with the capture v1 suite update. It is selected by `@requires:capture_ai_v1`; the v0 feature keeps `capture_ai_v0`.
 
 ## Risks / Trade-offs
 

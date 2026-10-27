@@ -10,7 +10,7 @@ Feature: AI capture v1 YAML parity
   Scenario: AI capture uses the capture v1 AI endpoint
     When capture_ai is called with JSON arguments:
       """application/json
-      {"distinct_id":"test_user","event":"$ai_generation"}
+      {"distinct_id":"test_user","event":"$ai_generation","properties":{"$ai_model":"gpt"}}
       """
     And pending captures are flushed
     Then exactly 1 capture request should have been received

@@ -29,5 +29,5 @@ _None._
 ## Impact
 
 - posthog-python `v1`, posthog-go `v1`, posthog-rs `v1` and the posthog-node capture v1 series conform, with the variations each requirement records (named in `design.md`). The legacy SDKs (browser, React Native, Android, Flutter on non-Apple platforms, Ruby, PHP, .NET, Elixir, Java) stay on the legacy requirements until their own capture v1 major; the new requirements are scoped to SDKs that deliver through capture v1, and the `capture_v0*` harness features are untouched.
-- Open sdk-specs PRs that touch the same ground: #145 (server flag properties; folded in here), #140 (non-finite numbers; this change records the Go local drop as an allowed variation, which #140 forbids), #81 (gzip by default; the v1 server SDKs default to no compression). These need one decision each before merge.
+- Open sdk-specs PRs that touch the same ground: #145 (server flag properties; folded in here), #140 (non-finite numbers; this change requires `null`, as #140 does), #81 (gzip by default; the v1 server SDKs default to no compression). These need one decision each before merge.
 - `migration/yaml-parity-v1` already carries `capture_v1` cases for the wire, outcomes and retries; this change gives them a canonical home and adds no harness cases.

@@ -31,7 +31,7 @@ The canonical specs predate the port. `capture` still says server SDKs stamp `$l
 **Scope by delivery wire, not by SDK name.** Requirements open with "An SDK that delivers events through capture v1 SHALL…". The harness already selects by the adapter's `capture_v1` / `capture_v0` capability, so a legacy SDK is neither selected nor failed. Per-SDK option names appear only as examples.
 
 **Record variations the SDK owners accepted instead of picking a new winner.** Where the four implementations differ on purpose, the requirement names the allowed variation:
-- Non-finite numbers: Python, Rust and Node serialize `NaN` and `±Infinity` as JSON `null`; Go drops that event locally and reports it. Both keep the batch valid, which is the rule. This conflicts with the stricter wording proposed in #140 ("SHALL NOT cause the event to be dropped"); one of the two must give way before merge.
+- Non-finite numbers: every server SDK sends `NaN` and `±Infinity` as JSON `null` and keeps the event, as #140 proposes. Rust and Node get `null` from their encoders; Python and Go v2 encode each event strictly first and rewrite non-finite numbers only for an event whose encoding fails (posthog-python #1125, posthog-go #394), so events without one cost nothing extra. iOS and Android drop the non-finite property and keep the event.
 - Compression default: Python, Go and Rust default to none; Node keeps gzip. #81 says gzip by default; it was written for client SDKs and needs a scope note or an exception.
 - A missing distinct id: Python, Rust and Node generate a personless id; Go without a request context returns an error. Both are long-standing and kept.
 - Timestamp digits: any count at or above milliseconds.
@@ -54,6 +54,6 @@ Spec-only. The four SDK branches already implement these rules; their migration 
 
 ## Open Questions
 
-- #140: keep Go's local drop of a non-finite event as an allowed variation, or require `null` everywhere (Go's owners declined the sanitizing pass on cost grounds)?
+- #140: resolved, `null` everywhere. Go v2 moved to `null` with a strict-encode-first fallback (posthog-go #394), which avoids the per-event cost of the sanitizing pass.
 - #81: scope the gzip-by-default requirement to client SDKs, or record the v1 server default of no compression as an exception?
 - Whether capture v1 SDKs should retry 404 or 429 is under review on the PostHog side; today both are terminal.

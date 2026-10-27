@@ -102,7 +102,7 @@ The following steps are the canonical flow for a single capture call. Client and
      3. Caller-supplied `properties`. These win over everything above (see **Caller-supplied event properties take precedence**).
      4. Person-processing state (`$process_person_profile`, `$is_identified`) based on current identity state. The SDK sets these after the caller's properties, so a caller can't override them.
      5. SDK-owned per-event keys that the SDK MAY set after the caller's properties: session properties (`$session_id`, `$window_id`) on client SDKs that support session replay, the session replay debug properties, and `$geoip_disable` when GeoIP is disabled.
-   - **Server:** request-context properties, then caller-supplied `properties`, then SDK-stamped properties. Most server SDKs stamp `$lib` and `$lib_version` over the caller's values, and SDKs with SDK-level default properties (python `super_properties`, go `DefaultEventProperties`, dotnet `SuperProperties`, elixir `global_properties`) apply them after the caller's properties too. `$groups` comes from the `groups` option.
+   - **Server:** request-context properties, then caller-supplied `properties`, then SDK-stamped properties. Most server SDKs stamp `$lib` and `$lib_version` over the caller's values, and SDKs with SDK-level default properties (python `super_properties`, go `DefaultEventProperties`, dotnet `SuperProperties`, elixir `global_properties`) apply them after the caller's properties too. The feature flag properties (`$feature/<key>`, `$active_feature_flags`) from a flags snapshot or `send_feature_flags` are values the SDK adds and fill only keys the layers above left unset (see **Server SDKs add feature flag properties as defaults**). `$groups` comes from the `groups` option.
 5. **Attach envelope fields.** Assign `timestamp` (caller override or `now()`, serialized in ISO 8601 and normalized to its equivalent UTC instant regardless of the input's original timezone/offset, preserving sub-second precision when the input carries it), `uuid` (caller override or a freshly generated UUIDv7; server SDKs normalize it to canonical lowercase hyphenated form), `distinct_id`, and `event` to the message. Server SDKs additionally stamp `$lib` / `$lib_version` onto properties here if not already present.
 6. **Run `before_send` hook.** If the SDK has been configured with a `before_send` callback (Python, Go, posthog-js, .NET), invoke it with the fully-assembled message. The callback may return a modified message, or return `null`/`None` to drop the event. If the callback throws, log a warning, stop the hook chain, and drop the event. Never enqueue the original or partially processed message after a hook failure. Server SDKs re-normalize the message `uuid` after the hook returns, because the hook may have replaced it with another accepted form.
 7. **Deliver.**
@@ -139,7 +139,7 @@ The following steps are the canonical flow for a single capture call. Client and
 - **`register` / `unregister`** (client) — mutate the super properties that capture merges into every event.
 - **`group` / `group_identify`** — populate the `$groups` property that capture attaches to each event.
 - **`alias`** — internally dispatches a `capture` call with event name `$create_alias`.
-- **Feature flags** — when `send_feature_flags` is enabled, capture calls into the flag evaluator (local or remote) to stamp `$feature/<key>` and `$active_feature_flags` onto the event.
+- **Feature flags** — when `send_feature_flags` is enabled, or when the caller passes a flags snapshot, capture calls into the flag evaluator (local or remote) to stamp `$feature/<key>` and `$active_feature_flags` onto the event. On server SDKs these fill only the keys the caller, the request context and the SDK-level default properties left unset.
 - **Session replay** — on client SDKs that support replay, capture updates session state so that replay snapshots remain attached to the same `$session_id`.
 - **Autocapture / pageview / heatmaps** — these features internally call capture with reserved event names (`$autocapture`, `$pageview`, `$pageleave`, `$heatmap`, `$web_vitals`).
 - **Exception capture** — `captureException` wraps `capture` with event name `$exception` and a normalized stacktrace property. Calling `capture('$exception', ...)` directly produces a warning in SDKs that ship `captureException` (posthog-js, posthog-python).
@@ -591,3 +591,46 @@ A backward clock change SHALL only pause refill until the clock catches up. It S
 - **AND** no event named "Four" should be enqueued
 - **AND** one event named "Five" should be enqueued
 
+### Requirement: Server SDKs add feature flag properties as defaults
+
+On server SDKs, the `$feature/<key>` and `$active_feature_flags` properties a capture call
+derives from a flags snapshot or from `send_feature_flags` are values the SDK adds, not values
+the caller set. They SHALL fill only the keys left unset by the event's own properties and, where
+the SDK has them, by the ambient request context and the SDK-level default/super properties
+(`super_properties`, `DefaultEventProperties`, `SuperProperties`, `global_properties`). An SDK
+that has no such layer is not required to add one.
+
+`$active_feature_flags` follows the same rule as a single `$feature/<key>`: a value supplied by
+any of those layers replaces the SDK's list rather than merging with it.
+
+The SDK SHALL stamp the flag properties before `before_send` runs, so a hook sees the resolved
+values and can change or remove them.
+
+#### Scenario: Flag properties land on an event that sets none of them (@server)
+- **GIVEN** the SDK resolves flag "beta-ui" to "variant-a" for the captured distinct id
+- **WHEN** capture is called with event "Save" and a flags snapshot, or with `send_feature_flags` enabled
+- **THEN** the enqueued "Save" event should have property "$feature/beta-ui" equal to "variant-a"
+- **AND** it should have "beta-ui" in "$active_feature_flags"
+
+#### Scenario: A property on the call wins over the flag value (@server)
+- **GIVEN** the SDK resolves flag "beta-ui" to "variant-a" for the captured distinct id
+- **WHEN** capture is called with event "Save", property "$feature/beta-ui" equal to "override", and a flags snapshot, or with `send_feature_flags` enabled
+- **THEN** the enqueued "Save" event should have property "$feature/beta-ui" equal to "override"
+
+#### Scenario: A request context value wins over the flag value (@server)
+- **GIVEN** the SDK resolves flag "beta-ui" to "variant-a" for the captured distinct id
+- **AND** the SDK's ambient request context carries "$feature/beta-ui" equal to "from-context"
+- **WHEN** capture is called with event "Save" and a flags snapshot, or with `send_feature_flags` enabled
+- **THEN** the enqueued "Save" event should have property "$feature/beta-ui" equal to "from-context"
+
+#### Scenario: An SDK-level default property wins over the flag value (@server)
+- **GIVEN** the SDK resolves flag "beta-ui" to "variant-a" for the captured distinct id
+- **AND** the SDK's default/super properties carry "$feature/beta-ui" equal to "from-default"
+- **WHEN** capture is called with event "Save" and a flags snapshot, or with `send_feature_flags` enabled
+- **THEN** the enqueued "Save" event should have property "$feature/beta-ui" equal to "from-default"
+
+#### Scenario: before_send can remove a flag property (@server)
+- **GIVEN** the SDK resolves flag "beta-ui" to "variant-a" for the captured distinct id
+- **AND** a before_send hook that deletes "$feature/beta-ui" from the event properties
+- **WHEN** capture is called with event "Save" and a flags snapshot, or with `send_feature_flags` enabled
+- **THEN** the delivered "Save" event should omit "$feature/beta-ui"

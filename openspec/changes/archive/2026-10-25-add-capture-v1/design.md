@@ -46,7 +46,7 @@ The canonical specs predate the port. `capture` still says server SDKs stamp `$l
 - [Legacy SDKs read as non-conformant on new rows of `compliance/<sdk>.md`] → the rows are scoped to capture v1, so an audit records "not yet on capture v1" rather than a defect. Their next-major port closes the rows.
 - [The posthog-node series is unmerged and can still change] → requirements cite only behavior that is also in Python, Go or Rust; Node-only details are limited to option names in examples. Re-check at the Node 6 release.
 - [Open spec PRs #140, #81, #145 overlap] → named in the proposal's Impact; each needs a decision before this change merges.
-- [Capture's retry rules for 404 and 429 are under review on the PostHog side] → the requirement states today's rule (terminal) and the design notes the review. If it changes, one requirement and one scenario change.
+- [404 and 429 were terminal in the first draft] → decided 2026-10-27: both are retried like `408` and the `5xx` statuses, so a transient status does not drop data. The requirement and both scenario tables carry the decided rule.
 
 ## Migration Plan
 
@@ -56,4 +56,3 @@ Spec-only. The four SDK branches already implement these rules; their migration 
 
 - #140: resolved, `null` everywhere. Go v2 moved to `null` with a strict-encode-first fallback (posthog-go #394), which avoids the per-event cost of the sanitizing pass.
 - #81: scope the gzip-by-default requirement to client SDKs, or record the v1 server default of no compression as an exception?
-- Whether capture v1 SDKs should retry 404 or 429 is under review on the PostHog side; today both are terminal.

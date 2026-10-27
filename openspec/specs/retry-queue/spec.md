@@ -47,7 +47,7 @@ nextDelay(attempt): Duration
    - The batch is sent to PostHog using the configured HTTP transport.
 5. **Classify failures.**
    - Legacy capture. Retryable: network errors, many server errors, rate limits / `429`, timeouts, and some transient transport errors. Non-retryable: malformed payloads, most 4xx client errors, or SDK-specific parse/serialization failures.
-   - Capture v1. Retryable: exactly `408`, `500`, `502`, `503`, `504`, network errors and timeouts, plus the `retry` entries of a 2xx `results` map. Everything else is terminal, including `429`, which comes from a layer in front of capture and carries no `Retry-After`. See **Capture v1 status classification and attempt budget**.
+   - Capture v1. Retryable: exactly `404`, `408`, `429`, `500`, `502`, `503`, `504`, network errors and timeouts, plus the `retry` entries of a 2xx `results` map. Everything else is terminal. `429` comes from a layer in front of capture and carries no `Retry-After` today, so its retries use the normal waits. See **Capture v1 status classification and attempt budget**.
 6. **Apply retry policy for retryable failures.**
    - Retry after an exponential or linear backoff delay.
    - Some SDKs pause flushing globally until the backoff window expires.
@@ -255,13 +255,13 @@ Jitter is an availability measure, not a correctness one. An SDK whose platform 
 
 ### Requirement: Capture v1 status classification and attempt budget
 
-An SDK that delivers events through capture v1 SHALL retry a capture request only on HTTP `408`, `500`, `502`, `503` and `504`, on a network error or timeout before a response is read, and for the `retry` entries of a 2xx `results` map. Every other response SHALL be terminal for the request, including `400`, `401`, `402` (billing limit; no per-event results, so every event in the request is reported lost), `404`, `413`, `415` and `429`. The SDK SHALL NOT fall back to a legacy endpoint on `404` and SHALL NOT split or halve the batch on `413`. A 2xx whose body is not a readable `results` map is terminal.
+An SDK that delivers events through capture v1 SHALL retry a capture request only on HTTP `404`, `408`, `429`, `500`, `502`, `503` and `504`, on a network error or timeout before a response is read, and for the `retry` entries of a 2xx `results` map. `404` and `429` are retried like the server errors so that a transient status (a route still rolling out, an edge rate limit) does not drop data; after the last attempt the batch is reported with that status. Every other response SHALL be terminal for the request, including `400`, `401`, `402` (billing limit; no per-event results, so every event in the request is reported lost), `413` and `415`. The SDK SHALL NOT fall back to a legacy endpoint on `404` and SHALL NOT split or halve the batch on `413`. A 2xx whose body is not a readable `results` map is terminal.
 
 Each batch SHALL get at most four attempts by default (three retries), with the retry count configurable within a bounded range. The waits before the second, third and fourth attempts SHALL be 100 ms, 200 ms and 400 ms (100 ms doubling), each multiplied by a random factor in `[0.75, 1.25]`, and never above a 30 second ceiling. A `Retry-After` header SHALL raise the wait to at least its value, clamped to the ceiling, and the jitter SHALL never shorten it. `Retry-After` SHALL be honored on a retryable status and on a 2xx with `retry` entries. After the last attempt, every event still pending SHALL be reported as exhausted through the SDK's error surface. The SDK SHALL NOT keep the events for a later flush; the analytics and AI lanes of a capture v1 server SDK are in-memory queues, not durable queues.
 
 Resends SHALL be SDK attempts, with the header rules in `capture`: the HTTP library's own retry mechanism SHALL be off for capture requests, because a library retry resends the stale `PostHog-Request-Timestamp` and attempt number.
 
-Legacy capture: `429` was retried, several SDKs retried every `5xx`, and some shrank the batch on `413`. Whether capture v1 SDKs should retry `404` or `429` is under review; this requirement states today's rule.
+Legacy capture: `429` was retried, several SDKs retried every `5xx`, and some shrank the batch on `413`.
 
 #### Scenario: Retryable statuses are retried with doubling waits (@server)
 - **GIVEN** a fresh SDK acceptance test harness
@@ -280,7 +280,9 @@ Legacy capture: `429` was retried, several SDKs retried every `5xx`, and some sh
 - **AND** all recorded request attempts should be consecutive integers starting at one
   Examples:
   | status |
+  | 404    |
   | 408    |
+  | 429    |
   | 500    |
   | 502    |
   | 503    |
@@ -304,9 +306,7 @@ Legacy capture: `429` was retried, several SDKs retried every `5xx`, and some sh
   | 400    | request_parsing_error   |
   | 401    | invalid_api_token       |
   | 402    | billing_limit_exceeded  |
-  | 404    | not_found               |
   | 413    | payload_too_large       |
-  | 429    | rate_limited            |
 
 #### Scenario: Retry-After raises the wait and jitter never lowers it (@server)
 - **GIVEN** a fresh SDK acceptance test harness

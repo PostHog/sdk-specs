@@ -411,7 +411,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     Then at least 3 capture request should have been received
     And the first inter-request delay should be at least 100 milliseconds
 
-  # Source: yaml:029a94a:capture_v1:retry_behavior:max_retries_respected
+  # Source: yaml:486fb42:capture_v1:retry_behavior:max_retries_respected
   Scenario: Three configured retries produce exactly four requests after fifteen seconds
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -428,3 +428,51 @@ Feature: Analytics-v1 retries and mock response YAML parity
     And pending captures are flushed
     And 15000 milliseconds elapse without a public SDK call
     Then exactly 4 capture request should have been received
+
+  # Source: yaml:486fb42:capture_v1:retry_behavior:retries_on_404
+  Scenario: HTTP 404 is retried and a 200 is observed
+    Given the mock serves these ordered analytics responses:
+      | status | headers | body | event_results |
+      | 404 | {} | "{\\"error\\":\\"not_found\\",\\"error_description\\":\\"Mock 404\\",\\"error_uri\\":\\"https://posthog.com/docs/api\\"}" | null |
+      | 200 | {} | null | null |
+    And the SDK is initialized with token "phc_test_key" and no additional configuration
+    When capture is called with JSON arguments:
+      """application/json
+      {"distinct_id":"test_user","event":"test_event"}
+      """
+    And pending captures are flushed
+    And 5000 milliseconds elapse without a public SDK call
+    Then at least 2 capture request should have been received
+    And at least one recorded response should have status 200
+
+  # Source: yaml:486fb42:capture_v1:retry_behavior:retries_on_429
+  Scenario: HTTP 429 is retried and a 200 is observed
+    Given the mock serves these ordered analytics responses:
+      | status | headers | body | event_results |
+      | 429 | {} | "{\\"error\\":\\"rate_limited\\",\\"error_description\\":\\"Mock 429\\",\\"error_uri\\":\\"https://posthog.com/docs/api\\"}" | null |
+      | 200 | {} | null | null |
+    And the SDK is initialized with token "phc_test_key" and no additional configuration
+    When capture is called with JSON arguments:
+      """application/json
+      {"distinct_id":"test_user","event":"test_event"}
+      """
+    And pending captures are flushed
+    And 5000 milliseconds elapse without a public SDK call
+    Then at least 2 capture request should have been received
+    And at least one recorded response should have status 200
+
+  # Source: yaml:486fb42:capture_v1:retry_behavior:retries_on_502
+  Scenario: HTTP 502 is retried and a 200 is observed
+    Given the mock serves these ordered analytics responses:
+      | status | headers | body | event_results |
+      | 502 | {} | "{\\"error\\":\\"bad_gateway\\",\\"error_description\\":\\"Mock 502\\",\\"error_uri\\":\\"https://posthog.com/docs/api\\"}" | null |
+      | 200 | {} | null | null |
+    And the SDK is initialized with token "phc_test_key" and no additional configuration
+    When capture is called with JSON arguments:
+      """application/json
+      {"distinct_id":"test_user","event":"test_event"}
+      """
+    And pending captures are flushed
+    And 5000 milliseconds elapse without a public SDK call
+    Then at least 2 capture request should have been received
+    And at least one recorded response should have status 200

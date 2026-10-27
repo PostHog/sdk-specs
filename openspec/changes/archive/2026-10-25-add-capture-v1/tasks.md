@@ -18,4 +18,8 @@
 - [x] 3.3 Run `openspec validate --specs --strict --no-interactive` and compare the totals with `main` (67 passed, 0 failed on 2026-10-25).
 - [ ] 3.4 Reconcile with sdk-specs #145 (flag properties), #140 (non-finite numbers) and #81 (compression default) before merge.
 
+## 4. Harness parity features
+
+- [x] 4.1 Mirror the harness capture v1 suite update (posthog-sdk-test-harness #92) in `migration/yaml-parity-v1`: `404`, `429` and `502` retry scenarios, and the `warning` result in place of `limited` (capture never sends `limited`).
+
 Validation note: these are specification checks. The scenarios are not opted in with `@sdk:server`; opting them in needs an end-to-end run of the harness against a real SDK adapter, which is a separate change.

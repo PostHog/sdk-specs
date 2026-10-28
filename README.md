@@ -44,6 +44,9 @@ capability-driven selection.
 
 | Capability | Spec | Scope | Status |
 |------------|------|-------|--------|
+| AI Datasets | [`openspec/specs/ai-datasets/spec.md`](openspec/specs/ai-datasets/spec.md) | public API (server) | Canonical |
+| AI Scorers | [`openspec/specs/ai-scorers/spec.md`](openspec/specs/ai-scorers/spec.md) | public API (server) | Canonical |
+| Offline Evaluations | [`openspec/specs/offline-evaluations/spec.md`](openspec/specs/offline-evaluations/spec.md) | public API (server) | Canonical |
 | Logs | [`openspec/specs/logs/spec.md`](openspec/specs/logs/spec.md) | product | Canonical |
 | Traces | [`openspec/specs/traces/spec.md`](openspec/specs/traces/spec.md) | product | Canonical |
 | MCP Analytics | [`openspec/specs/mcp-analytics/spec.md`](openspec/specs/mcp-analytics/spec.md) | product | Canonical |

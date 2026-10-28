@@ -97,18 +97,16 @@ The following steps are the canonical flow for a single capture call. Client and
    - Server: use the caller-provided `distinct_id`. If the SDK supports a "context" abstraction (Python), fall back to the context's current distinct id.
 4. **Enrich properties.** A new properties dictionary is constructed by merging in this order (later values win):
    - **Client:**
-     1. Super/registered properties.
-     2. SDK environment properties (`$current_url`, `$host`, `$pathname`, `$browser`, `$os`, `$screen_height`, `$device_type`, etc.; mobile adds `$screen_name`, `$app_version`, `$device_manufacturer`; all: `$lib`, `$lib_version`), feature flag properties (`$feature/<key>`, `$active_feature_flags`) when enabled and flags are known, and `$groups` from registered groups merged with the event's groups (the event's group wins per group type).
-     3. Caller-supplied `properties`. These win over everything above (see **Caller-supplied event properties take precedence**).
-     4. Person-processing state (`$process_person_profile`, `$is_identified`) based on current identity state. The SDK sets these after the caller's properties, so a caller can't override them.
-     5. SDK-owned per-event keys that the SDK MAY set after the caller's properties: session properties (`$session_id`, `$window_id`) on client SDKs that support session replay, the session replay debug properties, and `$geoip_disable` when GeoIP is disabled.
+     1. Properties the SDK sets itself, such as SDK environment and feature flag properties, `$groups` from registered groups (the event's group wins per group type), `$is_identified` and `$process_person_profile`.
+     2. Super/registered properties.
+     3. Caller-supplied `properties`. These win over everything above, and `before_send` (step 6) can change the result (see **Caller-supplied event properties take precedence**).
    - **Server:** request-context properties, then caller-supplied `properties`, then SDK-stamped properties. Most server SDKs stamp `$lib` and `$lib_version` over the caller's values, and SDKs with SDK-level default properties (python `super_properties`, go `DefaultEventProperties`, dotnet `SuperProperties`, elixir `global_properties`) apply them after the caller's properties too. `$groups` comes from the `groups` option.
-5. **Attach envelope fields.** Assign `timestamp` (caller override or `now()`, serialized in ISO 8601 and normalized to its equivalent UTC instant regardless of the input's original timezone/offset, preserving sub-second precision when the input carries it), `uuid` (caller override or a freshly generated UUIDv7), `distinct_id`, and `event` to the message. Server SDKs additionally stamp `$lib` / `$lib_version` onto properties here if not already present.
-6. **Run `before_send` hook.** If the SDK has been configured with a `before_send` callback (Python, Go, posthog-js, .NET), invoke it with the fully-assembled message. The callback may return a modified message, or return `null`/`None` to drop the event. If the callback throws, log a warning, stop the hook chain, and drop the event. Never enqueue the original or partially processed message after a hook failure.
+5. **Attach envelope fields.** Assign `timestamp` (caller override or `now()`, serialized in ISO 8601 and normalized to its equivalent UTC instant regardless of the input's original timezone/offset, preserving sub-second precision when the input carries it), `uuid` (caller override or a freshly generated UUIDv7; server SDKs normalize it to canonical lowercase hyphenated form), `distinct_id`, and `event` to the message. Server SDKs additionally stamp `$lib` / `$lib_version` onto properties here if not already present.
+6. **Run `before_send` hook.** If the SDK has been configured with a `before_send` callback (Python, Go, posthog-js, .NET), invoke it with the fully-assembled message. The callback may return a modified message, or return `null`/`None` to drop the event. If the callback throws, log a warning, stop the hook chain, and drop the event. Never enqueue the original or partially processed message after a hook failure. Server SDKs re-normalize the message `uuid` after the hook returns, because the hook may have replaced it with another accepted form.
 7. **Deliver.**
    - **Server (and `posthog-node`, `posthog-js/core` stateless):** push onto an in-memory queue (`max_queue_size` default 10,000). If the queue is full, drop the oldest element and log a warning (posthog-js core; `posthog-python` drops the new element). If queue size ≥ `flush_at` (default 20 client/core, 100 python-server), kick off a background flush. A periodic timer (`flush_interval`, typically 10s client / 10s–30s server) also triggers flushes.
    - **Client (browser):** forward to the request queue (`_requestQueue.enqueue`) unless `send_instantly` is set or batching is disabled, in which case send directly via `_send_retriable_request`. Flushes are opportunistic and aligned with network availability / page lifecycle (e.g. `sendBeacon` on `pagehide`).
-8. **Return.** Client SDKs return a `CaptureResult` object containing the event data (or `undefined` if dropped). Server SDKs return the generated UUID string (or `null`/`None` if dropped).
+8. **Return.** Client SDKs return a `CaptureResult` object containing the event data (or `undefined` if dropped). Server SDKs return the UUID string that was sent — the normalized, canonical form (or `null`/`None` if dropped).
 
 ## State & lifecycle
 
@@ -123,6 +121,7 @@ The following steps are the canonical flow for a single capture call. Client and
 - **Log and drop** when `before_send` throws. The SDK must not enqueue a fallback event because the failed hook may have been responsible for removing sensitive data.
 - **Log and swallow** other internal exceptions such as property enrichment or feature-flag-fetch failures. A failure to enqueue must not surface as an exception to the caller — the contract is that `capture` is fire-and-forget.
 - **Return sentinel** (`null`/`None`/`undefined`) when a drop occurs and the SDK's signature lets it express that. Some SDKs (Go, Java) lack a return value and communicate failure only via logging.
+- **Log and replace** (server SDKs) a caller-supplied `uuid` that cannot be parsed as a uuid, substituting a freshly generated UUIDv7. An unusable uuid override must not cost the caller the event.
 - **Never throw** to the caller under normal operation. Capture is latency-sensitive and lives on the hot path of application code; SDKs are expected to absorb all I/O and serialization errors internally.
 
 ## Concurrency & ordering
@@ -143,9 +142,7 @@ The following steps are the canonical flow for a single capture call. Client and
 - **Autocapture / pageview / heatmaps** — these features internally call capture with reserved event names (`$autocapture`, `$pageview`, `$pageleave`, `$heatmap`, `$web_vitals`).
 - **Exception capture** — `captureException` wraps `capture` with event name `$exception` and a normalized stacktrace property. Calling `capture('$exception', ...)` directly produces a warning in SDKs that ship `captureException` (posthog-js, posthog-python).
 - **Before-send hook / privacy filters** — capture is the integration point for drop/mutate hooks; see the before-send hook spec.
-
 ## Requirements
-
 ### Requirement: Canonical capture behavior
 
 The SDK SHALL implement the canonical `capture` behavior described by this spec. Implementations MAY adapt method names, parameter casing, type syntax, and lifecycle hooks to platform idioms where this spec explicitly allows variation, but MUST preserve the observable outcomes in the scenarios below.
@@ -393,16 +390,19 @@ The environment value SHALL act as a default, not an override: an explicit `$rel
 
 ### Requirement: Caller-supplied event properties take precedence
 
-On client SDKs, a property the caller passes on an event SHALL win over a registered (super) property with the same key and over an SDK context property with the same key, such as `$lib`, `$lib_version`, `$os`, `$app_version`, `$screen_width`, `$current_url`, `$screen_name`, `$feature/<key>` or `$active_feature_flags`. A group the caller passes for the event SHALL win over a registered group of the same type.
+On client SDKs, an event's properties SHALL be merged in this order, each layer overwriting the one before:
 
-The SDK SHALL set `$is_identified` and `$process_person_profile` after merging the caller's properties, so a caller can't override the SDK's identity or person-processing state for a single event.
+1. Properties the SDK sets itself.
+2. Registered (super) properties.
+3. The properties the caller passes on the event.
 
-The SDK MAY also set these SDK-owned per-event keys after merging the caller's properties:
+`before_send` (Behavior step 6) then runs over the assembled message and can change any of them.
 
-- the session replay debug properties (`$recording_status` and the `$sdk_debug_*` keys), as defined by `session-replay-debug-properties`
-- `$session_id` and `$window_id`. posthog-js and `@posthog/core`-based SDKs set the current session; posthog-ios and posthog-android keep a non-empty caller-supplied `$session_id`.
-- `$geoip_disable`, when the SDK is configured to disable GeoIP
-- posthog-js page and session bookkeeping, such as `token`, `$config_defaults`, `$duration` and the `$session_entry_*` and pageview properties
+A registered or caller value for a key the SDK sets itself changes that event only. It SHALL NOT change the SDK's own state: a later event without that key carries the SDK's value again, and a caller `$process_person_profile` does not turn person processing on or off for the SDK.
+
+The project token is request routing, not an event property. Where an SDK carries it on the event (posthog-js stamps `token` on every event and takes the batch `api_key` from it), the SDK SHALL set the configured token on every event, and a registered or caller `token` SHALL NOT replace it.
+
+A group the caller passes for the event SHALL win over a registered group of the same type.
 
 This requirement does not apply to server SDKs. Most server SDKs set `$lib` and `$lib_version` after the caller's properties, and python, go, dotnet and elixir apply their SDK-level default properties after the caller's properties as well.
 
@@ -420,7 +420,22 @@ This requirement does not apply to server SDKs. Most server SDKs set `$lib` and 
   | property | value      |
   | $lib     | custom-lib |
 
-#### Scenario: Caller can't override person-processing state (@client)
+#### Scenario: Registered property overrides an SDK-set property (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and person profiles mode "never"
+- **AND** registered properties are:
+  | property       | value |
+  | $is_identified | true  |
+- **WHEN** capture is called with event "Signed Up"
+- **THEN** one event named "Signed Up" should be enqueued
+- **AND** the enqueued event properties should include:
+  | property       | value |
+  | $is_identified | true  |
+
+#### Scenario: Caller property overrides an SDK-set property (@client)
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
 - **AND** persistent storage is empty
@@ -433,5 +448,177 @@ This requirement does not apply to server SDKs. Most server SDKs set `$lib` and 
 - **THEN** one event named "Signed Up" should be enqueued
 - **AND** the enqueued event properties should include:
   | property                | value |
+  | $process_person_profile | true  |
+  | $is_identified          | true  |
+
+#### Scenario: Caller property changes that event only (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and person profiles mode "never"
+- **WHEN** capture is called with event "Signed Up" and properties:
+  | property                | value |
+  | $process_person_profile | true  |
+  | $is_identified          | true  |
+- **AND** capture is called with event "Viewed Dashboard"
+- **THEN** one event named "Viewed Dashboard" should be enqueued
+- **AND** the enqueued "Viewed Dashboard" event properties should include:
+  | property                | value |
   | $process_person_profile | false |
   | $is_identified          | false |
+
+### Requirement: Client-level GeoIP control with per-call override
+
+A server SDK SHALL expose a client-level GeoIP option (`disableGeoip`, `disable_geoip`, or the
+platform's casing) that controls whether the events it sends ask the backend to skip GeoIP
+enrichment. That option SHOULD default to disabling enrichment: server SDKs send events from
+their own network, so enriching them would attribute every event to the server's location.
+posthog-php and posthog-rs currently default to enabling enrichment. Changing a shipped default
+is a breaking change, so each SDK makes it, if at all, in its next major release. Client SDKs
+SHALL NOT require the option: they run in the end user's network context, where GeoIP
+enrichment is the intended behavior.
+
+Event-producing APIs that accept options — at least `capture`, `identify`, `alias`, and
+`group_identify` — SHALL accept the same option per call. A per-call value that is not set
+(omitted or null) SHALL inherit the client-level setting and SHALL NOT be read as `false`. An
+explicitly set per-call value SHALL override the client-level setting in both directions: an
+explicit `false` SHALL re-enable GeoIP enrichment for that call even when the client-level
+setting disables it.
+
+An SDK whose shipped per-call option can't represent "not set", such as posthog-go's
+non-nullable `DisableGeoIP` message field, conforms by keeping the client-level setting
+authoritative for that API until a major release lets it tell an unset value from an explicit
+one. It SHALL NOT read the zero value as an explicit `false`. Scenarios that need an explicit
+per-call override on an event API are tagged `@geoip_per_call_unset_capable`.
+
+When the effective value disables GeoIP, the SDK SHALL mark the event with
+`$geoip_disable: true` among the event's ordinary properties and SHALL stamp it before
+`before_send` runs, so a hook can inspect, replace, or remove it. The marker SHALL NOT be copied
+into `$set`, `$set_once`, or `$group_set`, because it is event context rather than a person or
+group property. When the effective value does not disable GeoIP, the SDK SHALL omit the marker
+and SHALL NOT remove a `$geoip_disable` property the caller supplied in the call's properties.
+
+A remote feature-flag evaluation request SHALL carry the same effective value as the
+`geoip_disable` field of its request body, resolved from the per-call option where the flag API
+exposes one and otherwise from the client-level setting.
+
+`$geoip_disable` is a processing-control sentinel in the sense of the
+`feature-flag-called-tracker` minimal-event allowlist, so a minimized `$feature_flag_called`
+event SHALL retain it when the SDK stamped it.
+
+#### Scenario: The client-level setting marks an ordinary event (@server)
+- **GIVEN** the client is constructed with the GeoIP option set to disable enrichment
+- **WHEN** capture is called with event "Save" and no per-call GeoIP option
+- **THEN** the enqueued "Save" event should have property "$geoip_disable" equal to true
+
+#### Scenario: An explicit per-call false re-enables enrichment for one call (@server @geoip_per_call_unset_capable)
+- **GIVEN** the client is constructed with the GeoIP option set to disable enrichment
+- **WHEN** capture is called with event "Save" and the per-call GeoIP option set to false
+- **THEN** the enqueued "Save" event should omit "$geoip_disable"
+- **WHEN** capture is called with event "Save Again" and no per-call GeoIP option
+- **THEN** the enqueued "Save Again" event should have property "$geoip_disable" equal to true
+
+#### Scenario: An omitted per-call value inherits an enabled client setting (@server)
+- **GIVEN** the client is constructed with the GeoIP option set to allow enrichment
+- **WHEN** capture is called with event "Save" and no per-call GeoIP option
+- **THEN** the enqueued "Save" event should omit "$geoip_disable"
+
+#### Scenario: A caller-supplied marker survives an enabled client setting (@server)
+- **GIVEN** the client is constructed with the GeoIP option set to allow enrichment
+- **WHEN** capture is called with event "Save" and properties:
+  | property        | value |
+  | $geoip_disable  | true  |
+- **THEN** the enqueued "Save" event should have property "$geoip_disable" equal to true
+
+#### Scenario: Group identify carries the marker outside $group_set (@server)
+- **GIVEN** the client is constructed with the GeoIP option set to disable enrichment
+- **WHEN** group identify is called for group type "company" and key "acme" with properties:
+  | property | value |
+  | name     | Acme  |
+- **THEN** the enqueued "$groupidentify" event should have property "$geoip_disable" equal to true
+- **AND** the enqueued "$groupidentify" event "$group_set" should omit "$geoip_disable"
+
+#### Scenario: A flag evaluation request carries the effective value (@server)
+- **GIVEN** the client is constructed with the GeoIP option set to disable enrichment
+- **WHEN** a remote feature-flag evaluation request is made with no per-call GeoIP option
+- **THEN** the request body field "geoip_disable" should be true
+- **WHEN** a remote feature-flag evaluation request is made with the per-call GeoIP option set to false
+- **THEN** the request body field "geoip_disable" should be false
+
+### Requirement: Event uuid is sent in canonical form
+
+A server SDK SHALL serialize the event `uuid` in canonical lowercase hyphenated form (`8-4-4-4-12`, no braces, no `urn:uuid:` prefix). A caller-supplied uuid in another form the SDK accepts — uppercase, unhyphenated, brace-wrapped, or `urn:uuid:`-prefixed — SHALL be normalized to that form before the event is enqueued, and the uuid the capture call returns SHALL be the normalized value that was sent. The normalization SHALL be applied after the `before_send` hook, so a uuid the hook sets is normalized too.
+
+A caller-supplied value the SDK cannot parse as a uuid SHALL NOT fail or drop the capture call: the SDK SHALL replace it with a freshly generated UUIDv7 and SHOULD log a warning. The warning SHOULD NOT include the discarded value, because callers can put their own data in the uuid field.
+
+Capture v1 keys the per-event `results` map in a 2xx response by the canonical uuid while parsing the request's uuid leniently, so an event sent under a non-canonical uuid cannot be correlated with its own verdict: a retryable verdict is never retried and a drop verdict never reaches the SDK's error reporting.
+
+#### Scenario: Non-canonical caller uuid is normalized before send (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **WHEN** capture is called with distinct id "user-123", event "Signed Up", and uuid "0199C3E8-4C7B-7E2E-9F21-2B6D5A1C9E04"
+- **THEN** one event named "Signed Up" should be enqueued
+- **AND** the enqueued event uuid should be "0199c3e8-4c7b-7e2e-9f21-2b6d5a1c9e04"
+- **AND** the call should return the enqueued event's uuid
+
+#### Scenario: Unparseable caller uuid falls back to a generated uuid (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **WHEN** capture is called with distinct id "user-123", event "Signed Up", and uuid "not-a-uuid"
+- **THEN** the capture call should not throw
+- **AND** one event named "Signed Up" should be enqueued
+- **AND** the enqueued event uuid should not equal "not-a-uuid"
+- **AND** the enqueued event should include an event uuid
+- **AND** the call should return the enqueued event's uuid
+
+### Requirement: Client-side capture rate limiting never loses tokens to a clock change
+
+A client SDK that drops captures on a client-side rate limit (today posthog-js, as listed under "Drop silently") SHALL meter that limit with a token bucket persisted alongside the rest of its state. The bucket holds a token balance and the clock instant the balance was last computed at. Its size and refill rate are configurable per platform convention (posthog-js: `rate_limiting.events_per_second`, default 10, and `rate_limiting.events_burst_limit`, default ten times the per-second rate and never below it); a bucket with no persisted state starts full at the burst limit.
+
+The bucket is refilled from the device's wall clock, which can move backward — a manual change, an NTP correction, a timezone daemon. The refill SHALL therefore be monotonic:
+
+- The SDK SHALL refill the balance by the elapsed time since the stored instant, counting elapsed time as zero when the clock is behind that instant, multiplied by the per-second rate, and SHALL cap the balance at the burst limit. A backward clock change refills nothing and SHALL NOT remove tokens from the bucket.
+- The SDK SHALL store the later of the stored instant and the current instant, so the bucket does not refill again until the clock passes the latest instant it has seen. A rollback followed by the clock catching up SHALL NOT refill the bucket twice for the same stretch of real time.
+- An admitted capture SHALL consume one token and the balance SHALL NOT go below zero. A capture is rate limited when fewer than one token is available.
+
+A backward clock change SHALL only pause refill until the clock catches up. It SHALL NOT take away tokens the bucket already held, so a capture that had a token available before the change is still admitted after it.
+
+#### Scenario: A backward clock change does not drop the next capture (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and client rate limiting of 1 capture per second with a burst limit of 100
+- **WHEN** capture is called with event "Before Rollback"
+- **AND** the SDK clock moves backward by "143 seconds"
+- **AND** capture is called with event "After Rollback"
+- **THEN** one event named "Before Rollback" should be enqueued
+- **AND** one event named "After Rollback" should be enqueued
+
+#### Scenario: The bucket does not refill until the clock passes the latest instant it has seen (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and client rate limiting of 1 capture per second with a burst limit of 2
+- **WHEN** capture is called with event "One"
+- **AND** capture is called with event "Two"
+- **AND** the SDK clock moves backward by "10 seconds"
+- **AND** capture is called with event "Three"
+- **AND** the SDK clock advances by "10 seconds"
+- **AND** capture is called with event "Four"
+- **AND** the SDK clock advances by "1 second"
+- **AND** capture is called with event "Five"
+- **THEN** one event named "One" should be enqueued
+- **AND** one event named "Two" should be enqueued
+- **AND** no event named "Three" should be enqueued
+- **AND** no event named "Four" should be enqueued
+- **AND** one event named "Five" should be enqueued
+

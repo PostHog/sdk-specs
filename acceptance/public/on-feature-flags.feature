@@ -36,3 +36,16 @@ Feature: On Feature Flags
       | key     | value |
       | beta-ui | true  |
     Then the feature flag listener should not be invoked again
+
+  Scenario: Listener is invoked with the last known flags when a non-quota load fails
+    Given the SDK is initialized with token "test-token"
+    And feature flags are already loaded with values:
+      | key     | value |
+      | beta-ui | true  |
+    And a feature flag listener is registered
+    When a feature flag load fails for a reason other than quota limiting
+    Then the feature flag listener should be invoked
+    And payload-carrying feature flag listeners should receive flags:
+      | key     | value |
+      | beta-ui | true  |
+    And payload-carrying feature flag listeners should be told that loading flags errored

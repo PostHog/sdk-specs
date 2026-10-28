@@ -57,7 +57,7 @@ The earlier design accepted side-effect differences in the migration map: bulk m
 
 ### Let an omitted per-call option fall back to the client-level default
 
-The `get-feature-flag-result` naming requirement from #109 said value and result APIs SHALL default to sending the event. Read literally, an SDK could declare the option as `sendFeatureFlagEvents = true`, which overrides a disabled client-level default on every call that omits it. That breaks step 2 of the order above for the single-flag getters, and through the supersession map for snapshot reads too. The requirement now says an omitted option uses the client-level default where the SDK has one and otherwise sends, and that the option has no literal `true` default.
+The `get-feature-flag-result` naming requirement from #109 said value and result APIs SHALL default to sending the event. Read literally, an SDK could declare the option as `sendFeatureFlagEvents = true`, which overrides a disabled client-level default on every call that omits it. That breaks step 2 of the order above for the single-flag getters, and through the supersession map for snapshot reads too. The requirement now says an omitted option uses the client-level default where the SDK has one and otherwise sends. An SDK without a client-level default can still declare the option with a `true` default.
 
 ### Write the acceptance scenarios as request-local snapshot reads
 
@@ -91,7 +91,7 @@ The scenario where a suppressed snapshot read is followed by a single-flag gette
 This repository change is documentation-only. After archive:
 
 - Every server SDK that implements `evaluateFlags` adds the per-read option to its enablement and value accessors.
-- posthog-node lands #5252 (reopened after the stale bot closed it on 2026-10-23) or an equivalent. #5252 makes snapshot reads honor `sendFeatureFlagEvent` and adds the per-read option to `isEnabled()` and `getFlag()`. The JVM server SDK already honors `PostHogConfig.sendFeatureFlagEvent`.
+- posthog-node reopens #5252, which the stale bot closed unmerged on 2026-10-23, or implements an equivalent. #5252 makes snapshot reads honor `sendFeatureFlagEvent` and adds the per-read option to `isEnabled()` and `getFlag()`. The JVM server SDK already honors `PostHogConfig.sendFeatureFlagEvent`.
 - An SDK whose snapshot reads ignored its client-level default until now says in its changelog that callers who relied on snapshot reads for exposures while that default was off must now opt those reads in with the per-read option.
 - Wrappers that pass an explicit per-call value on every read override the client-level default. For example, the posthog-node OpenFeature provider defaults its own `sendFeatureFlagEvents` to `true` and passes it on every call. Such wrappers should leave the option unset unless their caller sets it. #5252 makes that change to the posthog-node provider in a separate commit.
 

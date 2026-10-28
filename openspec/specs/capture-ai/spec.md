@@ -137,8 +137,9 @@ lane configuration is scoped to the AI lane**.
    (replace or reject).
 3. **Isolation.** AI events ride their own queue/buffer with independent
    size caps, batching, and retry policy; they never share a send cycle with
-   analytics events. The queue starts lazily — clients that never capture AI
-   events pay no overhead.
+   analytics events. On server SDKs the queue starts lazily, so clients that
+   never capture AI events pay no overhead; client SDKs start their durable
+   queue at launch.
 4. **Delivery.** At-least-once delivery is permitted (retries may duplicate):
    a retry MUST resend the event with its entire original envelope
    unchanged — timestamp, distinct id, event name, and UUID, all stamped once
@@ -153,9 +154,9 @@ lane configuration is scoped to the AI lane**.
 ## Error handling
 
 - `capture_ai` never throws under normal operation, matching `capture`.
-- Events exceeding the operational per-event size cap are dropped in the
-  consumer, logging the event name and byte size only — never payload
-  content, which may be unredacted multimodal data.
+- Events exceeding the operational per-event size cap are dropped locally,
+  logging the event name and byte size only — never payload content, which
+  may be unredacted multimodal data.
 - Delivery failures surface through the SDK's existing error hooks
   (`on_error` and equivalents), not through the return value.
 

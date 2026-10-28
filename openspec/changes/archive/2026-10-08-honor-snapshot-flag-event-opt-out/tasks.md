@@ -5,6 +5,7 @@
 - [x] 1.3 Amend lazy access tracking and the supersession map so they defer to the new control.
 - [x] 1.4 Add matching acceptance scenarios to `acceptance/public/evaluate-flags.feature`.
 - [x] 1.5 After `2026-10-07-observe-evaluate-flags-server-reads` landed, rewrite those scenarios and their spec scenarios as request-local snapshot reads, tagged `@server` and, for the client-default cases, `@requires:flag_event_default`.
+- [x] 1.6 After review, clarify the `get-feature-flag-result` per-call option default, and add scenarios for an enabled client default with a per-read `false` and for a suppressed snapshot read followed by a single-flag getter.
 
 ## 2. Validation and archive
 

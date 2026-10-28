@@ -28,7 +28,7 @@ In posthog-node and the JVM server SDK, the single-flag getters resolve the even
 **Non-Goals:**
 
 - Changing what triggers an exposure: creating a snapshot stays silent, payload reads stay silent, and a read with no option anywhere still emits.
-- Specifying client-level defaults for SDKs that do not have one, or the singular and plural naming of the legacy per-call option. The open PostHog/sdk-specs#109 records that naming rule.
+- Specifying client-level defaults for SDKs that do not have one, or the singular and plural naming of the legacy per-call option. PostHog/sdk-specs#109 records that naming rule; this change only clarifies its default (see below).
 - OpenFeature providers and other wrappers built on top of the SDK. No spec in this repository governs them.
 
 ## Decisions
@@ -55,6 +55,10 @@ The `flag_missing` event for a key absent from the snapshot is the same `$featur
 
 The earlier design accepted side-effect differences in the migration map: bulk maps that become tracked reads, and Go's event-emitting payload getter that becomes a silent snapshot read. Those differences stay. A per-call event setting is different. It is an explicit customer choice, and the getters now point every caller at the snapshot API. A migration that silently reverses that choice is a regression, so the map carries the option across.
 
+### Let an omitted per-call option fall back to the client-level default
+
+The `get-feature-flag-result` naming requirement from #109 said value and result APIs SHALL default to sending the event. Read literally, an SDK could declare the option as `sendFeatureFlagEvents = true`, which overrides a disabled client-level default on every call that omits it. That breaks step 2 of the order above for the single-flag getters, and through the supersession map for snapshot reads too. The requirement now says an omitted option uses the client-level default where the SDK has one and otherwise sends, and that the option has no literal `true` default.
+
 ### Write the acceptance scenarios as request-local snapshot reads
 
 The acceptance scenarios use the request-local `evaluate flags and read` form from `2026-10-07-observe-evaluate-flags-server-reads`: one evaluation per request, ordered public reads, then an explicit flush and a check of the delivered exposures.
@@ -62,10 +66,12 @@ The acceptance scenarios use the request-local `evaluate flags and read` form fr
 - The per-read option goes in a read's `options` object as `send_feature_flag_events`, on `is_enabled` and `get_flag` reads. On `is_enabled` it sits next to `default_value`.
 - The client-level default goes in the setup configuration as `send_feature_flag_event`, the snake-case form of the posthog-node and JVM server option name.
 - A binding passes both to the SDK's public option. It never suppresses events itself: that change already rules out a synthetic suppression option in the adapter.
-- The two client-default scenarios require the `flag_event_default` SDK capability, because only some SDKs have a client-level default.
+- The three client-default scenarios require the `flag_event_default` SDK capability, because only some SDKs have a client-level default.
 - The scenarios are tagged `@server`, not `@sdk:server`. The repository README allows the integration tag only after a scenario has run end to end through the shared harness with a real SDK adapter, and no released SDK has the per-read option yet.
 
 The dedupe scenario sees only the traffic delivered after one flush. It catches a suppressed read that marks the tracker, because no exposure is delivered. It cannot tell a correct SDK from one that ignores the option, because both deliver one exposure. The default-on silencing scenario catches that case.
+
+The scenario where a suppressed snapshot read is followed by a single-flag getter has no acceptance counterpart. The request-local form reads only from the snapshot, and has no step that calls a single-flag getter in the same request.
 
 ### Alternatives considered
 
@@ -85,7 +91,7 @@ The dedupe scenario sees only the traffic delivered after one flush. It catches 
 This repository change is documentation-only. After archive:
 
 - Every server SDK that implements `evaluateFlags` adds the per-read option to its enablement and value accessors.
-- posthog-node lands #5252 or an equivalent. #5252 makes snapshot reads honor `sendFeatureFlagEvent` and adds the per-read option to `isEnabled()` and `getFlag()`. The JVM server SDK already honors `PostHogConfig.sendFeatureFlagEvent`.
+- posthog-node lands #5252 (reopened after the stale bot closed it on 2026-10-23) or an equivalent. #5252 makes snapshot reads honor `sendFeatureFlagEvent` and adds the per-read option to `isEnabled()` and `getFlag()`. The JVM server SDK already honors `PostHogConfig.sendFeatureFlagEvent`.
 - An SDK whose snapshot reads ignored its client-level default until now says in its changelog that callers who relied on snapshot reads for exposures while that default was off must now opt those reads in with the per-read option.
 - Wrappers that pass an explicit per-call value on every read override the client-level default. For example, the posthog-node OpenFeature provider defaults its own `sendFeatureFlagEvents` to `true` and passes it on every call. Such wrappers should leave the option unset unless their caller sets it. #5252 makes that change to the posthog-node provider in a separate commit.
 

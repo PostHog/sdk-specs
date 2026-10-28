@@ -61,6 +61,19 @@ A scenario in this specification that sets neither the per-read option nor a cli
 - **AND** exactly one delivered "$feature_flag_called" event identifies "checkout" with canonical response "control" and distinct id "snapshot-user"
 - **AND** no exposure identifies "beta-ui"
 
+#### Scenario: Per-read option overrides an enabled client-level default (@server @requires:flag_event_default)
+- **GIVEN** a fresh isolated server SDK and mock ingestion service
+- **AND** the SDK is initialized with its client-level feature flag event default explicitly enabled and a flush threshold larger than the exposure count
+- **AND** remote evaluation for distinct id "snapshot-user" returns "beta-ui" as true and "checkout" as variant "control"
+- **WHEN** the public evaluation method is called for "snapshot-user" with remote fallback enabled
+- **AND** the returned snapshot's enablement accessor is called for "beta-ui" with the per-read option `false`
+- **AND** its value accessor is called for "checkout" without the per-read option
+- **THEN** the caller-visible semantic results are true and "control", in that order
+- **WHEN** the SDK is explicitly flushed through its public method
+- **THEN** exactly one remote evaluation request has been received for "snapshot-user"
+- **AND** exactly one delivered "$feature_flag_called" event identifies "checkout" with canonical response "control" and distinct id "snapshot-user"
+- **AND** no exposure identifies "beta-ui"
+
 #### Scenario: Suppressed read leaves exposure dedupe untouched (@server)
 - **GIVEN** a fresh isolated server SDK and mock ingestion service
 - **AND** the SDK is initialized with a flush threshold larger than the exposure count and no client-level feature flag event setting
@@ -72,6 +85,17 @@ A scenario in this specification that sets neither the per-read option nor a cli
 - **WHEN** the SDK is explicitly flushed through its public method
 - **THEN** exactly one remote evaluation request has been received for "snapshot-user"
 - **AND** exactly one delivered "$feature_flag_called" event identifies "beta-ui" with canonical response true and distinct id "snapshot-user"
+
+#### Scenario: Suppressed snapshot read leaves the single-flag getter's exposure intact (@server)
+- **GIVEN** a fresh isolated server SDK and mock ingestion service
+- **AND** the SDK is initialized with a flush threshold larger than the exposure count and no client-level feature flag event setting
+- **AND** remote evaluation for distinct id "snapshot-user" returns "beta-ui" as true
+- **WHEN** the public evaluation method is called for "snapshot-user" with remote fallback enabled
+- **AND** the returned snapshot's enablement accessor is called for "beta-ui" with the per-read option `false`
+- **AND** the SDK's single-flag value getter is then called for "beta-ui" and "snapshot-user" without the per-call option
+- **THEN** both caller-visible semantic results are true
+- **WHEN** the SDK is explicitly flushed through its public method
+- **THEN** exactly one delivered "$feature_flag_called" event identifies "beta-ui" with canonical response true and distinct id "snapshot-user"
 
 #### Scenario: Suppressed reads still count for only accessed (@server)
 - **GIVEN** a fresh isolated server SDK and mock ingestion service

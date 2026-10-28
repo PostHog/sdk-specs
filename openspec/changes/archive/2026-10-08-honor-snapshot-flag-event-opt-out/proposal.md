@@ -11,6 +11,7 @@ Customers turn these events off for flags they do not use with flag analytics or
 - A read that does not send emits no `$feature_flag_called` (including `flag_missing`), leaves the dedupe tracker untouched, and still counts as access for `onlyAccessed()`.
 - `evaluateFlags()` takes no per-snapshot event option.
 - The supersession map now preserves exposure-event control: `getFeatureFlag(key, id, { sendFeatureFlagEvents: x })` becomes `evaluateFlags(id).getFlag(key, { sendFeatureFlagEvents: x })`.
+- The `get-feature-flag-result` per-call option requirement now says an omitted option uses the client-level default where the SDK has one, and otherwise sends. A literal `true` default would override a disabled client default.
 - Acceptance scenarios for each rule.
 
 Unchanged: creating a snapshot emits nothing, payload reads stay silent, a read with no option anywhere still emits, and the other documented migration differences (bulk maps, Go's legacy payload getter) stay as they are.
@@ -24,6 +25,7 @@ None.
 ### Modified Capabilities
 
 - `evaluate-flags`: add the snapshot feature flag event control, and amend lazy access tracking and the supersession map to defer to it.
+- `get-feature-flag-result`: let an omitted per-call feature flag event option fall back to the client-level default.
 
 ## Impact
 

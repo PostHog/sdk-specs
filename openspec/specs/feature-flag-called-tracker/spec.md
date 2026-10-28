@@ -36,7 +36,7 @@ In some SDKs, `shouldTrack` and `markSeen` are combined into one atomic "add if 
 3. **Suppress duplicate tracking events.** If the same combination has already been seen, do not emit another `$feature_flag_called` event.
 4. **Allow new tracking when the response or evaluation context changes.** If a flag's value changes for the same key, or if a server-side call evaluates the same flag/value for a different `distinct_id` or group context, allow a new `$feature_flag_called` event.
 5. **Reset on flag change and lifecycle boundaries.** When feature flag state changes, caches are reset, identity is reset, or the SDK is closed/shut down, clear the dedupe tracker so post-reset/reloaded SDK state can emit fresh tracking events and shutdown state cannot leak across SDK lifetimes. On client-side flag reloads, SDKs MAY retain the tracker if they can reliably compare the complete relevant flag state before and after reload (including flag keys, values, payloads, and other cached flag metadata used by accessors) and determine it is unchanged; otherwise, they SHOULD clear the tracker after reload.
-6. **Expose tracking controls unevenly at the wrapper layer when applicable.** For example, Flutter delegates to the underlying native/browser trackers and only exposes a per-call suppression flag on `getFeatureFlagResult(sendEvent: ...)`, while `getFeatureFlag(...)`, `getFeatureFlagPayload(...)`, and `isFeatureEnabled(...)` always use the default tracking path.
+6. **Expose tracking controls unevenly at the wrapper layer when applicable.** For example, Flutter delegates to the underlying native/browser trackers and exposes an optional per-call suppression flag on `getFeatureFlagResult(...)`, `getFeatureFlag(...)`, and `isFeatureEnabled(...)`; when the caller omits it, the read follows the configured client-level default rather than forcing tracking on. `getFeatureFlagPayload(...)` emits no tracking event and takes no flag.
 7. **Cap memory usage where needed.** Larger-scale implementations evict old entries using bounded maps or LRU-style caches. When a bounded tracker reaches its capacity, it SHOULD evict the oldest or least-recently-used entries incrementally. Capacity pressure SHOULD NOT clear the entire tracker, because doing so can flood analytics with duplicate `$feature_flag_called` events. Full tracker clears are reserved for explicit lifecycle/context boundaries such as observed flag-state change/cache reset, identity reset, or SDK close/shutdown.
 
 ## State & lifecycle
@@ -304,3 +304,50 @@ The gate SHALL persist alongside cached flag/local-evaluation definition state (
 - **WHEN** the local-evaluation definitions are refreshed via a `304 Not Modified` response
 - **AND** get feature flag "beta-ui" is called
 - **THEN** the enqueued "$feature_flag_called" event should be minimized per the allowlist
+
+### Requirement: Client-level feature flag event default
+
+A client SDK that exposes a client-level feature flag event configuration option (`sendFeatureFlagEvent`, in platform casing) SHALL apply it to every flag read that can emit `$feature_flag_called`, including the value getter, the enablement getter, and the structured result getter.
+
+Each read SHALL decide whether to emit in this order: the per-call option when the caller supplied one, then the client-level configuration value, then `true`. A read SHALL NOT default its per-call option to `true` and thereby bypass a disabled client-level configuration. A wrapper SDK that forwards the read to an underlying native or browser SDK SHALL omit the per-call override when the caller supplied none, so the underlying SDK applies its own configured default. Payload-only getters that never emit `$feature_flag_called` take no option and are unaffected.
+
+When the decision is `false`, the read SHALL emit no `$feature_flag_called` event and SHALL NOT consult or update the dedupe tracker, so a later opted-in read of the same flag and value still emits.
+
+#### Scenario: Client-level event default off silences flag reads (@client @requires:flag_event_default)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and its client-level feature flag event default disabled
+- **AND** cached feature flags are:
+  | key     | value |
+  | beta-ui | true  |
+- **WHEN** get feature flag result "beta-ui" is called
+- **AND** get feature flag "beta-ui" is called
+- **AND** is feature enabled "beta-ui" is called
+- **THEN** no event named "$feature_flag_called" should be enqueued
+
+#### Scenario: Per-call tracking option overrides a disabled client-level default (@client @requires:flag_event_default)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and its client-level feature flag event default disabled
+- **AND** cached feature flags are:
+  | key     | value |
+  | beta-ui | true  |
+- **WHEN** get feature flag result "beta-ui" is called with tracking enabled
+- **THEN** exactly one event named "$feature_flag_called" should be enqueued for flag "beta-ui"
+
+#### Scenario: Suppressed read leaves the dedupe tracker untouched (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** cached feature flags are:
+  | key     | value |
+  | beta-ui | true  |
+- **WHEN** get feature flag result "beta-ui" is called with tracking disabled
+- **AND** get feature flag result "beta-ui" is called
+- **THEN** exactly one event named "$feature_flag_called" should be enqueued for flag "beta-ui"

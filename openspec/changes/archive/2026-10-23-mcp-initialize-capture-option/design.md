@@ -8,6 +8,8 @@ the handshake.
 - Default on, like every other event in the Configuration table.
 - With the option off, everything else stays the same. In particular, the SDK still mints the session
   token at `initialize`, so stateless and multi-pod sessions do not fragment.
+- The option name says "event", not "capture". SDKs with a manual client already have a method
+  that captures `$mcp_initialize` by hand, such as `PostHogMCP.captureInitialize()`.
 
 ## Alternatives Considered
 

@@ -44,7 +44,7 @@ whether it observes task stores ("Tool call event") as `@mcp_task_store_capable`
   uses (`type`, `tool`, `summary`, ...) or that reuses an injected argument's name, SHALL NOT capture
   arguments the tool does not declare, and SHALL send the event even when the host's report handler
   fails.
-- `$mcp_initialize` for a legacy `initialize`, unless the host turns the initialize capture option
+- `$mcp_initialize` for a legacy `initialize`, unless the host turns the initialize event option
   off (see "Configuration"). With the option off, the SDK SHALL NOT send `$mcp_initialize`, and SHALL
   change nothing else: the session token, `$session_id`, and the client and server identity of later
   events stay the same.
@@ -69,8 +69,8 @@ every enabled injected argument except `context`, whose place its own report arg
 - **AND** the SDK is flushed
 - **THEN** exactly one "$mcp_initialize" event should be sent
 
-#### Scenario: With initialize capture off, no $mcp_initialize is sent and the session holds (@mcp_initialize_capable)
-- **GIVEN** a stateless HTTP MCP server instrumented by the SDK with the initialize capture option off
+#### Scenario: With the initialize event option off, no $mcp_initialize is sent and the session holds (@mcp_initialize_capable)
+- **GIVEN** a stateless HTTP MCP server instrumented by the SDK with the initialize event option off
 - **WHEN** an MCP client on protocol revision "2025-11-25" sends `initialize`
 - **AND** calls tool "search_docs" with the session token from the `initialize` response
 - **AND** the SDK is flushed

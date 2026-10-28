@@ -7,7 +7,7 @@ does this.
 
 ## What Changes
 
-- Add an initialize capture option, on by default, to the Configuration table.
+- Add an initialize event option, on by default, to the Configuration table.
 - Modify the **Optional events** requirement: with the option off, the SDK sends no
   `$mcp_initialize` and changes nothing else.
 - Add the `@mcp_initialize_capable` acceptance tag and two scenarios: one event per legacy

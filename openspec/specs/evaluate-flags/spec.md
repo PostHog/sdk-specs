@@ -20,13 +20,14 @@ For server SDKs, the snapshot API supersedes these older call patterns (names va
 | --- | --- |
 | `isFeatureEnabled(...)` / `feature_enabled(...)` / `is_feature_enabled(...)` | `evaluateFlags(...).isEnabled(key)` |
 | `getFeatureFlag(...)` / `get_feature_flag(...)` | `evaluateFlags(...).getFlag(key)` |
+| `getFeatureFlag(key, id, { sendFeatureFlagEvents: x })` and the same per-call option on the other single-flag getters | `evaluateFlags(id).getFlag(key, { sendFeatureFlagEvents: x })`; the option moves to the snapshot read |
 | `getFeatureFlagPayload(...)` / `get_feature_flag_payload(...)` | `evaluateFlags(...).getFlagPayload(key)` (a silent payload lookup) |
 | `getFeatureFlagResult(...)` / `get_feature_flag_result(...)` | read the value and payload from the same snapshot (or use the platform's rich snapshot result) |
 | `getAllFlags(...)` / `get_all_flags(...)` | enumerate snapshot keys and read their values; each value read is tracked as access |
 | `getAllFlagsAndPayloads(...)` / `get_all_flags_and_payloads(...)` | enumerate snapshot keys and read values plus payloads; value reads are tracked and payload-only reads are silent |
 | `capture(..., sendFeatureFlags: true)` / `send_feature_flags` and equivalents | evaluate once, then pass the snapshot to `capture(..., flags: snapshot)` |
 
-This is a functional migration map, not a promise to preserve every legacy side effect. Snapshot `isEnabled(...)` / `getFlag(...)` calls report access through `$feature_flag_called`, while key enumeration and payload-only reads are silent. Consequently, folding a data-only bulk map into per-key `getFlag(...)` reads deliberately reports each value used, and migrating Go's historically event-emitting payload getter to snapshot `getFlagPayload(...)` deliberately makes payload-only access silent. Callers that require a legacy data-only bulk shape MAY continue using a retained compatibility method.
+This is a functional migration map. It preserves the caller's control over exposure events, but not every other legacy side effect. A per-call `sendFeatureFlagEvents` value moves to the matching snapshot read, as the snapshot feature flag event control defines, so a migrated call sends the same `$feature_flag_called` events. Snapshot `isEnabled(...)` / `getFlag(...)` calls otherwise report access through `$feature_flag_called`, while key enumeration and payload-only reads are silent. Consequently, folding a data-only bulk map into per-key `getFlag(...)` reads deliberately reports each value used, and migrating Go's historically event-emitting payload getter to snapshot `getFlagPayload(...)` deliberately makes payload-only access silent. Callers that require a legacy data-only bulk shape MAY continue using a retained compatibility method.
 
 Server SDKs MAY retain any of these APIs for compatibility, and formal deprecation status MAY vary by SDK and release policy. Documentation SHALL present `evaluateFlags(...)` as the preferred server composition when flag reads or event enrichment share one identity/evaluation context.
 
@@ -322,9 +323,9 @@ Filtering by runtime follows the in-memory filtering rules: it SHALL use only th
 
 ### Requirement: Lazy feature-flag access tracking
 
-Creating a `FeatureFlagEvaluations` snapshot SHALL NOT by itself emit `$feature_flag_called`, because evaluation does not prove that application code used a flag. Calling the snapshot's enablement or value accessor SHALL mark that key as accessed and SHALL route `$feature_flag_called` through the SDK's normal feature-flag-called dedupe tracker using the snapshot's canonical value and retained evaluation context.
+Creating a `FeatureFlagEvaluations` snapshot SHALL NOT by itself emit `$feature_flag_called`, because evaluation does not prove that application code used a flag. Calling the snapshot's enablement or value accessor SHALL mark that key as accessed. Unless the read's feature flag event decision is `false`, it SHALL also route `$feature_flag_called` through the SDK's normal feature-flag-called dedupe tracker using the snapshot's canonical value and retained evaluation context. The snapshot feature flag event control defines that decision and what a read does when it is `false`.
 
-Repeated enablement/value reads for the same identity, group context, key, and canonical value SHALL follow the existing tracker dedupe contract rather than emit one event per accessor call. On an original evaluation snapshot, reading a key absent from the evaluated set SHALL be treated as an attempted access and, when a distinct id is available, SHALL report the `flag_missing` error through the normal event metadata, except where the next paragraph replaces it with `local_evaluation_inconclusive`. Ancillary event metadata and the null/false response sentinel for a missing flag MAY vary by platform.
+Repeated enablement/value reads for the same identity, group context, key, and canonical value SHALL follow the existing tracker dedupe contract rather than emit one event per accessor call. On an original evaluation snapshot, reading a key absent from the evaluated set SHALL be treated as an attempted access and, when a distinct id is available and the read's feature flag event decision is `true`, SHALL report the `flag_missing` error through the normal event metadata, except where the next paragraph replaces it with `local_evaluation_inconclusive`. Ancillary event metadata and the null/false response sentinel for a missing flag MAY vary by platform.
 
 When the key read on an original evaluation snapshot is unresolved, as defined in "Snapshot unresolved flag reporting", an SDK that evaluates flags locally SHOULD report the `local_evaluation_inconclusive` error in place of the `flag_missing` error, whether or not it exposes unresolved flags; an SDK that exposes unresolved flags SHALL. Any other error reported for the same read, such as a response-level error, is unchanged. The returned enablement/value still follows the missing-key contract.
 
@@ -367,6 +368,127 @@ Filtered snapshots returned by `only(...)` / `onlyAccessed()` are intended to sc
 - **THEN** the returned enabled value for "checkout" should be false
 - **AND** the "$feature_flag_called" event for flag "checkout" should report error "local_evaluation_inconclusive"
 - **AND** the "$feature_flag_called" event for flag "checkout" should not report error "flag_missing"
+
+### Requirement: Snapshot feature flag event control
+
+The snapshot's enablement and value accessors, including a value accessor that returns a rich result object, SHALL accept an optional per-read feature flag event option. The option SHALL be named `sendFeatureFlagEvents`, adapted to platform casing (for example `send_feature_flag_events`), and passed in the platform's idiomatic optional-argument form. It has the meaning of the per-call option on the server SDK's single-flag getters: `true` sends `$feature_flag_called` for the read and `false` suppresses it. The payload accessor, key enumeration and in-memory filters SHALL NOT take the option, because they never report `$feature_flag_called`.
+
+For each enablement or value read, the SDK SHALL decide whether to send `$feature_flag_called` in this order, which is the order the single-flag getters use:
+
+1. the per-read option, when the caller supplies it;
+2. otherwise the SDK's client-level feature flag event default, when the SDK has one;
+3. otherwise `true`.
+
+`evaluateFlags(...)` SHALL NOT take a per-snapshot feature flag event option. One snapshot serves reads that need exposure events and reads that do not, so the choice belongs to each read.
+
+When the decision is `true`, the read follows the lazy access tracking rules unchanged. When the decision is `false`, the read:
+
+- SHALL NOT emit `$feature_flag_called`, including the `flag_missing` event for a key absent from an original snapshot;
+- SHALL NOT consult or update the feature-flag-called dedupe tracker, so a later read of the same key whose decision is `true`, on the snapshot or through a single-flag getter, still emits;
+- SHALL still mark the key as accessed for `onlyAccessed()`, because access scopes capture enrichment and is separate from exposure reporting.
+
+The option SHALL NOT change the returned value, cause evaluation or network I/O, or change the records the snapshot retains.
+
+A scenario in this specification that sets neither the per-read option nor a client-level default describes reads whose decision is `true`.
+
+#### Scenario: Client-level default off silences snapshot reads (@server @requires:flag_event_default)
+- **GIVEN** a fresh isolated server SDK and mock ingestion service
+- **AND** the SDK is initialized with its client-level feature flag event default disabled and a flush threshold larger than the exposure count
+- **AND** remote evaluation for distinct id "snapshot-user" returns "beta-ui" as true and "checkout" as variant "control"
+- **WHEN** the public evaluation method is called for "snapshot-user" with remote fallback enabled
+- **AND** the returned snapshot's enablement accessor is called for "beta-ui" and its value accessor for "checkout", without the per-read option
+- **THEN** the caller-visible semantic results are true and "control", in that order
+- **WHEN** the SDK is explicitly flushed through its public method
+- **THEN** exactly one remote evaluation request has been received for "snapshot-user"
+- **AND** no delivered event is named "$feature_flag_called"
+
+#### Scenario: Per-read option overrides a disabled client-level default (@server @requires:flag_event_default)
+- **GIVEN** a fresh isolated server SDK and mock ingestion service
+- **AND** the SDK is initialized with its client-level feature flag event default disabled and a flush threshold larger than the exposure count
+- **AND** remote evaluation for distinct id "snapshot-user" returns "beta-ui" as true, "checkout" as variant "control", and "search" as false
+- **WHEN** the public evaluation method is called for "snapshot-user" with remote fallback enabled
+- **AND** the returned snapshot's enablement accessor is called for "beta-ui" and its value accessor for "checkout", each with the per-read option `true`
+- **AND** its value accessor is called for "search" without the per-read option
+- **THEN** the caller-visible semantic results are true, "control", and false, in that order
+- **WHEN** the SDK is explicitly flushed through its public method
+- **THEN** exactly one remote evaluation request has been received for "snapshot-user"
+- **AND** exactly two delivered events are named "$feature_flag_called" and carry distinct id "snapshot-user"
+- **AND** exactly one exposure identifies "beta-ui" with canonical response true
+- **AND** exactly one exposure identifies "checkout" with canonical response "control"
+- **AND** no exposure identifies "search"
+
+#### Scenario: Per-read option silences one read on a default-on client (@server)
+- **GIVEN** a fresh isolated server SDK and mock ingestion service
+- **AND** the SDK is initialized with a flush threshold larger than the exposure count and no client-level feature flag event setting
+- **AND** remote evaluation for distinct id "snapshot-user" returns "beta-ui" as true and "checkout" as variant "control"
+- **WHEN** the public evaluation method is called for "snapshot-user" with remote fallback enabled
+- **AND** the returned snapshot's enablement accessor is called for "beta-ui" with the per-read option `false`
+- **AND** its value accessor is called for "checkout" without the per-read option
+- **THEN** the caller-visible semantic results are true and "control", in that order
+- **WHEN** the SDK is explicitly flushed through its public method
+- **THEN** exactly one remote evaluation request has been received for "snapshot-user"
+- **AND** exactly one delivered "$feature_flag_called" event identifies "checkout" with canonical response "control" and distinct id "snapshot-user"
+- **AND** no exposure identifies "beta-ui"
+
+#### Scenario: Per-read option overrides an enabled client-level default (@server @requires:flag_event_default)
+- **GIVEN** a fresh isolated server SDK and mock ingestion service
+- **AND** the SDK is initialized with its client-level feature flag event default explicitly enabled and a flush threshold larger than the exposure count
+- **AND** remote evaluation for distinct id "snapshot-user" returns "beta-ui" as true and "checkout" as variant "control"
+- **WHEN** the public evaluation method is called for "snapshot-user" with remote fallback enabled
+- **AND** the returned snapshot's enablement accessor is called for "beta-ui" with the per-read option `false`
+- **AND** its value accessor is called for "checkout" without the per-read option
+- **THEN** the caller-visible semantic results are true and "control", in that order
+- **WHEN** the SDK is explicitly flushed through its public method
+- **THEN** exactly one remote evaluation request has been received for "snapshot-user"
+- **AND** exactly one delivered "$feature_flag_called" event identifies "checkout" with canonical response "control" and distinct id "snapshot-user"
+- **AND** no exposure identifies "beta-ui"
+
+#### Scenario: Suppressed read leaves exposure dedupe untouched (@server)
+- **GIVEN** a fresh isolated server SDK and mock ingestion service
+- **AND** the SDK is initialized with a flush threshold larger than the exposure count and no client-level feature flag event setting
+- **AND** remote evaluation for distinct id "snapshot-user" returns "beta-ui" as true
+- **WHEN** the public evaluation method is called for "snapshot-user" with remote fallback enabled
+- **AND** the returned snapshot's enablement accessor is called for "beta-ui" with the per-read option `false`
+- **AND** its value and enablement accessors are then called in order for "beta-ui" without the per-read option
+- **THEN** the three caller-visible semantic results are true
+- **WHEN** the SDK is explicitly flushed through its public method
+- **THEN** exactly one remote evaluation request has been received for "snapshot-user"
+- **AND** exactly one delivered "$feature_flag_called" event identifies "beta-ui" with canonical response true and distinct id "snapshot-user"
+
+#### Scenario: Suppressed snapshot read leaves the single-flag getter's exposure intact (@server)
+- **GIVEN** a fresh isolated server SDK and mock ingestion service
+- **AND** the SDK is initialized with a flush threshold larger than the exposure count and no client-level feature flag event setting
+- **AND** remote evaluation for distinct id "snapshot-user" returns "beta-ui" as true
+- **WHEN** the public evaluation method is called for "snapshot-user" with remote fallback enabled
+- **AND** the returned snapshot's enablement accessor is called for "beta-ui" with the per-read option `false`
+- **AND** the SDK's single-flag value getter is then called for "beta-ui" and "snapshot-user" without the per-call option
+- **THEN** both caller-visible semantic results are true
+- **WHEN** the SDK is explicitly flushed through its public method
+- **THEN** exactly one delivered "$feature_flag_called" event identifies "beta-ui" with canonical response true and distinct id "snapshot-user"
+
+#### Scenario: Suppressed reads still count for only accessed (@server)
+- **GIVEN** a fresh isolated server SDK and mock ingestion service
+- **AND** the SDK is initialized with a flush threshold larger than the exposure count and no client-level feature flag event setting
+- **AND** remote evaluation for distinct id "snapshot-user" returns "beta-ui" as true, "checkout" as variant "control", and "search" as false
+- **WHEN** the public evaluation method is called for "snapshot-user" with remote fallback enabled
+- **AND** the returned snapshot's enablement accessor is called for "beta-ui" and its value accessor for "search", each with the per-read option `false`
+- **AND** its accessed-key filter is called and the filtered keys are enumerated
+- **THEN** the enablement and value results are true and false, in that order
+- **AND** the accessed-filter key set is exactly "beta-ui" and "search"
+- **WHEN** the SDK is explicitly flushed through its public method
+- **THEN** exactly one remote evaluation request has been received for "snapshot-user"
+- **AND** no delivered event is named "$feature_flag_called"
+
+#### Scenario: Missing-key read with the option disabled reports no missing flag (@server)
+- **GIVEN** a fresh isolated server SDK and mock ingestion service
+- **AND** the SDK is initialized with a flush threshold larger than the exposure count and no client-level feature flag event setting
+- **AND** remote evaluation for distinct id "snapshot-user" returns "beta-ui" as true and omits "missing"
+- **WHEN** the public evaluation method is called for "snapshot-user" with remote fallback enabled
+- **AND** the returned snapshot's enablement and value accessors are called for "missing", each with the per-read option `false`
+- **THEN** "missing" returns false enablement and the platform's native nullish missing value
+- **WHEN** the SDK is explicitly flushed through its public method
+- **THEN** exactly one remote evaluation request has been received for "snapshot-user"
+- **AND** no delivered event is named "$feature_flag_called", including flag_missing metadata
 
 ### Requirement: Reuse snapshot for capture enrichment
 

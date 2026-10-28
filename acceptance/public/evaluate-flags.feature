@@ -1191,6 +1191,181 @@ Feature: Evaluate Flags
       {"requests":[{"token":"test-token","distinct_id":"snapshot-user","status":503}],"exposures":[{"distinct_id":"snapshot-user","key":"checkout","missing":true}]}
       """
 
+  @server @requires:flag_event_default
+  Scenario: Server snapshot client-level event default off silences reads
+    Given an isolated SDK instance
+    And remote snapshot fixtures are:
+      """application/json
+      {"identities":{"snapshot-user":{"beta-ui":{"value":true},"checkout":{"value":"control"}}}}
+      """
+    And the SDK is initialized with token "test-token" and JSON configuration:
+      """application/json
+      {"flush_at":100,"flush_interval_ms":0,"send_feature_flag_event":false}
+      """
+    When evaluate flags and read is called with JSON arguments:
+      """application/json
+      {"distinct_id":"snapshot-user","options":{"only_evaluate_locally":false},"reads":[{"method":"is_enabled","key":"beta-ui"},{"method":"get_flag","key":"checkout"}]}
+      """
+    Then the public snapshot outcomes should have these semantics:
+      """application/json
+      {"results":[{"value":true},{"value":"control"}]}
+      """
+    When pending captures are flushed
+    Then the flushed snapshot traffic should be:
+      """application/json
+      {"requests":[{"token":"test-token","distinct_id":"snapshot-user"}],"exposures":[]}
+      """
+
+  @server @requires:flag_event_default
+  Scenario: Server snapshot per-read event option overrides a disabled client-level default
+    Given an isolated SDK instance
+    And remote snapshot fixtures are:
+      """application/json
+      {"identities":{"snapshot-user":{"beta-ui":{"value":true},"checkout":{"value":"control"},"search":{"value":false}}}}
+      """
+    And the SDK is initialized with token "test-token" and JSON configuration:
+      """application/json
+      {"flush_at":100,"flush_interval_ms":0,"send_feature_flag_event":false}
+      """
+    When evaluate flags and read is called with JSON arguments:
+      """application/json
+      {"distinct_id":"snapshot-user","options":{"only_evaluate_locally":false},"reads":[{"method":"is_enabled","key":"beta-ui","options":{"send_feature_flag_events":true}},{"method":"get_flag","key":"checkout","options":{"send_feature_flag_events":true}},{"method":"get_flag","key":"search"}]}
+      """
+    Then the public snapshot outcomes should have these semantics:
+      """application/json
+      {"results":[{"value":true},{"value":"control"},{"value":false}]}
+      """
+    When pending captures are flushed
+    Then the flushed snapshot traffic should be:
+      """application/json
+      {"requests":[{"token":"test-token","distinct_id":"snapshot-user"}],"exposures":[{"distinct_id":"snapshot-user","key":"beta-ui","value":true},{"distinct_id":"snapshot-user","key":"checkout","value":"control"}]}
+      """
+
+  @server
+  Scenario: Server snapshot per-read event option silences one read on a default-on client
+    Given an isolated SDK instance
+    And remote snapshot fixtures are:
+      """application/json
+      {"identities":{"snapshot-user":{"beta-ui":{"value":true},"checkout":{"value":"control"}}}}
+      """
+    And the SDK is initialized with token "test-token" and JSON configuration:
+      """application/json
+      {"flush_at":100,"flush_interval_ms":0}
+      """
+    When evaluate flags and read is called with JSON arguments:
+      """application/json
+      {"distinct_id":"snapshot-user","options":{"only_evaluate_locally":false},"reads":[{"method":"is_enabled","key":"beta-ui","options":{"send_feature_flag_events":false}},{"method":"get_flag","key":"checkout"}]}
+      """
+    Then the public snapshot outcomes should have these semantics:
+      """application/json
+      {"results":[{"value":true},{"value":"control"}]}
+      """
+    When pending captures are flushed
+    Then the flushed snapshot traffic should be:
+      """application/json
+      {"requests":[{"token":"test-token","distinct_id":"snapshot-user"}],"exposures":[{"distinct_id":"snapshot-user","key":"checkout","value":"control"}]}
+      """
+
+  @server @requires:flag_event_default
+  Scenario: Server snapshot per-read event option overrides an enabled client-level default
+    Given an isolated SDK instance
+    And remote snapshot fixtures are:
+      """application/json
+      {"identities":{"snapshot-user":{"beta-ui":{"value":true},"checkout":{"value":"control"}}}}
+      """
+    And the SDK is initialized with token "test-token" and JSON configuration:
+      """application/json
+      {"flush_at":100,"flush_interval_ms":0,"send_feature_flag_event":true}
+      """
+    When evaluate flags and read is called with JSON arguments:
+      """application/json
+      {"distinct_id":"snapshot-user","options":{"only_evaluate_locally":false},"reads":[{"method":"is_enabled","key":"beta-ui","options":{"send_feature_flag_events":false}},{"method":"get_flag","key":"checkout"}]}
+      """
+    Then the public snapshot outcomes should have these semantics:
+      """application/json
+      {"results":[{"value":true},{"value":"control"}]}
+      """
+    When pending captures are flushed
+    Then the flushed snapshot traffic should be:
+      """application/json
+      {"requests":[{"token":"test-token","distinct_id":"snapshot-user"}],"exposures":[{"distinct_id":"snapshot-user","key":"checkout","value":"control"}]}
+      """
+
+  @server
+  Scenario: Server snapshot suppressed read leaves exposure dedupe untouched
+    Given an isolated SDK instance
+    And remote snapshot fixtures are:
+      """application/json
+      {"identities":{"snapshot-user":{"beta-ui":{"value":true}}}}
+      """
+    And the SDK is initialized with token "test-token" and JSON configuration:
+      """application/json
+      {"flush_at":100,"flush_interval_ms":0}
+      """
+    When evaluate flags and read is called with JSON arguments:
+      """application/json
+      {"distinct_id":"snapshot-user","options":{"only_evaluate_locally":false},"reads":[{"method":"is_enabled","key":"beta-ui","options":{"send_feature_flag_events":false}},{"method":"get_flag","key":"beta-ui"},{"method":"is_enabled","key":"beta-ui"}]}
+      """
+    Then the public snapshot outcomes should have these semantics:
+      """application/json
+      {"results":[{"value":true},{"value":true},{"value":true}]}
+      """
+    When pending captures are flushed
+    Then the flushed snapshot traffic should be:
+      """application/json
+      {"requests":[{"token":"test-token","distinct_id":"snapshot-user"}],"exposures":[{"distinct_id":"snapshot-user","key":"beta-ui","value":true}]}
+      """
+
+  @server
+  Scenario: Server snapshot suppressed reads still count for accessed-key filtering
+    Given an isolated SDK instance
+    And remote snapshot fixtures are:
+      """application/json
+      {"identities":{"snapshot-user":{"beta-ui":{"value":true},"checkout":{"value":"control"},"search":{"value":false}}}}
+      """
+    And the SDK is initialized with token "test-token" and JSON configuration:
+      """application/json
+      {"flush_at":100,"flush_interval_ms":0}
+      """
+    When evaluate flags and read is called with JSON arguments:
+      """application/json
+      {"distinct_id":"snapshot-user","options":{"only_evaluate_locally":false},"reads":[{"method":"is_enabled","key":"beta-ui","options":{"send_feature_flag_events":false}},{"method":"get_flag","key":"search","options":{"send_feature_flag_events":false}},{"method":"only_accessed","reads":[{"method":"keys"}]}]}
+      """
+    Then the public snapshot outcomes should have these semantics:
+      """application/json
+      {"results":[{"value":true},{"value":false},{"results":[{"keys":["beta-ui","search"]}]}]}
+      """
+    When pending captures are flushed
+    Then the flushed snapshot traffic should be:
+      """application/json
+      {"requests":[{"token":"test-token","distinct_id":"snapshot-user"}],"exposures":[]}
+      """
+
+  @server
+  Scenario: Server snapshot missing-key reads with the event option off report no missing flag
+    Given an isolated SDK instance
+    And remote snapshot fixtures are:
+      """application/json
+      {"identities":{"snapshot-user":{"beta-ui":{"value":true}}}}
+      """
+    And the SDK is initialized with token "test-token" and JSON configuration:
+      """application/json
+      {"flush_at":100,"flush_interval_ms":0}
+      """
+    When evaluate flags and read is called with JSON arguments:
+      """application/json
+      {"distinct_id":"snapshot-user","options":{"only_evaluate_locally":false},"reads":[{"method":"is_enabled","key":"missing","options":{"send_feature_flag_events":false}},{"method":"get_flag","key":"missing","options":{"send_feature_flag_events":false}}]}
+      """
+    Then the public snapshot outcomes should have these semantics:
+      """application/json
+      {"results":[{"value":false},{"missing":true}]}
+      """
+    When pending captures are flushed
+    Then the flushed snapshot traffic should be:
+      """application/json
+      {"requests":[{"token":"test-token","distinct_id":"snapshot-user"}],"exposures":[]}
+      """
+
   @unresolved_flags_capable
   Scenario: Local-only evaluation reports an experience continuity flag as unresolved
     Given local feature flag definitions resolve "beta-ui" for distinct id "user-123" as true

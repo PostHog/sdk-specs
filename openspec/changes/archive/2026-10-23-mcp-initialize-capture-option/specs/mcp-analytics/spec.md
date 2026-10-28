@@ -47,7 +47,8 @@ whether it observes task stores ("Tool call event") as `@mcp_task_store_capable`
 - `$mcp_initialize` for a legacy `initialize`, unless the host turns the initialize event option
   off (see "Configuration"). With the option off, the SDK SHALL NOT send `$mcp_initialize`, and SHALL
   change nothing else: the session token, `$session_id`, and the client and server identity of later
-  events stay the same.
+  events stay the same. The SDK SHALL NOT send an `$exception` for a failed `initialize`, with the
+  option on or off.
 - `$mcp_resource_read` and `$mcp_resources_list` for resource requests. `$mcp_resource_read` SHALL
   NOT carry the resource's contents.
 

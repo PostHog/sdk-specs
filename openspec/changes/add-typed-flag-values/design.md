@@ -99,7 +99,7 @@ The existing `evaluate-flags` and `is-feature-enabled` specs say a present `fals
 
 ### D9. Payloads
 
-**Assumption.** The payload accessor stays and is the legacy home: version 1 payloads as today, and for config version 2 number and object flags the value itself (the SDK supplies it, because v4 sends `metadata.payload: null` for them). Typed accessors are the recommended way to read number and object values. Users who model configuration as variant plus payload keep using `getFeatureFlag` plus `getFeatureFlagPayload` on those flags. To move, they recreate the flag as a config version 2 object flag whose rule or variant values are the configurations, and read it with `getObjectValue`.
+**Assumption.** The payload accessor stays and is the legacy home: version 1 payloads as today, and for config version 2 number and object flags the value itself (the SDK supplies it, because v4 sends `metadata.payload: null` for them). A supplied payload is the same JSON value the server would have encoded, not necessarily the same text: number formatting differs by language, so `1e-7` may print as `1e-07`. Typed accessors are the recommended way to read number and object values. Users who model configuration as variant plus payload keep using `getFeatureFlag` plus `getFeatureFlagPayload` on those flags. To move, they recreate the flag as a config version 2 object flag whose rule or variant values are the configurations, and read it with `getObjectValue`.
 **Alternative.** Make the payload accessor legacy-only, returning nothing for config version 2 flags, or have typed object reads fall back to a version 1 payload.
 **Why.** Legacy payload readers keep working when a flag's type changes to number or object, and typed reads never coerce.
 **Lenses.** DX: new code needs one call instead of two, and the value cannot disagree with the variant. OF: n/a. Migration: payload users keep working; moving needs a flag change, not just a code change.
@@ -243,6 +243,8 @@ What each kind of user does:
 - **Boolean flags:** `isFeatureEnabled(k)` becomes `getBooleanValue(k, false)`. Same result for boolean flags. Differences: a multivariate flag is `TYPE_MISMATCH` (keep `isFeatureEnabled` or use `getStringValue`), and a config version 2 flag with a `null` default returns your default instead of `false`.
 - **Multivariate flags:** `getFeatureFlag(k)` becomes `getStringValue(k, 'control')`. Same variant key; no-match returns your default instead of `false` or `undefined`.
 - **Payload users:** nothing changes on existing flags. New number and object flags read in one call. Moving variant-plus-payload configuration means recreating the flag as an object flag; `details.variant` keeps the arm key.
+- **Number and object flags on legacy accessors:** they render as enabled for every value, including `0` and `{}`. That applies to `isFeatureEnabled`, `$feature/<key>` and `$active_feature_flags`, so an insight that splits on `$feature/<key>` puts everyone in one group. Read them with the typed accessors.
+- **Changing a flag's payload into a value:** code written for a version 1 flag whose payload is `{ "max_uploads": 50 }` gets the bare value once the flag becomes a number flag, and falls back to its own default if it expects the object. Ship the flag change and the code change together.
 - **OpenFeature users:** no change for existing flags (D15). Config version 2 flags resolve natively with full reasons and metadata.
 - **Analytics:** unchanged. Typed and legacy reads produce the same event and dedupe together, so a code base can mix them.
 

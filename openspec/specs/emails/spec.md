@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Send one transactional email, such as a password reset or a receipt, from a transactional template in PostHog to one recipient, and read the email's delivery status by its message ID. A send never goes out twice for one call, and an error keeps PostHog's stable code.
+Send one transactional email, such as a password reset or a receipt, from a transactional template in PostHog to one recipient, and read the email's delivery status by its message ID. Every attempt of one call uses the same idempotency key so PostHog can deduplicate retries, and an error keeps PostHog's stable code.
 
 ## Applicability
 

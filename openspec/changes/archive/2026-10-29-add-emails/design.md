@@ -11,7 +11,7 @@ Sources, in priority order:
 **Goals:**
 
 - One contract every server SDK implements for sending a transactional email and reading its status.
-- A retry policy that never sends an email twice and never retries what waiting can't fix.
+- A retry policy that reuses one idempotency key across a call's attempts, so PostHog can deduplicate retries, and never retries what waiting can't fix. PostHog's deduplication has a known gap: if an email is queued but its key's completion record is lost, an attempt that arrives after the 60 second pending reservation expires can queue it again.
 - Errors that keep PostHog's stable `code`, so a new server code needs no SDK change.
 
 **Non-Goals:**
@@ -29,10 +29,13 @@ Sources, in priority order:
 
 ## Conformance at the time of writing
 
+Assessed at posthog-node `eb01f45` (PostHog/posthog-js#5418) and posthog-python `5abcf29` (PostHog/posthog-python#1093).
+
 | Requirement | posthog-node | posthog-python |
 | --- | --- | --- |
 | Public surface | Pass | Pass |
-| Per-send `max_retries` | Pass | Fail: no per-send override |
+| Per-send `max_retries` | Pass | Pass, from `5abcf29`. Earlier revisions had no per-send override |
+| Shutdown | Pass | Partial: async shutdown waits for email requests in flight. Synchronous shutdown closes the session without waiting for a send or a retry running on another thread |
 | All other requirements | Pass | Pass |
 
 ## Risks / Trade-offs

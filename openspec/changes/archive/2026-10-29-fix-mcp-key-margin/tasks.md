@@ -1,6 +1,6 @@
 ## 1. Spec delta
 
-- [x] 1.1 Modify **Payload privacy** in `mcp-analytics` so the margin cut keeps the start shared with the passes run on the string cut to its limit
+- [x] 1.1 Modify **Payload privacy** in `mcp-analytics` so the margin cut keeps the longest common prefix with the passes run on the string's first limit characters
 - [x] 1.2 Add a scenario for a long signed link used as an object key
 
 ## 2. Validation

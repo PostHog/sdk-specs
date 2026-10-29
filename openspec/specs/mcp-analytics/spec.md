@@ -503,14 +503,15 @@ These passes SHALL cost in proportion to the property limits, not to the payload
 apply the entry and nesting limits of "Property reference" and the key-based redaction. For each
 remaining string with a limit, object keys included, it SHALL run the binary check on the uncut string,
 cut the string to its limit plus 1,024 characters, run the remaining passes, then cut it to its limit,
-or, when the first cut removed text, also run the passes on the string cut to its limit and keep only
-the start the two results share, cut to the limit. The margin lets a match that crosses the limit be
-recognized whole. A match split by the cut at the limit can be left raw in the second result, but the
-first redacts it, and one split by the cut at the margin lies past the end of the second result, so
-the shared start holds neither. Measuring by the first result's length minus the margin instead would
-also drop kept text for each redaction inside the margin, which empties a key such as a link whose
-token alone is longer than the key limit. Scanning the whole payload first makes one large result
-cost hundreds of milliseconds.
+or, when the first cut removed text, also run the same remaining passes on the string's first limit
+characters, with no truncation marker, keep the longest common prefix of the two results, compared by
+character, and cut that to its limit. The margin lets a match that crosses the limit be recognized
+whole. A match split by the cut at the limit can be left raw in the second result, but the first
+redacts it, and a match no longer than the margin that is split by the cut at the margin lies past the
+end of the second result, so the common prefix holds neither. Measuring by the first result's length
+minus the margin instead would also drop kept text for each redaction inside the margin, which empties
+a key such as a link whose token alone is longer than the key limit. Scanning the whole payload first
+makes one large result cost hundreds of milliseconds.
 
 The SDK SHOULD also redact other credential-shaped values (known key formats, long high-entropy
 tokens). It SHALL expose a before-send hook that can modify or drop each MCP event after this
@@ -545,7 +546,7 @@ drops its `$exception`.
 - **WHEN** an MCP client calls tool "check_links" with arguments `{"links": {"<link>": "report"}}`, where `<link>` is "https://acme.s3.amazonaws.com/q3.pdf?token=" followed by 1,300 "A" characters, then "&X-Amz-Signature=abc123"
 - **AND** the SDK is flushed
 - **THEN** the "$mcp_parameters" should contain "https://acme.s3.amazonaws.com/q3.pdf"
-- **AND** the "$mcp_parameters" should not contain "abc123"
+- **AND** the "$mcp_parameters" should not contain "AAAAAAAAAAAAAAAAAAAA"
 - **AND** the "$mcp_parameters" should contain "report"
 
 #### Scenario: A PostHog token is redacted only as a whole word

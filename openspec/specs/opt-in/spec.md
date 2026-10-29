@@ -91,9 +91,7 @@ Browser-specific opt-in accepts extra options such as a custom capture event nam
 - **Session replay / integrations** — some SDKs stop or restart them when opt state changes. Where replay
   restarts on opt-in, the requirements below govern the new session and the restart decision. Opt-in restarts
   replay the app wanted at opt-out even when sampling, a linked flag, or an event trigger held it off then; those
-  gates are evaluated again in the new session. The SDKs still differ on whether opt-in rotates the session when a
-  linked flag or unloaded remote config then keeps replay from starting: posthog-ios and posthog-react-native rotate
-  whenever replay was wanted, while posthog-android rotates only when replay starts. That case is not specified here.
+  gates are evaluated again in the new session.
 - **Browser consent APIs** — browser uses richer consent semantics than the mobile/core SDKs and maps opt-in/out to persistence and cookieless-mode behavior.
 
 ## Requirements
@@ -140,7 +138,7 @@ The SDK SHALL implement the canonical `opt-in` behavior described by this spec. 
 
 ### Requirement: Opt-in restarts session replay in a new session
 
-A client SDK that stops session replay while opted out SHALL start a new session before replay restarts on opt-in, so that no frame recorded after consent is attributed to the session that was active while the user was opted out. The requirement is on the observable outcome: after opt-in restarts replay, the current session id SHALL differ from the one in use at opt-out. Where a wrapper owns the session id rather than the native SDK, the wrapper SHALL perform the rotation.
+A client SDK that stops session replay while opted out SHALL start a new session before replay restarts on opt-in, so that no frame recorded after consent is attributed to the session that was active while the user was opted out. The requirement is on the observable outcome: after opt-in restarts replay, the current session id SHALL differ from the one in use at opt-out. Where a wrapper owns the session id rather than the native SDK, the wrapper SHALL perform the rotation. When the app wanted replay at opt-out, opt-in SHALL start the new session even if a linked flag or remote config that has not loaded keeps replay from starting, so that a later start does not resume the session that was active while the user was opted out.
 
 #### Scenario: Opt in restarts replay in a new session
 - **GIVEN** a fresh SDK acceptance test harness
@@ -154,6 +152,22 @@ A client SDK that stops session replay while opted out SHALL start a new session
 - **WHEN** opt out is called
 - **AND** opt in is called
 - **THEN** session recording should be active
+- **WHEN** get session id is called
+- **THEN** the returned session id should not be "session-123"
+
+#### Scenario: Opt in starts a new session while a linked flag holds replay off
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** session replay is enabled
+- **AND** the remote config links recording to flag "replay-flag" variant "test"
+- **AND** feature flag "replay-flag" resolves to variant "control" for the user
+- **AND** the current session id is "session-123"
+- **WHEN** opt out is called
+- **AND** opt in is called
+- **THEN** session recording should not be active
 - **WHEN** get session id is called
 - **THEN** the returned session id should not be "session-123"
 

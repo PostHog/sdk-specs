@@ -6,7 +6,6 @@
 
 - Record the session-rotation rule, so consent is a clean boundary in the replay data.
 - Record that opt-in restores the replay the app wanted, and that consent does not override an app's explicit `stopSessionRecording()`.
-- Leave the one case where the SDKs still differ unspecified rather than picking a winner without a product decision.
 
 ## Decisions
 
@@ -22,6 +21,4 @@
 
 **The decision starts from the configuration at launch.** iOS, Android and React Native seed it from the session replay option at setup, and Flutter's native layer does the same, so an app that launched opted out with replay enabled records on its first opt-in. No SDK's `reset()` changes it; React Native's `reset()` after `optOut()` restores replay as `optIn()` does, because it clears the opt-out.
 
-## Open questions
-
-When replay was wanted at opt-out but a linked flag or unloaded remote config keeps it from starting after opt-in, posthog-ios and posthog-react-native still rotate the session, while posthog-android rotates only when replay starts. This change does not pick a winner; it needs a separate spec change.
+**The new session starts even when a gate holds replay off.** If opt-in rotated only once the linked flag and remote config let replay start, a start after flags loaded later would resume the session that was active while the user was opted out.

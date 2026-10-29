@@ -37,8 +37,8 @@ The exact callback shape varies by SDK:
 - **browser:** `onFeatureFlags(callback): () => void`
 - **js-core / react-native:** `onFeatureFlags(callback): () => void` with a simpler callback that receives the latest `featureFlags` map/list
 - **iOS:** `onFeatureFlags(callback) -> Subscription` with `unsubscribe()`, whose callback receives the enabled flag keys, their variants, and `errorsLoading`; also available from Objective-C as `onFeatureFlags:`
-- **Android:** `PostHogConfig.onFeatureFlags = callback` and `reloadFeatureFlags(onFeatureFlags?)`
-- **Flutter:** `PostHogConfig(onFeatureFlags: ...)` / `config.onFeatureFlags = ...` during `setup(...)`
+- **Android:** `PostHogConfig.onFeatureFlags = PostHogFeatureFlagsCallback` and `reloadFeatureFlags(PostHogFeatureFlagsCallback?)` (4.0+), whose `loaded(...)` receives a `PostHogFeatureFlagsLoaded` carrying the enabled flag keys, their variants, and `errorsLoading`; before 4.0 the callback was `PostHogOnFeatureFlags`, which took no arguments
+- **Flutter:** `PostHogConfig(onFeatureFlags: void Function(PostHogFeatureFlagsLoaded))` / `config.onFeatureFlags = ...` during `setup(...)` (6.0+), with the same three fields on every platform the plugin bridges; before 6.0 the callback was `void Function()`
 - **Unity:** `PostHogConfig.OnFeatureFlagsLoaded = Action` and static event `PostHog.OnFeatureFlagsLoaded += handler`
 
 `on-feature-flags` is used as the canonical name because the majority of audited client surfaces use that phrase directly.
@@ -53,12 +53,14 @@ The exact callback shape varies by SDK:
 3. **Invoke again on subsequent updates.**
    - The callback is not one-shot; it is intended to react to future flag changes as well.
 4. **Pass callback data according to SDK style.**
-   - Browser and iOS pass enabled flag keys, variants, and an error indication like `errorsLoading`.
-     These are the **error-aware** listeners.
+   - Browser, iOS, Android (4.0+), and Flutter (6.0+) pass enabled flag keys, variants, and an error
+     indication like `errorsLoading`. These are the **error-aware** listeners.
    - js-core / React Native expose a simpler callback shape centered on the latest feature-flag values,
      with no error indication.
-   - Browser, iOS, and js-core / React Native are the **payload-carrying** listeners.
-   - Android, Flutter, and Unity primarily expose a readiness signal with no direct payload; callers re-read flags through getter APIs when notified.
+   - Browser, iOS, Android (4.0+), Flutter (6.0+), and js-core / React Native are the
+     **payload-carrying** listeners.
+   - Unity exposes a readiness signal with no direct payload; callers re-read flags through getter
+     APIs when notified. Android before 4.0 and Flutter before 6.0 were readiness-only too.
 5. **Support immediate invocation when state is already loaded in some SDKs.**
    - Browser and iOS call the callback once with the current values if flags were already loaded.
    - Other SDKs may instead invoke only on the next load/update cycle.
@@ -86,7 +88,7 @@ The exact callback shape varies by SDK:
 - They remain active until explicitly unsubscribed/removed, or until the SDK instance is torn down.
 - Startup flag preload paths may trigger the callback early in app lifecycle.
 - Cache-driven startups can also trigger the callback before a fresh network reload completes.
-- Wrapper SDKs may translate platform-native notifications into their own callback surface. Flutter maps native/browser flag-loaded signals into a Dart `onFeatureFlags` callback set during `setup(...)`.
+- Wrapper SDKs may translate platform-native notifications into their own callback surface. Flutter maps native/browser flag-loaded signals into a Dart `onFeatureFlags` callback set during `setup(...)`. From 6.0 it maps the native result's values and error state into the Dart result rather than dropping them.
 
 ## Error handling
 
@@ -170,3 +172,58 @@ The SDK SHALL implement the canonical `on-feature-flags` behavior described by t
   | key     | value |
   | beta-ui | true  |
 - **AND** error-aware feature flag listeners should be told that loading flags errored
+
+### Requirement: Flags-loaded result on a payload-carrying listener
+
+A payload-carrying flag-loaded listener SHALL receive, in the SDK's documented representation, all
+three of: the keys of the enabled flags, the value of each enabled flag (`true` or its variant
+string), and whether the latest load failed. The representation MAY be one result object (posthog-ios
+4.0, posthog-android 4.0 and posthog-flutter 6.0 each pass a `PostHogFeatureFlagsLoaded` with
+`flags`, `variants` and `errorsLoading`) or separate arguments (posthog-js passes the flag keys, the
+variants, and a context carrying `errorsLoading`). This spec does not require one argument list
+across platforms.
+
+In the `PostHogFeatureFlagsLoaded` shape, a disabled flag SHALL be omitted from both `flags` and
+`variants` rather than carried with a `false` value, so an empty result and "every flag is off" are
+the same observation. An SDK using that shape SHALL NOT report a disabled flag as enabled to make
+the two distinguishable; a caller that needs the full map reads it through the getter APIs.
+
+The listener SHALL receive a result that describes the load that triggered it on every invocation
+path, not only on a successful remote load. A path that serves cached, bootstrapped or last-known
+values SHALL carry those values, and a path on which the load failed SHALL report the failure rather
+than present the retained values as freshly loaded. An SDK SHALL NOT substitute an empty or
+synthesized success for a result it cannot determine.
+
+#### Scenario: Listener result carries the enabled flags and their variants
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** a feature flag listener is registered
+- **WHEN** feature flags are loaded with values:
+  | key        | value   |
+  | beta-ui    | true    |
+  | new-layout | variant |
+- **THEN** payload-carrying feature flag listeners should receive flags:
+  | key        | value   |
+  | beta-ui    | true    |
+  | new-layout | variant |
+- **AND** error-aware feature flag listeners should not be told that loading flags errored
+
+#### Scenario: A disabled flag is left out of the listener result
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** the SDK passes its flag-loaded result as a `PostHogFeatureFlagsLoaded`
+- **AND** a feature flag listener is registered
+- **WHEN** feature flags are loaded with values:
+  | key     | value |
+  | beta-ui | true  |
+  | old-ui  | false |
+- **THEN** payload-carrying feature flag listeners should receive flags:
+  | key     | value |
+  | beta-ui | true  |
+- **AND** the result should not contain "old-ui"

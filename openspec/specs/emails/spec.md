@@ -50,6 +50,7 @@ The status is one of `queued`, `sent`, `failed`, `delivered`, `bounced`, or `com
 | `429` with `quota_limited` | `monthly_quota_exceeded` |
 | Other `429` | `rate_limit_exceeded` |
 | `503`, or a network error | `service_unavailable` |
+| A local `invalid_*` argument error, with no HTTP status | `validation_error` |
 | Anything else | `application_error` |
 
 ## Requirements
@@ -169,11 +170,19 @@ Before retry `n`, counting from 0, the SDK SHALL wait about `2^n` seconds with j
 
 ### Requirement: Send result
 
-A `2xx` response SHALL produce a result with the message ID from `message_id`, `replayed` (true only when the response says `true`), and the response's warnings, each with a code, a message and an optional fix. The SDK SHALL log each warning. A result means PostHog queued the email, not that it was delivered.
+A `2xx` response with a nonempty string `message_id` SHALL produce a result with that message ID, `replayed` (true only when the response says `true`), and the response's warnings, each with a code, a message and an optional fix. The SDK SHALL log each warning. A result means PostHog queued the email, not that it was delivered.
 
 #### Scenario: A replay returns the first send's ID
 - **WHEN** the response is `202` with `{"message_id": "msg_1", "replayed": true}`
 - **THEN** the result has ID `msg_1` and `replayed` true
+
+### Requirement: Send response without a message ID
+
+A `2xx` response whose body is not JSON, or whose `message_id` is missing, empty or not a string, SHALL produce the error `api_error` with the response's HTTP status, and SHALL NOT be retried.
+
+#### Scenario: An acceptance without a message ID is an error
+- **WHEN** the response is `202` with `{}`
+- **THEN** the SDK makes 1 attempt and reports the error code `api_error` with status 202
 
 ### Requirement: Error fields
 
@@ -185,7 +194,7 @@ An error from a PostHog response SHALL carry the response's `code` unchanged, or
 
 ### Requirement: Error names
 
-An error SHALL carry a `name`, a coarse category for callers that branch on the kind of failure rather than the exact code. The name SHALL follow the mapping in the Error names table of this spec, which keys on the HTTP status and, for `409`, `422` and `429`, on the code.
+An error SHALL carry a `name`, a coarse category for callers that branch on the kind of failure rather than the exact code. The name SHALL follow the mapping in the Error names table of this spec, which keys on the HTTP status and, for `409`, `422` and `429`, on the code. A local argument error with an `invalid_*` code and no HTTP status SHALL be named `validation_error`.
 
 #### Scenario: A quota error has the quota name
 - **WHEN** the response is `429` with code `quota_limited`
@@ -197,7 +206,7 @@ An error SHALL carry a `name`, a coarse category for callers that branch on the 
 
 ### Requirement: Error channel
 
-The SDK SHALL report an email error through the language's idiomatic channel and only that channel. An SDK whose awaited methods do not reject, such as posthog-node, SHALL resolve to `{ data, error }` with exactly one of the two set. An SDK that raises errors, such as posthog-python, SHALL raise one email error type. An SDK that resolves instead of raising SHALL report an unexpected internal failure as code `unexpected_error`.
+The SDK SHALL report an email error through the language's idiomatic channel only. An SDK whose awaited methods do not reject, such as posthog-node, SHALL resolve to `{ data, error }` with exactly one set, and SHALL report an unexpected internal failure as `unexpected_error`. An SDK that raises, such as posthog-python, SHALL raise one email error type for request and SDK failures, and MAY keep argument errors as native exceptions.
 
 #### Scenario: posthog-node never rejects a send
 - **GIVEN** posthog-node
@@ -236,12 +245,17 @@ A disabled client SHALL send no email request and SHALL report the error `client
 
 ### Requirement: Shutdown
 
-After the client shuts down, it SHALL send no email request and SHALL report the error `client_closed`. Shutdown SHALL wait for email requests in flight, retries included, to settle before it finishes.
+After the client shuts down, it SHALL send no email request and SHALL report the error `client_closed`. Shutdown SHALL wait for email requests in flight, retries included, to settle. Where shutdown takes a timeout, it SHALL wait for them only within the remaining timeout.
 
 #### Scenario: Shutdown waits for a send in its retry backoff
-- **GIVEN** a send whose first attempt failed with a `503` and that waits to retry
-- **WHEN** the caller shuts the client down
+- **GIVEN** a send whose first attempt failed with a `503` and that waits about 1 second to retry
+- **WHEN** the caller shuts the client down with a timeout of 30 seconds
 - **THEN** shutdown finishes only after the retry settles
+
+#### Scenario: Shutdown keeps to its timeout during a retry backoff
+- **GIVEN** a send whose first attempt failed with a `503` and that waits about 1 second to retry
+- **WHEN** the caller shuts the client down with a timeout of 100 milliseconds
+- **THEN** shutdown finishes within about 100 milliseconds
 
 #### Scenario: A shut-down client sends nothing
 - **GIVEN** a client that has shut down

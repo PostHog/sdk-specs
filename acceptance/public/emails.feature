@@ -60,6 +60,15 @@ Feature: Emails
       | 429    | quota_limited             | 1        |
       | 422    | recipient_suppressed      | 1        |
 
+  # Requirement: Send response without a message ID
+
+  Scenario: An acceptance without a message ID is an error and is not retried
+    Given the SDK is initialized with token "test-token", host "https://us.i.posthog.com" and secret key "phs_test"
+    And the mock server will answer the next email send with status 202 and body {}
+    When the caller sends to "user@example.com" with template ID "0190f6d2-7c1e-7b3a-9f5e-1c2d3e4f5a6b"
+    Then the mock server should receive 1 email send request
+    And the send should fail with error code "api_error" and status 202
+
   # Requirement: Retry timing
 
   Scenario: A Retry-After over 30 seconds fails at once

@@ -55,7 +55,7 @@ The snapshot SHALL retain the evaluation identity/context and available evaluati
 
 The snapshot SHALL expose the typed value and details accessors defined by `typed-flag-values` and SHALL resolve them from the retained records only. A typed read SHALL NOT issue a flag-evaluation request or consult current definitions, caches or the remote endpoint.
 
-Typed accessors are value accessors for access tracking. A typed read SHALL mark its key as accessed, so `onlyAccessed()` keeps that flag, and SHALL route `$feature_flag_called` through the feature-flag-called tracker exactly as `getFlag(...)` does for the same key (see `feature-flag-called-tracker`). This applies when the accessor returns the caller default because of a `null` value, a `false` value read as another type, or a type mismatch. A typed read of a key absent from an original evaluation snapshot SHALL return the caller default with `FLAG_NOT_FOUND` and SHALL report `flag_missing` like any other missing-key access. A typed read on an empty or no-op snapshot SHALL return the caller default with `FLAG_NOT_FOUND` and SHALL NOT emit `$feature_flag_called`.
+Typed accessors are value accessors for access tracking. A typed read SHALL mark its key as accessed, so `onlyAccessed()` keeps that flag, and SHALL route `$feature_flag_called` through the feature-flag-called tracker exactly as `getFlag(...)` does for the same key (see `feature-flag-called-tracker`). This applies when the accessor returns the caller default because of a `null` value, a `false` value read as another type, or a type mismatch. A typed read of a key absent from an original evaluation snapshot SHALL return the caller default with `FLAG_NOT_FOUND` and SHALL report the same error as any other missing-key access: `flag_missing`, or `local_evaluation_inconclusive` for an unresolved key (see "Snapshot unresolved flag reporting"). A typed read on an empty or no-op snapshot SHALL return the caller default with `FLAG_NOT_FOUND` and SHALL NOT emit `$feature_flag_called`.
 
 #### Scenario: Typed read is a snapshot read that counts as access
 - **GIVEN** remote evaluation for distinct id "user-123" returns "upload-limit" with the number value 25 and "banner-copy" with the string value "Hello"
@@ -70,6 +70,12 @@ Typed accessors are value accessors for access tracking. A typed read SHALL mark
 - **WHEN** the string details accessor is called for "typo-flag" with caller default "x"
 - **THEN** the details value is "x" with error code `FLAG_NOT_FOUND`
 - **AND** `$feature_flag_called` metadata identifies "typo-flag" as `flag_missing`
+
+#### Scenario: Typed read of an unresolved key (@unresolved_flags_capable)
+- **GIVEN** local evaluation for distinct id "user-123" left "checkout" unresolved and no remote value filled it
+- **WHEN** the string details accessor is called for "checkout" with caller default "x"
+- **THEN** the details value is "x" with error code `FLAG_NOT_FOUND`
+- **AND** the "$feature_flag_called" event for flag "checkout" should report error "local_evaluation_inconclusive"
 
 #### Scenario: Typed read on a no-op snapshot is silent
 - **GIVEN** `evaluateFlags(...)` returned an empty snapshot because no distinct id could be resolved

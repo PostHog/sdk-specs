@@ -8,11 +8,11 @@ When syncing this delta into the canonical `event-batcher` spec:
 
 ## ADDED Requirements
 
-### Requirement: Capture v1 batches are byte-aware and never shrink after a 413
+### Requirement: Capture v1 batches are byte-aware and server SDKs never shrink them after a 413
 
 An SDK that delivers events through capture v1 SHALL size each event by the bytes it will actually send (UTF-8 of the serialized event, exact or an upper bound, never a character count) and SHALL keep every analytics request at or under a byte target of at most 5 MiB of event bytes. The check SHALL run before appending: when the batch is non-empty and the next event would exceed the target, the batch is sent first and the event starts the next batch, so order is kept and an event larger than the target ships alone. The count thresholds (`flushAt`, `maxBatchSize`) still apply. Serializing each event once and building the body from those bytes is the preferred implementation; SDKs that already measure by a second serialization MAY keep it.
 
-The SDK SHALL NOT impose a per-event analytics size cap below capture's own per-event limit (capture drops an event too large to store and reports it per event); an SDK MAY drop locally only an event larger than the request body limit, which capture can never accept. A `413` response SHALL be terminal: the SDK SHALL NOT halve, split or resend the batch.
+The SDK SHALL NOT impose a per-event analytics size cap below capture's own per-event limit (capture drops an event too large to store and reports it per event); an SDK MAY drop locally only an event larger than the request body limit, which capture can never accept. A `413` response SHALL be terminal on a server SDK: it SHALL NOT halve, split or resend the batch. A client SDK MAY halve a batch of more than one event on a `413` and resend it, as `retry-queue` allows; a `413` for a single event is terminal.
 
 Legacy capture: several SDKs batched by count only, enforced per-event caps inherited from older forks (32 KB to 900 KB), and shrank the batch after a `413`.
 

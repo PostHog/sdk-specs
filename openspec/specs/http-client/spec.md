@@ -54,7 +54,7 @@ Platform-specific implementations often split these into dedicated methods per e
    - `UnityWebRequest` in Unity
    - `requests.Session` in Python
    - `HttpClient` in .NET
-6. **Allow wrapper SDKs to delegate transport ownership instead of creating a second HTTP client.** Flutter's Dart layer forwards setup/config to the underlying native SDKs and delegates all runtime transport to those native/browser clients rather than implementing its own request stack.
+6. **Allow wrapper SDKs to delegate transport ownership instead of creating a second HTTP client.** Flutter's Dart layer forwards setup/config to the underlying native SDKs and delegates all runtime transport to those native/browser clients rather than implementing its own request stack. posthog-flutter 6.0 on Windows and Linux has its own Dart transport.
 7. **Translate HTTP failures into SDK-meaningful errors.**
    - Status codes and response bodies are surfaced so retry/caching layers can decide whether to retry, clear caches, or log errors.
    - Some transports parse `Retry-After` headers.
@@ -103,7 +103,7 @@ Usually none directly, aside from transient request/response objects. Higher lay
 - **feature-flag-cache** and **reload-feature-flags** depend on flag/decide/remote-config requests made by this layer.
 - **persistent-storage** may persist metadata returned by HTTP-backed components (for example cached flags/request ids).
 - **consent-gating** may prevent higher layers from calling the transport at all.
-- **wrapper setup/config** may act only as a pass-through surface. Flutter serializes host/API/batching/privacy config into platform setup payloads and then relies on native/browser transports to perform the actual requests.
+- **wrapper setup/config** may act only as a pass-through surface. Flutter serializes host/API/batching/privacy config into platform setup payloads and then relies on native/browser transports to perform the actual requests, except on Windows and Linux, where posthog-flutter 6.0 sends them itself.
 ## Requirements
 ### Requirement: Canonical http-client behavior
 

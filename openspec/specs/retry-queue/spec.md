@@ -16,7 +16,7 @@ This is not a single public API. It is the internal reliability layer behind `ca
 
 ## Applicability
 
-`both` — client and server SDKs both have retry/batching layers, though the implementations differ. Requirements that explicitly refer to a bounded durable queue apply when an SDK owns storage intended to survive a process or application restart; they do not require page-lifetime best-effort buffers to become persistent. Some wrapper SDKs, such as Flutter, do not own a second retry queue and instead delegate queue/retry state to the underlying native/browser SDK.
+`both` — client and server SDKs both have retry/batching layers, though the implementations differ. Requirements that explicitly refer to a bounded durable queue apply when an SDK owns storage intended to survive a process or application restart; they do not require page-lifetime best-effort buffers to become persistent. Some wrapper SDKs, such as Flutter on iOS, macOS, Android and the web, do not own a second retry queue and instead delegate queue/retry state to the underlying native/browser SDK. posthog-flutter 6.0 on Windows and Linux owns its own durable queue.
 
 ## Public signature(s)
 
@@ -67,7 +67,7 @@ nextDelay(attempt): Duration
     - Some SDKs on legacy capture shrink batch size on `413 Payload Too Large` and retry rather than dropping the whole batch immediately.
     - On capture v1, `413` is terminal; byte-aware batching keeps every request under the body limit (see `event-batcher`).
 11. **Allow wrapper SDKs to delegate queue ownership instead of creating a second queue.**
-    - Flutter's Dart layer can preprocess or drop events before enqueue (`beforeSend`, screen-context injection, exception normalization), but successful `identify`, `capture`, `alias`, `group`, `flush`, and `close` calls are then forwarded into the underlying native/browser SDKs, where the actual queue, retry counters, and drop policy live.
+    - Flutter's Dart layer can preprocess or drop events before enqueue (`beforeSend`, screen-context injection, exception normalization), but successful `identify`, `capture`, `alias`, `group`, `flush`, and `close` calls are then forwarded into the underlying native/browser SDKs, where the actual queue, retry counters, and drop policy live. On Windows and Linux, posthog-flutter 6.0 keeps its own Dart queue instead.
 
 ## State & lifecycle
 
@@ -91,7 +91,7 @@ nextDelay(attempt): Duration
 - A positive offline signal pauses transport attempts without preventing durable enqueue.
 - Some SDKs preserve queued events across app restarts (persistent queue / file-backed queue).
 - On shutdown, implementations may attempt a final drain/flush or wait for pending writes.
-- Wrapper SDKs may have no queue lifecycle of their own. Flutter keeps no separate Dart-side queued-event store; its mobile wrapper forwards event-producing calls and explicit `flush()` / `close()` into the native SDKs, while Flutter Web forwards event calls to `posthog-js` and does not add an additional wrapper-managed retry queue.
+- Wrapper SDKs may have no queue lifecycle of their own. Flutter keeps no separate Dart-side queued-event store; its mobile wrapper forwards event-producing calls and explicit `flush()` / `close()` into the native SDKs, while Flutter Web forwards event calls to `posthog-js` and does not add an additional wrapper-managed retry queue. posthog-flutter 6.0 on Windows and Linux has its own queue lifecycle.
 
 ## Error handling
 
@@ -114,7 +114,7 @@ nextDelay(attempt): Duration
 - **persistent storage** — backs durable queues on client SDKs that survive restarts.
 - **HTTP client / transport** — supplies retryable vs non-retryable errors.
 - **consent gating / opt-out** — may prevent enqueue entirely or clear queued events in some SDKs.
-- **before-send-hook / wrapper preprocessing** — some wrappers can modify or drop events before they ever reach the queue. Flutter's Dart `beforeSend` callbacks and exception/screen preprocessing run before delegated native/browser enqueue.
+- **before-send-hook / wrapper preprocessing** — some wrappers can modify or drop events before they ever reach the queue. Flutter's Dart `beforeSend` callbacks and exception/screen preprocessing run before delegated native/browser enqueue, or before its own Dart queue on Windows and Linux.
 - **flush()** — forces the retry queue to attempt immediate delivery.
 ## Requirements
 ### Requirement: Canonical retry-queue behavior
@@ -259,7 +259,7 @@ An SDK that delivers events through capture v1 SHALL retry a capture request onl
 
 On a server SDK, each batch SHALL get at most four attempts by default (three retries), with the retry count configurable within a bounded range. The waits before the second, third and fourth attempts SHALL be 100 ms, 200 ms and 400 ms (100 ms doubling), each multiplied by a random factor in `[0.75, 1.25]`, and never above a 30 second ceiling. A `Retry-After` header SHALL raise the wait to at least its value, clamped to the ceiling, and the jitter SHALL never shorten it. `Retry-After` SHALL be honored on a retryable status and on a 2xx with `retry` entries. After the last attempt, every event still pending SHALL be reported as exhausted through the SDK's error surface. The SDK SHALL NOT keep the events for a later flush; the analytics and AI lanes of a capture v1 server SDK are in-memory queues, not durable queues.
 
-Client SDKs keep capture v1 events in a durable disk queue instead (posthog-ios 4.0, posthog-android 4.0 and the posthog-flutter 6.0 Windows and Linux lane). Such an SDK SHALL keep its existing backoff (1 second doubling to 30 seconds, with jitter) and MAY have no attempt limit, so it reports no event as exhausted; the queue's size cap evicts the oldest events. On a `413` for a batch of more than one event it MAY halve the batch and resend it; a `413` for a single event is terminal.
+Client SDKs keep capture v1 events in a durable disk queue instead (posthog-ios 4.0, posthog-android 4.0 and the posthog-flutter 6.0 Windows and Linux lane). Such an SDK SHALL keep its existing backoff (1 second doubling to 30 seconds, with jitter) and MAY have no attempt limit, so it reports no event as exhausted; the queue's size cap evicts the oldest events. On a `413` for a batch of more than one event it MAY halve the batch and resend it; a `413` for a single event is terminal. A `Retry-After` header SHALL raise the wait to at least its value after jitter, capped at 30 seconds.
 
 Resends SHALL be SDK attempts, with the header rules in `capture`: the HTTP library's own retry mechanism SHALL be off for capture requests, because a library retry resends the stale `PostHog-Request-Timestamp` and attempt number.
 

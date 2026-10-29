@@ -739,7 +739,7 @@ An SDK that delivers events through capture v1 SHALL read the `results` object o
 
 The SDK SHALL NOT hard-code the set of `details` tags. When a `results` entry carries `duplicates_dropped: n`, the request repeated that uuid: the first event with that uuid in the request takes the entry's `result` and `details`, and the SDK SHALL report exactly the next `n` events with that uuid as `drop` with the reason `duplicate_event_uuid`, never retrying them. The SDK SHALL NOT guard, split, rewrite or deduplicate repeated uuids before sending.
 
-When no error handler is registered, the SDK SHALL log one aggregate line per batch that lost events, carrying the count, the cause and the endpoint, and never event content.
+When no error handler is registered, the SDK SHALL log one aggregate line per batch that lost events, carrying the count, the cause and the endpoint, and never event content. A client SDK, which has no error handler, MAY log that line only in debug mode, because it can repeat on every flush during an outage; in debug mode it SHALL log it.
 
 Legacy capture: a 2xx meant the whole request was accepted and there was no per-event verdict.
 
@@ -1089,7 +1089,7 @@ Legacy capture: whole-batch serialization let one bad value lose every event in 
 
 ### Requirement: The client fails open on a missing or personal API key
 
-Constructing an SDK client SHALL never throw or fail because of the project token. An empty or whitespace-only token, or a token that starts with `phx_` (a personal API key, which capture always rejects), SHALL produce a disabled client that accepts every call, sends nothing, returns flag defaults and logs one error, so a secret key never reaches the wire. Any other malformed token SHALL be sent as given, and capture's `401` SHALL reach the error surface. The SDK SHALL offer an explicit way to build a disabled client for tests. A built-in integration SHALL NOT raise or return a constructor error over an analytics-only setup problem; it logs one error and turns its own capture off.
+Constructing an SDK client SHALL never throw or fail because of the project token. An empty or whitespace-only token, or a token that starts with `phx_` (a personal API key, which capture always rejects), SHALL produce a disabled client that accepts every call, sends nothing, returns flag defaults and logs one error, so a secret key never reaches the wire. The SDK SHALL log that error whether or not debug mode is on, client SDKs included. Any other malformed token SHALL be sent as given, and capture's `401` SHALL reach the error surface. The SDK SHALL offer an explicit way to build a disabled client for tests. A built-in integration SHALL NOT raise or return a constructor error over an analytics-only setup problem; it logs one error and turns its own capture off.
 
 #### Scenario: A personal API key disables the client without throwing (@server)
 - **GIVEN** a fresh SDK acceptance test harness

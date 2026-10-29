@@ -1,10 +1,10 @@
 ## Why
 
-**Payload privacy** cuts a long string to its limit plus a 1,024-character margin, redacts it, then cuts it to the redacted length minus 1,024. Object keys use the same rule with their 256 limit, so any redaction inside the margin is taken off the kept text too. A link whose `token` query field is longer than the key limit comes out as `""` when used as an object key (a link check keyed by link), and every such key in one object collides on `""`. SDKs that also redact `X-Amz-Security-Token` (posthog-python, posthog-rs) hit this with S3 presigned links made with temporary credentials, whose session token is about 1,000 characters.
+**Payload privacy** cuts a long string to its limit plus a 1,024-character margin, redacts it, then cuts it to the redacted length minus 1,024. Object keys use the same rule with their 256 limit, so any redaction inside the margin is taken off the kept text too. A link whose `token` query field is longer than the key limit comes out as `""` when used as an object key (a link check keyed by link), and every such key in one object collides on `""`. The spec doesn't require redacting `X-Amz-Security-Token`, but SDKs that do (posthog-python, posthog-rs) also hit this with S3 presigned links made with temporary credentials, whose session token is often around 1,000 characters.
 
 ## What Changes
 
-- **Payload privacy**: when the margin cut removed text, the SDK also runs the passes on the string cut to its limit and keeps only the start the two results share, cut to the limit. A redaction inside the margin no longer shortens what is kept, and a match split by either cut is still dropped. The passes themselves don't change.
+- **Payload privacy**: when the margin cut removed text, the SDK also runs the passes on the string cut to its limit and keeps only the start the two results share, cut to the limit. A redaction inside the margin no longer shortens what is kept, a match split by either cut is still dropped, and nothing either result redacted is kept. The passes themselves don't change; strings over their limit get one more pass over at most the limit.
 - New scenario: a long signed link used as an object key keeps its start.
 
 ## Capabilities

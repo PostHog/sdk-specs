@@ -20,7 +20,7 @@ The canonical specs predate the port. `capture` still says server SDKs stamp `$l
 
 **Non-Goals:**
 - The AI lane (`capture_ai`, `/i/v1/ai/events`, lane configuration). That is the `add-capture-ai-v1` change.
-- Client-SDK capture v1 (posthog-ios 4.0 is in review; its rules may diverge on retries and disk queues). Nothing here is tagged `@client`.
+- Client-SDK specific scenarios. Client SDKs that deliver through capture v1 (posthog-ios 4.0, posthog-android 4.0 and the posthog-flutter 6.0 Windows and Linux lane) are bound by these wire rules, with the client variations the requirements name: a durable disk queue with no attempt limit, 413 batch halving, request identity that resets when a resend's events change or the app restarts, a wrapper's own SDK name, and no global options. No scenario is tagged `@client` yet.
 - New harness scenarios. The scenarios below use the existing step vocabulary where one exists but are not opted in with `@sdk:server`; opting in needs an end-to-end run against a real adapter.
 - Deleting the legacy `/batch/` narrative or the `capture_v0*` harness features.
 

@@ -18,9 +18,9 @@
 
 **An explicit stop survives opt-out.** All four SDKs clear "wanted" on `stopSessionRecording()`, so opt-in leaves a recording the app stopped stopped.
 
-**Calls made while opted out do not count.** Android ignores `startSessionReplay()`/`stopSessionReplay()` while opted out; on iOS the integration is uninstalled, so there is nothing to start or stop; Flutter's restart flag is set at opt-out; React Native ignores them since posthog-js#5336. The decision is taken at opt-out.
+**Calls made while opted out do not count.** Android, iOS and React Native (since posthog-js#5363) ignore start and stop calls made while opted out when tracking what the app wants; Flutter's restart flag is set at opt-out. The decision is taken at opt-out.
 
-**`reset()` clears the remembered decision.** iOS resets it to the default in `reset()`, and React Native treats `reset()` after `optOut()` as an opt-in. Otherwise an app that launched opted out would never get replay.
+**The decision starts from the configuration at launch.** iOS, Android and React Native seed it from the session replay option at setup, and Flutter's native layer does the same, so an app that launched opted out with replay enabled records on its first opt-in. No SDK's `reset()` changes it; React Native's `reset()` after `optOut()` restores replay as `optIn()` does, because it clears the opt-out.
 
 ## Open questions
 

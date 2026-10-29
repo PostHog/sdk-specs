@@ -8,7 +8,7 @@ The spec says only that "some SDKs stop or restart them when opt state changes".
 
 - Require a client SDK that stops replay on opt-out to start a **new session** before replay restarts on opt-in, so no post-consent frame is attributed to the session that was active while the user was opted out.
 - Require the SDK to decide at opt-out from whether the app **wanted** replay — enabled in config or started with `startSessionRecording()`, and not stopped since — rather than from whether it was recording. Replay held off at opt-out by sampling, a linked flag or an event trigger restarts in the new session, where those gates are evaluated again.
-- Require replay the app stopped before opting out to stay stopped, `startSessionRecording()` and `stopSessionRecording()` calls made **while opted out** not to change the decision, and `reset()` to clear it back to the default so an app that launches opted out still gets replay on its first opt-in.
+- Require replay the app stopped before opting out to stay stopped, `startSessionRecording()` and `stopSessionRecording()` calls made **while opted out** not to change the decision, and the decision to start from the configuration at launch so an app that launches opted out with replay enabled still gets replay on its first opt-in.
 - Record in the narrative that the SDKs still differ on whether opt-in rotates the session when a linked flag or unloaded remote config keeps replay from starting, and leave that case unspecified.
 
 ## Capabilities

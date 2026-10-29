@@ -22,6 +22,7 @@ alike. It does not cover LLM analytics (tokens, cost, prompts), which belong to 
 | posthog-js | `@posthog/mcp` |
 | posthog-python | `posthog.mcp` (inside `posthog`) |
 | posthog-go | `posthogmcp` (manual API), `posthogmcpsdk` (go-sdk adapter) |
+| posthog-rs | `posthog_rs::mcp` (feature `mcp`, rmcp adapter) |
 | posthog-ruby | not yet |
 
 ## Public signatures
@@ -68,6 +69,8 @@ table is the one place defaults are stated.
 | conversation anchoring | on | Injects `conversation_id`, mints handles, and derives `$session_id` from them |
 | identify | none | Resolves `distinct_id`, `$set`, and `$groups` per request |
 | exception autocapture | on | Emits `$exception` next to failed calls |
+| initialize event | on | Sends `$mcp_initialize` for each legacy `initialize`; off sends none and changes nothing else |
+| tools list event | on | Sends `$mcp_tools_list` for each `tools/list`; off sends none and changes nothing else |
 | parameter capture | on | Sends `$mcp_parameters` |
 | response capture | on | Sends `$mcp_response` on `$mcp_tool_call`, including successful calls, where a wrong or empty result is the failure no error flag shows |
 | before-send hook | none | Modifies or drops each MCP event before capture |
@@ -90,6 +93,7 @@ means set whenever the SDK can determine the value. Events: "call" is `$mcp_tool
 | `$mcp_is_error` | call | JSON boolean | required |
 | `$mcp_duration_ms` | call, `$mcp_input_required` | JSON number, milliseconds | required |
 | `$mcp_source` | call | `"posthog_mcp_analytics"` | required |
+| `$mcp_interface` | all, `$exception` | `"mcp"` for an MCP server; `"webmcp"` is reserved for in-page browser tools | required |
 | `$session_id` | all | non-empty string | required |
 | `$mcp_resource_name` | call, report | string, the tool name (on a report, the virtual tool's), at most 256 characters | should |
 | `$mcp_tool_description`, `$mcp_tool_category` | call | string, at most 2,048 characters | known |
@@ -314,10 +318,9 @@ is not a token.
 The event `distinct_id` SHALL be the identity the server resolves for the request, else `$session_id`.
 Without a resolved identity every event, `$exception` included, SHALL set `$process_person_profile:
 false`, so anonymous calls create no person profiles. With one, the SDK SHALL NOT set it, and SHALL
-send identity properties as `$set` and groups as `$groups`. The SDK MAY also send `$identify`, at most
-once per session in each process and again when the identity changes; it SHALL carry only the
-identity (`distinct_id`, `$set`, `$groups`, `$session_id`) and client and server identity, never
-`$mcp_parameters` or `$mcp_response`. Nothing depends on it, because every event carries the identity.
+send identity properties as `$set` and groups as `$groups` on every event. The SDK SHALL NOT send a
+standalone `$identify` event, for any MCP revision or session mode. It would carry no
+`$anon_distinct_id`, so ingestion would merge no person, and every event already carries the identity.
 
 #### Scenario: An anonymous call does not create a person
 - **GIVEN** an MCP server instrumented by the SDK with no identify option
@@ -325,6 +328,14 @@ identity (`distinct_id`, `$set`, `$groups`, `$session_id`) and client and server
 - **AND** the SDK is flushed
 - **THEN** the "$mcp_tool_call" event's distinct_id should equal its "$session_id"
 - **AND** its property "$process_person_profile" should be the boolean false
+
+#### Scenario: An identified call sends no $identify
+- **GIVEN** an MCP server instrumented by the SDK whose identify option resolves distinct id "user-123" with properties {"plan":"pro"}
+- **WHEN** an MCP client calls tool "search_docs"
+- **AND** the SDK is flushed
+- **THEN** the "$mcp_tool_call" event's distinct_id should be "user-123"
+- **AND** its property "$set" should equal {"plan":"pro"}
+- **AND** no "$identify" event should be sent
 
 ### Requirement: Client and server identity
 
@@ -363,6 +374,14 @@ model), and `conversation_id`. The SDK SHALL:
 - remove injected arguments before the handler runs and keep them out of `$mcp_parameters`;
 - treat an argument a server's tool declares itself as the tool's data: pass it through, capture it in
   `$mcp_parameters`, and never read it as intent, model, or handle;
+- resolve ownership during `tools/call` from the tool registry or the original tool definition, even
+  when the server instance did not serve `tools/list`. If the framework exposes no readable registry,
+  automatic instrumentation SHALL provide a host callback that resolves the original tool by name.
+  The callback returns the original schema, before SDK injection, in the same form that the host
+  advertises it. Ownership learned from a listing on the current instance wins. A missing result or
+  callback failure leaves ownership unknown,
+  logs the failure, and does not change the MCP response. The SDK strips only arguments that it can
+  prove it owns;
 - preserve the order and content of the server's tool list otherwise, apart from the
   `_mcp_instructions` output-schema declaration of "Session identity".
 
@@ -384,6 +403,16 @@ describing people and entities by role ("a customer"), because pattern redaction
 - **THEN** the tool handler should receive arguments `{"query": "flags"}`
 - **AND** the "$mcp_tool_call" event's property "$mcp_intent" should be "find the flags docs"
 - **AND** its property "$mcp_intent_source" should be "context_parameter"
+
+#### Scenario: A fresh low-level server resolves injected argument ownership
+- **GIVEN** automatic instrumentation creates a fresh low-level server for `tools/call`
+- **AND** the tool "search_docs" has a strict schema that declares only "query"
+- **AND** that server instance has not served `tools/list`
+- **AND** a host callback resolves tool "search_docs" to its original schema before SDK injection
+- **WHEN** the MCP client calls tool "search_docs" with arguments `{"query": "flags", "context": "find docs", "llm_model": "model-a"}`
+- **THEN** the tool handler should receive arguments `{"query": "flags"}`
+- **AND** the "$mcp_tool_call" event's property "$mcp_intent" should be "find docs"
+- **AND** the "$mcp_tool_call" event's property "$mcp_llm_model" should be "model-a"
 
 ### Requirement: Payload capture
 
@@ -444,30 +473,41 @@ sending, the SDK SHALL:
   is one of: authorization, cookie, set-cookie, x-api-key, token, password, secret, or api key, api
   token, access token, refresh token, client secret, private key written with `-`, `_`, or no
   separator;
-- redact PostHog tokens (`ph` plus a lowercase letter and `_`, then 20 or more of `[A-Za-z0-9_-]`),
-  URL user info, and URL query and fragment fields named by that key list or as a signature (such as
-  `sig`, `signature`, `X-Amz-Signature`);
+- redact PostHog tokens (`ph` plus a lowercase letter and `_`, then 20 or more of `[A-Za-z0-9_-]`,
+  between word boundaries, where only ASCII letters, digits, and `_` are word characters, so a name
+  such as `graphs_per_dashboard_and_insight` is kept), URL user info, and URL query and fragment
+  fields named by that key list or as a signature (such as `sig`, `signature`, `X-Amz-Signature`);
 - redact, inside any string, the value of a JSON member whose key is on that key list, writing
   `"[redacted]"` so JSON stays valid (`"password": "hunter2"` becomes `"password": "[redacted]"`),
   because a tool that returns `structuredContent` also returns it as JSON text. The value is a string,
   number, boolean, or flat array of those; a string may be cut off at a line end or the text's end,
   even after a trailing `\`. Values that nest objects, and JSON inside a JSON string, are out of scope;
 - replace with the placeholder `[binary data redacted - not supported by PostHog MCP analytics]` a
-  string of 10,240 or more characters whose first and last 1,024 characters are all base64 or base64url
-  characters (`=` padding allowed at the end), or that is a `data:` URL whose header ends in
-  `;base64,`;
+  string of 10,240 or more characters that is a `data:` URL whose header ends in `;base64,`, or that,
+  once any trailing run of `=` is set aside, is not empty and has first and last 1,024 characters all
+  from one alphabet: base64 with `\r` and `\n`, because MIME and PEM base64 break lines, or base64url;
 - redact email addresses, IP addresses, Luhn-valid card numbers, US social security numbers, and phone
   numbers from `$mcp_intent` and every property "Property reference" marks sanitized as free text.
 
+Object keys inside `$mcp_parameters` and `$mcp_response` are captured strings too, because a result
+keyed by data (a link check keyed by signed URL) carries the credential in the key. The key list is
+matched against each key as received; the key then SHALL get the PostHog token, URL, JSON member, and
+binary passes, with the key limit of "Property reference" in place of the string limit. The SHOULD on
+other credential-shaped values below does not extend to keys, because entropy detectors read field names
+such as `Get_Organization_Memberships` as credentials. When cutting or redaction makes keys of one object
+equal, the SDK SHALL keep the entry whose key as received sorts first by Unicode code point.
+`$mcp_input_keys` SHALL count a name the PostHog token or URL pass would change as a name that was not
+recorded.
+
 These passes SHALL cost in proportion to the property limits, not to the payload. The SDK SHALL first
-apply the entry, nesting, and key limits of "Property reference" and the key-based redaction. For each
-remaining string with a limit it SHALL run the binary check on the uncut string, cut the string to its
-limit plus 1,024 characters, run the remaining passes, then cut it to its limit, or, when the first cut
-removed text, to the passed string's length minus 1,024 if that is smaller. The margin lets a match
-that crosses the limit be recognized whole, and the second rule drops the margin's last 1,024
-characters, where a match split by the first cut could otherwise slide under the limit after an earlier
-redaction shortens the text. Scanning the whole payload first makes one large result cost hundreds of
-milliseconds.
+apply the entry and nesting limits of "Property reference" and the key-based redaction. For each
+remaining string with a limit, object keys included, it SHALL run the binary check on the uncut string,
+cut the string to its limit plus 1,024 characters, run the remaining passes, then cut it to its limit,
+or, when the first cut removed text, to the passed string's length minus 1,024 if that is smaller. The
+margin lets a match that crosses the limit be recognized whole, and the second rule drops the margin's
+last 1,024 characters, where a match split by the first cut could otherwise slide under the limit after
+an earlier redaction shortens the text. Scanning the whole payload first makes one large result cost
+hundreds of milliseconds.
 
 The SDK SHOULD also redact other credential-shaped values (known key formats, long high-entropy
 tokens). It SHALL expose a before-send hook that can modify or drop each MCP event after this
@@ -490,6 +530,26 @@ drops its `$exception`.
 - **THEN** the first text block in "$mcp_response" should be `{"user":"ada","password":"[redacted]"}`
 - **AND** the "$mcp_response" should not contain "hunter2"
 
+#### Scenario: A credential in an object key is redacted
+- **GIVEN** an MCP server instrumented by the SDK with a tool "check_links"
+- **WHEN** an MCP client calls tool "check_links" with arguments `{"links": {"https://bucket.test/a.png?X-Amz-Signature=abc123": "logo"}}`
+- **AND** the SDK is flushed
+- **THEN** the "$mcp_parameters" should not contain "abc123"
+- **AND** the "$mcp_parameters" should contain "logo"
+
+#### Scenario: A PostHog token is redacted only as a whole word
+- **GIVEN** an MCP server instrumented by the SDK with a tool "save_note"
+- **WHEN** an MCP client calls tool "save_note" with arguments `{"note": "key phc_AbCdEfGhIjKlMnOpQrStUvWx for graphs_per_dashboard_and_insight"}`
+- **AND** the SDK is flushed
+- **THEN** the "$mcp_parameters" should not contain "phc_AbCdEfGhIjKlMnOpQrStUvWx"
+- **AND** the "$mcp_parameters" should contain "graphs_per_dashboard_and_insight"
+
+#### Scenario: Line-wrapped base64 in a result is replaced
+- **GIVEN** an MCP server instrumented by the SDK with a tool "export" that returns a text block of 157 lines of 76 base64 characters joined by `\r\n`, the last line ending in "=="
+- **WHEN** an MCP client calls tool "export"
+- **AND** the SDK is flushed
+- **THEN** the first text block in "$mcp_response" should be "[binary data redacted - not supported by PostHog MCP analytics]"
+
 ### Requirement: Event size bounds
 
 Every MCP event's properties, `$set` and `$groups` included, SHALL serialize to at most 102,400 bytes
@@ -511,17 +571,38 @@ limits of "Property reference" first, then measure) rather than re-serializing r
 ### Requirement: Library identity
 
 MCP events SHALL carry `$lib` as `posthog-<runtime>-mcp` (such as `posthog-node-mcp`,
-`posthog-python-mcp`) and `$lib_version` as the version of the installed package that ships the
-instrumentation (for Python, `posthog`; for Go, `posthog-go`, which builds the events for both
-`posthogmcp` and `posthogmcpsdk`). `$lib` marks an event as coming from the MCP instrumentation, so the
-SDK SHOULD NOT relabel events the host application captures through the same client; where the platform
-can only relabel the whole client, the SDK SHALL document that MCP analytics needs a dedicated client.
+`posthog-python-mcp`, `posthog-rs-mcp`) and `$lib_version` as the version of the installed package that
+ships the instrumentation (for Python, `posthog`; for Go, `posthog-go`, which builds the events for both
+`posthogmcp` and `posthogmcpsdk`; for Rust, `posthog-rs`, which ships `posthog_rs::mcp` behind its
+`mcp` feature). `$lib` marks an event as coming from the MCP instrumentation, so the SDK SHOULD NOT
+relabel events the host application captures through the same client; where the platform can only
+relabel the whole client, the SDK SHALL document that MCP analytics needs a dedicated client.
 
 #### Scenario: Events name the MCP instrumentation
 - **GIVEN** an MCP server instrumented by the SDK
 - **WHEN** an MCP client calls tool "search_docs"
 - **AND** the SDK is flushed
 - **THEN** the "$mcp_tool_call" event's property "$lib" should end with "-mcp"
+
+### Requirement: Interface identity
+
+Every MCP analytics event, and the `$exception` captured next to a failed call, SHALL carry
+`$mcp_interface` naming the interface the call arrived through, set before any before-send hook
+runs. Server instrumentation, the scope of this spec, SHALL send `"mcp"`. `"webmcp"` is reserved for
+in-page browser tools instrumented by a client SDK and SHALL NOT be sent by an MCP server. `$lib`
+("Library identity") names the runtime, not the interface, and SHALL NOT be used in its place.
+
+#### Scenario: Server events name the mcp interface
+- **GIVEN** an MCP server instrumented by the SDK
+- **WHEN** an MCP client calls tool "search_docs"
+- **AND** the SDK is flushed
+- **THEN** the "$mcp_tool_call" event's property "$mcp_interface" should be "mcp"
+
+#### Scenario: A failed call's exception names the same interface
+- **GIVEN** an MCP server instrumented by the SDK with exception autocapture enabled and a tool "search_docs" whose handler throws
+- **WHEN** an MCP client calls tool "search_docs"
+- **AND** the SDK is flushed
+- **THEN** the "$exception" event's property "$mcp_interface" should be "mcp"
 
 ### Requirement: Optional events
 
@@ -530,7 +611,8 @@ and SHALL come only from a request the client sent: never from a request the fra
 internally, and never `$mcp_initialize` without an `initialize`. Automatic instrumentation SHOULD emit
 `$mcp_input_required` and `$mcp_unknown_tool`, and MAY emit the others; a manual API MAY offer capture
 methods for any of them. An SDK declares which of these events it emits as the acceptance capability
-tags `@mcp_input_required_capable`, `@mcp_unknown_tool_capable`, and `@mcp_tools_list_capable`, and
+tags `@mcp_input_required_capable`, `@mcp_unknown_tool_capable`, `@mcp_tools_list_capable`, and
+`@mcp_initialize_capable`, and
 whether it observes task stores ("Tool call event") as `@mcp_task_store_capable`. The rules that no
 `$mcp_tool_call` is sent for a round, a task handle, or an unknown tool apply to every SDK.
 
@@ -540,6 +622,9 @@ whether it observes task stores ("Tool call event") as `@mcp_task_store_capable`
   theirs. Its `$mcp_response` SHALL keep only the result envelope (such as `nextCursor`, `ttlMs`,
   `cacheScope`, `_meta`), never the `tools` array, and is omitted when the envelope is empty; the
   response capture option does not apply to it.
+  With the tools list event option off (see "Configuration"), the SDK SHALL NOT send
+  `$mcp_tools_list`, nor the `$exception` of a failed listing, and SHALL change nothing else: the
+  listing keeps its injected arguments and virtual tools.
 - `$mcp_input_required` for each `input_required` result a client receives: `$mcp_tool_name`,
   `$mcp_duration_ms` for that round, and `$mcp_input_request_methods`, never the requests' or answers'
   content. It records every round, including rounds whose call never completes. Not rounds: a round a
@@ -566,8 +651,13 @@ whether it observes task stores ("Tool call event") as `@mcp_task_store_capable`
   uses (`type`, `tool`, `summary`, ...) or that reuses an injected argument's name, SHALL NOT capture
   arguments the tool does not declare, and SHALL send the event even when the host's report handler
   fails.
-- `$mcp_initialize` for a legacy `initialize`; `$mcp_resource_read` and `$mcp_resources_list` for
-  resource requests. `$mcp_resource_read` SHALL NOT carry the resource's contents.
+- `$mcp_initialize` for a legacy `initialize`, unless the host turns the initialize event option
+  off (see "Configuration"). With the option off, the SDK SHALL NOT send `$mcp_initialize`, and SHALL
+  change nothing else: the session token, `$session_id`, and the client and server identity of later
+  events stay the same. The SDK SHALL NOT send an `$exception` for a failed `initialize`, with the
+  option on or off.
+- `$mcp_resource_read` and `$mcp_resources_list` for resource requests. `$mcp_resource_read` SHALL
+  NOT carry the resource's contents.
 
 A virtual tool SHALL NOT be advertised when the server already registers a tool of that name. It gets
 every enabled injected argument except `context`, whose place its own report arguments take, follows
@@ -580,3 +670,26 @@ every enabled injected argument except `context`, whose place its own report arg
 - **THEN** the "$mcp_tools_list" event's property "$mcp_listed_tool_names" should be an array of the 100 tool names on the first page
 - **AND** its property "$mcp_response" should include "nextCursor"
 - **AND** its property "$mcp_response" should not include "tools"
+
+#### Scenario: Each legacy initialize sends one $mcp_initialize (@mcp_initialize_capable)
+- **GIVEN** an MCP server instrumented by the SDK with default options
+- **WHEN** an MCP client on protocol revision "2025-11-25" sends `initialize`
+- **AND** the SDK is flushed
+- **THEN** exactly one "$mcp_initialize" event should be sent
+
+#### Scenario: With the initialize event option off, no $mcp_initialize is sent and the session holds (@mcp_initialize_capable)
+- **GIVEN** a stateless HTTP MCP server instrumented by the SDK with the initialize event option off
+- **WHEN** an MCP client on protocol revision "2025-11-25" sends `initialize`
+- **AND** calls tool "search_docs" with the session token from the `initialize` response
+- **AND** the SDK is flushed
+- **THEN** no "$mcp_initialize" event should be sent
+- **AND** the "$mcp_tool_call" event's "$session_id" should equal the session in that token
+
+#### Scenario: With the tools list event option off, a listing sends no $mcp_tools_list and keeps injected arguments (@mcp_tools_list_capable)
+- **GIVEN** an MCP server instrumented by the SDK with the tools list event option off and a tool "search_docs"
+- **WHEN** an MCP client lists tools
+- **AND** calls tool "search_docs" with arguments `{"query": "flags", "context": "find flag docs"}`
+- **AND** the SDK is flushed
+- **THEN** no "$mcp_tools_list" event should be sent
+- **AND** the listed "search_docs" input schema should include `context`
+- **AND** the "$mcp_tool_call" event's property "$mcp_intent" should be "find flag docs"

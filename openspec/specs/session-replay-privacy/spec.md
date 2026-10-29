@@ -298,4 +298,3 @@ The SDK SHALL evaluate each window by its own flags. A window without `FLAG_SECU
 - **AND** a dialog window without `FLAG_SECURE` is shown over an activity window that has `FLAG_SECURE`
 - **WHEN** a replay frame of the dialog window is captured
 - **THEN** the dialog window is captured under the normal masking rules
-

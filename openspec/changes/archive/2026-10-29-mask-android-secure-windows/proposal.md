@@ -5,7 +5,7 @@ Android apps set `WindowManager.LayoutParams.FLAG_SECURE` on screens that must n
 ## What Changes
 
 - New requirement in `session-replay-privacy`: while the window being captured has `FLAG_SECURE`, Android session replay records that window **fully masked** rather than skipping it, in every replay mode. Recordings show that something private was on screen instead of freezing on the previous frame.
-  - Screenshot mode: an opaque masked frame the size of the window; the window's pixels are never copied or uploaded.
+  - Screenshot mode: an opaque masked frame the size of the window; none of the window's pixels are recorded or uploaded.
   - Wireframe mode: one masked node covering the window, with no child views, text or images.
 - The secure state is checked when capture starts and again before the frame is recorded; the frame is masked if the window was secure at either point.
 - Touch interactions on a secure window are not recorded. The app still receives them.

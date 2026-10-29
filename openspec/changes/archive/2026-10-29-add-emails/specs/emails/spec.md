@@ -131,13 +131,13 @@ An error from a PostHog response SHALL carry the response's `code` unchanged, or
 
 ### Requirement: Error names
 
-An error SHALL carry a Resend-style `name`, so code that branches on Resend's names keeps working. The name SHALL follow the mapping in the Error names table of this spec, which keys on the HTTP status and, for `409`, `422` and `429`, on the code.
+An error SHALL carry a `name`, a coarse category for callers that branch on the kind of failure rather than the exact code. The name SHALL follow the mapping in the Error names table of this spec, which keys on the HTTP status and, for `409`, `422` and `429`, on the code.
 
-#### Scenario: A quota error has the Resend quota name
+#### Scenario: A quota error has the quota name
 - **WHEN** the response is `429` with code `quota_limited`
 - **THEN** the error name is `monthly_quota_exceeded`
 
-#### Scenario: A reused idempotency key has the Resend idempotency name
+#### Scenario: A reused idempotency key has the idempotency name
 - **WHEN** the response is `422` with code `idempotency_key_reused`
 - **THEN** the error name is `invalid_idempotent_request`
 

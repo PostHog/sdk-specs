@@ -21,7 +21,7 @@ Sources, in priority order:
 
 ## Decisions
 
-- **Error channel follows the language.** posthog-node returns `{ data, error }` and does not reject, which matches its other awaited methods and the Resend shape. posthog-python raises `EmailError`. Both are idiomatic, so the spec requires the platform's idiomatic channel and forbids both at once, rather than forcing one shape.
+- **Error channel follows the language.** posthog-node returns `{ data, error }` and does not reject, which matches its other awaited methods. posthog-python raises `EmailError`. Both are idiomatic, so the spec requires the platform's idiomatic channel and forbids both at once, rather than forcing one shape.
 - **Local argument checks follow the language.** posthog-node returns a `validation_error` with an `invalid_*` code, and posthog-python raises `TypeError` or `ValueError`. The spec requires the check to happen before any request and allows either channel.
 - **Per-send `max_retries` is canonical.** The shared contract named it. posthog-node has it and posthog-python does not, so posthog-python is the SDK to change.
 - **The custom-host refusal is canonical.** Both SDKs refuse to send the secret key to a host that is not PostHog Cloud unless the caller names the app host, because a custom host is often an ingestion proxy.

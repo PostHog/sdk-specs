@@ -6,7 +6,7 @@ This change records one contract for sending a transactional email from a templa
 
 ## What Changes
 
-- New capability spec `emails` for server SDKs, covering: the public surface (`send` and `get`), authentication with a secret key, the app host and the refusal to send the key to a custom host, the send request, the idempotency key, the retry policy, the send result and its warnings, structured errors with PostHog's code and a Resend-style name, the status read, disabled and shut-down clients, and shutdown draining.
+- New capability spec `emails` for server SDKs, covering: the public surface (`send` and `get`), authentication with a secret key, the app host and the refusal to send the key to a custom host, the send request, the idempotency key, the retry policy, the send result and its warnings, structured errors with PostHog's code and a category name, the status read, disabled and shut-down clients, and shutdown draining.
 - New acceptance feature `acceptance/public/emails.feature`.
 - Not in scope: the code-content form (subject and body in the call), the `capture_engagement` send option, and client SDKs. The send API does not accept the first two yet, and a secret key must never reach a client.
 

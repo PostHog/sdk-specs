@@ -71,7 +71,7 @@ Feature: Emails
 
   # Requirements: Error fields, Error names
 
-  Scenario Outline: Errors keep PostHog's code and carry a Resend-style name
+  Scenario Outline: Errors keep PostHog's code and carry a category name
     Given the SDK is initialized with token "test-token", host "https://us.i.posthog.com" and secret key "phs_test"
     And the mock server will fail the next email send with status <status> and code "<code>"
     When the caller sends to "user@example.com" with template ID "0190f6d2-7c1e-7b3a-9f5e-1c2d3e4f5a6b" and a per-send retry limit of 0

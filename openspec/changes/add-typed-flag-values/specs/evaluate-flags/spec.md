@@ -57,6 +57,10 @@ The snapshot SHALL expose the typed value and details accessors defined by `type
 
 Typed accessors are value accessors for access tracking. A typed read SHALL mark its key as accessed, so `onlyAccessed()` keeps that flag, and SHALL route `$feature_flag_called` through the feature-flag-called tracker exactly as `getFlag(...)` does for the same key (see `feature-flag-called-tracker`). This applies when the accessor returns the caller default because of a `null` value, a `false` value read as another type, or a type mismatch. A typed read of a key absent from an original evaluation snapshot SHALL return the caller default with `FLAG_NOT_FOUND` and SHALL report the same error as any other missing-key access: `flag_missing`, or `local_evaluation_inconclusive` for an unresolved key (see "Snapshot unresolved flag reporting"). A typed read on an empty or no-op snapshot SHALL return the caller default with `FLAG_NOT_FOUND` and SHALL NOT emit `$feature_flag_called`.
 
+Each typed accessor, in both forms, SHALL accept the per-read `sendFeatureFlagEvents` option and decide whether to send `$feature_flag_called` as "Snapshot feature flag event control" defines for value reads.
+
+The snapshot is the server's unit of evaluation: one evaluation per request, and every typed and legacy read in that request sees the same values and reports what the request saw. A server SDK MAY later add typed single-flag client methods under the rule in `typed-flag-values` "Accessor placement"; they are additive and do not change snapshot reads.
+
 #### Scenario: Typed read is a snapshot read that counts as access
 - **GIVEN** remote evaluation for distinct id "user-123" returns "upload-limit" with the number value 25 and "banner-copy" with the string value "Hello"
 - **WHEN** `evaluateFlags("user-123")` is called
@@ -76,6 +80,14 @@ Typed accessors are value accessors for access tracking. A typed read SHALL mark
 - **WHEN** the string details accessor is called for "checkout" with caller default "x"
 - **THEN** the details value is "x" with error code `FLAG_NOT_FOUND`
 - **AND** the "$feature_flag_called" event for flag "checkout" should report error "local_evaluation_inconclusive"
+
+#### Scenario: Per-read option suppresses a typed read's event
+- **GIVEN** remote evaluation for distinct id "user-123" returns "banner-copy" with the string value "Hello"
+- **WHEN** `evaluateFlags("user-123")` is called
+- **AND** the string value accessor is called for "banner-copy" with caller default "Welcome" and `sendFeatureFlagEvents` false
+- **THEN** it returns "Hello"
+- **AND** no `$feature_flag_called` event is emitted
+- **AND** `onlyAccessed()` returns a snapshot containing "banner-copy"
 
 #### Scenario: Typed read on a no-op snapshot is silent
 - **GIVEN** `evaluateFlags(...)` returned an empty snapshot because no distinct id could be resolved

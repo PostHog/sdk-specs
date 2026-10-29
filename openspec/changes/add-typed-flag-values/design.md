@@ -42,7 +42,8 @@ This design is a starting point for iteration. Each decision below states the as
 
 **Assumption.** Server SDKs put the accessors on the `evaluateFlags()` snapshot only. Client SDKs put them on the client and read loaded flags. Server SDKs do not add typed single-flag client methods; one that does must make each method behave like a one-key `evaluateFlags()` followed by the snapshot accessor.
 **Alternative.** Also add `client.getBooleanValue(key, default, distinctId, options)` and the rest to server clients.
-**Why.** The snapshot is already the preferred server API, it serves the async clients too, and it keeps one evaluation per request. Eight more per-call methods with the full evaluation-context parameter list double the server surface. An OpenFeature server provider can call `evaluateFlags(distinctId, { flagKeys: [key] })` at the same cost as a single-flag getter.
+**Why.** The snapshot is already the preferred server API, it serves the async clients too, and it keeps one evaluation per request: every read in a request sees the same values, and the events report what that request saw. Eight more per-call methods with the full evaluation-context parameter list double the server surface. An OpenFeature server provider can call `evaluateFlags(distinctId, { flagKeys: [key] })` at the same cost as a single-flag getter, or reuse a snapshot it already holds for the context; it must not evaluate every flag for each resolution.
+**Precedent.** Most flag SDKs read on the client with the user passed per call, so users coming from them will look for `client.getStringValue(key, default, distinctId)`. The placement rule keeps that addable later without a break: such a method behaves like a one-key snapshot read.
 **Lenses.** DX: one obvious server pattern; one extra line for single-flag callers. OF: matches OpenFeature's split between the static-context (client) and dynamic-context (server) paradigms, with the snapshot as the bound context. Migration: server users of single-flag getters must adopt `evaluateFlags()` first.
 
 ### D3. Default semantics
@@ -88,6 +89,7 @@ The existing `evaluate-flags` and `is-feature-enabled` specs say a present `fals
 **Assumption.** A typed read emits the same event as a legacy read of the same flag: same tracker, same dedupe key, and `$feature_flag_response` is the legacy rendering (`true` for number and object values, `false` for `null`), never the caller default. A type mismatch is not reported as `$feature_flag_error`. The rule and experiment attribution properties and any dedupe-key extension come with `$experiment_exposure`.
 **Alternative.** Send the value the accessor returned (the typed value, or the caller default), and extend the dedupe key with config version and rule context now.
 **Why.** Users can swap one call at a time without double events or broken insights: a typed read and a legacy read of the same flag dedupe together. The public event schema accepts only a boolean or a non-empty string in `$feature_flag_response`, so number and object values cannot go there yet. The caller default is a local fallback, not something the flag evaluated to.
+The value and details forms emit the same event, and a repeated read emits nothing new while the dedupe key holds. When `$experiment_exposure` arrives, a typed read that returned the caller default because of a type mismatch still reports the assignment: the user was assigned to the arm, and experiment analysis counts assignment.
 **Lenses.** DX: invisible. OF: n/a (OpenFeature does not capture). Migration: no analytics change.
 
 ### D8. Behaviour against older servers
@@ -116,11 +118,12 @@ The existing `evaluate-flags` and `is-feature-enabled` specs say a present `fals
 **Assumption.** Typed accessors never coerce, for any config version. `getBooleanValue` on a multivariate flag is `TYPE_MISMATCH`, while `isFeatureEnabled` returns `true` for it. `getNumberValue` does not parse a variant string, and `getObjectValue` does not read a payload.
 **Alternative.** Coerce for version 1 flags the way today's providers do.
 **Why.** One rule for every flag; the same code keeps working when a flag moves to config version 2. Coercion hides mistakes such as a variant `"10"` that later becomes `"ten"`.
+JSON booleans are never numbers. In Python, where `bool` is a subclass of `int`, the number accessors reject `True` and the boolean accessor rejects `1`; an `isinstance` check alone gets both wrong. Bootstrapped and overridden values go through the same check.
 **Lenses.** DX: strict, with a clear error code. OF: OpenFeature 1.3.4 asks for this. Migration: `isFeatureEnabled` on multivariate flags does not map to `getBooleanValue`. Those callers keep `isFeatureEnabled` or compare `getStringValue`.
 
 ### D12. Number and object values
 
-**Assumption.** Numbers are binary64. An integer accessor rejects fractional or out-of-range numbers as `TYPE_MISMATCH`. Objects are JSON objects only; arrays are not typed values (the wire rejects them), and version 1 array payloads stay on the payload accessor. A returned object must not let the caller mutate the snapshot.
+**Assumption.** Numbers are binary64. An integer accessor rejects fractional numbers and integers above 2^53 − 1 in magnitude as `TYPE_MISMATCH`, even in languages with 64-bit integers, so a JavaScript SDK and a Python SDK agree on the same flag. `-0` reads as 0. Objects are JSON objects only; arrays are not typed values (the wire rejects them), and version 1 array payloads stay on the payload accessor. A returned object must not let the caller mutate the snapshot.
 **Alternative.** Accept top-level arrays as OpenFeature "structure" values.
 **Why.** The config schema only admits top-level objects, so the reader matches the writer.
 **Lenses.** DX: predictable. OF: a subset of "structure". Migration: none.
@@ -284,3 +287,4 @@ The decisions above are assumptions, not settled answers. The PR description lis
 - Should the details object expose the human-readable reason description for debugging, outside `error_message`?
 - Should older-server records keep the legacy `variant` as `details.variant`? The contract treats all metadata of such records as absent, so this change leaves it out.
 - What do framework bindings (React hooks, Vue composables) look like? They can wait for this contract.
+- Should `flag_metadata` also carry OpenFeature's experiment metadata names next to `variant_key`, if the OpenFeature conventions define them?

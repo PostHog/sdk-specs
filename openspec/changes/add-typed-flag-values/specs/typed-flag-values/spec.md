@@ -2,7 +2,9 @@
 
 ### Requirement: Typed accessor surface
 
-The SDK SHALL expose typed flag accessors for four value types: boolean, string, number and object. Each type SHALL have a value form, which returns the value, and a details form, which returns an evaluation-details object. Every accessor SHALL take the flag key and a required caller default of the accessor's type, and SHALL return a value of that type. Accessors SHALL NOT throw or reject for a missing, failed, unreadable or mismatched flag; they return the caller default instead.
+The SDK SHALL expose typed flag accessors for four value types: boolean, string, number and object. Each type SHALL have a value form, which returns the value, and a details form, which returns an evaluation-details object. Every accessor SHALL take the flag key and a required caller default of the accessor's type, and SHALL return a value of that type. Accessors SHALL NOT throw or reject for a missing, failed, unreadable or mismatched flag; they return the caller default instead. A typed read SHALL NOT throw or reject when application code that runs during the read throws, such as a `before_send` hook or an event callback; the SDK SHALL log the exception and return the result it resolved.
+
+The value form and the details form of one type SHALL resolve the same value and SHALL have the same side effects: the same access marking and the same events.
 
 Names follow the OpenFeature client methods in the host language's casing:
 
@@ -12,7 +14,7 @@ Names follow the OpenFeature client methods in the host language's casing:
 | Python, Ruby, Elixir | `get_boolean_value`, `get_string_value`, `get_number_value`, `get_object_value` | `get_boolean_details`, … |
 | Go, .NET | `GetBooleanValue`, … (with the platform's async suffix where its flag getters have one) | `GetBooleanDetails`, … |
 
-Number values are IEEE-754 binary64. A language with distinct integer and floating-point types SHOULD expose integer and floating-point accessors (for example `getIntegerValue` and `getDoubleValue`) in place of, or next to, the number accessor. An integer accessor SHALL treat a number that is not integral, or does not fit the integer type, as a value of another type. Object values are JSON objects. The SDK SHALL return them in the platform's JSON-object representation, and SHALL NOT let a caller change the evaluated flag state by mutating a returned object.
+Number values are IEEE-754 binary64. A language with distinct integer and floating-point types SHOULD expose integer and floating-point accessors (for example `getIntegerValue` and `getDoubleValue`) in place of, or next to, the number accessor. An integer accessor SHALL accept only integral numbers whose magnitude is at most 2^53 − 1, the range in which every binary64 integer is exact, and SHALL treat any other number as a value of another type. The limit applies even where the language's integer type could hold a larger value, so every SDK returns the same result for the same flag. `-0` is the integer 0. Object values are JSON objects. The SDK SHALL return them in the platform's JSON-object representation, and SHALL NOT let a caller change the evaluated flag state by mutating a returned object.
 
 Where the platform's existing flag getters are asynchronous, the typed accessors MAY be asynchronous in the same way.
 
@@ -20,6 +22,12 @@ Where the platform's existing flag getters are asynchronous, the typed accessors
 - **GIVEN** the evaluated flag "upload-limit" has the number value 25
 - **WHEN** the number value accessor is called for "upload-limit" with caller default 10
 - **THEN** it returns 25
+
+#### Scenario: A throwing hook does not break a typed read
+- **GIVEN** the evaluated flag "banner-copy" has the string value "Hello"
+- **AND** application code that runs when the SDK emits `$feature_flag_called` throws an exception
+- **WHEN** the string value accessor is called for "banner-copy" with caller default "Welcome"
+- **THEN** it returns "Hello" without throwing
 
 #### Scenario: Details form returns the same value with its details
 - **GIVEN** the evaluated flag "banner-copy" has the string value "Hello" with reason code `targeting_match`
@@ -32,7 +40,9 @@ Where the platform's existing flag getters are asynchronous, the typed accessors
 
 Server SDKs that implement `evaluate-flags` SHALL expose the typed accessors on the `FeatureFlagEvaluations` snapshot (see the `evaluate-flags` requirement "Snapshot typed accessors"). They are not required to add typed single-flag methods to the client. A server SDK that adds them SHALL make each one behave like an `evaluateFlags(...)` call scoped to that one key followed by the snapshot's typed accessor.
 
-Client SDKs SHALL expose the typed accessors on the client. They SHALL read the currently loaded flag state, like `getFeatureFlag(...)`, and SHALL NOT start a network request. Client accessors MAY accept the per-call event-suppression option that the platform's existing flag getters accept.
+Client SDKs SHALL expose the typed accessors on the client. They SHALL read the currently loaded flag state, like `getFeatureFlag(...)`, and SHALL NOT start a network request or wait for a load in progress. Each read SHALL resolve from the flag state loaded at the time of the read; the SDK SHALL NOT keep typed results across a reload.
+
+Every typed accessor SHALL accept the per-read feature flag event option that the platform's flag getters accept, with the same name and the same meaning: `sendFeatureFlagEvents` on the server snapshot (see the `evaluate-flags` requirement "Snapshot feature flag event control") and the client's per-call option on client SDKs (see `get-feature-flag-result`).
 
 #### Scenario: Server reads a typed value from a snapshot
 - **GIVEN** remote evaluation for distinct id "user-123" returns flag "upload-limit" with the number value 25
@@ -47,9 +57,18 @@ Client SDKs SHALL expose the typed accessors on the client. They SHALL read the 
 - **THEN** it returns "Hello"
 - **AND** no feature-flag request is made
 
+#### Scenario: Client reads follow a reload
+- **GIVEN** a client SDK has loaded flag "banner-copy" with the string value "Hello"
+- **AND** the string value accessor has returned "Hello" for "banner-copy"
+- **WHEN** a flags reload changes "banner-copy" to "Hi"
+- **AND** the string value accessor is called again for "banner-copy" with caller default "Welcome"
+- **THEN** it returns "Hi"
+
 ### Requirement: Typed values resolve without coercion
 
-A typed accessor SHALL compare the JSON type of the flag's value with the requested type and SHALL NOT convert one type to another. It SHALL resolve the value in this order:
+A typed accessor SHALL compare the JSON type of the flag's value with the requested type and SHALL NOT convert one type to another. JSON `true` and `false` are booleans, not numbers. In a language whose boolean type is a subtype of its integer type, such as Python, the number, integer and floating-point accessors SHALL NOT accept a boolean, and the boolean accessor SHALL NOT accept an integer.
+
+It SHALL resolve the value in this order, and the first step that applies decides the result. A missing, failed or unreadable flag therefore never reports `TYPE_MISMATCH`, whatever the requested type:
 
 1. If a situation listed in "Caller default on missing, failed and unreadable flags" applies, return the caller default with that requirement's error code.
 2. If the value has the requested type, return it. For the boolean accessor this includes `false`: a configured flag default of `false` wins over the caller default.
@@ -83,6 +102,9 @@ The rules apply to every flag, including config version 1 flags: a boolean flag 
   | {"steps": 3}  | object  | {}       | {"steps": 3}  | none          |
   | {}            | object  | {"a": 1} | {}            | none          |
   | true          | object  | {}       | {}            | TYPE_MISMATCH |
+  | 0             | boolean | true     | true          | TYPE_MISMATCH |
+  | -0            | number  | 10       | -0            | none          |
+  | 1e21          | number  | 10       | 1e21          | none          |
 
 #### Scenario: Integer accessor rejects a fractional number
 - **GIVEN** the SDK's language has distinct integer and floating-point types
@@ -91,6 +113,28 @@ The rules apply to every flag, including config version 1 flags: a boolean flag 
 - **THEN** it returns 1 with error code `TYPE_MISMATCH`
 - **WHEN** the floating-point accessor is called for "ratio" with caller default 1.0
 - **THEN** it returns 0.25
+
+#### Scenario: Integer accessor edge cases
+- **GIVEN** the SDK's language has distinct integer and floating-point types
+- **AND** flag "n" has the number value <value>
+- **WHEN** the integer details accessor is called for "n" with caller default 7
+- **THEN** the details value is <returned>
+- **AND** the details error code is <error_code>
+
+  | value            | returned         | error_code    |
+  | 3                | 3                | none          |
+  | 3.0              | 3                | none          |
+  | -0               | 0                | none          |
+  | 9007199254740991 | 9007199254740991 | none          |
+  | 9007199254740993 | 7                | TYPE_MISMATCH |
+  | 1e21             | 7                | TYPE_MISMATCH |
+  | true             | 7                | TYPE_MISMATCH |
+
+#### Scenario: Failed flag read with another type reports the failure
+- **GIVEN** the record for "checkout-flow-child" has `failed: true` and value `null`
+- **WHEN** the number details accessor is called for "checkout-flow-child" with caller default 10
+- **THEN** the details value is 10
+- **AND** the error code is `GENERAL`, not `TYPE_MISMATCH`
 
 ### Requirement: Caller default on missing, failed and unreadable flags
 
@@ -268,11 +312,19 @@ A typed accessor SHALL read a bootstrapped flag value (see `bootstrap`) as a typ
 
 A typed accessor SHALL read a client-side override in the same way, with reason `override` and empty `flag_metadata`. An override is never reported as `TARGETING_MATCH`.
 
+Bootstrapped and overridden values SHALL go through the same type check as evaluated values. A value of another type SHALL return the caller default with `TYPE_MISMATCH`; the SDK SHALL NOT pass it through unchecked.
+
 #### Scenario: Bootstrapped string value
 - **GIVEN** the SDK is initialized with `bootstrap.featureFlags` `{ "banner-copy": "Hello" }`
 - **WHEN** the string details accessor is called for "banner-copy" with caller default "Welcome" before any flags response
 - **THEN** the details value is "Hello"
 - **AND** the reason is `CACHED` and `flag_metadata` is empty
+
+#### Scenario: An override of another type is a type mismatch
+- **GIVEN** a client-side override sets "upload-limit" to the string "25"
+- **WHEN** the number details accessor is called for "upload-limit" with caller default 10
+- **THEN** the details value is 10
+- **AND** the error code is `TYPE_MISMATCH`
 
 ### Requirement: Locally evaluated flags
 
@@ -286,7 +338,7 @@ A server SDK that evaluates config version 1 flags locally SHALL resolve typed r
 
 ### Requirement: OpenFeature providers wrap the details accessors
 
-A PostHog OpenFeature provider SHALL build its resolution details from the SDK's details accessors: OpenFeature `value`, `variant`, `reason`, `errorCode`, `errorMessage` and `flagMetadata` come from the matching details fields without remapping. A provider for a server SDK SHALL evaluate through `evaluateFlags(...)` scoped to the requested key, or through equivalent single-flag typed methods.
+A PostHog OpenFeature provider SHALL build its resolution details from the SDK's details accessors: OpenFeature `value`, `variant`, `reason`, `errorCode`, `errorMessage` and `flagMetadata` come from the matching details fields without remapping. A provider for a server SDK SHALL evaluate through `evaluateFlags(...)` scoped to the requested key, through equivalent single-flag typed methods, or by reading a snapshot it has already evaluated for the same evaluation context. It SHALL NOT evaluate every flag for each resolution.
 
 A provider that has released coercions for config version 1 flags (boolean as enabled, number parsed from the variant, object from the payload) MAY keep them for config version 1 flags until its next major release. It SHALL NOT apply them to config version 2 flags.
 

@@ -13,7 +13,7 @@
 
 ## 3. Acceptance and discoverability
 
-- [ ] 3.1 Add `acceptance/public/typed-flag-values.feature` with the typed resolution table, missing, failed and malformed records, older-server records, bootstrap, and the shared `$feature_flag_called` event.
+- [ ] 3.1 Add `acceptance/public/typed-flag-values.feature` with the typed resolution table, integer edge cases, check order, missing, failed and malformed records, older-server records, bootstrap and overrides, a throwing hook, the per-read event option, and the shared `$feature_flag_called` event from both forms.
 - [ ] 3.2 Add "Typed Flag Values" to the capability index in `README.md`.
 
 ## 4. Validation and archive

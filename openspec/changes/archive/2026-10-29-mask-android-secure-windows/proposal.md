@@ -27,5 +27,7 @@ _None._
 - **posthog-android**: screenshot mode, touches in screenshot mode, and the post-copy re-check in PostHog/posthog-android#910; wireframe mode and touches in every mode in PostHog/posthog-android#912 (stacked on #910). Both target `main` (3.x) and reach 4.0 when `main` is merged into the 4.0 branches; 4.0 removes wireframe mode (PostHog/posthog-android#908).
 - **posthog-flutter**: Flutter renders its own Android replay frames, so it implements the screenshot behaviour in its plugin (PostHog/posthog-flutter#685). Native-screen captures and touch recording come from posthog-android.
 - **posthog-react-native**: Android replay runs through posthog-android; the plugin's pinned version is bumped in PostHog/posthog-js#5483.
+- **posthog-kmp**: Android replay runs through posthog-android; it picks this up when its pinned version (3.72.9) is bumped to a release that includes the behaviour.
+- **posthog-unity**: captures its own frames with Unity's `ScreenCapture` and has no `FLAG_SECURE` handling, so it's in scope but doesn't conform yet. Implementing this is a follow-up.
 - **posthog-ios**, **posthog-js (browser)**, server SDKs: not applicable.
 - Behaviour change for apps that set `FLAG_SECURE`: those screens now appear as solid black frames in recordings, without taps.

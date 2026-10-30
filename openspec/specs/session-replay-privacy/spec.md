@@ -247,7 +247,7 @@ If the network capture masking callback throws, the SDK MUST catch the exception
 
 On Android, while a window captured by session replay is a **secure window** — its `WindowManager.LayoutParams` flags include `FLAG_SECURE` — the SDK SHALL record that window fully masked rather than skip it, in every replay mode the SDK supports.
 
-This applies to every SDK whose Android session replay captures that window, including wrapper SDKs that render replay frames themselves (posthog-flutter) or delegate capture to posthog-android (posthog-react-native). It is not applicable on iOS, which has no window-level secure flag and masks sensitive inputs per field under the existing rules.
+This applies to every SDK whose Android session replay captures that window, including wrapper SDKs that render replay frames themselves (posthog-flutter) or delegate capture to posthog-android (posthog-react-native, posthog-kmp). posthog-kmp conforms once its pinned posthog-android version includes this behavior. posthog-unity captures its own Android frames and does not implement this requirement yet; its conformance is a named follow-up. It is not applicable on iOS, which has no window-level secure flag and masks sensitive inputs per field under the existing rules.
 
 Recording a secure window fully masked means:
 

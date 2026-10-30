@@ -1,0 +1,15 @@
+## 1. Contract update
+
+- [x] 1.1 Survey the server SDKs' per-call and client-level `$feature_flag_called` controls, and how their snapshot reads handle them today.
+- [x] 1.2 Add the snapshot feature flag event control requirement and its scenarios to the `evaluate-flags` delta.
+- [x] 1.3 Amend lazy access tracking and the supersession map so they defer to the new control.
+- [x] 1.4 Add matching acceptance scenarios to `acceptance/public/evaluate-flags.feature`.
+- [x] 1.5 After `2026-10-07-observe-evaluate-flags-server-reads` landed, rewrite those scenarios and their spec scenarios as request-local snapshot reads, tagged `@server` and, for the client-default cases, `@requires:flag_event_default`.
+- [x] 1.6 After review, clarify the `get-feature-flag-result` per-call option default, and add scenarios for an enabled client default with a per-read `false` and for a suppressed snapshot read followed by a single-flag getter.
+
+## 2. Validation and archive
+
+- [x] 2.1 Validate the change and canonical specs strictly, parse the Gherkin feature, and check the diff.
+- [x] 2.2 Sync the delta into `openspec/specs/evaluate-flags/spec.md` and archive the change on this branch.
+
+Validation: `openspec validate --specs --strict` passes, the change passed strict validation before archiving, the acceptance feature parses as Gherkin, and `git diff --check` is clean. These are specification checks, not executed SDK conformance tests.

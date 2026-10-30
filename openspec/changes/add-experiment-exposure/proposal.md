@@ -20,7 +20,7 @@ Ingestion is ready for this. It leaves a directly captured `$experiment_exposure
 - A malformed split (any of rule type `experiment`, rule ID or variant key missing) emits no exposure. Its `$feature_flag_called` keeps config version 2 and the reason code and omits the whole rule tuple. The SDK never guesses the missing parts.
 - `$feature_flag_called` for config version 2 results gains `$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`, by a per-reason presence table. No event carries an experiment ID, a holdout ID or an assignment seed.
 - `$feature_flag_response` keeps the legacy rendering on both events (`true` for number and object values, `false` for `null`), until a number and object event schema exists. The arm is `$feature_flag_variant`.
-- The `$feature_flag_called` dedupe key for config version 2 results also includes the config version, rule ID and variant key. `$experiment_exposure` gets its own bounded dedupe namespace keyed on distinct ID, groups, flag key, config version, rule ID and variant key. The value, request ID, evaluation time and local or remote source are not in that key.
+- The `$feature_flag_called` dedupe key for config version 2 results also includes the config version, reason code, rule ID, rule type and variant key. `$experiment_exposure` gets its own bounded dedupe namespace keyed on distinct ID, groups, flag key, config version, rule ID and variant key. The value, request ID, evaluation time and local or remote source are not in the exposure key.
 - The feature flag event decision (per-read option, client-level default) governs both events. Payload-only reads stay silent.
 - Minimal-event mode keeps the new attribution properties.
 - An SDK that evaluates config version 2 flags locally emits the same exposure with `locally_evaluated` true. Config version 1 flags never get a direct SDK exposure.
@@ -42,7 +42,7 @@ No breaking changes. Config version 1 flags, their events and their dedupe are u
 ## Impact
 
 - Specs only. No SDK code changes in this repository.
-- SDKs that read `/flags?v=4` add the exposure, the attribution properties and the dedupe changes. posthog-python is first; its implementation is in progress on top of [PostHog/posthog-python#1031](https://github.com/PostHog/posthog-python/pull/1031), which reads the v4 record.
+- SDKs that read `/flags?v=4` add the exposure, the attribution properties and the dedupe changes. posthog-python is first: [PostHog/posthog-python#1154](https://github.com/PostHog/posthog-python/pull/1154) is a draft, stacked on [PostHog/posthog-python#1031](https://github.com/PostHog/posthog-python/pull/1031), which reads the v4 record.
 - Ingestion needs no further change.
 - Experiment analysis of config version 2 flags reads the arm from `$feature_flag_variant` on SDK-sent exposures. That query work is outside this repository.
 

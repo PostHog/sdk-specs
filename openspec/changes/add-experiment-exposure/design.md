@@ -94,7 +94,7 @@ The trigger does not look at whether an Experiment links to the rule, and ignore
 
 **Choice.**
 
-- `$feature_flag_called` keeps its existing key, and for config version 2 results the key also includes the config version, rule ID and variant key, as sent on the event.
+- `$feature_flag_called` keeps its existing key, and for config version 2 results the key also includes the config version, reason code, rule ID, rule type and variant key, as sent on the event.
 - `$experiment_exposure` has its own bounded namespace, keyed on the distinct ID, the canonical group context, the flag key, the config version, the rule ID and the variant key.
 - If both events share one cache, the event name is part of the key, or the SDK checks and marks both entries in one atomic step.
 - Bootstrapped and overridden values never reserve an exposure key.
@@ -102,9 +102,10 @@ The trigger does not look at whether an Experiment links to the rule, and ignore
 **Why.**
 
 - Without rule context, the flag-called key collapses distinct outcomes that share a value: two A/A arms, a holdout and an arm, two successive experiments, an experiment and the release rule that ships its winner. Including the config version also gives a flag that moves from config version 1 to 2 a fresh event.
+- The flag-called key includes the reason code and rule type too, which are exactly the attribution the event carries. Two outcomes of one rule that have no variant and share a value (for example a holdout, then a paused experiment) then stay apart. A new event appears only when the reported outcome changes, so the extra fields cost nothing on repeated reads.
 - The exposure key leaves out the value: equal-valued arms are already separated by the variant key, and the legacy rendering of number and object values is not an identity.
 - The exposure key leaves out the request ID, the evaluation time and the local or remote source. Otherwise a remote fallback after a local result, or a second request for the same user, would count one assignment twice.
-- The reason code and rule type are not in either key. They add nothing within one rule ID for an exposure, which only exists for splits. For the flag-called key, the one collapse left is the same rule reporting two variant-less outcomes with the same value (for example holdout, then paused), which is rare and carries no arm.
+- The reason code and rule type are not in the exposure key. An exposure only exists for a split, where they are always `experiment_split` and `experiment`, so they would add nothing.
 - The exposure key always includes the distinct ID, even in client SDKs whose flag-called tracker leaves it out, because an exposure belongs to an identity.
 - A shared cache without the event name lets the flag-called entry suppress the exposure written right after it, so the experiment loses its first exposure.
 
@@ -159,10 +160,9 @@ This change works whichever lands first.
 
 1. Review this change and settle the decisions.
 2. Add the acceptance scenarios and the README index entry, then apply and archive in the same PR, as the repository requires.
-3. SDKs implement against the archived spec. posthog-python is first; it stacks on posthog-python#1031.
+3. SDKs implement against the archived spec. posthog-python is first: draft PostHog/posthog-python#1154, stacked on posthog-python#1031.
 
 ## Open Questions
 
 - When a number and object event schema exists, does `$feature_flag_response` on the exposure switch to the typed value, or does the exposure drop it?
-- Should the flag-called key also include the reason code, to separate two variant-less outcomes of one rule that share a value?
 - Should SDKs that persist their flag-called dedupe state across page loads (posthog-js browser) persist the exposure namespace the same way? This change allows it but does not require it.

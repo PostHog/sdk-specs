@@ -103,12 +103,14 @@ The SDK SHALL NOT add any of these properties for a config version 1 record, a r
 For a `$feature_flag_called` event that carries `$feature_flag_config_version` 2, the tracker key SHALL include, in addition to its existing inputs (the flag key, the `$feature_flag_response` value, and the distinct ID and canonical group context where the SDK includes them):
 
 - the config version;
+- the reason code, as sent on the event;
 - the rule ID, as sent on the event;
+- the rule type, as sent on the event;
 - the variant key, as sent on the event.
 
-An absent rule ID or variant key SHALL be a key component distinct from every present value. The key SHALL be the same on every read path, so typed and legacy reads of the same flag and outcome dedupe together. The local or remote source, the request ID and the evaluation time SHALL NOT be part of the key. The key for every other event, including every config version 1 event, does not change, and the tracker's reset, eviction and event-decision rules do not change.
+An absent reason code, rule ID, rule type or variant key SHALL be a key component distinct from every present value. The key SHALL be the same on every read path, so typed and legacy reads of the same flag and outcome dedupe together. The local or remote source, the request ID and the evaluation time SHALL NOT be part of the key. The key for every other event, including every config version 1 event, does not change, and the tracker's reset, eviction and event-decision rules do not change.
 
-As a result, a repeated read of the same outcome emits no second event, while each of these emits a new event for the same identity, flag and value: another arm of an A/A test, another experiment rule, a holdout after an arm of the same rule, a release rule that ships an experiment's winning value, and a flag that moves from config version 1 to config version 2.
+As a result, a repeated read of the same outcome emits no second event, while each of these emits a new event for the same identity, flag and value: another arm of an A/A test, another experiment rule, a holdout after an arm of the same rule, another outcome of the same rule with no variant (for example a holdout, then a paused experiment), a release rule that ships an experiment's winning value, and a flag that moves from config version 1 to config version 2.
 
 #### Scenario: A repeated read of the same outcome emits one event
 - **GIVEN** the record for "checkout-flow" is a complete config version 2 experiment split with value true, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
@@ -126,6 +128,12 @@ As a result, a repeated read of the same outcome emits no second event, while ea
 - **WHEN** a later evaluation puts "user-123" in the holdout of the same rule, with value false
 - **AND** "checkout-flow" is read again
 - **THEN** a second `$feature_flag_called` event is enqueued with `$feature_flag_reason_code` "holdout" and no `$feature_flag_variant`
+
+#### Scenario: A paused experiment after a holdout of the same rule emits a new event
+- **GIVEN** a read for distinct id "user-123" emitted `$feature_flag_called` for "checkout-flow" with value false, reason code `holdout`, rule type `experiment` and rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13"
+- **WHEN** the experiment is paused and the next evaluation for "user-123" reports reason code `experiment_paused` for the same rule, with value false
+- **AND** "checkout-flow" is read again
+- **THEN** a second `$feature_flag_called` event is enqueued with `$feature_flag_reason_code` "experiment_paused" and `$feature_flag_rule_id` "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13"
 
 #### Scenario: Shipping the winner emits a new event
 - **GIVEN** a read for distinct id "user-123" emitted `$feature_flag_called` for "checkout-flow" with value true, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"

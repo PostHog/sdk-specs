@@ -247,13 +247,13 @@ Retries SHALL use exponential backoff starting at 300ms before the first retry, 
 
 ### Requirement: Request body compression and opt-out
 
-A client SDK that compresses outgoing request bodies SHALL use gzip, SHALL apply it by default, and SHALL expose a configuration option that turns compression off for the whole client. A compressed request SHALL declare gzip with the `Content-Encoding: gzip` header where the transport can set it. A browser transport that must keep a CORS-simple request MAY send the gzip body without a declaration and rely on the server detecting gzip bodies, as posthog-js does.
+A client SDK that compresses outgoing request bodies SHALL use gzip, SHALL apply it by default, and SHALL expose a configuration option that turns compression off for the whole client. A client SDK MAY send uncompressed, or use another encoding the server advertises, when gzip is unavailable on the platform or the server's remote configuration does not advertise gzip. A compressed request SHALL declare gzip with the `Content-Encoding: gzip` header where the transport can set it. A browser transport that must keep a CORS-simple request MAY send the gzip body without a declaration and rely on the server detecting gzip bodies, as posthog-js does.
 
 The option MAY be an extensible encoding enum (`compression`, with a gzip default and a "none" member) or a boolean switch, named in the SDK's own style (for example `disable_compression`). New configuration surfaces SHOULD use the enum shape so further encodings can be added without another option. Whichever shape a client SDK ships, the default SHALL leave gzip enabled, so an app that sets nothing keeps the current behavior.
 
 Server SDKs MAY default to no compression, MAY offer other encodings, and MAY expose compression as a positive or negative boolean or as an enum. The rules below apply to every SDK that compresses request bodies.
 
-When compression is turned off, every request the SDK would otherwise have compressed SHALL carry an uncompressed body that parses as plain JSON, and SHALL omit any gzip declaration. Endpoints the SDK never compressed are unaffected. The set of compressed endpoints is SDK-specific and is not fixed by this requirement.
+When compression is turned off, every request the SDK would otherwise have compressed SHALL carry the uncompressed body, plain JSON for JSON endpoints, and SHALL omit any gzip declaration. A browser unload beacon that must avoid a CORS preflight MAY instead send a CORS-simple body without gzip, such as base64 form data. Endpoints the SDK never compressed are unaffected. The set of compressed endpoints is SDK-specific and is not fixed by this requirement.
 
 A client SDK's opt-out SHALL be reachable through configuration. An SDK that reserves `Content-Encoding` against caller-supplied custom headers SHALL NOT treat overriding that header as the way to disable compression.
 
@@ -294,5 +294,7 @@ When compression fails locally — for example a gzip encoder that throws — th
 - **AND** the mock server will fail the next ingestion request with status 400
 - **WHEN** capture is called with event "Save"
 - **AND** flush is called
-- **THEN** the SDK should not resend the same payload uncompressed
-- **AND** later ingestion request bodies should still be gzip-compressed
+- **AND** capture is called with event "Next"
+- **AND** flush is called
+- **THEN** the SDK should not resend the "Save" payload uncompressed
+- **AND** the ingestion request containing event "Next" should still be compressed with the configured encoding

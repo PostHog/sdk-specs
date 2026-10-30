@@ -11,6 +11,7 @@
 2. Allow both the mobile enum and the posthog-js boolean. Both are shipped public API; requiring one name would be a breaking rename with no behavioral gain. Recommend the enum shape for new surfaces, the rationale both mobile PRs give.
 3. Require the control to be reachable through configuration. The reserved-header problem is exactly what made these apps stuck, so "there is a custom-header workaround" is not an acceptable substitute.
 4. Permit a local gzip failure to fall back to an uncompressed body (iOS does this), but forbid downgrading and resending after a server rejects a compressed body. Both mobile PRs explicitly declined automatic retry-after-400, citing the lack of a reproduction.
+5. Scope the gzip default and the config opt-out to client SDKs. Server SDKs ship different defaults today (posthog-python `gzip=False`, posthog-php `compress_request = false`, posthog-go `CompressionNone`), other encodings, and posthog-elixir has no config option, so they only keep the rules that hold everywhere: the off-state, the local-failure fallback, and no silent downgrade after a rejection. The logs and traces compression requirements defer to this opt-out.
 
 ## Validation
 

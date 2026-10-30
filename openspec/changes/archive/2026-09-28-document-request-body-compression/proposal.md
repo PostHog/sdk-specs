@@ -20,7 +20,7 @@ That gap became visible when apps behind managed networks and Android work profi
 
 ## Impact
 
-posthog-android, posthog-ios, posthog-flutter, and posthog-js satisfy the opt-out requirement today. Other SDKs that gzip request bodies without exposing a control do not; implementation belongs in their repositories.
+posthog-android, posthog-ios, posthog-flutter, and posthog-js satisfy the opt-out requirement today. posthog-kmp is a client SDK with no compression option yet and needs one. Other SDKs that gzip request bodies without exposing a control do not; implementation belongs in their repositories.
 
 ## Non-goals
 

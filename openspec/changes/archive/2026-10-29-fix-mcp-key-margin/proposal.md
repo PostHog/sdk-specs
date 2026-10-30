@@ -19,5 +19,5 @@ _None._
 
 ## Impact
 
-- **posthog-rs**: `bounded_text` cuts by the redacted length minus the margin and needs the second pass and common-prefix cut.
-- Other SDKs that scan with the margin need the same change.
+- **posthog-rs** is the only SDK with this bug today, in 256-character fields such as tool names and host context values: `bounded_text` cuts by the redacted length minus the margin and needs the second pass and common-prefix cut.
+- Any SDK that adopts the margin rule needs the common-prefix cut.

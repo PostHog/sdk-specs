@@ -43,14 +43,14 @@ Browser-specific opt-in accepts extra options such as a custom capture event nam
 2. **Persist opted-out state.** Store a local flag indicating capture is disabled.
 3. **Block future capture.** Subsequent `capture(...)`, `identify(...)`, `group(...)`, and related APIs short-circuit while opted out.
 4. **Keep the decision across restarts.** The opted-out state is persisted locally in audited SDKs so it survives app restarts.
-5. **Apply SDK-specific cleanup if needed.** Some SDKs also clear in-flight data or stop auxiliary systems such as session replay. Client SDKs that stop session replay also record there and then whether the app wanted it, because that decides what opt-in restarts.
+5. **Apply SDK-specific cleanup if needed.** Some SDKs also clear in-flight data or stop auxiliary systems such as session replay. Mobile client SDKs that stop session replay also record there and then whether the app wanted it, because that decides what opt-in restarts.
 
 ### `optIn`
 
 1. **Guard / no-op if unavailable.** Disabled or uninitialized SDKs no-op.
 2. **Persist opted-in state.** Clear the local opt-out flag so capture becomes allowed again.
 3. **Re-enable future capture.** Subsequent analytics APIs are processed normally.
-4. **Re-enable SDK subsystems if needed.** Some SDKs restart paused integrations or queues. Where session replay restarts, a new session starts first.
+4. **Re-enable SDK subsystems if needed.** Some SDKs restart paused integrations or queues. Where a mobile client SDK restarts session replay, a new session starts first.
 5. **Keep the decision across restarts.** The opted-in state is persisted locally in audited SDKs.
 
 ## State & lifecycle
@@ -88,11 +88,11 @@ Browser-specific opt-in accepts extra options such as a custom capture event nam
 
 - **`capture` / `identify` / `group` / `alias`** — all are gated by the opt-out state in audited client SDKs.
 - **`reset`** — in several audited SDKs, reset clears the persisted opt-out state, so opt-out should not be treated as stronger-than-reset privacy state.
-- **Session replay / integrations** — some SDKs stop or restart them when opt state changes. Where replay
-  restarts on opt-in, the requirements below govern the new session and the restart decision. Opt-in restarts
+- **Session replay / integrations** — some SDKs stop or restart them when opt state changes. Where a mobile
+  client SDK restarts replay on opt-in, the requirements below govern the new session and the restart decision. Opt-in restarts
   replay the app wanted at opt-out even when sampling, a linked flag, or an event trigger held it off then; those
   gates are evaluated again in the new session.
-- **Browser consent APIs** — browser uses richer consent semantics than the mobile/core SDKs and maps opt-in/out to persistence and cookieless-mode behavior.
+- **Browser consent APIs** — browser uses richer consent semantics than the mobile/core SDKs and maps opt-in/out to persistence and cookieless-mode behavior. The replay restart requirements below do not apply to it.
 
 ## Requirements
 
@@ -138,7 +138,7 @@ The SDK SHALL implement the canonical `opt-in` behavior described by this spec. 
 
 ### Requirement: Opt-in restarts session replay in a new session
 
-A client SDK that stops session replay while opted out SHALL start a new session before replay restarts on opt-in, so that no frame recorded after consent is attributed to the session that was active while the user was opted out. The requirement is on the observable outcome: after opt-in restarts replay, the current session id SHALL differ from the one in use at opt-out. Where a wrapper owns the session id rather than the native SDK, the wrapper SHALL perform the rotation. When the app wanted replay at opt-out, opt-in SHALL start the new session even if a linked flag or remote config that has not loaded keeps replay from starting, so that a later start does not resume the session that was active while the user was opted out.
+A mobile client SDK (iOS, Android, React Native, or Flutter on a native platform) that stops session replay while opted out SHALL start a new session before replay restarts on opt-in, so that no frame recorded after consent is attributed to the session that was active while the user was opted out. The requirement is on the observable outcome: after opt-in restarts replay, the current session id SHALL differ from the one in use at opt-out. Where a wrapper owns the session id rather than the native SDK, the wrapper SHALL perform the rotation. When the app wanted replay at opt-out, opt-in SHALL start the new session even if a linked flag or remote config that has not loaded keeps replay from starting, so that a later start does not resume the session that was active while the user was opted out. This requirement does not apply to browser `opt_in_capturing` / `opt_out_capturing`, which have their own consent semantics, or to Flutter on web, which leaves replay to posthog-js.
 
 #### Scenario: Opt in restarts replay in a new session
 - **GIVEN** a fresh SDK acceptance test harness
@@ -173,7 +173,7 @@ A client SDK that stops session replay while opted out SHALL start a new session
 
 ### Requirement: Opt-in restarts the session replay the app wanted at opt-out
 
-The SDK SHALL decide at opt-out whether opt-in restarts session replay, from whether the app wanted replay then, not from whether it was recording. The app wants replay when session replay is enabled in its configuration or it called `startSessionRecording()`, and it has not called `stopSessionRecording()` since. When the app wanted replay, opt-in SHALL restart it in a new session even if sampling, a linked flag, or an event trigger held it off at opt-out; those gates SHALL be evaluated again for the new session. The SDK SHALL NOT restart a recording the app stopped before opting out: consent does not undo an explicit `stopSessionRecording()`. A start or stop call made while opted out SHALL NOT change that decision, because replay is stopped or uninstalled then. At launch the decision SHALL start from the configuration, so an application that launches opted out with session replay enabled records on its first opt-in.
+A mobile client SDK (iOS, Android, React Native, or Flutter on a native platform) that stops session replay while opted out SHALL decide at opt-out whether opt-in restarts session replay, from whether the app wanted replay then, not from whether it was recording. The app wants replay when session replay is enabled in its configuration or it called `startSessionRecording()`, and it has not called `stopSessionRecording()` since. When the app wanted replay, opt-in SHALL restart it in a new session even if sampling, a linked flag, or an event trigger held it off at opt-out; those gates SHALL be evaluated again for the new session. The SDK SHALL NOT restart a recording the app stopped before opting out: consent does not undo an explicit `stopSessionRecording()`. A start or stop call made while opted out SHALL NOT change that decision, because replay is stopped or uninstalled then. At launch the decision SHALL start from the configuration, so an application that launches opted out with session replay enabled records on its first opt-in. This requirement does not apply to the browser SDK or to Flutter on web: a browser `stopSessionRecording()` stays in effect through opt-out and opt-in, including when it is called while opted out.
 
 #### Scenario: Opt in keeps a recording the app stopped stopped
 - **GIVEN** a fresh SDK acceptance test harness

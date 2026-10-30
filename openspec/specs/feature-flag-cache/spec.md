@@ -92,7 +92,7 @@ clear(): void
 - **feature-flag getter APIs** (`get-feature-flag`, `is-feature-enabled`, `get-feature-flag-payload`, `get-feature-flag-result`) read from this cache.
 - **persistent storage** backs durable cached flags across restarts.
 - **override/bootstrap mechanisms** may layer extra values over the stored cache when serving reads.
-- **wrapper-layer callbacks** such as Flutter's `onFeatureFlags` can observe cache updates even when the wrapper does not own the cache itself.
+- **wrapper-layer listeners** such as Flutter's `onFeatureFlags` can observe cache updates even when the wrapper does not own the cache itself.
 - **remote-config/session-replay integrations** sometimes depend on the same response that updates the flag cache.
 ## Requirements
 ### Requirement: Canonical feature-flag-cache behavior

@@ -1,6 +1,6 @@
 ## Context
 
-The server can answer `/flags?v=4` ([PostHog/posthog#107732](https://github.com/PostHog/posthog/pull/107732), [PostHog/posthog#123366](https://github.com/PostHog/posthog/pull/123366)). Clients already send `v=3` and arbitrary `v` values, so only an exact `v=4` selects the typed record; every other version keeps the older record. A v4 record has five members: `key`, `value`, `failed`, `reason` and `metadata`. `value` is the flag's typed application value: a boolean, a non-empty string, a number, an object, or `null` when the flag default is `null`. `enabled` and `variant` no longer exist at v4; readers derive them from `value`. The public wire contract is `contracts/feature_flag_rules_v2` in [posthog-sdk-test-harness 1.13.1](https://github.com/PostHog/posthog-sdk-test-harness/releases/tag/1.13.1) (contract 2.3.1): the producer schema, the reader fixtures, the OpenFeature mapping in `registries/literals.json`, and the legacy rendering table of the typed value corpus. This change does not touch the wire. It defines what an application calls and sees.
+The server can answer `/flags?v=4` ([PostHog/posthog#107732](https://github.com/PostHog/posthog/pull/107732), [PostHog/posthog#123366](https://github.com/PostHog/posthog/pull/123366)). Clients already send `v=3` and arbitrary `v` values, so only an exact `v=4` selects the typed record; every other version keeps the older record. A v4 record has five members: `key`, `value`, `failed`, `reason` and `metadata`. `value` is the flag's typed application value: a boolean, a non-empty string, a number, an object, or `null` when the flag default is `null`. `enabled` and `variant` no longer exist at v4; readers derive them from `value`. The public wire contract is `contracts/feature_flag_rules_v2` in [posthog-sdk-test-harness 1.26.0](https://github.com/PostHog/posthog-sdk-test-harness/releases/tag/1.26.0) (contract 7.0.0): the producer schema, the reader fixtures, the OpenFeature mapping in `registries/literals.json`, and the legacy rendering table of the typed value corpus. This change does not touch the wire. It defines what an application calls and sees.
 
 Today's SDK surface is built on `enabled`, a variant key and a payload:
 
@@ -9,7 +9,7 @@ Today's SDK surface is built on `enabled`, a variant key and a payload:
 
 PostHog ships OpenFeature providers for Python (in `posthog-python`), Node and web (in `posthog-js`) and Elixir (in `posthog-elixir`). All four call `getFeatureFlagResult` and map it the same way: boolean reads return `enabled` (so a multivariate flag reads as `true`), string reads return the variant, number reads parse the variant string (Python and Elixir also accept hexadecimal), object reads return the payload, and a disabled flag read as a non-boolean type returns the caller default without an error. Reasons are `TARGETING_MATCH` when enabled, `DISABLED` for `flag_disabled`, otherwise `DEFAULT`; the PostHog reason text goes into flag metadata as `posthog_reason`.
 
-[posthog-python#1031](https://github.com/PostHog/posthog-python/pull/1031) (draft) is the reference implementation. It requests `v=4`, keeps each record's value, reason and metadata, adds `get_boolean_value` / `get_boolean_details` and the string, number and object pairs to the `evaluate_flags()` snapshot, and keeps every legacy getter and `$feature_flag_called` unchanged.
+[posthog-python#1031](https://github.com/PostHog/posthog-python/pull/1031) (draft) requests `v=4` and keeps each record's value, reason and metadata. [posthog-python#1147](https://github.com/PostHog/posthog-python/pull/1147) (draft, stacked on #1031) is the reference implementation for typed reads. It adds `get_boolean_value` / `get_boolean_details` and the string, number, integer, float and object pairs to the `evaluate_flags()` snapshot, and keeps every legacy getter unchanged.
 
 This design is a starting point for iteration. Each decision below states the assumption the specs take, the main alternative, and how the choice scores on three lenses: developer experience (DX), OpenFeature compatibility (OF) and migration from today's API (Migration).
 
@@ -72,10 +72,10 @@ The existing `evaluate-flags` and `is-feature-enabled` specs say a present `fals
 
 ### D5. Shape of the details object
 
-**Assumption.** Fields `key`, `value`, `variant`, `reason`, `error_code`, `error_message`, `flag_metadata`, in each language's casing. `reason` is the OpenFeature reason string. `variant` is `metadata.variant_key` and is left out when an error code is set. `flag_metadata` is a flat map of the contract's scalar keys (`id`, `version`, `config_version`, `reason_code`, `condition_index`, `rule_type`, `rule_id`, `variant_key`), with wire (snake_case) key names in every language. It leaves out the payload, `has_experiment` and the reason description.
-**Alternatives.** (a) The posthog-python#1031 shape: `reason` is the structured PostHog reason (`code`, `condition_index`, `description`) and `metadata` is a typed metadata object that includes the payload. (b) `flagKey` instead of `key`. (c) camelCase metadata keys, which OpenFeature's telemetry appendix uses.
-**Why.** A provider can copy every field without remapping, and OpenFeature hooks and telemetry see the same vocabulary as other providers. The fine-grained `reason_code` and rule identity survive in metadata. `key` matches today's `FeatureFlagResult`. Wire key names in metadata are the same string in every SDK, so dashboards and hooks can rely on them. The description is non-normative text, and exposing it invites code that branches on it; failures still carry it as `error_message`.
-**Lenses.** DX: one shape everywhere, but metadata is a map, not a typed object, so no autocompletion. OF: direct. Migration: new type; #1031 must change its details type before it ships.
+**Assumption.** Fields `key`, `value`, `variant`, `reason`, `error_code`, `error_message`, `flag_metadata`, in each language's casing. `reason` is the OpenFeature reason string. `variant` is `metadata.variant_key` and is left out when an error code is set or the caller's default is returned. `flag_metadata` is a flat map of the contract's scalar keys (`id`, `version`, `config_version`, `reason_code`, `condition_index`, `rule_type`, `rule_id`, `variant_key`), with wire (snake_case) key names in every language. It leaves out the payload, `has_experiment` and the reason description. Languages with fixed fields, such as Python dataclasses, represent an absent `variant`, `error_code` or `error_message` as `None` or `null` instead of leaving the field out; `flag_metadata` leaves absent keys out.
+**Alternatives.** (a) The shape of the first posthog-python#1031 draft: `reason` is the structured PostHog reason (`code`, `condition_index`, `description`) and `metadata` is a typed metadata object that includes the payload. (b) `flagKey` instead of `key`. (c) camelCase metadata keys, which OpenFeature's telemetry appendix uses.
+**Why.** A provider can copy every field without remapping, and OpenFeature hooks and telemetry see the same vocabulary as other providers. Both reasons are needed because the OpenFeature reason merges causes: `DEFAULT` covers a holdout, a rollout miss, a paused experiment and no rule matched, and only `flag_metadata.reason_code` tells them apart. The rule identity also survives in metadata. `key` matches today's `FeatureFlagResult`. Wire key names in metadata are the same string in every SDK, so dashboards and hooks can rely on them. The description is non-normative text, and exposing it invites code that branches on it; failures still carry it as `error_message`.
+**Lenses.** DX: one shape everywhere, but metadata is a map, not a typed object, so no autocompletion. OF: direct. Migration: new type; posthog-python#1147 implements it.
 
 ### D6. Error codes and reason vocabulary
 
@@ -86,11 +86,11 @@ The existing `evaluate-flags` and `is-feature-enabled` specs say a present `fals
 
 ### D7. `$feature_flag_called` from typed reads
 
-**Assumption.** A typed read emits the same event as a legacy read of the same flag: same tracker, same dedupe key, and `$feature_flag_response` is the legacy rendering (`true` for number and object values, `false` for `null`), never the caller default. A type mismatch is not reported as `$feature_flag_error`. The rule and experiment attribution properties and any dedupe-key extension come with `$experiment_exposure`.
-**Alternative.** Send the value the accessor returned (the typed value, or the caller default), and extend the dedupe key with config version and rule context now.
+**Assumption.** A typed read emits the same event as a legacy read of the same flag: same tracker, the key a legacy read of the same flag uses, and `$feature_flag_response` is the legacy rendering (`true` for number and object values, `false` for `null`), never the caller default. A missing key keeps the legacy `null` response. The exception is a read of the wrong type: a typed read that returns the caller default with `TYPE_MISMATCH` sends no `$feature_flag_called` and no `$experiment_exposure`, and takes no dedupe slot. The SDK logs an error instead, once per flag key and accessor type per client, with the text of `error_message`, and keeps the logged pairs within its flag-called cache bound. The rule and experiment attribution properties and any dedupe-key extension come with `$experiment_exposure`.
+**Alternative.** Send the value the accessor returned (the typed value, or the caller default), and extend the dedupe key with config version and rule context now. For a type mismatch: report the flag's own value and the assignment, as a legacy read would.
 **Why.** Users can swap one call at a time without double events or broken insights: a typed read and a legacy read of the same flag dedupe together. The public event schema accepts only a boolean or a non-empty string in `$feature_flag_response`, so number and object values cannot go there yet. The caller default is a local fallback, not something the flag evaluated to.
-The value and details forms emit the same event, and a repeated read emits nothing new while the dedupe key holds. When `$experiment_exposure` arrives, a typed read that returned the caller default because of a type mismatch still reports the assignment: the user was assigned to the arm, and experiment analysis counts assignment.
-**Lenses.** DX: invisible. OF: n/a (OpenFeature does not capture). Migration: no analytics change.
+The value and details forms emit the same event, and a repeated read emits nothing new while the dedupe key holds. A wrong-type read is a bug in the calling code: the application got its own default, not the flag's value or the arm's, so reporting it would count an exposure the user never saw, and its dedupe slot would hide the first correct read. A `null` value or a `false` value read as another type is different: the flag has no value for that read, the default is the intended result, and the read reports the assignment like a legacy read.
+**Lenses.** DX: a wrong-type read shows up as an error log, not as analytics. OF: n/a (OpenFeature does not capture). Migration: no analytics change for reads of the right type.
 
 ### D8. Behaviour against older servers
 
@@ -123,7 +123,7 @@ JSON booleans are never numbers. In Python, where `bool` is a subclass of `int`,
 
 ### D12. Number and object values
 
-**Assumption.** Numbers are binary64. An integer accessor rejects fractional numbers and integers above 2^53 − 1 in magnitude as `TYPE_MISMATCH`, even in languages with 64-bit integers, so a JavaScript SDK and a Python SDK agree on the same flag. `-0` reads as 0. Objects are JSON objects only; arrays are not typed values (the wire rejects them), and version 1 array payloads stay on the payload accessor. A returned object must not let the caller mutate the snapshot.
+**Assumption.** Numbers are binary64. The number and floating-point accessors return the nearest binary64 value, so an integer above 2^53 − 1 in magnitude comes back rounded, as JavaScript returns it; a Python SDK returns it as a `float`. An integer accessor rejects fractional numbers and integers above 2^53 − 1 in magnitude as `TYPE_MISMATCH`, even in languages with 64-bit integers, so a JavaScript SDK and a Python SDK agree on the same flag. `-0` reads as 0. Objects are JSON objects only; arrays are not typed values (the wire rejects them), and version 1 array payloads stay on the payload accessor. A returned object must not let the caller mutate the snapshot.
 **Alternative.** Accept top-level arrays as OpenFeature "structure" values.
 **Why.** The config schema only admits top-level objects, so the reader matches the writer.
 **Lenses.** DX: predictable. OF: a subset of "structure". Migration: none.
@@ -228,9 +228,8 @@ async resolveStringEvaluation(flagKey, defaultValue, context) {
 
 Deliberate differences:
 
-- **Event capture on access.** PostHog emits `$feature_flag_called` on every read, because experiments and flag analytics depend on it. OpenFeature leaves this to hooks and its tracking API.
+- **Event capture on access.** PostHog emits `$feature_flag_called` on reads, deduped, because experiments and flag analytics depend on it. Every accessor takes the per-read feature flag event option to skip it. OpenFeature leaves this to hooks and its tracking API.
 - **Snapshot model.** Server SDKs bind the evaluation context once per request in `evaluateFlags()`, and `capture(flags: snapshot)` reuses the exact values. OpenFeature evaluates per call with a dynamic context.
-- **No hooks or evaluation options** on the native accessors; providers add them.
 - **`version` metadata** is the flag's integer row version. OpenFeature's telemetry guidance suggests a string; providers may convert it.
 - **Group context.** A missing group is `INVALID_CONTEXT`, because PostHog keeps the person in `targetingKey` and groups in other context fields.
 
@@ -249,21 +248,22 @@ What each kind of user does:
 - **Number and object flags on legacy accessors:** they render as enabled for every value, including `0` and `{}`. That applies to `isFeatureEnabled`, `$feature/<key>` and `$active_feature_flags`, so an insight that splits on `$feature/<key>` puts everyone in one group. Read them with the typed accessors.
 - **Changing a flag's payload into a value:** code written for a version 1 flag whose payload is `{ "max_uploads": 50 }` gets the bare value once the flag becomes a number flag, and falls back to its own default if it expects the object. Ship the flag change and the code change together.
 - **OpenFeature users:** no change for existing flags (D15). Config version 2 flags resolve natively with full reasons and metadata.
-- **Analytics:** unchanged. Typed and legacy reads produce the same event and dedupe together, so a code base can mix them.
+- **Analytics:** unchanged. Typed and legacy reads produce the same event and dedupe together, so a code base can mix them. A read of the wrong type sends no event and logs an error instead.
 
 Each call moves on its own. A code base can keep `isFeatureEnabled` everywhere and adopt `getObjectValue` for one new flag.
 
-## Differences from posthog-python#1031
+## Reference implementation
 
-| Topic | #1031 | This change |
+posthog-python#1147 is the reference implementation for typed reads. It moved off the details shape of the first posthog-python#1031 draft, which differed from this change here:
+
+| Topic | First #1031 draft | This change |
 | --- | --- | --- |
 | `reason` | Structured PostHog reason object (`code`, `condition_index`, `description`) | OpenFeature reason string; `reason_code` and `condition_index` in `flag_metadata` |
 | Metadata | Typed `metadata` object, includes the payload | Scalar `flag_metadata` map of the contract's keys, without the payload |
-| `variant` on an error | Taken from metadata even when the default is returned | Left out when an error code is set |
-| Locally evaluated version 1 flags | No reason or metadata | Derived reason and `config_version` 1 |
+| `variant` when the default is returned | Taken from metadata | Left out when an error code is set or the caller's default is returned |
+| Locally evaluated version 1 flags | No reason or metadata | Derived reason, `config_version` 1 and the definition's `id` and `version` |
 | Older-server records | Silent | One diagnostic log; `TYPE_MISMATCH` message names the cause |
-
-Placement, resolution rules, error codes, legacy rendering, payload synthesis and the event behaviour match.
+| Type mismatch | Same event as a legacy read | No event, no dedupe slot, one error log per flag key and accessor type |
 
 ## Risks / Trade-offs
 
@@ -278,7 +278,7 @@ Placement, resolution rules, error codes, legacy rendering, payload synthesis an
 
 1. Review this proposal and settle the decisions in the PR description.
 2. Adjust the specs, add `acceptance/public/typed-flag-values.feature`, add the capability to the README index, then apply and archive in the same PR, as the repository requires.
-3. SDKs implement against the archived spec. posthog-python#1031 adjusts its details type first; Node is next.
+3. SDKs implement against the archived spec. posthog-python#1147 goes first; Node is next.
 
 ## Open Questions
 

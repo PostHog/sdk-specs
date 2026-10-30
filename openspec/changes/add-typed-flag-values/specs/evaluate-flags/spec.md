@@ -55,7 +55,7 @@ The snapshot SHALL retain the evaluation identity/context and available evaluati
 
 The snapshot SHALL expose the typed value and details accessors defined by `typed-flag-values` and SHALL resolve them from the retained records only. A typed read SHALL NOT issue a flag-evaluation request or consult current definitions, caches or the remote endpoint.
 
-Typed accessors are value accessors for access tracking. A typed read SHALL mark its key as accessed, so `onlyAccessed()` keeps that flag, and SHALL route `$feature_flag_called` through the feature-flag-called tracker exactly as `getFlag(...)` does for the same key (see `feature-flag-called-tracker`). This applies when the accessor returns the caller default because of a `null` value, a `false` value read as another type, or a type mismatch. A typed read of a key absent from an original evaluation snapshot SHALL return the caller default with `FLAG_NOT_FOUND` and SHALL report the same error as any other missing-key access: `flag_missing`, or `local_evaluation_inconclusive` for an unresolved key (see "Snapshot unresolved flag reporting"). A typed read on an empty or no-op snapshot SHALL return the caller default with `FLAG_NOT_FOUND` and SHALL NOT emit `$feature_flag_called`.
+Typed accessors are value accessors for access tracking. A typed read SHALL mark its key as accessed, so `onlyAccessed()` keeps that flag, including when the accessor returns the caller default because of a `null` value, a `false` value read as another type, or a type mismatch. A typed read SHALL route `$feature_flag_called` through the feature-flag-called tracker exactly as `getFlag(...)` does for the same key (see `feature-flag-called-tracker`), including when it returns the caller default because of a `null` value or a `false` value read as another type. A read that returns `TYPE_MISMATCH` SHALL NOT emit the event or touch the tracker (see `typed-flag-values` "Type mismatches are logged, not reported"). A typed read of a key absent from an original evaluation snapshot SHALL return the caller default with `FLAG_NOT_FOUND` and SHALL report the same error as any other missing-key access: `flag_missing`, or `local_evaluation_inconclusive` for an unresolved key (see "Snapshot unresolved flag reporting"). A typed read on an empty or no-op snapshot SHALL return the caller default with `FLAG_NOT_FOUND` and SHALL NOT emit `$feature_flag_called`.
 
 Each typed accessor, in both forms, SHALL accept the per-read `sendFeatureFlagEvents` option and decide whether to send `$feature_flag_called` as "Snapshot feature flag event control" defines for value reads.
 
@@ -68,6 +68,14 @@ The snapshot is the server's unit of evaluation: one evaluation per request, and
 - **THEN** it returns 25
 - **AND** exactly one remote feature-flag evaluation request was made in total
 - **AND** `onlyAccessed()` returns a snapshot containing "upload-limit" and not "banner-copy"
+
+#### Scenario: A mismatched typed read counts as access but sends no event
+- **GIVEN** remote evaluation for distinct id "user-123" returns "legacy-layout" with the string value "compact"
+- **WHEN** `evaluateFlags("user-123")` is called
+- **AND** the boolean value accessor is called for "legacy-layout" with caller default false
+- **THEN** it returns false
+- **AND** no `$feature_flag_called` event is emitted
+- **AND** `onlyAccessed()` returns a snapshot containing "legacy-layout"
 
 #### Scenario: Typed read of a missing key on an original snapshot
 - **GIVEN** an original evaluation snapshot with a resolvable distinct id does not contain "typo-flag"

@@ -14,7 +14,7 @@ Names follow the OpenFeature client methods in the host language's casing:
 | Python, Ruby, Elixir | `get_boolean_value`, `get_string_value`, `get_number_value`, `get_object_value` | `get_boolean_details`, … |
 | Go, .NET | `GetBooleanValue`, … (with the platform's async suffix where its flag getters have one) | `GetBooleanDetails`, … |
 
-Number values are IEEE-754 binary64. A language with distinct integer and floating-point types SHOULD expose integer and floating-point accessors (for example `getIntegerValue` and `getDoubleValue`) in place of, or next to, the number accessor. An integer accessor SHALL accept only integral numbers whose magnitude is at most 2^53 − 1, the range in which every binary64 integer is exact, and SHALL treat any other number as a value of another type. The limit applies even where the language's integer type could hold a larger value, so every SDK returns the same result for the same flag. `-0` is the integer 0. Object values are JSON objects. The SDK SHALL return them in the platform's JSON-object representation, and SHALL NOT let a caller change the evaluated flag state by mutating a returned object.
+Number values are IEEE-754 binary64. The number accessor SHALL return the nearest binary64 value of the flag's number. For an integer beyond 2^53 − 1 in magnitude, which binary64 cannot hold exactly, that is the rounded value JavaScript returns, and a Python SDK returns it as a `float`. A language with distinct integer and floating-point types SHOULD expose integer and floating-point accessors (for example `getIntegerValue` and `getDoubleValue`) in place of, or next to, the number accessor. A floating-point accessor SHALL accept every number and return its nearest binary64 value. An integer accessor SHALL accept only integral numbers whose magnitude is at most 2^53 − 1, the range in which every binary64 integer is exact, and SHALL treat any other number as a value of another type. The limit applies even where the language's integer type could hold a larger value, so every SDK returns the same result for the same flag. `-0` is the integer 0. Object values are JSON objects. The SDK SHALL return them in the platform's JSON-object representation, and SHALL NOT let a caller change the evaluated flag state by mutating a returned object.
 
 Where the platform's existing flag getters are asynchronous, the typed accessors MAY be asynchronous in the same way.
 
@@ -64,6 +64,23 @@ Every typed accessor SHALL accept the per-read feature flag event option that th
 - **AND** the string value accessor is called again for "banner-copy" with caller default "Welcome"
 - **THEN** it returns "Hi"
 
+#### Scenario: The per-read event option applies to the details form
+- **GIVEN** flag "banner-copy" has the string value "Hello"
+- **WHEN** the string details accessor is called for "banner-copy" with caller default "Welcome" and the per-read feature flag event option false
+- **THEN** the details value is "Hello"
+- **AND** no `$feature_flag_called` event is emitted
+- **WHEN** the string value accessor is called again for "banner-copy" with caller default "Welcome" and without the option
+- **THEN** one `$feature_flag_called` event is emitted for "banner-copy"
+
+#### Scenario: The per-read event option also suppresses the experiment exposure
+- **GIVEN** an SDK that sends `$experiment_exposure`
+- **AND** the record for "checkout-flow" has value true, reason code `experiment_split`, and metadata config version 2, rule type `experiment`, rule id "6bb788aa-df76-4a77-8bed-9f247e279ccd" and variant key "test"
+- **WHEN** the boolean details accessor is called for "checkout-flow" with caller default false and the per-read feature flag event option false
+- **THEN** the details value is true and the details variant is "test"
+- **AND** no `$feature_flag_called` and no `$experiment_exposure` event is emitted
+- **WHEN** the boolean value accessor is called again for "checkout-flow" with caller default false and without the option
+- **THEN** one `$feature_flag_called` and one `$experiment_exposure` event are emitted for "checkout-flow"
+
 ### Requirement: Typed values resolve without coercion
 
 A typed accessor SHALL compare the JSON type of the flag's value with the requested type and SHALL NOT convert one type to another. JSON `true` and `false` are booleans, not numbers. In a language whose boolean type is a subtype of its integer type, such as Python, the number, integer and floating-point accessors SHALL NOT accept a boolean, and the boolean accessor SHALL NOT accept an integer.
@@ -76,6 +93,8 @@ It SHALL resolve the value in this order, and the first step that applies decide
 4. If the value is `false` and the requested type is not boolean, return the caller default without an error code. The details carry the reason of the flag's record. A disabled config version 1 flag, or an older server's rendering of a `null` value, therefore reads as "no value" rather than as a type error.
 5. Otherwise return the caller default with error code `TYPE_MISMATCH` and reason `ERROR`.
 
+Steps 3 and 4 return the caller default without an error code: the flag has no value for this read, which is not an error. `error_code` alone therefore does not show that the value is the caller default. The reason does: it is the record's own reason, which for these values is usually `DEFAULT` (an unmatched or disabled flag, or a flag default) or `DISABLED` (an inactive local definition), and `variant` is absent. A developer who needs to know reads `DEFAULT` or `DISABLED` without an error code as "the flag gave no targeted value": the details value is then the flag's own default when that default has the requested type, and the caller default otherwise.
+
 The rules apply to every flag, including config version 1 flags: a boolean flag reads through the boolean accessor, and a multivariate flag reads its variant key through the string accessor. A multivariate flag read through the boolean accessor is a `TYPE_MISMATCH`, unlike the legacy enablement accessor, which treats a variant as enabled.
 
 #### Scenario: Typed resolution table
@@ -84,27 +103,58 @@ The rules apply to every flag, including config version 1 flags: a boolean flag 
 - **THEN** the details value is <returned>
 - **AND** the details error code is <error_code>
 
-  | value         | type    | default  | returned      | error_code    |
-  | true          | boolean | false    | true          | none          |
-  | false         | boolean | true     | false         | none          |
-  | null          | boolean | true     | true          | none          |
-  | "compact"     | boolean | false    | false         | TYPE_MISMATCH |
-  | 1             | boolean | false    | false         | TYPE_MISMATCH |
-  | "compact"     | string  | "x"      | "compact"     | none          |
-  | false         | string  | "x"      | "x"           | none          |
-  | null          | string  | "x"      | "x"           | none          |
-  | true          | string  | "x"      | "x"           | TYPE_MISMATCH |
-  | 12.5          | number  | 10       | 12.5          | none          |
-  | 0             | number  | 10       | 0             | none          |
-  | "12"          | number  | 10       | 10            | TYPE_MISMATCH |
-  | true          | number  | 10       | 10            | TYPE_MISMATCH |
-  | false         | number  | 10       | 10            | none          |
-  | {"steps": 3}  | object  | {}       | {"steps": 3}  | none          |
-  | {}            | object  | {"a": 1} | {}            | none          |
-  | true          | object  | {}       | {}            | TYPE_MISMATCH |
-  | 0             | boolean | true     | true          | TYPE_MISMATCH |
-  | -0            | number  | 10       | -0            | none          |
-  | 1e21          | number  | 10       | 1e21          | none          |
+  | value            | type    | default  | returned         | error_code    |
+  | true             | boolean | false    | true             | none          |
+  | false            | boolean | true     | false            | none          |
+  | null             | boolean | true     | true             | none          |
+  | "compact"        | boolean | false    | false            | TYPE_MISMATCH |
+  | 1                | boolean | false    | false            | TYPE_MISMATCH |
+  | "compact"        | string  | "x"      | "compact"        | none          |
+  | false            | string  | "x"      | "x"              | none          |
+  | null             | string  | "x"      | "x"              | none          |
+  | true             | string  | "x"      | "x"              | TYPE_MISMATCH |
+  | 12.5             | number  | 10       | 12.5             | none          |
+  | 0                | number  | 10       | 0                | none          |
+  | "12"             | number  | 10       | 10               | TYPE_MISMATCH |
+  | true             | number  | 10       | 10               | TYPE_MISMATCH |
+  | false            | number  | 10       | 10               | none          |
+  | {"steps": 3}     | object  | {}       | {"steps": 3}     | none          |
+  | {}               | object  | {"a": 1} | {}               | none          |
+  | true             | object  | {}       | {}               | TYPE_MISMATCH |
+  | 0                | boolean | true     | true             | TYPE_MISMATCH |
+  | -0               | number  | 10       | -0               | none          |
+  | 1e21             | number  | 10       | 1e21             | none          |
+  | 9007199254740993 | number  | 10       | 9007199254740992 | none          |
+
+#### Scenario: A false value read as another type returns the caller default without an error
+- **GIVEN** the config version 1 record for "beta-ui" has value false and reason code `no_condition_match`
+- **WHEN** the string details accessor is called for "beta-ui" with caller default "Welcome"
+- **THEN** the details value is "Welcome"
+- **AND** the reason is `DEFAULT` and there is no error code
+- **AND** the details have no variant
+- **AND** `flag_metadata.reason_code` is "no_condition_match"
+
+#### Scenario: Each numeric accessor
+- **GIVEN** the SDK exposes the <accessor> accessor
+- **AND** flag "n" has the value <value>
+- **WHEN** the <accessor> details accessor is called for "n" with caller default <default>
+- **THEN** the details value is <returned>
+- **AND** the details error code is <error_code>
+
+  | accessor       | value            | default | returned           | error_code    |
+  | number         | 3                | 7       | 3                  | none          |
+  | integer        | 3                | 7       | 3                  | none          |
+  | floating-point | 3                | 7.0     | 3.0                | none          |
+  | number         | 0.25             | 7       | 0.25               | none          |
+  | integer        | 0.25             | 7       | 7                  | TYPE_MISMATCH |
+  | floating-point | 0.25             | 7.0     | 0.25               | none          |
+  | number         | 9007199254740993 | 7       | 9007199254740992   | none          |
+  | integer        | 9007199254740993 | 7       | 7                  | TYPE_MISMATCH |
+  | floating-point | 9007199254740993 | 7.0     | 9007199254740992.0 | none          |
+  | number         | "3"              | 7       | 7                  | TYPE_MISMATCH |
+  | integer        | true             | 7       | 7                  | TYPE_MISMATCH |
+  | floating-point | false            | 7.0     | 7.0                | none          |
+  | number         | null             | 7       | 7                  | none          |
 
 #### Scenario: Integer accessor rejects a fractional number
 - **GIVEN** the SDK's language has distinct integer and floating-point types
@@ -135,6 +185,21 @@ The rules apply to every flag, including config version 1 flags: a boolean flag 
 - **WHEN** the number details accessor is called for "checkout-flow-child" with caller default 10
 - **THEN** the details value is 10
 - **AND** the error code is `GENERAL`, not `TYPE_MISMATCH`
+
+### Requirement: Type mismatches are logged, not reported
+
+A typed read that returns the caller default with `TYPE_MISMATCH` SHALL NOT emit `$feature_flag_called`, and SHALL NOT emit `$experiment_exposure` in an SDK that sends it. It SHALL NOT consult or update the flag-called dedupe tracker or the exposure dedupe namespace, so the next read of the same flag with the right type emits both events as if the mismatched read had not happened. A wrong-type read is a bug in the calling code: the application got its own default, not the flag's value. Whether the read counts as an access is unchanged (see `evaluate-flags` "Snapshot typed accessors").
+
+Instead, the SDK SHALL log an error the first time a client instance gets `TYPE_MISMATCH` for a flag key and an accessor type, with the same text as the details' `error_message`. Later mismatches for the same key and type SHALL NOT log again. The value and details forms of one type share a type; the integer and floating-point accessors are types of their own. The SDK SHALL keep the set of logged key and type pairs within the size bound of its flag-called dedupe tracker. Evicting a pair only means that it can be logged again.
+
+#### Scenario: A type mismatch is logged once per key and type
+- **GIVEN** flag "upload-limit" has the string value "25"
+- **WHEN** the number details accessor is called twice for "upload-limit" with caller default 10
+- **AND** the number value accessor is called for "upload-limit" with caller default 10
+- **AND** the boolean value accessor is called for "upload-limit" with caller default false
+- **THEN** the SDK has logged exactly two errors for "upload-limit"
+- **AND** one of them has the same text as the number details' `error_message`
+- **AND** no `$feature_flag_called` event is emitted for "upload-limit"
 
 ### Requirement: Caller default on missing, failed and unreadable flags
 
@@ -184,11 +249,13 @@ The details form SHALL return an object with these fields. Field names SHALL be 
 | --- | --- |
 | `key` | The flag key passed to the accessor. |
 | `value` | The resolved value, or the caller default. |
-| `variant` | The record's `metadata.variant_key` when the accessor returned the flag's value and the record has one. Absent when an error code is set. |
+| `variant` | The record's `metadata.variant_key` when the accessor returned the flag's value and the record has one. Absent when an error code is set or the caller's default is returned. |
 | `reason` | The OpenFeature reason from the table below, as a string. |
 | `error_code` | An OpenFeature error code, or absent. |
 | `error_message` | Human-readable detail for the error code, or absent. |
 | `flag_metadata` | A map with string keys and boolean, string or number values, taken from the record. |
+
+In a language whose details type has fixed fields, such as a Python dataclass, an absent `variant`, `error_code` or `error_message` SHALL be the language's null (`None`, `null`) rather than left out. Keys of `flag_metadata` are left out, never null.
 
 `reason` SHALL use the OpenFeature reason vocabulary. The first matching row applies:
 
@@ -228,6 +295,7 @@ The config version 2 rows are the public contract's OpenFeature mapping. The con
 - **WHEN** the string details accessor is called for "banner-copy" with caller default "Welcome"
 - **THEN** the details value is "Welcome"
 - **AND** the reason is `DEFAULT` and there is no error code
+- **AND** the details have no variant
 - **AND** `flag_metadata.reason_code` is "no_rule_match"
 
 #### Scenario: Details of a type mismatch keep the record's metadata
@@ -244,7 +312,7 @@ An SDK that implements typed accessors SHALL request the `/flags` response versi
 
 A record without a `value` member comes from a server that does not send typed values. The SDK SHALL then use the record's `variant` as the value, or its `enabled` boolean when there is no variant, SHALL read the config version as 1, and SHALL ignore any rule or experiment metadata in that record. It SHALL NOT mix this reading with v4 fields in one record. Consequences the SDK SHALL document:
 
-- Number and object values reach such a server's records only as a payload, so the number and object accessors return the caller default with `TYPE_MISMATCH`. The error message SHALL say that the value may need a server that sends typed values.
+- Number and object values reach such a server's records only as a payload, so the number and object accessors return the caller default with `TYPE_MISMATCH`, and send no `$feature_flag_called` (see "Type mismatches are logged, not reported"). The error message SHALL say that the value may need a server that sends typed values.
 - A `null` flag default reaches such a server's records as `enabled: false`, so the boolean accessor returns `false`, not the caller default.
 
 The SDK SHALL log one diagnostic per client instance the first time it reads a record without `value`, and SHALL NOT probe, retry or cache server capabilities to avoid it.
@@ -328,13 +396,24 @@ Bootstrapped and overridden values SHALL go through the same type check as evalu
 
 ### Requirement: Locally evaluated flags
 
-A server SDK that evaluates config version 1 flags locally SHALL resolve typed reads of those results by the same rules, taking the value as the variant, or the boolean result when there is no variant. The details SHALL have `config_version` 1 in `flag_metadata` and the reason derived for config version 1 records. A flag whose local definition is inactive SHALL read as its existing inactive result, `false`, with reason `DISABLED`. Local evaluation of config version 2 flags is not part of this capability.
+A server SDK that evaluates config version 1 flags locally SHALL resolve typed reads of those results by the same rules, taking the value as the variant, or the boolean result when there is no variant. The details SHALL have the reason derived for config version 1 records. A flag whose local definition is inactive SHALL read as its existing inactive result, `false`, with reason `DISABLED`. Local evaluation of config version 2 flags is not part of this capability.
+
+The `flag_metadata` of a locally evaluated flag SHALL carry exactly these keys: `id` and `version` from the flag definition, `config_version` 1, `variant_key` when the result has a variant, and `reason_code` `flag_disabled` when the definition is inactive. It SHALL NOT carry `condition_index`, any other `reason_code`, `rule_type` or `rule_id`, even where the evaluator knows which condition matched, so every SDK reports the same map for the same definition. A remotely evaluated record of the same flag can carry more keys.
 
 #### Scenario: Locally evaluated multivariate flag
-- **GIVEN** local evaluation resolves "legacy-layout" for distinct id "user-123" to variant "compact"
+- **GIVEN** the local definition of "legacy-layout" has id 202 and version 9
+- **AND** local evaluation resolves "legacy-layout" for distinct id "user-123" to variant "compact" by its second condition
 - **WHEN** `evaluateFlags("user-123")` is called and the string details accessor is called for "legacy-layout" with caller default "grid"
-- **THEN** the details value is "compact"
-- **AND** the reason is `TARGETING_MATCH` and `flag_metadata.config_version` is 1
+- **THEN** the details value is "compact" and the details variant is "compact"
+- **AND** the reason is `TARGETING_MATCH`
+- **AND** `flag_metadata` is exactly `id` 202, `version` 9, `config_version` 1 and `variant_key` "compact"
+
+#### Scenario: Locally evaluated inactive flag
+- **GIVEN** the local definition of "beta-ui" has id 203, version 4 and is inactive
+- **WHEN** `evaluateFlags("user-123")` is called and the boolean details accessor is called for "beta-ui" with caller default true
+- **THEN** the details value is false
+- **AND** the reason is `DISABLED` and there is no error code
+- **AND** `flag_metadata` is exactly `id` 203, `version` 4, `config_version` 1 and `reason_code` "flag_disabled"
 
 ### Requirement: OpenFeature providers wrap the details accessors
 

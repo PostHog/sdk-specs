@@ -15,7 +15,7 @@ Feature: Emails
     When the caller sends to "user@example.com" with template ID "0190F6D2-7C1E-7B3A-9F5E-1C2D3E4F5A6B", template data {"name":"Ada"} and distinct ID "user_123"
     Then the mock server should receive 1 email send request to "https://us.posthog.com/api/projects/@current/messaging/send/email/"
     And the request header "Authorization" should equal "Bearer phs_test"
-    And the request body should equal JSON {"template":{"id":"0190f6d2-7c1e-7b3a-9f5e-1c2d3e4f5a6b"},"to":"user@example.com","message_data":{"name":"Ada"},"identifiers":{"distinct_id":"user_123"}}
+    And the request body should equal JSON {"template_id":"0190f6d2-7c1e-7b3a-9f5e-1c2d3e4f5a6b","to":"user@example.com","message_data":{"name":"Ada"},"distinct_id":"user_123"}
     And the send result should have ID "msg_1" and replayed false
 
   # Requirement: Custom host refusal

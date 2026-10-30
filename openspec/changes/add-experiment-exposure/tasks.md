@@ -11,7 +11,7 @@
 - [ ] 2.2 Update the delta specs for every decision that changes.
 - [ ] 2.3 Confirm that experiment analysis reads the arm from `$feature_flag_variant` on SDK-sent exposures.
 - [x] 2.4 Reword the dedupe sentence of `add-typed-flag-values` "Typed reads share the flag-called event" to "the key a legacy read of the same flag uses". Done in that change, before either archives.
-- [ ] 2.5 Release a harness contract whose `$experiment_exposure` projection drops `$feature_flag_config_version`, `$feature_flag_rule_type`, `$feature_flag_reason_code` and `$experiment_exposure_source`, and point this change at it.
+- [x] 2.5 Release a harness contract whose `$experiment_exposure` projection drops `$feature_flag_config_version`, `$feature_flag_rule_type`, `$feature_flag_reason_code` and `$experiment_exposure_source`, and point this change at it (posthog-sdk-test-harness 1.27.0, contract 8.0.0).
 
 ## 3. Acceptance and discoverability
 

@@ -8,14 +8,14 @@ Experiment analysis counts `$experiment_exposure` events. Today ingestion create
 
 A `/flags?v=4` record carries `value`, `failed`, `reason` (`code`, `condition_index`, `description`) and `metadata` (`id`, `version`, `description`, `has_experiment`, `config_version`, `rule_type`, `rule_id`, `variant_key`, `forced_variant`, `payload`). For a config version 2 flag the record says exactly which rule ended evaluation and, for an experiment split, which arm. The SDK holds that record when application code reads the flag, so it can send the exposure itself.
 
-The public wire contract is `contracts/feature_flag_rules_v2` in [posthog-sdk-test-harness 1.26.0](https://github.com/PostHog/posthog-sdk-test-harness/releases/tag/1.26.0) (contract 7.0.0). This change relies on four of its files:
+The public wire contract is `contracts/feature_flag_rules_v2` in [posthog-sdk-test-harness 1.27.0](https://github.com/PostHog/posthog-sdk-test-harness/releases/tag/1.27.0) (contract 8.0.0). This change relies on four of its files:
 
 - `rules/response_presence.json`: which rule fields each reason code requires or forbids.
 - `schemas/feature_flag_called_context.schema.json`: the closed projection of the flag-access properties on `$feature_flag_called`, including the malformed-split diagnostic.
 - `schemas/experiment_exposure_properties.schema.json`: the closed projection of the required `$experiment_exposure` properties.
 - `fixtures/wire/readers.json`: for each reader case, whether a reader emits an exposure.
 
-This change turns the contract into SDK behaviour: when to emit, what each event carries, and how dedupe works. It needs one contract change: the 1.26.0 exposure projection still requires `$feature_flag_config_version`, `$feature_flag_rule_type`, `$feature_flag_reason_code` and `$experiment_exposure_source`, which decision 14 removes from the exposure. A harness release must drop them before this change archives.
+This change turns the contract into SDK behaviour: when to emit, what each event carries, and how dedupe works. Contract 8.0.0 ([posthog-sdk-test-harness#98](https://github.com/PostHog/posthog-sdk-test-harness/pull/98)) already matches it: the exposure projection requires only the properties decision 14 keeps, and the `$feature_flag_called` projection rejects `$feature_flag_reason` on config version 2 calls.
 
 Ingestion already supports SDK-sent exposures. It does not touch a directly captured `$experiment_exposure`, and it does not copy a `$feature_flag_called` that carries `$feature_flag_config_version` 2 ([PostHog/posthog#125449](https://github.com/PostHog/posthog/pull/125449)).
 

@@ -7,7 +7,7 @@ Experiment analysis counts `$experiment_exposure` events. SDKs do not send them 
 - tell apart two experiment rules on one flag, or an experiment from a holdout or a rollout on the same flag;
 - handle arms whose values are booleans, numbers or objects.
 
-Flags with config version 2 ("flag rules v2") are built from ordered rules, and one rule type is `experiment`. In a `/flags?v=4` response, each flag record carries the exact reason code, rule ID, rule type and variant key. The public wire contract in [posthog-sdk-test-harness 1.26.0](https://github.com/PostHog/posthog-sdk-test-harness/releases/tag/1.26.0) (`contracts/feature_flag_rules_v2`, contract 7.0.0) defines those records, the property projections of both events, and which records produce an exposure. The SDK knows exactly when a read assigned an arm, and which arm, so it should send the exposure itself.
+Flags with config version 2 ("flag rules v2") are built from ordered rules, and one rule type is `experiment`. In a `/flags?v=4` response, each flag record carries the exact reason code, rule ID, rule type and variant key. The public wire contract in [posthog-sdk-test-harness 1.27.0](https://github.com/PostHog/posthog-sdk-test-harness/releases/tag/1.27.0) (`contracts/feature_flag_rules_v2`, contract 8.0.0) defines those records, the property projections of both events, and which records produce an exposure. The SDK knows exactly when a read assigned an arm, and which arm, so it should send the exposure itself.
 
 Ingestion is ready for this. It leaves a directly captured `$experiment_exposure` untouched, and it does not copy a `$feature_flag_called` event that carries `$feature_flag_config_version` 2 ([PostHog/posthog#125449](https://github.com/PostHog/posthog/pull/125449)).
 

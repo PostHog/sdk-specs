@@ -18,7 +18,9 @@ The trigger SHALL NOT depend on whether an experiment links to the rule. `metada
 
 No other outcome SHALL emit `$experiment_exposure`: not a targeting match, a percentage rollout match, a terminal rollout miss (including an experiment rule's rollout exclusion), a holdout, a paused experiment, a no-rule match or flag default, a missing flag, a failed or unreadable record, a bootstrapped value, a client-side override, a config version 1 record, or a record from a server that does not send typed values (which reads as config version 1).
 
-The decision SHALL use the evaluation details that supplied the value, not the value the read returned. A read that returned a caller-supplied default instead of the flag's value, because the value is `null`, is `false` read as another type, or has another type than the read asks for, SHALL still emit the exposure when the details meet the conditions. An arm whose value is `false` is still an assignment.
+The decision SHALL use the evaluation details that supplied the value, not the value the read returned. A read that returned a caller-supplied default instead of the flag's value, because the value is `null` or is `false` read as another type, SHALL still emit the exposure when the details meet the conditions. An arm whose value is `false` is still an assignment.
+
+A typed read that returned the caller default because the value has another type than the read asks for (a type mismatch) SHALL emit neither `$feature_flag_called` nor `$experiment_exposure`, and SHALL NOT consult or update either dedupe namespace, so the next read of the right type emits both. The SDK logs the mismatch instead, as the typed accessors define.
 
 #### Scenario: An experiment split emits both events
 - **GIVEN** the record for "checkout-flow" has value true, `failed` false, reason code `experiment_split`, and metadata config version 2, rule type `experiment`, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
@@ -67,11 +69,21 @@ The decision SHALL use the evaluation details that supplied the value, not the v
 - **WHEN** a read of "legacy-layout" emits `$feature_flag_called`
 - **THEN** no `$experiment_exposure` event is enqueued
 
-#### Scenario: A read that returns its caller default still reports the assignment
+#### Scenario: A read that returns its caller default for a false arm still reports the assignment
+- **GIVEN** the record for "checkout-flow" is a complete config version 2 experiment split with value false, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "control"
+- **WHEN** an accessor that asks for a string value reads "checkout-flow" with caller default "blue"
+- **AND** it returns "blue" because the value is `false`
+- **THEN** one `$feature_flag_called` event is enqueued with `$feature_flag_response` false
+- **AND** one `$experiment_exposure` event is enqueued with `$feature_flag_variant` "control"
+
+#### Scenario: A read of the wrong type emits neither event and reserves nothing
 - **GIVEN** the record for "checkout-flow" is a complete config version 2 experiment split with value "blue", rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
 - **WHEN** an accessor that asks for a boolean value reads "checkout-flow" with caller default false
 - **AND** it returns false because the value is a string
-- **THEN** one `$feature_flag_called` event is enqueued with `$feature_flag_response` "blue"
+- **THEN** no `$feature_flag_called` and no `$experiment_exposure` event is enqueued
+- **WHEN** an accessor that asks for a string value then reads "checkout-flow" with caller default "red"
+- **THEN** it returns "blue"
+- **AND** one `$feature_flag_called` event is enqueued with `$feature_flag_response` "blue"
 - **AND** one `$experiment_exposure` event is enqueued with `$feature_flag_variant` "test"
 
 #### Scenario: The exposure does not depend on a linked experiment
@@ -119,15 +131,13 @@ Each `$experiment_exposure` event SHALL carry these properties:
 | --- | --- |
 | `$feature_flag` | The flag key. |
 | `$feature_flag_response` | The legacy rendering of the record's value, the same as on the paired `$feature_flag_called` event: `true` or `false` for a boolean, the string for a string, `false` for `null`, and `true` for a number or an object. |
-| `$feature_flag_config_version` | `2` |
 | `$feature_flag_variant` | `metadata.variant_key` |
 | `$feature_flag_rule_id` | `metadata.rule_id` |
-| `$feature_flag_rule_type` | `"experiment"` |
-| `$feature_flag_reason_code` | `"experiment_split"` |
-| `$experiment_exposure_source` | `"sdk"` |
 | `locally_evaluated` | `true` when local evaluation produced the details, otherwise `false`. Client SDKs, whose values come from the flags service, send `false`. |
 
-`$feature_flag_response` on the exposure is diagnostic only. The arm is `$feature_flag_variant`, which separates arms whose values are equal. The legacy rendering stays until an event schema for number and object values is decided.
+`$feature_flag_response` on the exposure is diagnostic only. The arm is `$feature_flag_variant`, which separates arms whose values are equal. The rule ID identifies the experiment rule, and its presence marks the exposure as sent by the SDK.
+
+The exposure SHALL NOT carry `$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_type` or `$experiment_exposure_source`. The SDK sends the exposure only for a config version 2 experiment split, so their values would be constants. The paired `$feature_flag_called` event keeps them (see `feature-flag-called-tracker`).
 
 The SDK SHALL also include each of these that is available for the read, with the value it puts on the paired `$feature_flag_called` event:
 
@@ -147,19 +157,16 @@ The exposure MAY also carry `$feature_flag_payload`, `$feature/<key>` and the ot
 - **AND** the response has request id "7c0e5d1a-3b2f-4e6d-8a9c-0f1e2d3c4b5a"
 - **WHEN** a read of "checkout-flow" emits `$feature_flag_called`
 - **THEN** the `$experiment_exposure` event has distinct id "user-123" and these properties:
-  | property                     | value                                |
-  | $feature_flag                | checkout-flow                        |
-  | $feature_flag_response       | true                                 |
-  | $feature_flag_config_version | 2                                    |
-  | $feature_flag_variant        | test                                 |
-  | $feature_flag_rule_id        | 3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13 |
-  | $feature_flag_rule_type      | experiment                           |
-  | $feature_flag_reason_code    | experiment_split                     |
-  | $experiment_exposure_source  | sdk                                  |
-  | locally_evaluated            | false                                |
-  | $feature_flag_id             | 412                                  |
-  | $feature_flag_version        | 9                                    |
-  | $feature_flag_request_id     | 7c0e5d1a-3b2f-4e6d-8a9c-0f1e2d3c4b5a |
+  | property                 | value                                |
+  | $feature_flag            | checkout-flow                        |
+  | $feature_flag_response   | true                                 |
+  | $feature_flag_variant    | test                                 |
+  | $feature_flag_rule_id    | 3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13 |
+  | locally_evaluated        | false                                |
+  | $feature_flag_id         | 412                                  |
+  | $feature_flag_version    | 9                                    |
+  | $feature_flag_request_id | 7c0e5d1a-3b2f-4e6d-8a9c-0f1e2d3c4b5a |
+- **AND** it has none of `$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_type` and `$experiment_exposure_source`
 - **AND** its event UUID differs from the UUID of the paired `$feature_flag_called` event
 
 #### Scenario: A number-valued arm is rendered as true

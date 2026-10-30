@@ -15,7 +15,7 @@ The public wire contract is `contracts/feature_flag_rules_v2` in [posthog-sdk-te
 - `schemas/experiment_exposure_properties.schema.json`: the closed projection of the required `$experiment_exposure` properties.
 - `fixtures/wire/readers.json`: for each reader case, whether a reader emits an exposure.
 
-This change does not alter the contract. It turns the contract into SDK behaviour: when to emit, what each event carries, and how dedupe works.
+This change turns the contract into SDK behaviour: when to emit, what each event carries, and how dedupe works. It needs one contract change: the 1.26.0 exposure projection still requires `$feature_flag_config_version`, `$feature_flag_rule_type`, `$feature_flag_reason_code` and `$experiment_exposure_source`, which decision 14 removes from the exposure. A harness release must drop them before this change archives.
 
 Ingestion already supports SDK-sent exposures. It does not touch a directly captured `$experiment_exposure`, and it does not copy a `$feature_flag_called` that carries `$feature_flag_config_version` 2 ([PostHog/posthog#125449](https://github.com/PostHog/posthog/pull/125449)).
 
@@ -64,7 +64,9 @@ The trigger does not look at whether an Experiment links to the rule, and ignore
 
 **Choice.** The decision and both events read the evaluation details that supplied the value. The value the read returned is not an input.
 
-**Why.** The returned value can differ from the record. A typed read can return its caller default because the value is `null`, is `false` read as another type, or has another type. A legacy read renders number and object values as `true`. The user was still assigned the arm, and experiment analysis counts assignment. An arm whose value is `false` is still an arm.
+**Why.** The returned value can differ from the record. A typed read can return its caller default because the value is `null` or is `false` read as another type, and a legacy read renders number and object values as `true`. The user was still assigned the arm, and experiment analysis counts assignment. An arm whose value is `false` is still an arm.
+
+**Exception: a read of the wrong type.** A typed read that returns its caller default because the value has another type sends neither event and takes no dedupe slot, so the next read of the right type sends both. The SDK logs an error instead (#104). A wrong-type read is a bug in the calling code: the application got its own default, not the arm's value, so counting it would record an exposure the user never saw, and its dedupe slot would hide the first correct read.
 
 ### 4. Malformed splits fail closed
 
@@ -74,12 +76,12 @@ The trigger does not look at whether an Experiment links to the rule, and ignore
 
 ### 5. Attribution properties on `$feature_flag_called`
 
-**Choice.** For config version 2 results, `$feature_flag_called` carries `$feature_flag_config_version`, `$feature_flag_reason_code`, and `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant` when the reason code allows them. A per-reason table sets presence. Config version 1 events do not change.
+**Choice.** For config version 2 results, `$feature_flag_called` carries `$feature_flag_config_version`, `$feature_flag_reason_code`, and `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant` when the reason code allows them, and no `$feature_flag_reason`. A per-reason table sets presence. Config version 1 events do not change.
 
 **Why.**
 
 - `$feature_flag_config_version` is separate from `$feature_flag_version`, which is the flag row's edit counter.
-- `$feature_flag_reason_code` is the machine-readable code. `$feature_flag_reason` stays the human-readable description, so existing insights keep working.
+- `$feature_flag_reason_code` is the machine-readable code, and it replaces `$feature_flag_reason`, the human-readable description, on config version 2 events. The description can be rebuilt from the code and the rule, and nothing analyses config version 2 events by it. Config version 1 events keep the description, so existing insights keep working.
 - The table follows `rules/response_presence.json`. Rule fields come only from the record, and a field the table forbids is dropped even if a record carries it, so events stay valid against the public projection.
 - No event carries an experiment ID: the evaluator cannot know which Experiment links to the rule. No event carries a holdout ID: a holdout belongs to its rule and is identified by rule ID plus the `holdout` reason. No event carries an assignment seed: seeds are evaluation inputs for local evaluation, not outcomes, and in events they would leak into analytics storage and exports.
 - Config version 1 events stay byte-for-byte the same, so nothing that reads them today changes.
@@ -144,9 +146,19 @@ The trigger does not look at whether an Experiment links to the rule, and ignore
 This change works whichever lands first.
 
 - It does not use #104's accessor names, details object or reason vocabulary. It speaks of "reads that emit `$feature_flag_called`" and "the evaluation details that supplied the value", which cover typed accessors once they exist.
-- #104's "Typed reads share the flag-called event" says a typed read uses "the existing" dedupe key and adds no properties, and leaves both to this change. Its intent is that a typed read and a legacy read of the same flag share one key. Whichever change archives second rewords that sentence to "the key a legacy read of the same flag uses", so it stays true once this change extends the key.
-- #104 requires a typed read that returned its caller default to still report the assignment. Decision 3 does that.
+- #104's "Typed reads share the flag-called event" says a typed read uses "the key a legacy read of the same flag uses", including any config version 2 attribution the tracker adds, and adds no properties itself. It stays true once this change extends the key.
+- #104 requires a typed read that returned its caller default because the value is `null` or `false` to still report the assignment, and a typed read of the wrong type to send neither event, take no dedupe slot and log an error instead. Decision 3 matches.
 - #104 fixes the legacy rendering in `$feature_flag_response` and gives bootstrapped and overridden values empty metadata. Decisions 6 and 9 agree.
+
+### 14. The exposure carries the assignment, not constants
+
+**Choice.** `$experiment_exposure` carries `$feature_flag`, `$feature_flag_response` (the legacy rendering, diagnostic only), `$feature_flag_variant`, `$feature_flag_rule_id` and `locally_evaluated`, plus the flag ID, version, request ID, evaluation time and groups when available. It carries no `$feature_flag_rule_type`, `$feature_flag_reason_code`, `$feature_flag_config_version` or `$experiment_exposure_source`. `$feature_flag_called` keeps all of its attribution properties, by its per-reason table. The exposure dedupe key does not change.
+
+**Why.**
+
+- The SDK sends the exposure only for a config version 2 experiment split, so the rule type, the reason code and the config version would always be `experiment`, `experiment_split` and `2`.
+- A rule ID belongs to one experiment rule and is never reused, so it identifies the experiment.
+- Ingestion does not copy a `$feature_flag_called` that carries `$feature_flag_config_version` 2, and a copy is made from a call that never has a rule ID. The presence of `$feature_flag_rule_id` therefore already marks an exposure as SDK-sent, without a source property.
 
 ## Risks / Trade-offs
 
@@ -164,5 +176,5 @@ This change works whichever lands first.
 
 ## Open Questions
 
-- When a number and object event schema exists, does `$feature_flag_response` on the exposure switch to the typed value, or does the exposure drop it?
+- A later change may replace `$feature_flag_response` on config version 2 events with a typed value property, together with the PostHog features that read it. That is out of scope here.
 - Should SDKs that persist their flag-called dedupe state across page loads (posthog-js browser) persist the exposure namespace the same way? This change allows it but does not require it.

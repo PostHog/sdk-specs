@@ -12,7 +12,7 @@ When the evaluation details that supplied a read's value come from a config vers
 | `$feature_flag_rule_type` | `metadata.rule_type` | by the table below |
 | `$feature_flag_variant` | `metadata.variant_key` | by the table below |
 
-`$feature_flag_config_version` is the flag's config version. It is distinct from `$feature_flag_version`, the version of the flag's row. `$feature_flag_reason_code` is the machine-readable reason code; `$feature_flag_reason` stays the human-readable description where the SDK sends it.
+`$feature_flag_config_version` is the flag's config version. It is distinct from `$feature_flag_version`, the version of the flag's row. `$feature_flag_reason_code` is the machine-readable reason code, and it replaces `$feature_flag_reason`, the human-readable description of the reason: a config version 2 event SHALL NOT carry `$feature_flag_reason`. Config version 1 events keep `$feature_flag_reason` where the SDK sends it today.
 
 The rule fields depend on the reason code:
 
@@ -44,6 +44,13 @@ The SDK SHALL NOT add any of these properties for a config version 1 record, a r
   | $feature_flag_rule_id        | 3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13 |
   | $feature_flag_rule_type      | experiment                           |
   | $feature_flag_variant        | test                                 |
+- **AND** it has no `$feature_flag_reason`
+
+#### Scenario: A config version 2 event carries the reason code, not the description
+- **GIVEN** the record for "beta-ui" has value true, reason code `targeting_match` with description "Matched rule 1", config version 2, rule type `targeted_release` and rule id "c41f9e07-2d6b-4a83-b5e1-7f0a3c8d2e96"
+- **WHEN** a read of "beta-ui" emits `$feature_flag_called`
+- **THEN** the event has `$feature_flag_reason_code` "targeting_match"
+- **AND** it has no `$feature_flag_reason`
 
 #### Scenario: A holdout names the rule but no variant
 - **GIVEN** the record for "checkout-flow" has value false, reason code `holdout`, config version 2, rule type `experiment` and rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13"
@@ -94,9 +101,10 @@ The SDK SHALL NOT add any of these properties for a config version 1 record, a r
 - **THEN** the event has `$feature_flag_response` true
 
 #### Scenario: Config version 1 events do not change
-- **GIVEN** the record for "legacy-layout" has value "compact", reason code `condition_match`, config version 1 and variant key "compact"
+- **GIVEN** the record for "legacy-layout" has value "compact", reason code `condition_match` with description "Matched condition set 1", config version 1 and variant key "compact"
 - **WHEN** a read of "legacy-layout" emits `$feature_flag_called`
 - **THEN** the event has none of `$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`
+- **AND** in an SDK that sends `$feature_flag_reason`, the event has `$feature_flag_reason` "Matched condition set 1"
 
 ### Requirement: Config version 2 dedupe key
 
@@ -159,7 +167,7 @@ The SDK SHALL support a server-controlled "minimal event" mode that reduces `$fe
 When gated on, the event's properties SHALL be reduced to an allowlist covering, at minimum, these categories:
 
 - **Flag identity and outcome** — the flag key, its resolved value, and the experiment-linkage flag itself (e.g. `$feature_flag`, `$feature_flag_response`, `$feature_flag_has_experiment`).
-- **Evaluation debug scalars** the server/SDK already attaches (e.g. `$feature_flag_id`, `$feature_flag_version`, `$feature_flag_reason`, `$feature_flag_request_id`, `$feature_flag_evaluated_at`, `$feature_flag_error`, `locally_evaluated`).
+- **Evaluation debug scalars** the server/SDK already attaches (e.g. `$feature_flag_id`, `$feature_flag_version`, `$feature_flag_reason`, `$feature_flag_request_id`, `$feature_flag_evaluated_at`, `$feature_flag_error`, `locally_evaluated`). A config version 2 event has no `$feature_flag_reason`; its `$feature_flag_reason_code` takes that place.
 - **Group and person-processing context** needed for correct downstream handling (e.g. `$groups`, `$process_person_profile`).
 - **Session/SDK linkage** (e.g. `$session_id`, `$lib`, `$lib_version`) and, on server SDKs, the server marker (e.g. `$is_server`).
 - **Static, low-cardinality platform/runtime identity properties** the SDK already attaches to every event, kept for platform/runtime breakdowns on flag-call debugging (e.g. `$os`/`$python_version` on posthog-python; the equivalent OS/runtime identity fields on other SDKs).
@@ -168,7 +176,7 @@ When gated on, the event's properties SHALL be reduced to an allowlist covering,
 
 Everything else — including super properties, custom event properties passed by the caller, and other enriched context tags — SHALL be stripped from a minimized event.
 
-> Note (non-normative): the exact property allowlist is stated here at the category level, not as one fixed literal list, because SDKs differ in exactly which static platform fields they attach. posthog-python's allowlist (`$feature_flag`, `$feature_flag_response`, `$feature_flag_has_experiment`, `$feature_flag_id`, `$feature_flag_version`, `$feature_flag_reason`, `$feature_flag_request_id`, `$feature_flag_evaluated_at`, `$feature_flag_error`, `locally_evaluated`, `$groups`, `$process_person_profile`, `$session_id`, `$lib`, `$lib_version`, `$is_server`, `$geoip_disable`, `$os`, `$os_version`, `$os_distro`, `$python_runtime`, `$python_version`) is the reference implementation other SDKs describe mirroring. Every SDK's allowlist also includes the config version 2 attribution properties listed above.
+> Note (non-normative): the exact property allowlist is stated here at the category level, not as one fixed literal list, because SDKs differ in exactly which static platform fields they attach. posthog-python's allowlist (`$feature_flag`, `$feature_flag_response`, `$feature_flag_has_experiment`, `$feature_flag_id`, `$feature_flag_version`, `$feature_flag_reason`, `$feature_flag_request_id`, `$feature_flag_evaluated_at`, `$feature_flag_error`, `locally_evaluated`, `$groups`, `$process_person_profile`, `$session_id`, `$lib`, `$lib_version`, `$is_server`, `$geoip_disable`, `$os`, `$os_version`, `$os_distro`, `$python_runtime`, `$python_version`) is the reference implementation other SDKs describe mirroring. Every SDK's allowlist also includes the config version 2 attribution properties listed above. `$feature_flag_reason` stays on the allowlist for config version 1 events; config version 2 events never carry it.
 
 If the gate is absent, the `has_experiment` signal is missing/unknown, or the flag is linked to an experiment, the SDK SHALL send the full, unminimized event unchanged — minimization fails safe to "send everything" rather than risk silently dropping properties a consumer depends on.
 
@@ -281,3 +289,4 @@ The gate SHALL persist alongside cached flag/local-evaluation definition state (
   | $feature_flag_rule_type      | experiment                           |
   | $feature_flag_variant        | test                                 |
 - **AND** the enqueued event properties should not include "team"
+- **AND** the enqueued event properties should not include "$feature_flag_reason"

@@ -16,9 +16,10 @@ Ingestion is ready for this. It leaves a directly captured `$experiment_exposure
 ## What Changes
 
 - A read that emits `$feature_flag_called` also emits one `$experiment_exposure` when the evaluation details that supplied its value are a complete config version 2 experiment split: reason code `experiment_split`, rule type `experiment`, a rule ID and a variant key, and the value was not bootstrapped or overridden. Nothing else emits it.
-- The decision uses those evaluation details, not the value the read returned. A read that returned its caller default still reports the assignment.
+- The decision uses those evaluation details, not the value the read returned. A read that returned its caller default because the value is `null` or `false` still reports the assignment. A typed read of the wrong type sends neither event and takes no dedupe slot.
 - A malformed split (any of rule type `experiment`, rule ID or variant key missing) emits no exposure. Its `$feature_flag_called` keeps config version 2 and the reason code and omits the whole rule tuple. The SDK never guesses the missing parts.
-- `$feature_flag_called` for config version 2 results gains `$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`, by a per-reason presence table. No event carries an experiment ID, a holdout ID or an assignment seed.
+- `$feature_flag_called` for config version 2 results gains `$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`, by a per-reason presence table, and drops `$feature_flag_reason`, the human-readable description that `$feature_flag_reason_code` replaces. Config version 1 events keep it. No event carries an experiment ID, a holdout ID or an assignment seed.
+- `$experiment_exposure` carries the flag key, `$feature_flag_response`, `$feature_flag_variant`, `$feature_flag_rule_id` and `locally_evaluated`, plus the flag ID, version, request ID, evaluation time and groups when available. It carries no rule type, reason code, config version or source marker: those are constants for an experiment split, and the rule ID marks the event as SDK-sent.
 - `$feature_flag_response` keeps the legacy rendering on both events (`true` for number and object values, `false` for `null`), until a number and object event schema exists. The arm is `$feature_flag_variant`.
 - The `$feature_flag_called` dedupe key for config version 2 results also includes the config version, reason code, rule ID, rule type and variant key. `$experiment_exposure` gets its own bounded dedupe namespace keyed on distinct ID, groups, flag key, config version, rule ID and variant key. The value, request ID, evaluation time and local or remote source are not in the exposure key.
 - The feature flag event decision (per-read option, client-level default) governs both events. Payload-only reads stay silent.
@@ -49,7 +50,7 @@ No breaking changes. Config version 1 flags, their events and their dedupe are u
 ## Out of scope
 
 - Typed flag accessors and the evaluation-details object. They are #104.
-- An event schema that carries number and object values in `$feature_flag_response`.
+- Replacing `$feature_flag_response` on config version 2 events with a typed value property, and the PostHog features that read it.
 - Custom exposure events that an experiment defines in place of `$experiment_exposure`.
 - Experiment analysis queries, including how analysis picks the arm.
 - The ingestion-derived exposure for config version 1 flags. It stays as it is.

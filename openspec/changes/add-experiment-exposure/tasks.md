@@ -10,12 +10,13 @@
 - [ ] 2.1 Settle the decisions in `design.md` and record any change there.
 - [ ] 2.2 Update the delta specs for every decision that changes.
 - [ ] 2.3 Confirm that experiment analysis reads the arm from `$feature_flag_variant` on SDK-sent exposures.
-- [ ] 2.4 If `add-typed-flag-values` is archived first, add a MODIFIED delta for its "Typed reads share the flag-called event" requirement so its dedupe sentence reads "the key a legacy read of the same flag uses". If this change is archived first, that edit moves to `add-typed-flag-values`.
+- [x] 2.4 Reword the dedupe sentence of `add-typed-flag-values` "Typed reads share the flag-called event" to "the key a legacy read of the same flag uses". Done in that change, before either archives.
+- [ ] 2.5 Release a harness contract whose `$experiment_exposure` projection drops `$feature_flag_config_version`, `$feature_flag_rule_type`, `$feature_flag_reason_code` and `$experiment_exposure_source`, and point this change at it.
 
 ## 3. Acceptance and discoverability
 
-- [ ] 3.1 Add `acceptance/private/experiment-exposure.feature` covering the trigger outcomes (split, arm value false, holdout, rollout exclusion, paused, targeted match, failed, malformed split, config version 1, older-server record), the required and forbidden properties, the dedupe cases (repeat read, remote after local, A/A arms, new rule, groups, shared cache), the event decision (client-level and per-read), bootstrap, overrides and a throwing capture hook.
-- [ ] 3.2 Add attribution, dedupe-key and minimal-event scenarios to `acceptance/private/feature-flag-called-tracker.feature`.
+- [ ] 3.1 Add `acceptance/private/experiment-exposure.feature` covering the trigger outcomes (split, arm value false, holdout, rollout exclusion, paused, targeted match, failed, malformed split, config version 1, older-server record), a typed read of the wrong type, the required and forbidden properties, the dedupe cases (repeat read, remote after local, A/A arms, new rule, groups, shared cache), the event decision (client-level and per-read), bootstrap, overrides and a throwing capture hook.
+- [ ] 3.2 Add attribution (including the absent `$feature_flag_reason`), dedupe-key and minimal-event scenarios to `acceptance/private/feature-flag-called-tracker.feature`.
 - [ ] 3.3 Add the harness step bindings that set a v4 record with reason and rule metadata, and that inspect `$experiment_exposure`.
 - [ ] 3.4 Add "Experiment Exposure" to the capability index in `README.md`.
 - [ ] 3.5 When syncing, write the Purpose section of `openspec/specs/experiment-exposure/spec.md`, and update the prose of `openspec/specs/feature-flag-called-tracker/spec.md` (Behavior item 1, Interactions) so it points to the config version 2 dedupe key and to `experiment-exposure`.

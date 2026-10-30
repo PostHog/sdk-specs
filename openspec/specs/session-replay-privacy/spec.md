@@ -251,8 +251,8 @@ This applies to every SDK whose Android session replay captures that window, inc
 
 Recording a secure window fully masked means:
 
-- In screenshot mode, the SDK SHALL record an opaque masked frame with the window's dimensions and MUST NOT record or upload any of the window's pixels.
-- In wireframe mode, the SDK SHALL record one masked node covering the window and MUST NOT serialize the window's child views, text, or images.
+- In screenshot mode, the SDK SHALL record an opaque, solid black frame with the window's dimensions and MUST NOT record or upload any of the window's pixels.
+- In wireframe mode, the SDK SHALL record one masked node covering the window, filled solid black, and MUST NOT serialize the window's child views, text, or images.
 
 The SDK SHALL check the window's secure state when capture starts and again before the captured frame is recorded, and SHALL record the frame fully masked if the window was secure at either check.
 
@@ -265,6 +265,7 @@ The SDK SHALL evaluate each window by its own flags. A window without `FLAG_SECU
 - **AND** the captured window has `FLAG_SECURE`
 - **WHEN** a replay frame is captured
 - **THEN** the recorded frame is fully masked with the window's dimensions
+- **AND** the frame is solid black
 - **AND** no pixels from the window are recorded or uploaded
 
 #### Scenario: Wireframe mode records a secure window as one masked node
@@ -272,6 +273,7 @@ The SDK SHALL evaluate each window by its own flags. A window without `FLAG_SECU
 - **AND** the captured window has `FLAG_SECURE` and contains a text view showing "1234"
 - **WHEN** a replay snapshot is captured
 - **THEN** the recorded snapshot contains one masked node covering the window
+- **AND** the node is filled solid black
 - **AND** it contains no child views, images, or text "1234"
 
 #### Scenario: A window that becomes secure during capture is masked

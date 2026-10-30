@@ -503,11 +503,13 @@ These passes SHALL cost in proportion to the property limits, not to the payload
 apply the entry and nesting limits of "Property reference" and the key-based redaction. For each
 remaining string with a limit, object keys included, it SHALL run the binary check on the uncut string,
 cut the string to its limit plus 1,024 characters, run the remaining passes, then cut it to its limit,
-or, when the first cut removed text, to the passed string's length minus 1,024 if that is smaller. The
-margin lets a match that crosses the limit be recognized whole, and the second rule drops the margin's
-last 1,024 characters, where a match split by the first cut could otherwise slide under the limit after
-an earlier redaction shortens the text. Scanning the whole payload first makes one large result cost
-hundreds of milliseconds.
+or, when the first cut removed text, also run the same remaining passes on the string's first limit
+characters, with no truncation marker, keep the longest common prefix of the two results, compared by
+Unicode code point, and cut that to its limit. The margin lets a match that crosses the limit be
+recognized whole. A match split by the cut at the limit can be left raw in the second result, but the
+first redacts it, and a match no longer than the margin that is split by the cut at the margin lies past
+the end of the second result, so the common prefix holds neither. Scanning the whole payload first makes
+one large result cost hundreds of milliseconds.
 
 The SDK SHOULD also redact other credential-shaped values (known key formats, long high-entropy
 tokens). It SHALL expose a before-send hook that can modify or drop each MCP event after this
@@ -536,6 +538,14 @@ drops its `$exception`.
 - **AND** the SDK is flushed
 - **THEN** the "$mcp_parameters" should not contain "abc123"
 - **AND** the "$mcp_parameters" should contain "logo"
+
+#### Scenario: A long signed link used as an object key keeps its start
+- **GIVEN** an MCP server instrumented by the SDK with a tool "check_links"
+- **WHEN** an MCP client calls tool "check_links" with arguments `{"links": {"<link>": "report"}}`, where `<link>` is "https://acme.s3.amazonaws.com/q3.pdf?token=" followed by 1,300 "A" characters, then "&X-Amz-Signature=abc123"
+- **AND** the SDK is flushed
+- **THEN** the "$mcp_parameters" should contain "https://acme.s3.amazonaws.com/q3.pdf"
+- **AND** the "$mcp_parameters" should not contain "AAAAAAAAAAAAAAAAAAAA"
+- **AND** the "$mcp_parameters" should contain "report"
 
 #### Scenario: A PostHog token is redacted only as a whole word
 - **GIVEN** an MCP server instrumented by the SDK with a tool "save_note"

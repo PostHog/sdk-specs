@@ -177,11 +177,7 @@ The SDK SHALL implement the canonical `on-feature-flags` behavior described by t
 
 ### Requirement: Lifetime of a runtime listener registration
 
-A runtime listener registration — a method that registers a callback and returns an unsubscribe
-handle or function, as posthog-js, posthog-ios 4.0 and posthog-android 4.0 do — SHALL stay active
-until the caller unsubscribes it, including across a `close()`/`setup()` cycle. Unsubscribing SHALL
-stop delivery for that registration only, and SHALL be safe to call more than once. A config-time
-callback field has no handle to outlive anything and is out of scope.
+A runtime listener registration — a method that registers a callback and returns an unsubscribe handle or function, as posthog-js, posthog-ios 4.0, posthog-android 4.0 and posthog_flutter 6.0 do — SHALL stay active until the caller unsubscribes it, including across a `close()`/`setup()` cycle. Unsubscribing SHALL stop delivery for that registration only, and SHALL be safe to call more than once. A config-time callback field has no handle to outlive anything and is out of scope.
 
 #### Scenario: A registration keeps receiving loads after a teardown and re-setup
 - **GIVEN** a fresh SDK acceptance test harness
@@ -201,10 +197,7 @@ callback field has no handle to outlive anything and is out of scope.
 
 ### Requirement: Loads discarded by reset or close reach no listener
 
-A flag load already in flight when `reset()` or `close()` ran SHALL NOT be delivered to a listener
-when it completes, and SHALL NOT be replayed to a listener registered afterwards: it carries the
-flags of the identity or instance the caller just discarded. The SDK MAY drop such a load by any
-means it chooses.
+A flag load already in flight when `reset()` or `close()` ran SHALL NOT be delivered to a listener when it completes, and SHALL NOT be replayed to a listener registered afterwards: it carries the flags of the identity or instance the caller just discarded. The SDK MAY drop such a load by any means it chooses.
 
 #### Scenario: A load in flight across reset is not delivered
 - **GIVEN** a fresh SDK acceptance test harness

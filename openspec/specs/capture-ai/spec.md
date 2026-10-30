@@ -7,22 +7,28 @@
 exactly the same arguments as the host SDK's `capture` but delivers the event
 on an isolated route to PostHog's dedicated AI ingestion endpoint, which
 accepts much larger payloads than analytics capture. PostHog's own AI wrapper
-libraries route through it when the client opts in; users call it directly for
-manual AI capture.
+libraries always send through it; users call it directly for manual AI
+capture.
 
 `capture_ai` is a pipe: it sends the payload as given. Redaction, truncation,
 and media handling are wrapper concerns governed by configuration — never
 applied to manual `capture_ai` payloads.
 
-Status: public beta. The surface described here is frozen; guarantees may
-strengthen, never weaken, before GA.
+On capture v1 the AI route is `POST /i/v1/ai/events`, the AI lane of the same
+API that serves `/i/v1/analytics/events`; see `capture` for the shared wire
+contract, headers, per-event results and event-building order.
 
 ## Applicability
 
-`server` — currently implemented by posthog-python and posthog-node. Other
-server SDKs (Rust, Go, Ruby, ...) adopt this spec if and when they add AI
-support; until then their AI events ride plain `capture` under its standard
-limits. The **AI instrumentation attributes events to the active context**
+`server`, and client SDKs on capture v1 that ship an AI method — implemented
+by posthog-python 8.0 (`capture_ai`), posthog-node 6.0 (`captureAi`), posthog-go
+v2 (`EnqueueAI`), posthog-rs 1.0 (`capture_ai`), posthog-ios 4.0 and
+posthog-android 4.0 (`captureAi`), and posthog-flutter 6.0 (`captureAi`: native
+on iOS, macOS and Android, its own Dart lane on Windows and Linux), all on
+capture v1. Where a client SDK differs, the requirement says so in a
+"Client SDKs:" note. Other server SDKs (Ruby, PHP, .NET, ...) adopt this spec if
+and when they add AI support; until then their AI events ride plain `capture`
+under its standard limits. The **AI instrumentation attributes events to the active context**
 requirement binds any SDK shipping the OpenTelemetry AI bridge — today
 posthog-js (`@posthog/ai`), posthog-python, and posthog-go (`otel`) — whether or
 not that SDK exposes `capture_ai`.
@@ -50,6 +56,29 @@ Mirrors the host SDK's `capture`/`captureImmediate` pair. Returns the event
 UUID, or `undefined` when the client is disabled. The immediate variant
 resolves only after the network send completes (the serverless use case).
 
+### posthog-go
+
+```go
+func (c Client) EnqueueAI(msg Message) error
+func (c *client) EnqueueAIWithContext(ctx context.Context, msg Message) error
+```
+
+Accepts any message type, like `Enqueue`. Returns an error only for a local
+problem (closed or disabled client, validation); delivery results arrive
+through `Config.Callback`.
+
+### posthog-rs
+
+```rust
+fn capture_ai(&self, event: Event)
+fn capture_ai_batch(&self, events: Vec<Event>, historical_migration: bool)
+async fn capture_ai_immediate(&self, event: Event) -> Result<CaptureSummary, Error>
+async fn capture_ai_batch_immediate(&self, events: Vec<Event>, historical_migration: bool) -> Result<CaptureSummary, Error>
+```
+
+The blocking client has the same names, synchronous. The queued methods are
+fire-and-forget; the immediate variants return the per-event summary.
+
 ### Surface-parity rule
 
 `capture_ai` mirrors the host SDK's public `capture` surface: the same
@@ -64,20 +93,43 @@ Python — constructor kwarg and module attribute; `enableFullAiCapture` in
 Node — client option), default false. When true, PostHog's AI wrapper
 libraries:
 
-1. route their events through the dedicated AI path instead of analytics
-   `capture`,
-2. skip string truncation (a cut through base64 corrupts media; large text
+1. skip string truncation (a cut through base64 corrupts media; large text
    contexts stay intact), and
-3. pass media (raw bytes, base64, data URIs) through unredacted instead of
+2. pass media (raw bytes, base64, data URIs) through unredacted instead of
    replacing it with type-aware placeholders.
+
+The flag does not choose the route: on capture v1 the wrappers always send
+through the AI method (see **Built-in AI integrations always use the AI
+method**). On legacy capture they sent through analytics `capture` unless the
+flag was set.
 
 Privacy mode always takes precedence: with it on, content properties are
 stripped regardless of this flag.
 
+### AI lane delivery
+
+The AI lane has its own delivery configuration, separate from the analytics
+lane's: compression, queue capacity and request timeout, named after the lane
+(`capture_ai_compression`, `capture_ai_max_queue_size`, `capture_ai_timeout`
+in posthog-python; `CaptureAICompression`, `CaptureAIMaxQueueSize`,
+`CaptureAIBatchUploadTimeout` in posthog-go; `capture_ai_compression`,
+`capture_ai_max_queue_size` in posthog-rs, whose request timeout is shared;
+`captureAiCompression`, `captureAiMaxQueueSize`, `captureAiRequestTimeoutMs`
+in posthog-node). Server SDK defaults are a 1000-event queue and a 30 second timeout,
+longer than analytics because AI payloads are much larger. The compression
+default is the SDK's: none in posthog-python, posthog-go and posthog-rs, gzip
+in posthog-node. The analytics lane's compression and queue capacity never
+reach the AI lane; batching settings may be shared. The per-event cap is
+optionally exposed (`capture_ai_max_event_bytes` in posthog-python) and can
+only be lowered; the batch target is an internal constant. See **AI
+lane configuration is scoped to the AI lane**.
+
 ## Behavior
 
 1. **Admission.** Same enrichment pipeline as `capture` (distinct id,
-   timestamp, `$lib`/`$lib_version`, `before_send`), differing only in the
+   timestamp, the layer order, `before_send`, hoisting of the legacy option
+   properties; on capture v1 the library identity comes from the
+   `PostHog-Sdk-Info` header, not from properties), differing only in the
    delivery route.
 2. **UUID.** The SDK attaches a client-generated UUID to every event on the
    AI path when the caller supplies no UUID, and returns the attached UUID to
@@ -85,8 +137,9 @@ stripped regardless of this flag.
    (replace or reject).
 3. **Isolation.** AI events ride their own queue/buffer with independent
    size caps, batching, and retry policy; they never share a send cycle with
-   analytics events. The queue starts lazily — clients that never capture AI
-   events pay no overhead.
+   analytics events. On server SDKs the queue starts lazily, so clients that
+   never capture AI events pay no overhead; client SDKs start their durable
+   queue at launch.
 4. **Delivery.** At-least-once delivery is permitted (retries may duplicate):
    a retry MUST resend the event with its entire original envelope
    unchanged — timestamp, distinct id, event name, and UUID, all stamped once
@@ -94,14 +147,18 @@ stripped regardless of this flag.
    full envelope (`[timestamp, distinct_id, event, uuid]`), which is what
    makes at-least-once delivery safe: duplicates collapse to one stored
    event. At-most-once (drop after retry exhaustion) is equally compliant.
-   The invariant is the stable envelope, not the delivery count.
+   The invariant is the stable envelope, not the delivery count. On capture
+   v1 the server answers with a per-event verdict and the SDK resends only the
+   events marked `retry` (see `capture` and `retry-queue`).
 
 ## Error handling
 
 - `capture_ai` never throws under normal operation, matching `capture`.
-- Events exceeding the operational per-event size cap are dropped in the
-  consumer, logging the event name and byte size only — never payload
-  content, which may be unredacted multimodal data.
+- Events exceeding the operational per-event size cap are dropped locally,
+  logging the event name and byte size only — never payload content, which
+  may be unredacted multimodal data. An SDK that stops measuring once an
+  event passes the cap logs "over N bytes" instead of the full size. Client
+  SDKs MAY log this drop only in debug mode, like their other drop lines.
 - Delivery failures surface through the SDK's existing error hooks
   (`on_error` and equivalents), not through the return value.
 
@@ -116,13 +173,16 @@ promise. Reference forms (e.g. `phaiblob://`) may join the schema additively.
 
 ## Transport (non-normative)
 
-These are current operational values, explicitly NOT part of this contract,
-and may change without notice: endpoint `/i/v0/ai/batch/` (v0 batch wire
-shape), 8 MiB per-event cap, ~5 MiB batch target, compression per SDK default
-(Node: transport gzip on unless disabled; Python: gzip opt-in), bounded
-retries with backoff. Capture v1 re-implements the same contract on
-`/i/v1/ai/...` with per-event outcomes; that cutover must not change anything
-in the Requirements below.
+These are current operational values and may change without notice. Capture
+v1: endpoint `/i/v1/ai/events`; the request body limit is larger than the
+analytics endpoint's (20 MiB compressed and 100 MiB decompressed today);
+capture drops an event whose `properties` exceed 8 MiB
+(`ai_event_too_big`) and an event over the project's AI byte budget
+(`ai_byte_rate_limited`); SDKs target about 5 MiB per request; retries follow
+`retry-queue`. Legacy capture: endpoint `/i/v0/ai/batch/` with the v0 batch
+wire shape, where a non-AI event rejected the whole batch. The exposure of the
+per-event cap (lower-only) and the lane configuration are normative (see the
+Requirements); the cap's value and the batch target are not.
 ## Requirements
 ### Requirement: Canonical capture_ai behavior
 
@@ -188,18 +248,21 @@ the scenarios below.
 
 ### Requirement: Full AI capture flag
 
-The SDK SHALL expose a single boolean option (default false), named
-`enable_full_ai_capture` adapted to platform convention, that governs what the
-SDK's AI wrapper libraries capture. It SHALL NOT alter payloads passed to
+An SDK that ships PostHog AI wrapper libraries SHALL expose a single boolean
+option (default false), named `enable_full_ai_capture` adapted to platform
+convention (today posthog-python and posthog-node), that governs what the
+SDK's AI wrapper libraries capture. When true, the wrappers skip string truncation and pass media through unredacted; when false, they truncate long strings and replace media with a type-aware placeholder. The flag SHALL NOT change which route the wrappers use: on a capture v1 SDK they always send through the AI method (see **Built-in AI integrations always use the AI method**). It SHALL NOT alter payloads passed to
 `capture_ai` directly.
 
 #### Scenario: wrapper media is redacted by default and passed through when enabled (@server)
 - **GIVEN** an AI wrapper capturing a payload containing base64 media
 - **WHEN** the client has the flag unset
 - **THEN** the captured content should replace the media with a type-aware placeholder
+- **AND** the event should be sent through the AI method
 - **WHEN** the client has the flag set to true
 - **THEN** the captured content should contain the media unmodified
 - **AND** no string truncation should be applied to the captured content
+- **AND** the event should be sent through the AI method
 
 #### Scenario: privacy mode wins over the flag (@server)
 - **GIVEN** an AI wrapper capturing a payload containing base64 media
@@ -294,3 +357,161 @@ Where it applies:
 - **GIVEN** an active context with properties that include a null value, an empty string, and a non-finite number
 - **WHEN** an AI span started inside that context ends
 - **THEN** the exported AI event should omit those keys rather than export empty or non-finite values
+
+### Requirement: AI events travel on their own lane to the capture v1 AI endpoint
+
+An SDK that delivers events through capture v1 and supports AI capture SHALL send events captured through its AI method with `POST {host}/i/v1/ai/events`, using the request body, headers, per-event results and retry rules defined for analytics capture in `capture` and `retry-queue`. The AI method SHALL send the event as given, with the same event-building order as `capture`, and SHALL NOT reroute by event name: a non-`$ai_` event captured through the AI method is sent to the AI endpoint, where capture drops it with `details: misrouted_event`, and an `$ai_*` event captured through `capture` is sent to the analytics endpoint. The SDK MAY log at debug level when the AI method receives a non-`$ai_` name.
+
+The AI lane SHALL have its own queue, flush cycle, retry state and in-flight request, started lazily on the first AI event, so that a slow or failing AI lane never delays, drops or resends analytics events, and the reverse. `flush()` and `shutdown()` SHALL signal both lanes before waiting on either, under one deadline. Client SDKs: the AI queue is durable (on disk), starts at launch so events left from an earlier launch are sent, and `flush()` and `close()` signal both lanes without blocking.
+
+Every platform of an SDK that delivers events through capture v1 SHALL ship this lane and the AI method; a wrapper SDK SHALL NOT leave a capture v1 platform without them. On a platform still on legacy capture (posthog-flutter on the web, which sends through posthog-js), the AI method SHALL send nothing, log that AI capture is unsupported there, and return the SDK's not-admitted value, and SHALL NOT fall back to `capture`.
+
+Capture currently accepts `$ai_*` events on the analytics endpoint and forwards them to the AI pipeline. That acceptance is temporary; the SDK and its built-in integrations SHALL NOT rely on it.
+
+Legacy capture: the AI route was `/i/v0/ai/batch/`, which rejected a whole batch containing a non-AI event.
+
+#### Scenario: AI capture uses the capture v1 AI endpoint (@server)
+- **GIVEN** an isolated SDK with empty persistent storage
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **WHEN** capture_ai is called with JSON arguments:
+  """application/json
+  {"distinct_id":"test_user","event":"$ai_generation","properties":{"$ai_model":"gpt"}}
+  """
+- **AND** pending captures are flushed
+- **THEN** exactly 1 capture request should have been received
+- **AND** every capture request path should be one of:
+  | path             |
+  | /i/v1/ai/events  |
+- **AND** the first received event field "event" should equal "$ai_generation"
+- **AND** the first request should authenticate with bearer token "phc_test_key"
+
+#### Scenario: Ordinary capture does not reroute AI-named events (@server)
+- **GIVEN** an isolated SDK with empty persistent storage
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **WHEN** capture is called with JSON arguments:
+  """application/json
+  {"distinct_id":"test_user","event":"$ai_generation"}
+  """
+- **AND** pending captures are flushed
+- **THEN** exactly 1 capture request should have been received
+- **AND** every capture request path should be one of:
+  | path                   |
+  | /i/v1/analytics/events |
+- **AND** no capture request should use "/i/v1/ai/events"
+
+#### Scenario: A non-AI event on the AI method is sent and its misroute is reported (@server)
+- **GIVEN** an isolated SDK with empty persistent storage
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** the mock serves these ordered AI responses:
+  | status | body                                                          |
+  | 200    | {"results":{"*":{"result":"drop","details":"misrouted_event"}}} |
+- **WHEN** capture_ai is called with JSON arguments:
+  """application/json
+  {"distinct_id":"test_user","event":"button_clicked"}
+  """
+- **AND** pending captures are flushed
+- **THEN** exactly 1 capture request should have been received
+- **AND** every capture request path should be one of:
+  | path             |
+  | /i/v1/ai/events  |
+- **AND** the SDK should report the event "button_clicked" as dropped with details "misrouted_event"
+
+#### Scenario: A failing AI lane does not delay analytics delivery (@server)
+- **GIVEN** an isolated SDK with empty persistent storage
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** the mock delays every request to "/i/v1/ai/events" until released
+- **WHEN** capture_ai is called with distinct id "test_user" and event "$ai_generation"
+- **AND** capture is called with distinct id "test_user" and event "button_clicked"
+- **AND** 2000 milliseconds elapse without a public SDK call
+- **THEN** the analytics batch endpoint should have received "button_clicked"
+- **WHEN** the delayed AI request is released and succeeds
+- **AND** pending captures are flushed
+- **THEN** the AI batch endpoint should have received "$ai_generation"
+
+### Requirement: Built-in AI integrations always use the AI method
+
+PostHog's own AI wrapper libraries and instrumentation that emit `$ai_*` events through the SDK (provider wrappers, the OpenTelemetry AI bridge where it captures events, MCP add-ons) SHALL send them through the client's AI method on every capture v1 SDK, regardless of `enable_full_ai_capture` or any other setting. They SHALL set `process_person_profile: false` as an option when they substitute a trace or session id for a missing user id, and SHALL never write a legacy option property. A wrapper given a client object that lacks the AI method (a stand-in or mock) SHALL log one error when it is constructed and turn its own AI capture off; it SHALL NOT fall back to `capture` and SHALL NOT raise into the host application.
+
+Legacy capture: wrappers sent through `capture` unless `enable_full_ai_capture` was set.
+
+#### Scenario: A wrapper event rides the AI lane with the flag unset (@server)
+- **GIVEN** an isolated SDK with empty persistent storage
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** a PostHog AI wrapper is attached to the client with the full-capture flag unset
+- **WHEN** the wrapper records one generation
+- **AND** pending captures are flushed
+- **THEN** the AI batch endpoint should receive "$ai_generation"
+- **AND** the analytics batch endpoint should receive no events
+
+#### Scenario: A client without the AI method disables the wrapper's capture without raising (@server)
+- **GIVEN** a client object that exposes capture but not the AI method
+- **WHEN** a PostHog AI wrapper is constructed around it
+- **AND** the wrapper records one generation
+- **THEN** the construction and the recording should not throw
+- **AND** the wrapper should log one error about the missing AI method
+- **AND** no event should be sent through capture
+
+### Requirement: AI lane configuration is scoped to the AI lane
+
+An SDK that delivers events through capture v1 and supports AI capture SHALL expose the AI lane's compression mode, queue capacity and request timeout as public options named after the lane (for example `capture_ai_compression`, `capture_ai_max_queue_size` and `capture_ai_timeout` in posthog-python; `CaptureAICompression`, `CaptureAIMaxQueueSize` and `CaptureAIBatchUploadTimeout` in posthog-go; `capture_ai_compression` and `capture_ai_max_queue_size` in posthog-rs, whose request timeout is shared; `captureAiCompression`, `captureAiMaxQueueSize` and `captureAiRequestTimeoutMs` in posthog-node; `captureAiCompression`, `captureAiMaxQueueSize`, `captureAiTimeout` and `captureAiMaxEventBytes` in posthog-ios, posthog-android and the posthog-flutter `PostHogConfig`). The defaults SHALL be a queue capacity of 1000 events and a request timeout of 30 seconds on server SDKs. Client SDKs: posthog-ios 4.0, posthog-android 4.0 and the posthog-flutter 6.0 Windows and Linux lane default to 100 events and a 60 second timeout, which is an idle read and write timeout, not a deadline for the whole request, with a fixed 50 MiB disk cap that drops the oldest events. The default compression is the SDK's choice and SHALL be documented: posthog-python, posthog-go and posthog-rs default to none; posthog-node, posthog-ios, posthog-android and the posthog-flutter 6.0 Windows and Linux lane to gzip. The SDK SHALL offer only the codecs its runtime provides and SHALL validate the effective lane values after defaults are applied.
+
+The analytics lane's compression and queue capacity, including environment variables that set analytics compression, SHALL NOT change AI uploads, and the reverse. Batching settings such as the flush threshold, flush interval and batch size, and the request timeout where the SDK has one shared value, MAY be shared between the lanes. The 5 MiB batch target SHALL NOT be configurable. The per-event size cap MAY be exposed (`capture_ai_max_event_bytes` in posthog-python) and then only lowered: a configured value above the SDK's ceiling SHALL NOT take effect, and the SDK SHALL either refuse it (posthog-python raises) or clamp it to the ceiling with a log (posthog-ios and posthog-android). The cap measures what the SDK's size check measures (see **AI event size and batching on capture v1**): where that is the whole serialized event, the cap's ceiling is the 8 MiB properties limit plus the SDK's envelope headroom (64 KiB in posthog-python, posthog-ios and posthog-android).
+
+#### Scenario: Analytics compression does not reach the AI lane (@server)
+- **GIVEN** an isolated SDK with empty persistent storage
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key", flush threshold 1, and analytics compression "gzip"
+- **AND** no AI lane compression is configured
+- **WHEN** capture is called with distinct id "test_user" and event "button_clicked"
+- **AND** capture_ai is called with distinct id "test_user" and event "$ai_generation"
+- **AND** pending captures are flushed
+- **THEN** the request received on the analytics batch endpoint should declare "Content-Encoding" "gzip"
+- **AND** the request received on the AI batch endpoint should carry the SDK's documented AI compression default
+
+#### Scenario: The per-event cap can be lowered but not raised (@server)
+- **GIVEN** an isolated SDK with empty persistent storage
+- **AND** the mock PostHog server is reset
+- **AND** the SDK exposes a per-event size cap for the AI lane
+- **WHEN** the SDK is initialized with a per-event cap below the SDK's ceiling
+- **AND** capture_ai is called with an event whose properties exceed the configured cap but not the ceiling
+- **AND** pending captures are flushed
+- **THEN** no event should reach the AI batch endpoint
+- **AND** the SDK should report the event as dropped locally
+- **WHEN** the SDK is initialized with a per-event cap above the SDK's ceiling
+- **THEN** the SDK should not use a cap above its ceiling
+
+### Requirement: AI event size and batching on capture v1
+
+An SDK that delivers events through capture v1 and supports AI capture SHALL NOT send an AI event it measures over the 8 MiB ceiling on `properties`. With the default cap and an exact `properties` measure, it SHALL NOT refuse one at or under that size; a lowered cap or the whole-event measure below MAY refuse a smaller event. The SDK SHALL either measure `properties` exactly or measure the whole serialized event against the ceiling plus a fixed envelope headroom (64 KiB in posthog-python and posthog-go); an event the whole-event measure admits but capture rejects comes back as `details: ai_event_too_big` and is surfaced like any other drop. An event over the SDK's measure SHALL be dropped on every send path, including immediate and synchronous ones, and reported through the SDK's error surface or a log line that names the event and its byte size (or "over N bytes" when the SDK stops measuring at the cap) and never its content.
+
+The AI lane SHALL batch by bytes with a 5 MiB target, checked before appending: when the batch is non-empty and the next event would exceed the target, the batch is sent first and the event starts the next one, so order is kept and an event over the target ships alone.
+
+Capture drops an AI event over its own ceiling with `details: ai_event_too_big` and one over the project's AI byte budget with `details: ai_byte_rate_limited`; the SDK SHALL surface both as opaque `details` strings like any other drop.
+
+#### Scenario: An event at the ceiling is sent and one over it is dropped with a content-free log (@server)
+- **GIVEN** an isolated SDK with empty persistent storage
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 2
+- **WHEN** capture_ai is called with event "$ai_generation" named "at-ceiling" whose properties serialize to exactly 8388608 bytes
+- **AND** capture_ai is called with event "$ai_generation" named "over-ceiling" whose properties serialize to 9437184 bytes and contain the marker "SECRET-MARKER"
+- **AND** pending captures are flushed
+- **THEN** the AI batch endpoint should receive exactly 1 event
+- **AND** the received event should be "at-ceiling"
+- **AND** the SDK should log the event name and byte size of "over-ceiling"
+- **AND** the log output should not contain "SECRET-MARKER"
+
+#### Scenario: AI batches close before the byte target and keep order (@server)
+- **GIVEN** an isolated SDK with empty persistent storage
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 10
+- **WHEN** capture_ai is called sequentially 3 times with an event named "gen-{index}" whose properties serialize to about 3 MiB
+- **AND** pending captures are flushed
+- **THEN** at least 2 capture request should have been received on the AI batch endpoint
+- **AND** no received request body should exceed the SDK's byte target plus envelope overhead
+- **AND** the events "gen-0", "gen-1" and "gen-2" should have been received in that order across the requests
+

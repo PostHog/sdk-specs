@@ -88,6 +88,8 @@ The SDK SHALL implement the canonical `before-send-hook` behavior described by t
 
 If any before-send hook throws, the SDK SHALL catch the exception, record a warning, stop the remaining hook chain, and drop the event. The SDK MUST NOT enqueue the original event or the last successfully transformed value because the failed hook may have been responsible for removing sensitive data.
 
+The log line for a throwing hook SHALL name the dropped event and the exception type, and SHALL NOT include the exception message or any event content, because the message can carry the data the hook was removing. A stack trace MAY be logged at debug level only. A server SDK SHALL print this line whether or not debug mode is on, so a dropped event is never silent. A client SDK MAY print it only in debug mode, like its other logs.
+
 #### Scenario: Before-send can mutate an assembled event before enqueue
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"

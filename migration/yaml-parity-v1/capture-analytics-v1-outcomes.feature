@@ -45,11 +45,11 @@ Feature: Analytics-v1 partial outcomes and default omission YAML parity
     And 3000 milliseconds elapse without a public SDK call
     Then exactly 1 capture request should have been received
 
-  # Source: yaml:029a94a:capture_v1:partial_batch_handling:does_not_retry_limited_events
-  Scenario: Limited events are not retried
+  # Source: yaml:486fb42:capture_v1:partial_batch_handling:does_not_retry_warning_events
+  Scenario: Warning events are not retried
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
-      | 200 | {} | null | ["ok","limited"] |
+      | 200 | {} | null | ["ok","warning"] |
     And the SDK is initialized with token "phc_test_key" and flush threshold 10
     When capture is called sequentially 2 times with zero-based top-level index substitution:
       """application/json
@@ -186,11 +186,11 @@ Feature: Analytics-v1 partial outcomes and default omission YAML parity
     And 3000 milliseconds elapse without a public SDK call
     Then exactly 1 capture request should have been received
 
-  # Source: yaml:029a94a:capture_v1:partial_batch_handling:mixed_ok_drop_limited_no_retry
-  Scenario: Mixed ok drop and limited outcomes produce one request
+  # Source: yaml:486fb42:capture_v1:partial_batch_handling:mixed_ok_drop_warning_no_retry
+  Scenario: Mixed ok drop and warning outcomes produce one request
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
-      | 200 | {} | null | ["ok","drop","limited","ok"] |
+      | 200 | {} | null | ["ok","drop","warning","ok"] |
     And the SDK is initialized with token "phc_test_key" and flush threshold 10
     When capture is called sequentially 4 times with zero-based top-level index substitution:
       """application/json

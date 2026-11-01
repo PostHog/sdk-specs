@@ -699,7 +699,7 @@ An SDK that delivers events through capture v1 SHALL send these headers on every
 - `PostHog-Request-Id`: a UUID minted once per batch and kept across every retry of that batch.
 - `PostHog-Attempt`: `1` on the first attempt, incremented by one on each retry of the same batch.
 - A client SDK with a durable disk queue MAY mint a new `PostHog-Request-Id` and restart `PostHog-Attempt` at `1` when the events in a resend change (events captured during a backoff join it) or after the app restarts, because it keeps the retry identity in memory.
-- `PostHog-Request-Timestamp`: the send time of this attempt as an RFC 3339 string with an explicit offset and at least millisecond precision, taken from the same clock as the event timestamps and stamped again on every attempt.
+- `PostHog-Request-Timestamp`: the send time of this attempt as an RFC 3339 string with an explicit offset and at least three fractional-second digits (see **Timestamps on capture v1**), taken from the same clock as the event timestamps and stamped again on every attempt.
 - `Content-Encoding` only when the body is compressed, with one of `gzip`, `deflate`, `br` or `zstd`.
 
 Every header value SHALL be visible ASCII. The body's `created_at` SHALL be set once per batch and kept across retries. Capture uses `PostHog-Request-Timestamp` to correct for client clock skew, so a retry that resends a stale timestamp shifts every event in the request by the retry delay; the SDK SHALL NOT let an HTTP library retry a capture request on its behalf.
@@ -716,7 +716,7 @@ Every header value SHALL be visible ASCII. The body's `created_at` SHALL be set 
 - **AND** the first request header "User-Agent" should equal the "PostHog-Sdk-Info" header
 - **AND** the first request header "PostHog-Request-Id" should be a valid UUID
 - **AND** the first request header "PostHog-Attempt" should be integer 1
-- **AND** the first request header "PostHog-Request-Timestamp" should be an RFC 3339 timestamp with an explicit offset and at least millisecond precision
+- **AND** the first request header "PostHog-Request-Timestamp" should be an RFC 3339 timestamp with an explicit offset and at least 3 fractional-second digits
 
 #### Scenario: A retry keeps the request id and restamps the attempt and timestamp (@server)
 - **GIVEN** a fresh SDK acceptance test harness
@@ -742,7 +742,7 @@ An SDK that delivers events through capture v1 SHALL read the `results` object o
 - `drop` means capture refused the event; the SDK SHALL NOT resend it and SHALL report it through its error surface with the `details` tag as an opaque string.
 - `retry` means capture could not store the event this time; the SDK SHALL resend only the `retry` events, in their original relative order, as a new attempt of the same batch, and SHALL report an event still `retry` after the last attempt as exhausted.
 - An entry whose `result` value the SDK does not recognize, and an event whose uuid is absent from `results`, SHALL be treated as delivered.
-- A 2xx whose body cannot be read as `{"results": {...}}` is a terminal failure of the whole batch.
+- A 2xx whose body is not JSON, or whose `results` is missing, `null` or not an object, cannot be read. It is a terminal failure of the whole batch: the SDK SHALL NOT resend the batch and SHALL report its events as lost through its error surface. `{"results": {}}` can be read, and every event in that batch counts as delivered.
 
 The SDK SHALL NOT hard-code the set of `details` tags. When a `results` entry carries `duplicates_dropped: n`, the request repeated that uuid: the first event with that uuid in the request takes the entry's `result` and `details`, and the SDK SHALL report exactly the next `n` events with that uuid as `drop` with the reason `duplicate_event_uuid`, never retrying them. The SDK SHALL NOT guard, split, rewrite or deduplicate repeated uuids before sending.
 
@@ -1030,7 +1030,7 @@ Legacy capture: distinct ids over 200 characters were shortened and the event ke
 
 ### Requirement: Timestamps on capture v1
 
-An SDK that delivers events through capture v1 SHALL stamp a missing event `timestamp` once, when the event is captured or enqueued, from the same clock as `PostHog-Request-Timestamp`, and SHALL NOT change it afterwards (not on retry, not after a restart). Every timestamp on the wire (`timestamp`, `created_at`, `PostHog-Request-Timestamp`) SHALL be RFC 3339 with an explicit offset (`Z` or `±HH:MM`) and at least millisecond precision; finer precision in a caller-supplied timestamp SHALL be kept. A client SDK MAY write the timestamps it stamps itself with millisecond precision. The SDK SHALL NOT correct clock skew locally, SHALL NOT reject or clamp a future timestamp, and SHALL NOT send an `offset` field. An unparseable caller timestamp SHALL be replaced with the current time and logged with a warning that names the rule and never the value. A naive caller timestamp follows the SDK's documented zone rule.
+An SDK that delivers events through capture v1 SHALL stamp a missing event `timestamp` once, when the event is captured or enqueued, from the same clock as `PostHog-Request-Timestamp`, and SHALL NOT change it afterwards (not on retry, not after a restart). Every timestamp on the wire (`timestamp`, `created_at`, `PostHog-Request-Timestamp`) SHALL be RFC 3339 with an explicit offset (`Z` or `±HH:MM`) and at least three fractional-second digits, written even when they are zero (`2025-01-01T00:00:00.000Z`, never `2025-01-01T00:00:00Z`). Finer digits from the caller or the clock SHALL be kept, up to nine (3, 6 or 9 digits are all fine), and SHALL NOT be trimmed below three. A client SDK MAY write the timestamps it stamps itself with exactly three digits (milliseconds). The SDK SHALL NOT correct clock skew locally, SHALL NOT reject or clamp a future timestamp, and SHALL NOT send an `offset` field. An unparseable caller timestamp SHALL be replaced with the current time and logged with a warning that names the rule and never the value. A naive caller timestamp follows the SDK's documented zone rule.
 
 Legacy capture: `timestamp` was optional and some SDKs sent an `offset`; posthog-rs rejected future timestamps.
 
@@ -1053,6 +1053,23 @@ Legacy capture: `timestamp` was optional and some SDKs sent an `offset`; posthog
 - **WHEN** capture is called with distinct id "user-123" and event "Stamped"
 - **AND** pending captures are flushed
 - **THEN** every event in the first capture request should have UTC timestamp "2025-01-01T00:00:00.250Z"
+
+#### Scenario: Whole-second timestamps keep three zero digits (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 2
+- **WHEN** capture is called with distinct id "user-123" and event "Stamped"
+- **AND** capture is called with JSON arguments:
+  """application/json
+  {"distinct_id":"user-123","event":"Caller","timestamp":"2025-01-02T03:04:05Z"}
+  """
+- **AND** pending captures are flushed
+- **THEN** exactly 1 capture request should have been received
+- **AND** the first received event field "timestamp" should equal "2025-01-01T00:00:00.000Z"
+- **AND** the second received event field "timestamp" should equal "2025-01-02T03:04:05.000Z"
+- **AND** the request body field "created_at" should equal "2025-01-01T00:00:00.000Z"
+- **AND** the first request header "PostHog-Request-Timestamp" should equal "2025-01-01T00:00:00.000Z"
 
 #### Scenario: A retry resends the original event timestamp (@server)
 - **GIVEN** a fresh SDK acceptance test harness

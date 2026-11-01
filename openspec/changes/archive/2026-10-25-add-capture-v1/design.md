@@ -34,7 +34,7 @@ The canonical specs predate the port. `capture` still says server SDKs stamp `$l
 - Non-finite numbers: every server SDK sends `NaN` and `±Infinity` as JSON `null` and keeps the event, as #140 proposes. Rust and Node get `null` from their encoders; Python and Go v2 encode each event strictly first and rewrite non-finite numbers only for an event whose encoding fails (posthog-python #1125, posthog-go #394), so events without one cost nothing extra. iOS and Android drop the non-finite property and keep the event.
 - Compression default: Python, Go and Rust default to none; Node keeps gzip. #81 (merged) scopes its gzip default to client SDKs and lets server SDKs default to no compression.
 - A missing distinct id: Python, Rust and Node generate a personless id; Go without a request context returns an error. Both are long-standing and kept.
-- Timestamp digits: any count at or above milliseconds.
+- Timestamp digits: 3, 6 or 9 fractional digits are all fine; fewer than 3 is not, so a zero fraction is written as `.000`.
 - Network failures after the last attempt: posthog-node 6 puts the events back at the head of its queue for the next flush, bounded by the queue cap; Python, Go and Rust report them as exhausted.
 - Hoisting the legacy option properties and the AI per-event measurement are mechanisms the SDK chooses; the observable result is fixed.
 

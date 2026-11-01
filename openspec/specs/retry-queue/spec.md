@@ -47,7 +47,7 @@ nextDelay(attempt): Duration
    - The batch is sent to PostHog using the configured HTTP transport.
 5. **Classify failures.**
    - Legacy capture. Retryable: network errors, many server errors, rate limits / `429`, timeouts, and some transient transport errors. Non-retryable: malformed payloads, most 4xx client errors, or SDK-specific parse/serialization failures.
-   - Capture v1. Retryable: exactly `404`, `408`, `429`, `500`, `502`, `503`, `504`, network errors and timeouts, plus the `retry` entries of a 2xx `results` map. Everything else is terminal. `429` comes from a layer in front of capture and carries no `Retry-After` today, so its retries use the normal waits. See **Capture v1 status classification and attempt budget**.
+   - Capture v1. Retryable: exactly `404`, `408`, `429`, `500`, `502`, `503`, `504`, network errors and timeouts, plus the `retry` entries of a 2xx `results` map. Everything else is terminal. `429` comes from a layer in front of capture and carries no `Retry-After` today, so its retries use the normal waits. Capture's own `408`, `500`, `503` and `504` responses, and a 2xx with `retry` entries, carry `Retry-After: 1`. See **Capture v1 status classification and attempt budget**.
 6. **Apply retry policy for retryable failures.**
    - Retry after an exponential or linear backoff delay.
    - Some SDKs pause flushing globally until the backoff window expires.
@@ -65,7 +65,7 @@ nextDelay(attempt): Duration
    - Retry-budget exhaustion alone is not a terminal disposition for a bounded durable queue and must not clear it.
 10. **Handle oversized batches specially (legacy capture).**
     - Some SDKs on legacy capture shrink batch size on `413 Payload Too Large` and retry rather than dropping the whole batch immediately.
-    - On capture v1, `413` is terminal; byte-aware batching keeps every request under the body limit (see `event-batcher`).
+    - On capture v1, `413` is terminal on server SDKs; byte-aware batching keeps every request under the body limit (see `event-batcher`). A client SDK MAY halve a batch of more than one event on a `413` and resend it; a `413` for a single event is terminal.
 11. **Allow wrapper SDKs to delegate queue ownership instead of creating a second queue.**
     - Flutter's Dart layer can preprocess or drop events before enqueue (`beforeSend`, screen-context injection, exception normalization), but successful `identify`, `capture`, `alias`, `group`, `flush`, and `close` calls are then forwarded into the underlying native/browser SDKs, where the actual queue, retry counters, and drop policy live. On Windows and Linux, posthog-flutter 6.0 keeps its own Dart queue instead.
 
@@ -91,7 +91,7 @@ nextDelay(attempt): Duration
 - A positive offline signal pauses transport attempts without preventing durable enqueue.
 - Some SDKs preserve queued events across app restarts (persistent queue / file-backed queue).
 - On shutdown, implementations may attempt a final drain/flush or wait for pending writes.
-- Wrapper SDKs may have no queue lifecycle of their own. Flutter keeps no separate Dart-side queued-event store; its mobile wrapper forwards event-producing calls and explicit `flush()` / `close()` into the native SDKs, while Flutter Web forwards event calls to `posthog-js` and does not add an additional wrapper-managed retry queue. posthog-flutter 6.0 on Windows and Linux has its own queue lifecycle.
+- Wrapper SDKs may have no queue lifecycle of their own. posthog-flutter 6.0 on Windows and Linux has its own Dart queue and queue lifecycle. On iOS, macOS and Android, Flutter keeps no Dart-side queued-event store: it forwards event-producing calls and explicit `flush()` / `close()` into the native SDKs. Flutter Web forwards event calls to `posthog-js` and adds no wrapper-managed retry queue.
 
 ## Error handling
 
@@ -257,7 +257,7 @@ Jitter is an availability measure, not a correctness one. An SDK whose platform 
 
 An SDK that delivers events through capture v1 SHALL retry a capture request only on HTTP `404`, `408`, `429`, `500`, `502`, `503` and `504`, on a network error or timeout before a response is read, and for the `retry` entries of a 2xx `results` map. `404` and `429` are retried like the server errors so that a transient status (a route still rolling out, an edge rate limit) does not drop data; after the last attempt the batch is reported with that status. Every other response SHALL be terminal for the request, including `400`, `401`, `402` (billing limit; no per-event results, so every event in the request is reported lost), `413` and `415`. The SDK SHALL NOT fall back to a legacy endpoint on `404`, and a server SDK SHALL NOT split or halve the batch on `413` (client SDKs: see below). A 2xx whose body is not a readable `results` map is terminal.
 
-On a server SDK, each batch SHALL get at most four attempts by default (three retries), with the retry count configurable within a bounded range. The waits before the second, third and fourth attempts SHALL be 100 ms, 200 ms and 400 ms (100 ms doubling), each multiplied by a random factor in `[0.75, 1.25]`, and never above a 30 second ceiling. A `Retry-After` header SHALL raise the wait to at least its value, clamped to the ceiling, and the jitter SHALL never shorten it. `Retry-After` SHALL be honored on a retryable status and on a 2xx with `retry` entries. After the last attempt, every event still pending SHALL be reported as exhausted through the SDK's error surface. The SDK SHALL NOT keep the events for a later flush; the analytics and AI lanes of a capture v1 server SDK are in-memory queues, not durable queues.
+On a server SDK, each batch SHALL get at most four attempts by default (three retries), with the retry count configurable within a bounded range. The waits before the second, third and fourth attempts SHALL be 100 ms, 200 ms and 400 ms (100 ms doubling), each multiplied by a random factor in `[0.75, 1.25]`, and never above a 30 second ceiling. A `Retry-After` header SHALL raise the wait to at least its value, clamped to the ceiling, and the jitter SHALL never shorten it. `Retry-After` SHALL be honored on a retryable status and on a 2xx with `retry` entries. Capture's own `408`, `500`, `503` and `504` responses, and a 2xx with `retry` entries, carry `Retry-After: 1`, so the SDK waits at least 1 second before resending after them. After the last attempt, every event still pending SHALL be reported as exhausted through the SDK's error surface. The SDK SHALL NOT keep the events for a later flush; the analytics and AI lanes of a capture v1 server SDK are in-memory queues, not durable queues. One exception: when the last attempt got no HTTP response (a network error or timeout), the SDK MAY put the events still pending back at the head of the lane's queue for the next flush instead of reporting them, keeping their uuids and timestamps and bounded by the queue cap. The next flush sends them in a new request with a new `PostHog-Request-Id`. posthog-node 6 does this. The exception never applies when the last attempt got an HTTP response.
 
 Client SDKs keep capture v1 events in a durable disk queue instead (posthog-ios 4.0, posthog-android 4.0 and the posthog-flutter 6.0 Windows and Linux lane). Such an SDK SHALL keep its existing backoff (1 second doubling to 30 seconds, with jitter) and MAY have no attempt limit, so it reports no event as exhausted; the queue's size cap evicts the oldest events. On a `413` for a batch of more than one event it MAY halve the batch and resend it; a `413` for a single event is terminal. A `Retry-After` header SHALL raise the wait to at least its value after jitter, capped at 30 seconds.
 
@@ -283,12 +283,8 @@ Legacy capture: `429` was retried, several SDKs retried every `5xx`, and some sh
   Examples:
   | status |
   | 404    |
-  | 408    |
   | 429    |
-  | 500    |
   | 502    |
-  | 503    |
-  | 504    |
 
 #### Scenario: Terminal statuses are not retried and are reported (@server)
 - **GIVEN** a fresh SDK acceptance test harness

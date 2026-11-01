@@ -34,7 +34,7 @@ Platform-specific implementations often split these into dedicated methods per e
 ## Behavior
 
 1. **Build endpoint URLs from host configuration.**
-   - Event ingestion uses `/batch` or `/capture` on legacy capture, and `/i/v1/analytics/events` (analytics) and `/i/v1/ai/events` (AI) on capture v1 (posthog-python 8.0, posthog-go v2, posthog-rs 1.0, posthog-node 6.0).
+   - Event ingestion uses `/batch` or `/capture` on legacy capture, and `/i/v1/analytics/events` (analytics) and `/i/v1/ai/events` (AI) on capture v1 (posthog-python 8.0, posthog-go v2, posthog-rs 1.0, posthog-node 6.0, posthog-ios 4.0, posthog-android 4.0 and posthog-flutter 6.0, on Windows and Linux with its own transport and on iOS, macOS and Android through the native SDKs).
    - Feature flags use `/flags` or `/decide`-family endpoints.
    - Remote config / local evaluation may use asset/API endpoints distinct from the ingestion host.
 2. **Construct request bodies.**

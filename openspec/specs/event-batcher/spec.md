@@ -41,7 +41,7 @@ startFlushTimer(): void
 8. **Allow explicit flushes.** Public `flush()` or shutdown paths bypass the normal timer/threshold waiting and drain what is pending.
 9. **Run on background workers/timers where appropriate.** Native/server SDKs commonly use dedicated threads, executors, coroutines, or async handlers to batch without blocking callers.
 10. **Allow wrapper SDKs to delegate batching to an underlying platform SDK instead of owning a second batcher.** Flutter exposes batching knobs like `flushAt`, `maxQueueSize`, `maxBatchSize`, and `flushInterval`, forwards them to the native mobile SDKs during setup, and otherwise delegates event batching to the underlying native/browser implementation. posthog-flutter 6.0 on Windows and Linux has its own Dart batcher.
-11. **Adapt batch size when necessary (legacy capture).** Some SDKs on legacy capture reduce effective batch size after oversized-payload errors (`413`) so future flushes use smaller chunks. On capture v1 a `413` is terminal and the batch is never split or resent.
+11. **Adapt batch size when necessary (legacy capture).** Some SDKs on legacy capture reduce effective batch size after oversized-payload errors (`413`) so future flushes use smaller chunks. On capture v1 a `413` is terminal on server SDKs and the batch is never split or resent; a client SDK MAY halve a batch of more than one event and resend it (see **Capture v1 batches are byte-aware and server SDKs never shrink them after a 413**).
 
 ## State & lifecycle
 

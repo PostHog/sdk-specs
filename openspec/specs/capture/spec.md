@@ -493,12 +493,17 @@ authoritative for that API until a major release lets it tell an unset value fro
 one. It SHALL NOT read the zero value as an explicit `false`. Scenarios that need an explicit
 per-call override on an event API are tagged `@geoip_per_call_unset_capable`.
 
-When the effective value disables GeoIP, the SDK SHALL mark the event with
-`$geoip_disable: true` among the event's ordinary properties and SHALL stamp it before
-`before_send` runs, so a hook can inspect, replace, or remove it. The marker SHALL NOT be copied
-into `$set`, `$set_once`, or `$group_set`, because it is event context rather than a person or
-group property. When the effective value does not disable GeoIP, the SDK SHALL omit the marker
-and SHALL NOT remove a `$geoip_disable` property the caller supplied in the call's properties.
+An explicitly set per-call value is a value of that event: the SDK SHALL send it as
+`$geoip_disable` with that value, `true` or `false`, so a per-call `false` beats a
+`$geoip_disable: true` from the request context or the SDK-level default properties. A
+`$geoip_disable` in the same call's properties still wins over it (see **Server SDKs build every
+event in one layer order**). When no per-call value is set and the client-level setting disables
+GeoIP, the SDK SHALL mark the event with `$geoip_disable: true` among the event's ordinary
+properties. The SDK SHALL stamp the marker before `before_send` runs, so a hook can inspect,
+replace, or remove it. The marker SHALL NOT be copied into `$set`, `$set_once`, or `$group_set`,
+because it is event context rather than a person or group property. When no per-call value is set
+and the client-level setting does not disable GeoIP, the SDK SHALL omit the marker and SHALL NOT
+remove a `$geoip_disable` property the caller supplied in the call's properties.
 
 A remote feature-flag evaluation request SHALL carry the same effective value as the
 `geoip_disable` field of its request body, resolved from the per-call option where the flag API
@@ -516,7 +521,7 @@ event SHALL retain it when the SDK stamped it.
 #### Scenario: An explicit per-call false re-enables enrichment for one call (@server @geoip_per_call_unset_capable)
 - **GIVEN** the client is constructed with the GeoIP option set to disable enrichment
 - **WHEN** capture is called with event "Save" and the per-call GeoIP option set to false
-- **THEN** the enqueued "Save" event should omit "$geoip_disable"
+- **THEN** the enqueued "Save" event should have property "$geoip_disable" equal to false
 - **WHEN** capture is called with event "Save Again" and no per-call GeoIP option
 - **THEN** the enqueued "Save Again" event should have property "$geoip_disable" equal to true
 
@@ -989,7 +994,7 @@ An SDK that delivers events through capture v1 SHALL remove `$session_id` and `$
 
 An SDK that delivers events through capture v1 SHALL treat an empty or whitespace-only caller `distinct_id` as missing. A missing id keeps the SDK's existing behavior: a generated personless id (UUIDv7, with `process_person_profile: false` set as an option) or a clear error returned to the caller. The SDK SHALL never send an event without a `distinct_id` key.
 
-The SDK SHALL NOT shorten, hash or reject distinct ids by length or by placeholder value: capture v1 drops an event whose `distinct_id` is over 200 UTF-8 bytes (`distinct_id_too_large`) and accepts placeholder values such as `anonymous` without a person profile, and reports both per event. A `$groupidentify` event's `distinct_id` SHALL be the caller's id when given, else the request-context id where the SDK has one, else `$<group type>_<group key>`, and never a random value. An `alias` call SHALL never take its target from the request context. Global and context layers reach person-only events (`$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`) like any other event; `$groupidentify` never takes the context session id. Client SDKs have no request context: they send `$groupidentify` with the current distinct id, and with the session id like any other event.
+The SDK SHALL NOT shorten, hash or reject distinct ids by length or by placeholder value: capture v1 drops an event whose `distinct_id` is over 200 UTF-8 bytes (`distinct_id_too_large`) and accepts placeholder values such as `anonymous` without a person profile, and reports both per event. A `$groupidentify` event's `distinct_id` SHALL be the caller's id when given, else the request-context id where the SDK has one, else `$<group type>_<group key>`, and never a random value. An `alias` call SHALL never take its target from the request context. Global and context layers reach person-only events (`$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`) like any other event; `$groupidentify` never takes the context session id. When a layer sets `process_person_profile: false` on a person-only event, capture still accepts it and reports it `ok`, but ingestion drops it (ingestion warning `invalid_event_when_process_person_profile_is_false`), so the identify, alias, merge or group update never takes effect. Client SDKs have no request context: they send `$groupidentify` with the current distinct id, and with the session id like any other event.
 
 Legacy capture: distinct ids over 200 characters were shortened and the event kept; posthog-python 6.x used a random id for `$groupidentify` without a caller id.
 

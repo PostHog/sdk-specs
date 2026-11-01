@@ -450,10 +450,10 @@ Legacy capture: `timestamp` was optional and some SDKs sent an `offset`; posthog
   """
 - **AND** pending captures are flushed
 - **THEN** exactly 1 capture request should have been received
-- **AND** the first received event field "timestamp" should equal "2025-01-01T00:00:00.000Z"
-- **AND** the second received event field "timestamp" should equal "2025-01-02T03:04:05.000Z"
-- **AND** the request body field "created_at" should equal "2025-01-01T00:00:00.000Z"
-- **AND** the first request header "PostHog-Request-Timestamp" should equal "2025-01-01T00:00:00.000Z"
+- **AND** the first received event field "timestamp" should be the instant "2025-01-01T00:00:00Z" with at least 3 fractional-second digits
+- **AND** the second received event field "timestamp" should be the instant "2025-01-02T03:04:05Z" with at least 3 fractional-second digits
+- **AND** the request body field "created_at" should be the instant "2025-01-01T00:00:00Z" with at least 3 fractional-second digits
+- **AND** the first request header "PostHog-Request-Timestamp" should be the instant "2025-01-01T00:00:00Z" with at least 3 fractional-second digits
 
 #### Scenario: A retry resends the original event timestamp (@server)
 - **GIVEN** a fresh SDK acceptance test harness

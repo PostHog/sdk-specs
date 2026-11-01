@@ -16,7 +16,9 @@ When syncing this delta into the canonical `capture` spec:
 
 An SDK that delivers events through capture v1 SHALL send analytics events with `POST {host}/i/v1/analytics/events` and SHALL NOT use `/batch`, `/capture`, `/e`, `/track` or `/i/v0/e`. The request body SHALL be a JSON object `{"created_at": <RFC 3339 string>, "historical_migration"?: <boolean>, "batch": [<event>, ...]}`, with at least one event, and `historical_migration` present only when true. Historical-migration events and live events SHALL NOT share a request.
 
-Each event SHALL be a JSON object with the fields `event`, `uuid`, `distinct_id` and `timestamp` as JSON strings, `properties` as a JSON object, `options` as a JSON object (an empty object when the event has no options), and `session_id` and `window_id` as JSON strings only when present. The SDK SHALL NOT send any other top-level event field; a top-level `$set` or `$set_once` the SDK's API accepts is placed inside `properties`. The SDK SHALL NOT send `api_key`, `sent_at` or `offset` in the body.
+Each event SHALL be a JSON object with the fields `event`, `uuid`, `distinct_id` and `timestamp` as JSON strings, `properties` as a JSON object, `options` as a JSON object (an empty object when the event has no options; an SDK MAY omit an empty `options`, which capture reads as empty), and `session_id` and `window_id` as JSON strings only when present. The SDK SHALL NOT send any other top-level event field; a top-level `$set` or `$set_once` the SDK's API accepts is placed inside `properties`. The SDK SHALL NOT send `api_key`, `sent_at` or `offset` in the body.
+
+Session replay stays outside capture v1. Client SDKs keep sending `$snapshot` data to `/s/` with `api_key` in the body, and these rules do not apply to it.
 
 Capture v1 parses the request with one strict JSON parse and rejects the whole request with `400 request_parsing_error` when any field has the wrong JSON type, a required field is missing, or the body is not valid JSON. The SDK SHALL therefore guarantee these types on the wire, including after `before_send`: an event whose hook leaves `distinct_id` or `event` non-string, or whose serialization fails, is dropped locally and reported through the SDK's error surface or a log line, and never sent.
 
@@ -77,9 +79,10 @@ An SDK that delivers events through capture v1 SHALL send these headers on every
 - `Authorization: Bearer <project token>`. The token is never placed in the body.
 - `Content-Type: application/json`.
 - `User-Agent`, equal to the `PostHog-Sdk-Info` value.
-- `PostHog-Sdk-Info: <library>/<version>`, where `<library>` is the SDK's own canonical `$lib` name (`posthog-python`, `posthog-go`, `posthog-rs`, `posthog-node`) and `<version>` is the package version actually shipped. Capture derives `$lib` and `$lib_version` from this header, so a built-in integration SHALL NOT relabel the client.
+- `PostHog-Sdk-Info: <library>/<version>`, where `<library>` is the SDK's own canonical `$lib` name (`posthog-python`, `posthog-go`, `posthog-rs`, `posthog-node`, `posthog-ios`, `posthog-android`, `posthog-flutter`) and `<version>` is the package version actually shipped. Capture derives `$lib` and `$lib_version` from this header, so a built-in integration SHALL NOT relabel the client. A wrapper SDK whose events a native SDK delivers (posthog-flutter on iOS, macOS and Android, KMP, and the React Native plugin, which uses `posthog-react-native`) configures the native SDK with its own library name and version, as `$lib` did on legacy capture. posthog-flutter on Windows and Linux has its own transport and sends `posthog-flutter` directly.
 - `PostHog-Request-Id`: a UUID minted once per batch and kept across every retry of that batch.
 - `PostHog-Attempt`: `1` on the first attempt, incremented by one on each retry of the same batch.
+- A client SDK with a durable disk queue MAY mint a new `PostHog-Request-Id` and restart `PostHog-Attempt` at `1` when the events in a resend change (events captured during a backoff join it) or after the app restarts, because it keeps the retry identity in memory.
 - `PostHog-Request-Timestamp`: the send time of this attempt as an RFC 3339 string with an explicit offset and at least millisecond precision, taken from the same clock as the event timestamps and stamped again on every attempt.
 - `Content-Encoding` only when the body is compressed, with one of `gzip`, `deflate`, `br` or `zstd`.
 
@@ -127,7 +130,7 @@ An SDK that delivers events through capture v1 SHALL read the `results` object o
 
 The SDK SHALL NOT hard-code the set of `details` tags. When a `results` entry carries `duplicates_dropped: n`, the request repeated that uuid: the first event with that uuid in the request takes the entry's `result` and `details`, and the SDK SHALL report exactly the next `n` events with that uuid as `drop` with the reason `duplicate_event_uuid`, never retrying them. The SDK SHALL NOT guard, split, rewrite or deduplicate repeated uuids before sending.
 
-When no error handler is registered, the SDK SHALL log one aggregate line per batch that lost events, carrying the count, the cause and the endpoint, and never event content.
+When no error handler is registered, the SDK SHALL log one aggregate line per batch that lost events, carrying the count, the cause and the endpoint, and never event content. A client SDK, which has no error handler, MAY log that line only in debug mode, because it can repeat on every flush during an outage; in debug mode it SHALL log it. On a client SDK this line replaces per-event reporting and carries the count, the cause (the `details` tag or the status) and the endpoint. A 2xx whose body cannot be read counts as lost in this line, on client SDKs too.
 
 Legacy capture: a 2xx meant the whole request was accepted and there was no per-event verdict.
 
@@ -180,11 +183,11 @@ Legacy capture: a 2xx meant the whole request was accepted and there was no per-
 
 ### Requirement: Per-event options replace the legacy option properties
 
-An SDK that delivers events through capture v1 SHALL accept an `options` object on every event-producing call (capture, AI capture, exception capture, identify or person-property calls, alias and group identify), SHALL send it as the event's `options` with every key and value as given, and SHALL NOT validate, convert or filter option values: capture reads them leniently and drops an event whose value it cannot read with `details: invalid_options`, which the SDK reports like any other drop. Keys the SDK does not know SHALL pass through unchanged. A non-object `options` value on a dynamically typed SDK SHALL be logged as an error and the event sent without caller options.
+An SDK that delivers events through capture v1 SHALL accept an `options` object on every event-producing call (capture, AI capture, exception capture, identify or person-property calls, alias and group identify), SHALL send it as the event's `options` with every key and value as given, and SHALL NOT validate, convert or filter option values, except the conversion its encoder needs (for example a client SDK's JSON sanitizer that writes dates and URLs as strings and drops values JSON cannot hold, or the Flutter platform channel codec): capture reads them leniently and drops an event whose value it cannot read with `details: invalid_options`, which the SDK reports like any other drop. Keys the SDK does not know SHALL pass through unchanged. A non-object `options` value on a dynamically typed SDK SHALL be logged as an error and the event sent without caller options. posthog-flutter on the web delivers through posthog-js, which is on legacy capture, so there it maps options to the legacy option properties.
 
-The legacy option properties are the `$`-prefixed properties legacy capture reads as settings: `$process_person_profile`, `$cookieless_mode`, `$ignore_sent_at` and `$product_tour_id`. In the wire builder, after the last `before_send` hook and once per event, the SDK SHALL remove each of them from `properties` and SHALL copy its value into the matching option (`process_person_profile`, `cookieless_mode`, `disable_skew_correction`, `product_tour_id`) only when that option is absent or `null`. An option set by any layer therefore wins over a legacy property set by any layer. SDK-internal code (personless defaults, built-in AI and MCP integrations) SHALL set options directly and never write a legacy option property.
+The legacy option properties are the `$`-prefixed properties legacy capture reads as settings: `$process_person_profile`, `$cookieless_mode`, `$ignore_sent_at` and `$product_tour_id`. In the wire builder, after the last `before_send` hook and once per event, the SDK SHALL remove each of them from `properties` and SHALL copy its value into the matching option (`process_person_profile`, `cookieless_mode`, `disable_skew_correction`, `product_tour_id`) only when that option is absent or `null`. An option set by any layer therefore wins over a legacy property set by any layer. On a client SDK, the personless `process_person_profile: false` that the SDK sets itself is an SDK value: it fills only when no layer set the option or `$process_person_profile` (see **Caller-supplied event properties take precedence**), so a caller or registered `$process_person_profile: true` keeps person processing on. SDK-internal code (personless defaults, built-in AI and MCP integrations) SHALL set options directly and never write a legacy option property. Capture v1 reads these settings only from `options`: a `$ignore_sent_at` or `$product_tour_id` left in `properties` has no effect, and capture's reading of `$process_person_profile` and `$cookieless_mode` from `properties` is deprecated. Hoisting is what keeps callers that still set the legacy option properties working.
 
-An SDK with global default properties SHALL offer global default options with the same interface, and an SDK with a request-context layer for properties SHALL offer context options (for example `super_options` and `set_context_option` in posthog-python, `Config.DefaultEventOptions` and `RequestContext.Options` in posthog-go, `registerOptions()` and context `options` in posthog-node). An SDK with neither layer needs neither.
+A server SDK with global default properties SHALL offer global default options with the same interface, and an SDK with a request-context layer for properties SHALL offer context options (for example `super_options` and `set_context_option` in posthog-python, `Config.DefaultEventOptions` and `RequestContext.Options` in posthog-go, `registerOptions()` and context `options` in posthog-node). An SDK with neither layer needs neither. Client SDKs (posthog-ios, posthog-android, posthog-flutter) keep `register()` super properties without global options.
 
 Legacy capture: SDKs validated and converted `$process_person_profile` and `$cookieless_mode` themselves and sent them as properties.
 
@@ -241,13 +244,15 @@ Legacy capture: SDKs validated and converted `$process_person_profile` and `$coo
 
 ### Requirement: Server SDKs build every event in one layer order
 
-An SDK that delivers events through capture v1 SHALL build each event in this order, for every event type its public API produces (capture, AI capture, exception capture, identify or person-property events, alias and group identify):
+A server SDK that delivers events through capture v1 SHALL build each event in this order, for every event type its public API produces (capture, AI capture, exception capture, identify or person-property events, alias and group identify). Steps 4 and 5 apply to every SDK on capture v1, client SDKs included; a client SDK builds steps 1 to 3 as **Caller-supplied event properties take precedence** describes:
 
 1. **Identity resolves first.** The distinct id comes from the call, then the ambient request context, then a generated personless id (or the SDK's existing error for a missing id). A context session id becomes `$session_id` unless the event has its own.
 2. **The call's own values.** The call's `properties` and `options`, and typed call values (`groups`, a typed `$set` or `$set_once`), which win key by key over the same key in `properties`.
 3. **Fill-only defaults**, each layer filling only what the layers above left unset: the ambient request context, then the SDK-level default properties and options, then the values the SDK adds itself (`$is_server`, `$geoip_disable` from the client setting, system context, the `$feature/<key>` and `$active_feature_flags` properties derived from a flags snapshot or `send_feature_flags`, `$release_id`, the `process_person_profile: false` option for a personless event, and `$trace_id` with `$span_id` from an active OpenTelemetry span, added as a pair only when no layer set either key). A property is unset only when its key is missing, so a `null` property blocks the fill; an option is unset when it is missing or `null`. `$set`, `$set_once`, `$groups` and `$group_set` fill one level deep when both values are objects.
 4. **`before_send`** runs on an isolated copy of the assembled event, including `options`, and has the final say. The SDK SHALL NOT add or re-add any value after the hook. Where a minimized `$feature_flag_called` event is built, its allowlist SHALL be applied after step 3 and before step 4, and SHALL keep the legacy option properties, `$session_id` and `$window_id`.
 5. **Hoisting**, once, in the wire builder: the legacy option properties move into `options`, `$session_id` and `$window_id` move to their top-level fields, and `$lib` and `$lib_version` are removed.
+
+In a wrapper whose events a native SDK delivers (posthog-flutter on iOS, macOS and Android), the wrapper's hook runs first, then the native SDK adds its own values, then the native SDK's `before_send` runs and has the final say. The wrapper's hooks do not run on every event type (see `before-send-hook`).
 
 A per-call argument such as `disable_geoip` belongs to step 2, so it beats a context or global `$geoip_disable`; the client-level setting belongs to step 3, so a context or global value beats it. A built-in AI or MCP integration SHALL set `process_person_profile: false` at step 2 when it substitutes a trace or session id for a missing user id. Adding groups to an event SHALL NOT turn person processing on.
 
@@ -373,7 +378,7 @@ An SDK that delivers events through capture v1 SHALL remove `$session_id` and `$
 
 An SDK that delivers events through capture v1 SHALL treat an empty or whitespace-only caller `distinct_id` as missing. A missing id keeps the SDK's existing behavior: a generated personless id (UUIDv7, with `process_person_profile: false` set as an option) or a clear error returned to the caller. The SDK SHALL never send an event without a `distinct_id` key.
 
-The SDK SHALL NOT shorten, hash or reject distinct ids by length or by placeholder value: capture v1 drops an event whose `distinct_id` is over 200 UTF-8 bytes (`distinct_id_too_large`) and accepts placeholder values such as `anonymous` without a person profile, and reports both per event. A `$groupidentify` event's `distinct_id` SHALL be the caller's id when given, else the request-context id where the SDK has one, else `$<group type>_<group key>`, and never a random value. An `alias` call SHALL never take its target from the request context. Global and context layers reach person-only events (`$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`) like any other event; `$groupidentify` never takes the context session id.
+The SDK SHALL NOT shorten, hash or reject distinct ids by length or by placeholder value: capture v1 drops an event whose `distinct_id` is over 200 UTF-8 bytes (`distinct_id_too_large`) and accepts placeholder values such as `anonymous` without a person profile, and reports both per event. A `$groupidentify` event's `distinct_id` SHALL be the caller's id when given, else the request-context id where the SDK has one, else `$<group type>_<group key>`, and never a random value. An `alias` call SHALL never take its target from the request context. Global and context layers reach person-only events (`$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`) like any other event; `$groupidentify` never takes the context session id. When a layer sets `process_person_profile: false` on a person-only event, capture still accepts it and reports it `ok`, but ingestion drops it (ingestion warning `invalid_event_when_process_person_profile_is_false`), so the identify, alias, merge or group update never takes effect. Client SDKs have no request context: they send `$groupidentify` with the current distinct id, and with the session id like any other event.
 
 Legacy capture: distinct ids over 200 characters were shortened and the event kept; posthog-python 6.x used a random id for `$groupidentify` without a caller id.
 
@@ -409,7 +414,7 @@ Legacy capture: distinct ids over 200 characters were shortened and the event ke
 
 ### Requirement: Timestamps on capture v1
 
-An SDK that delivers events through capture v1 SHALL stamp a missing event `timestamp` once, when the event is captured or enqueued, from the same clock as `PostHog-Request-Timestamp`, and SHALL NOT change it afterwards (not on retry, not after a restart). Every timestamp on the wire (`timestamp`, `created_at`, `PostHog-Request-Timestamp`) SHALL be RFC 3339 with an explicit offset (`Z` or `±HH:MM`) and at least millisecond precision; finer precision the caller or the clock provides SHALL be kept. The SDK SHALL NOT correct clock skew locally, SHALL NOT reject or clamp a future timestamp, and SHALL NOT send an `offset` field. An unparseable caller timestamp SHALL be replaced with the current time and logged with a warning that names the rule and never the value. A naive caller timestamp follows the SDK's documented zone rule.
+An SDK that delivers events through capture v1 SHALL stamp a missing event `timestamp` once, when the event is captured or enqueued, from the same clock as `PostHog-Request-Timestamp`, and SHALL NOT change it afterwards (not on retry, not after a restart). Every timestamp on the wire (`timestamp`, `created_at`, `PostHog-Request-Timestamp`) SHALL be RFC 3339 with an explicit offset (`Z` or `±HH:MM`) and at least millisecond precision; finer precision in a caller-supplied timestamp SHALL be kept. A client SDK MAY write the timestamps it stamps itself with millisecond precision. The SDK SHALL NOT correct clock skew locally, SHALL NOT reject or clamp a future timestamp, and SHALL NOT send an `offset` field. An unparseable caller timestamp SHALL be replaced with the current time and logged with a warning that names the rule and never the value. A naive caller timestamp follows the SDK's documented zone rule.
 
 Legacy capture: `timestamp` was optional and some SDKs sent an `offset`; posthog-rs rejected future timestamps.
 
@@ -449,7 +454,7 @@ Legacy capture: `timestamp` was optional and some SDKs sent an `offset`; posthog
 
 ### Requirement: Each event is serialized on its own and the body is strict JSON
 
-An SDK that delivers events through capture v1 SHALL serialize each event independently, so that one event the encoder cannot write never costs its batch, and SHALL send a body a strict JSON parser accepts: no bare `NaN`, `Infinity` or `-Infinity` tokens and no duplicate keys. An event whose serialization fails SHALL be dropped alone and reported through the SDK's local-drop path. A non-finite number inside `properties` SHALL be sent as JSON `null` and the event kept (posthog-node, posthog-rs, posthog-python, and posthog-go from v2). The SDK SHALL NOT add a per-value check to events that hold no non-finite number: an encoder that already writes `null` needs nothing, and an encoder that rejects non-finite numbers SHALL encode each event strictly first and rewrite its non-finite numbers to `null` only when that encoding fails (posthog-python, posthog-go). A client SDK MAY drop the non-finite property instead and keep the event (posthog-ios, posthog-android).
+An SDK that delivers events through capture v1 SHALL serialize each event independently, so that one event the encoder cannot write never costs its batch, and SHALL send a body a strict JSON parser accepts: no bare `NaN`, `Infinity` or `-Infinity` tokens and no duplicate keys. An event whose serialization fails SHALL be dropped alone and reported through the SDK's local-drop path. A non-finite number inside `properties` SHALL be sent as JSON `null` and the event kept (posthog-node, posthog-rs, posthog-python, and posthog-go from v2). The SDK SHALL NOT add a per-value check to events that hold no non-finite number: an encoder that already writes `null` needs nothing, and an encoder that rejects non-finite numbers SHALL encode each event strictly first and rewrite its non-finite numbers to `null` only when that encoding fails (posthog-python, posthog-go). A client SDK MAY drop the non-finite property instead and keep the event (posthog-ios, posthog-android, posthog-flutter on Windows and Linux).
 
 A missing, `null`, empty or non-string event name SHALL be dropped locally and never sent, converted or raised to the caller. A non-string property or option key with a natural string form (number, boolean, symbol) MAY be converted as the language's JSON encoder does; a key the encoder cannot write drops only that key.
 
@@ -477,7 +482,7 @@ Legacy capture: whole-batch serialization let one bad value lose every event in 
 
 ### Requirement: The client fails open on a missing or personal API key
 
-Constructing an SDK client SHALL never throw or fail because of the project token. An empty or whitespace-only token, or a token that starts with `phx_` (a personal API key, which capture always rejects), SHALL produce a disabled client that accepts every call, sends nothing, returns flag defaults and logs one error, so a secret key never reaches the wire. Any other malformed token SHALL be sent as given, and capture's `401` SHALL reach the error surface. The SDK SHALL offer an explicit way to build a disabled client for tests. A built-in integration SHALL NOT raise or return a constructor error over an analytics-only setup problem; it logs one error and turns its own capture off.
+Constructing an SDK client SHALL never throw or fail because of the project token. An empty or whitespace-only token, or a token that starts with `phx_` (a personal API key, which capture always rejects), SHALL produce a disabled client that accepts every call, sends nothing, returns flag defaults and logs one message, so a secret key never reaches the wire. The SDK SHALL log that message whether or not debug mode is on, client SDKs included, at any level that is always on (an error, or a warning on posthog-android). Any other malformed token SHALL be sent as given, and capture's `401` SHALL reach the error surface. A server SDK SHALL offer an explicit way to build a disabled client for tests. A built-in integration SHALL NOT raise or return a constructor error over an analytics-only setup problem; it logs one error and turns its own capture off.
 
 #### Scenario: A personal API key disables the client without throwing (@server)
 - **GIVEN** a fresh SDK acceptance test harness
@@ -579,3 +584,86 @@ This requirement does not apply to server SDKs. Server SDKs that deliver through
   | property                | value |
   | $process_person_profile | false |
   | $is_identified          | false |
+
+### Requirement: Client-level GeoIP control with per-call override
+
+A server SDK SHALL expose a client-level GeoIP option (`disableGeoip`, `disable_geoip`, or the
+platform's casing) that controls whether the events it sends ask the backend to skip GeoIP
+enrichment. That option SHOULD default to disabling enrichment: server SDKs send events from
+their own network, so enriching them would attribute every event to the server's location.
+posthog-php and posthog-rs currently default to enabling enrichment. Changing a shipped default
+is a breaking change, so each SDK makes it, if at all, in its next major release. Client SDKs
+SHALL NOT require the option: they run in the end user's network context, where GeoIP
+enrichment is the intended behavior.
+
+Event-producing APIs that accept options — at least `capture`, `identify`, `alias`, and
+`group_identify` — SHALL accept the same option per call. A per-call value that is not set
+(omitted or null) SHALL inherit the client-level setting and SHALL NOT be read as `false`. An
+explicitly set per-call value SHALL override the client-level setting in both directions: an
+explicit `false` SHALL re-enable GeoIP enrichment for that call even when the client-level
+setting disables it.
+
+An SDK whose shipped per-call option can't represent "not set", such as posthog-go's
+non-nullable `DisableGeoIP` message field, conforms by keeping the client-level setting
+authoritative for that API until a major release lets it tell an unset value from an explicit
+one. It SHALL NOT read the zero value as an explicit `false`. Scenarios that need an explicit
+per-call override on an event API are tagged `@geoip_per_call_unset_capable`.
+
+An explicitly set per-call value is a value of that event: the SDK SHALL send it as
+`$geoip_disable` with that value, `true` or `false`, so a per-call `false` beats a
+`$geoip_disable: true` from the request context or the SDK-level default properties. A
+`$geoip_disable` in the same call's properties still wins over it (see **Server SDKs build every
+event in one layer order**). When no per-call value is set and the client-level setting disables
+GeoIP, the SDK SHALL mark the event with `$geoip_disable: true` among the event's ordinary
+properties. The SDK SHALL stamp the marker before `before_send` runs, so a hook can inspect,
+replace, or remove it. The marker SHALL NOT be copied into `$set`, `$set_once`, or `$group_set`,
+because it is event context rather than a person or group property. When no per-call value is set
+and the client-level setting does not disable GeoIP, the SDK SHALL omit the marker and SHALL NOT
+remove a `$geoip_disable` property the caller supplied in the call's properties.
+
+A remote feature-flag evaluation request SHALL carry the same effective value as the
+`geoip_disable` field of its request body, resolved from the per-call option where the flag API
+exposes one and otherwise from the client-level setting.
+
+`$geoip_disable` is a processing-control sentinel in the sense of the
+`feature-flag-called-tracker` minimal-event allowlist, so a minimized `$feature_flag_called`
+event SHALL retain it when the SDK stamped it.
+
+#### Scenario: The client-level setting marks an ordinary event (@server)
+- **GIVEN** the client is constructed with the GeoIP option set to disable enrichment
+- **WHEN** capture is called with event "Save" and no per-call GeoIP option
+- **THEN** the enqueued "Save" event should have property "$geoip_disable" equal to true
+
+#### Scenario: An explicit per-call false re-enables enrichment for one call (@server @geoip_per_call_unset_capable)
+- **GIVEN** the client is constructed with the GeoIP option set to disable enrichment
+- **WHEN** capture is called with event "Save" and the per-call GeoIP option set to false
+- **THEN** the enqueued "Save" event should have property "$geoip_disable" equal to false
+- **WHEN** capture is called with event "Save Again" and no per-call GeoIP option
+- **THEN** the enqueued "Save Again" event should have property "$geoip_disable" equal to true
+
+#### Scenario: An omitted per-call value inherits an enabled client setting (@server)
+- **GIVEN** the client is constructed with the GeoIP option set to allow enrichment
+- **WHEN** capture is called with event "Save" and no per-call GeoIP option
+- **THEN** the enqueued "Save" event should omit "$geoip_disable"
+
+#### Scenario: A caller-supplied marker survives an enabled client setting (@server)
+- **GIVEN** the client is constructed with the GeoIP option set to allow enrichment
+- **WHEN** capture is called with event "Save" and properties:
+  | property        | value |
+  | $geoip_disable  | true  |
+- **THEN** the enqueued "Save" event should have property "$geoip_disable" equal to true
+
+#### Scenario: Group identify carries the marker outside $group_set (@server)
+- **GIVEN** the client is constructed with the GeoIP option set to disable enrichment
+- **WHEN** group identify is called for group type "company" and key "acme" with properties:
+  | property | value |
+  | name     | Acme  |
+- **THEN** the enqueued "$groupidentify" event should have property "$geoip_disable" equal to true
+- **AND** the enqueued "$groupidentify" event "$group_set" should omit "$geoip_disable"
+
+#### Scenario: A flag evaluation request carries the effective value (@server)
+- **GIVEN** the client is constructed with the GeoIP option set to disable enrichment
+- **WHEN** a remote feature-flag evaluation request is made with no per-call GeoIP option
+- **THEN** the request body field "geoip_disable" should be true
+- **WHEN** a remote feature-flag evaluation request is made with the per-call GeoIP option set to false
+- **THEN** the request body field "geoip_disable" should be false

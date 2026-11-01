@@ -32,9 +32,10 @@ The canonical specs predate the port. `capture` still says server SDKs stamp `$l
 
 **Record variations the SDK owners accepted instead of picking a new winner.** Where the four implementations differ on purpose, the requirement names the allowed variation:
 - Non-finite numbers: every server SDK sends `NaN` and `±Infinity` as JSON `null` and keeps the event, as #140 proposes. Rust and Node get `null` from their encoders; Python and Go v2 encode each event strictly first and rewrite non-finite numbers only for an event whose encoding fails (posthog-python #1125, posthog-go #394), so events without one cost nothing extra. iOS and Android drop the non-finite property and keep the event.
-- Compression default: Python, Go and Rust default to none; Node keeps gzip. #81 says gzip by default; it was written for client SDKs and needs a scope note or an exception.
+- Compression default: Python, Go and Rust default to none; Node keeps gzip. #81 (merged) scopes its gzip default to client SDKs and lets server SDKs default to no compression.
 - A missing distinct id: Python, Rust and Node generate a personless id; Go without a request context returns an error. Both are long-standing and kept.
 - Timestamp digits: any count at or above milliseconds.
+- Network failures after the last attempt: posthog-node 6 puts the events back at the head of its queue for the next flush, bounded by the queue cap; Python, Go and Rust report them as exhausted.
 - Hoisting the legacy option properties and the AI per-event measurement are mechanisms the SDK chooses; the observable result is fixed.
 
 **Flag properties are folded into the layer-order requirement.** #145 proposes the same rule (flag properties fill under the call, the context and the global defaults, before `before_send`). This change states the whole order once and cites #145; if #145 merges first, the archive step reconciles the two requirements into one.
@@ -45,7 +46,7 @@ The canonical specs predate the port. `capture` still says server SDKs stamp `$l
 
 - [Legacy SDKs read as non-conformant on new rows of `compliance/<sdk>.md`] → the rows are scoped to capture v1, so an audit records "not yet on capture v1" rather than a defect. Their next-major port closes the rows.
 - [The posthog-node series is unmerged and can still change] → requirements cite only behavior that is also in Python, Go or Rust; Node-only details are limited to option names in examples. Re-check at the Node 6 release.
-- [Open spec PRs #140, #81, #145 overlap] → named in the proposal's Impact; each needs a decision before this change merges.
+- [Open spec PRs #140 and #145 overlap] → named in the proposal's Impact; each needs a decision before this change merges. #81 merged with its gzip default scoped to client SDKs.
 - [404 and 429 were terminal in the first draft] → decided 2026-10-27: both are retried like `408` and the `5xx` statuses, so a transient status does not drop data. The requirement and both scenario tables carry the decided rule.
 
 ## Migration Plan
@@ -55,4 +56,3 @@ Spec-only. The four SDK branches already implement these rules; their migration 
 ## Open Questions
 
 - #140: resolved, `null` everywhere. Go v2 moved to `null` with a strict-encode-first fallback (posthog-go #394), which avoids the per-event cost of the sanitizing pass.
-- #81: scope the gzip-by-default requirement to client SDKs, or record the v1 server default of no compression as an exception?

@@ -16,7 +16,7 @@
 - [x] 3.1 Run `openspec validate add-capture-v1 --type change --strict`.
 - [x] 3.2 Archive the change on this branch (`openspec archive add-capture-v1 --yes`), then apply each delta's "Narrative alignment" notes to the canonical specs by hand.
 - [x] 3.3 Run `openspec validate --specs --strict --no-interactive` and compare the totals with `main` (67 passed, 0 failed on 2026-10-25).
-- [ ] 3.4 Reconcile with sdk-specs #145 (flag properties), #140 (non-finite numbers) and #81 (compression default) before merge.
+- [ ] 3.4 Reconcile with sdk-specs #145 (flag properties) and #140 (non-finite numbers) before merge; both are still open. #81 (compression default) merged on 2026-10-30 with its gzip default scoped to client SDKs, which matches the v1 server defaults in `http-client`.
 
 ## 4. Harness parity features
 

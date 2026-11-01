@@ -3,7 +3,7 @@
 When syncing this delta into the canonical `event-batcher` spec:
 
 - In Behavior step 7, say that on capture v1 request-size limits are required, not optional: every lane is byte-aware with a target of at most 5 MiB of event bytes.
-- In Behavior step 11 and the "adjusted batch size" State entry, mark batch-size adaptation after `413` as legacy behavior; on capture v1 `413` is terminal.
+- In Behavior step 11 and the "adjusted batch size" State entry, mark batch-size adaptation after `413` as legacy behavior; on capture v1 `413` is terminal on server SDKs, and a client SDK MAY halve a batch of more than one event.
 - In Error handling, say that on capture v1 the batcher drops no analytics event for size below capture's own per-event limit; only an event that cannot fit any request may be dropped locally.
 
 ## ADDED Requirements

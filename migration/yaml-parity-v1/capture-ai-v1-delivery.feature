@@ -34,6 +34,7 @@ Feature: AI capture v1 delivery
     And pending captures are flushed
     Then the AI batch endpoint should have received "$ai_generation"
 
+  @sdk:server
   Scenario: An event at the ceiling is sent and one over it is dropped with a content-free log
     Given the SDK is initialized with token "phc_test_key" and flush threshold 2
     When capture_ai is called with event "$ai_generation" named "at-ceiling" whose properties serialize to exactly 8388608 bytes

@@ -41,7 +41,7 @@ Browser-specific opt-in accepts extra options such as a custom capture event nam
 
 1. **Guard / no-op if unavailable.** Disabled or uninitialized SDKs no-op.
 2. **Persist opted-out state.** Store a local flag indicating capture is disabled.
-3. **Block future capture.** Subsequent `capture(...)`, `identify(...)`, `group(...)`, and related APIs short-circuit while opted out.
+3. **Block future capture.** Subsequent `capture(...)`, `group(...)`, and related APIs short-circuit while opted out. `identify(...)` does not short-circuit: it still updates local identity state and person properties for flags, and reloads feature flags when the distinct id changes. Only its `$identify` / `$set` event is not captured (see `identify`).
 4. **Keep the decision across restarts.** The opted-out state is persisted locally in audited SDKs so it survives app restarts.
 5. **Apply SDK-specific cleanup if needed.** Some SDKs also clear in-flight data or stop auxiliary systems such as session replay.
 
@@ -86,7 +86,8 @@ Browser-specific opt-in accepts extra options such as a custom capture event nam
 
 ## Interactions
 
-- **`capture` / `identify` / `group` / `alias`** — all are gated by the opt-out state in audited client SDKs.
+- **`capture` / `group` / `alias`** — all are gated by the opt-out state in audited client SDKs.
+- **`identify`** — opt-out blocks only the `$identify` / `$set` event. `identify` still updates local identity state (distinct id, anonymous id, identified flag) and person properties for flags, and reloads feature flags when the distinct id changes. Feature flag loading is not gated by opt-out. `bootstrap` follows the same rule: opt-out suppresses event emission, not the local identity state.
 - **`reset`** — in several audited SDKs, reset clears the persisted opt-out state, so opt-out should not be treated as stronger-than-reset privacy state.
 - **Session replay / integrations** — some SDKs stop or restart them when opt state changes.
 - **Browser consent APIs** — browser uses richer consent semantics than the mobile/core SDKs and maps opt-in/out to persistence and cookieless-mode behavior.

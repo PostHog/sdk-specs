@@ -41,6 +41,20 @@ Feature: Identify
       | $anon_distinct_id    | anon-123       |
       | $set.email           | user@test.test |
 
+  @client
+  Scenario: Identify while opted out updates identity and reloads flags without sending events
+    Given a fresh SDK acceptance test harness
+    And the SDK clock is fixed at "2025-01-01T00:00:00Z"
+    And persistent storage is empty
+    And the mock PostHog server is reset
+    And the SDK is initialized with token "test-token"
+    And the current distinct id is "anon-123"
+    And analytics capture is opted out
+    When identify is called with distinct id "user-123"
+    Then get distinct id should return "user-123"
+    And the mock server should receive a feature flag request for distinct id "user-123"
+    And no event should be enqueued
+
   @sdk:server
   Scenario: Server identify without explicit or contextual identity generates a personless UUID
     Given an isolated SDK instance

@@ -1,7 +1,7 @@
 ## 1. Spec delta
 
-- [x] 1.1 Modify **Canonical identify behavior** in `identify` so client SDKs keep running `identify` while opted out, and add the identify-while-opted-out `@client` scenario
-- [x] 1.2 Add the matching scenario to `acceptance/public/identify.feature` with existing step text
+- [x] 1.1 Modify **Canonical identify behavior** in `identify` so client SDKs keep running `identify` while opted out, and add the identify-while-opted-out and same-properties-after-opt-in `@client` scenarios
+- [x] 1.2 Add the matching scenarios to `acceptance/public/identify.feature` with existing step text
 
 ## 2. Prose alignment (applied at archive, outside the requirement-delta mechanism)
 

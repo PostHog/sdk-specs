@@ -48,6 +48,24 @@ The SDK SHALL implement the canonical `identify` behavior described by this spec
 - **AND** the mock server should receive a feature flag request for distinct id "user-123"
 - **AND** no event should be enqueued
 
+#### Scenario: Identify while opted out does not suppress the same properties after opt in (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** the current distinct id is "anon-123"
+- **AND** analytics capture is opted out
+- **WHEN** identify is called with distinct id "user-123" and properties:
+  | property | value          |
+  | email    | user@test.test |
+- **AND** opt in is called
+- **AND** identify is called with distinct id "user-123" and properties:
+  | property | value          |
+  | email    | user@test.test |
+- **THEN** one event named "$set" should be enqueued
+- **AND** no event named "$identify" should be enqueued
+
 #### Scenario: Server identify delivers a profile update for explicit distinct id (@server)
 - **GIVEN** an isolated SDK instance and a fresh receiver
 - **AND** the SDK is initialized with token "test-token" and flush threshold 20

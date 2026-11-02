@@ -55,6 +55,25 @@ Feature: Identify
     And the mock server should receive a feature flag request for distinct id "user-123"
     And no event should be enqueued
 
+  @client
+  Scenario: Identify while opted out does not suppress the same properties after opt in
+    Given a fresh SDK acceptance test harness
+    And the SDK clock is fixed at "2025-01-01T00:00:00Z"
+    And persistent storage is empty
+    And the mock PostHog server is reset
+    And the SDK is initialized with token "test-token"
+    And the current distinct id is "anon-123"
+    And analytics capture is opted out
+    When identify is called with distinct id "user-123" and properties:
+      | property | value          |
+      | email    | user@test.test |
+    And opt in is called
+    And identify is called with distinct id "user-123" and properties:
+      | property | value          |
+      | email    | user@test.test |
+    Then one event named "$set" should be enqueued
+    And no event named "$identify" should be enqueued
+
   @sdk:server
   Scenario: Server identify without explicit or contextual identity generates a personless UUID
     Given an isolated SDK instance

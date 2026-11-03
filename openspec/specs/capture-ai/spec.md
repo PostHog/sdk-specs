@@ -138,9 +138,12 @@ lane configuration is scoped to the AI lane**.
    `PostHog-Sdk-Info` header, not from properties), differing only in the
    delivery route.
 2. **UUID.** The SDK attaches a client-generated UUID to every event on the
-   AI path when the caller supplies no UUID, and returns the attached UUID to
-   the caller. Handling of an invalid supplied UUID is platform-idiomatic
-   (replace or reject).
+   AI path when the caller supplies no UUID. Where the AI method returns a
+   value (posthog-python, posthog-node), it returns the attached UUID to the
+   caller. posthog-go's `EnqueueAI` returns only an error and posthog-rs's
+   queued methods return nothing; their events still carry the UUID on the
+   wire. Handling of an invalid supplied UUID is platform-idiomatic (replace
+   or reject).
 3. **Isolation.** AI events ride their own queue/buffer with independent
    size caps, batching, and retry policy; they never share a send cycle with
    analytics events. On server SDKs the queue starts lazily, so clients that
@@ -197,15 +200,21 @@ by this spec. Implementations MAY adapt method names, parameter casing, and
 option naming to platform idioms, but MUST preserve the observable outcomes in
 the scenarios below.
 
-#### Scenario: capture_ai mirrors capture's parameters and returns the event UUID (@server)
+#### Scenario: capture_ai mirrors capture's parameters (@server)
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the SDK is initialized with token "test-token"
 - **WHEN** capture_ai is called with distinct id "user-123", event "$ai_generation", and properties:
   | property  | value |
   | $ai_model | gpt   |
 - **THEN** one event named "$ai_generation" should be enqueued on the AI route
-- **AND** the call should return the enqueued event's uuid
 - **AND** the enqueued event should include a timestamp and uuid
+
+#### Scenario: capture_ai returns the event UUID where the AI method returns a value (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK's AI method returns a value
+- **AND** the SDK is initialized with token "test-token"
+- **WHEN** capture_ai is called with distinct id "user-123" and event "$ai_generation"
+- **THEN** the call should return the enqueued event's uuid
 
 #### Scenario: capture_ai rides an isolated route to the AI endpoint (@server)
 - **GIVEN** a fresh SDK acceptance test harness

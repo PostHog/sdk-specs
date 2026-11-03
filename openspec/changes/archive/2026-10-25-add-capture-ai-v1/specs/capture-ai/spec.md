@@ -7,6 +7,7 @@ When syncing this delta into the canonical `capture-ai` spec:
 - In Public signatures, add the Go and Rust shapes: `client.EnqueueAI(msg)` / `posthog.EnqueueAIWithContext(ctx, client, msg)` accepting any message type; `client.capture_ai(event)`, `capture_ai_batch(events, historical_migration)`, and the `*_immediate` variants returning the per-event summary.
 - In Configuration, rewrite the content-capture flag text so items 1 to 3 become: skip string truncation, and pass media through unredacted. Remove "route their events through the dedicated AI path", and add the AI lane delivery section from **AI lane configuration is scoped to the AI lane**.
 - In Behavior step 1, replace "`$lib`/`$lib_version`" with "the header-derived library identity" and point at `capture`'s layer order.
+- In Behavior step 2, return the UUID only where the AI method returns a value (posthog-python, posthog-node); name Go's error-only `EnqueueAI` and Rust's unit-returning queued methods, whose events still carry the UUID on the wire.
 - In Behavior step 4, keep at-least-once delivery, and add that on capture v1 only `retry` results are resent.
 - Replace the Transport (non-normative) section with the capture v1 values: endpoint `/i/v1/ai/events`, request body up to 20 MiB compressed, an 8 MiB ceiling on `properties`, a 5 MiB batch target, per-event results, and the retry rules of `retry-queue`.
 
@@ -170,6 +171,74 @@ Capture drops an AI event over its own ceiling with `details: ai_event_too_big` 
 - **AND** the events "gen-0", "gen-1" and "gen-2" should have been received in that order across the requests
 
 ## MODIFIED Requirements
+
+### Requirement: Canonical capture_ai behavior
+
+Server SDKs that support AI capture SHALL implement `capture_ai` as described
+by this spec. Implementations MAY adapt method names, parameter casing, and
+option naming to platform idioms, but MUST preserve the observable outcomes in
+the scenarios below.
+
+#### Scenario: capture_ai mirrors capture's parameters (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK is initialized with token "test-token"
+- **WHEN** capture_ai is called with distinct id "user-123", event "$ai_generation", and properties:
+  | property  | value |
+  | $ai_model | gpt   |
+- **THEN** one event named "$ai_generation" should be enqueued on the AI route
+- **AND** the enqueued event should include a timestamp and uuid
+
+#### Scenario: capture_ai returns the event UUID where the AI method returns a value (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK's AI method returns a value
+- **AND** the SDK is initialized with token "test-token"
+- **WHEN** capture_ai is called with distinct id "user-123" and event "$ai_generation"
+- **THEN** the call should return the enqueued event's uuid
+
+#### Scenario: capture_ai rides an isolated route to the AI endpoint (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK is initialized with token "test-token"
+- **WHEN** capture is called with distinct id "user-123" and event "button_clicked"
+- **AND** capture_ai is called with distinct id "user-123" and event "$ai_generation"
+- **AND** the SDK is flushed
+- **THEN** the analytics batch endpoint should receive only "button_clicked"
+- **AND** the AI batch endpoint should receive only "$ai_generation"
+
+#### Scenario: capture never reroutes AI-named events (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK is initialized with token "test-token"
+- **WHEN** capture is called with distinct id "user-123" and event "$ai_generation"
+- **AND** the SDK is flushed
+- **THEN** the analytics batch endpoint should receive "$ai_generation"
+- **AND** the AI batch endpoint should receive no events
+
+#### Scenario: the SDK generates a UUID when the caller supplies none (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK is initialized with token "test-token"
+- **WHEN** capture_ai is called with distinct id "user-123" and event "$ai_generation" and no uuid
+- **AND** the SDK is flushed
+- **THEN** the event received on the AI batch endpoint should carry a client-generated uuid
+- **WHEN** capture_ai is called with an explicit valid uuid
+- **AND** the SDK is flushed
+- **THEN** the event received on the AI batch endpoint should carry exactly that uuid
+- **AND** handling of an invalid supplied uuid is platform-idiomatic (replace or reject)
+
+#### Scenario: oversized events are dropped logging name and size only (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK is initialized with token "test-token"
+- **WHEN** capture_ai is called with an event whose serialized size exceeds the per-event cap
+- **AND** the SDK is flushed
+- **THEN** no event should reach the AI batch endpoint
+- **AND** the SDK should log the event name and byte size
+- **AND** the log output should not contain the event's property values
+
+#### Scenario: capture_ai never throws (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK is initialized with token "test-token"
+- **AND** the AI batch endpoint is unreachable
+- **WHEN** capture_ai is called with distinct id "user-123" and event "$ai_generation"
+- **AND** the SDK is flushed
+- **THEN** the caller should observe no exception
 
 ### Requirement: Full AI capture flag
 

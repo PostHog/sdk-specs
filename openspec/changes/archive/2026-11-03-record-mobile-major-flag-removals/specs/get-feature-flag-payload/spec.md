@@ -21,4 +21,4 @@ A client SDK MAY omit a dedicated payload getter when its flag result getter (`g
 
 ## Narrative alignment
 
-When syncing this delta, update the iOS, Android and Flutter **Surface variants** in `get-feature-flag-payload`, `get-feature-flags`, `get-feature-flags-and-payloads`, `reload-feature-flags` and `get-feature-flag`, and the Flutter wrapper notes in `feature-flag-cache` and `feature-flag-called-tracker`. No other requirement changes.
+When syncing this delta, update the iOS, Android and Flutter **Surface variants** in `get-feature-flag-payload`, `get-feature-flags`, `get-feature-flags-and-payloads` and `get-feature-flag`, and the Flutter wrapper notes in `feature-flag-cache` and `feature-flag-called-tracker`. No other requirement changes.

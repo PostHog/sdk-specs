@@ -1493,6 +1493,79 @@ Feature: Evaluate Flags
     When local feature flag definitions are refreshed successfully with a changed definition for "checkout" that still has experience continuity enabled
     Then exactly two warnings naming "checkout" and reason "experience_continuity" should be logged
 
+  @server @unresolvable_flag_warning_capable
+  Scenario Outline: Server definition loads do not warn about client-only flags
+    Given an isolated SDK instance
+    And the SDK is initialized with token "test-token" and local evaluation enabled
+    And SDK logging is enabled
+    And the local feature flag definition for "checkout" has <unresolvable setting>
+    And the local feature flag definition for "checkout" reports evaluation runtime "client"
+    When local feature flag definitions are refreshed successfully using "<refresh result>"
+    Then no warning naming "checkout" should be logged
+    And no remote feature flag evaluation request should have been sent
+
+    Examples:
+      | unresolvable setting | refresh result |
+      | experience continuity enabled | successful API load |
+      | experience continuity enabled | successful shared-cache load |
+      | a static cohort filter that local evaluation cannot resolve | successful API load |
+      | a static cohort filter that local evaluation cannot resolve | successful shared-cache load |
+
+  @server @unresolvable_flag_warning_capable
+  Scenario Outline: Server-applicable definitions still log warnings
+    Given an isolated SDK instance
+    And the SDK is initialized with token "test-token" and local evaluation enabled
+    And SDK logging is enabled
+    And the local feature flag definition for "checkout" has experience continuity enabled
+    And the local feature flag definition for "checkout" has <runtime field>
+    When local feature flag definitions are refreshed successfully using "successful API load"
+    Then exactly one warning naming "checkout" and reason "experience_continuity" should be logged
+    And no remote feature flag evaluation request should have been sent
+
+    Examples:
+      | runtime field |
+      | evaluation_runtime set to "server" |
+      | evaluation_runtime set to "all" |
+      | evaluation_runtime set to null |
+      | no evaluation_runtime field |
+
+  @server @unresolvable_flag_warning_capable
+  Scenario Outline: Suppressing client-only warnings preserves local evaluation
+    Given an isolated SDK instance
+    And the SDK is initialized with token "test-token" and local evaluation enabled
+    And SDK logging is enabled
+    And local feature flag definitions resolve "client-flag" for distinct id "user-123" as true
+    And the local feature flag definition for "client-flag" reports evaluation runtime "client"
+    And the local feature flag definition for "checkout" has experience continuity enabled
+    And the local feature flag definition for "checkout" reports evaluation runtime "client"
+    When local feature flag definitions are refreshed successfully using "<refresh result>"
+    And evaluate flags is called for distinct id "user-123" with local-only evaluation enabled
+    Then the snapshot should contain "client-flag" with value true
+    And no warning naming "checkout" should be logged
+    And no remote feature flag evaluation request should have been sent
+
+    Examples:
+      | refresh result |
+      | successful API load |
+      | successful shared-cache load |
+
+  @server @unresolvable_flag_warning_capable
+  Scenario: A flag returning from client-only to server runtime warns again
+    Given an isolated SDK instance
+    And the SDK is initialized with token "test-token" and local evaluation enabled
+    And SDK logging is enabled
+    And the local feature flag definition for "checkout" has experience continuity enabled
+    And the local feature flag definition for "checkout" reports evaluation runtime "server"
+    When local feature flag definitions are refreshed successfully using "successful API load"
+    Then exactly one warning naming "checkout" and reason "experience_continuity" should be logged
+    When the local feature flag definition for "checkout" changes evaluation runtime to "client"
+    And local feature flag definitions are refreshed successfully using "successful API load"
+    Then exactly one warning naming "checkout" and reason "experience_continuity" should be logged
+    When the local feature flag definition for "checkout" changes evaluation runtime to "server"
+    And local feature flag definitions are refreshed successfully using "successful API load"
+    Then exactly two warnings naming "checkout" and reason "experience_continuity" should be logged
+    And no remote feature flag evaluation request should have been sent
+
   @unresolved_flags_capable
   Scenario: Reading a flag the remote fallback resolved reports no inconclusive error
     Given the local feature flag definition for "checkout" has experience continuity enabled

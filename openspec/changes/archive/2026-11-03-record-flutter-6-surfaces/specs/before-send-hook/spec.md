@@ -1,0 +1,3 @@
+## Narrative alignment
+
+When syncing this delta, update **Behavior** item 1, the eligibility and "run late" bullets in **Lifecycle behavior**, and the feature-flag-called entry in the interactions list: Flutter 6.0 passes `beforeSend` callbacks the event the native SDK built on iOS, macOS and Android (system and registered properties, options, `uuid`, `distinctId`, `timestamp`) and the merged event on Windows and Linux; only Flutter Web keeps the pre-enrichment subset; `PosthogFlutterPlugin.addBeforeSend` in Swift and Kotlin filters native-initiated events, including `$feature_flag_called`. No requirement changes.

@@ -1,0 +1,35 @@
+## Narrative alignment
+
+When syncing this delta, update the Flutter surface variant to `getFeatureFlagResult(key, { bool? sendFeatureFlagEvent })` (6.0+, falling back to `PostHogConfig.sendFeatureFlagEvent` when omitted), with 5.x taking `{ sendEvent = true }`.
+
+## MODIFIED Requirements
+
+### Requirement: Per-call feature flag event option name
+
+A flag-reading API that lets the caller suppress `$feature_flag_called` for that call SHALL name the option `sendFeatureFlagEvent` on client SDKs and `sendFeatureFlagEvents` on server SDKs, adapted to platform casing (for example `send_feature_flag_event`). The singular form governs one call's event; the plural form governs event sending across a server-side evaluation that may emit several. On APIs that return a flag value or result, an omitted option SHALL fall back to the SDK's client-level feature flag event default where the SDK has one, and otherwise SHALL send the event. Payload-only reads keep their silent default (see `get-feature-flag-payload`); the option name still applies there. Per-call names that shipped before this requirement are recorded divergences and are not required to change: posthog-js core and react-native take a per-call `sendEvent` option (`FeatureFlagResultOptions`); their `sendFeatureFlagEvent` is the instance-level client option, not a per-call one. posthog-js browser takes a per-call `send_event` option (`FeatureFlagOptions`). Flutter 5.x takes `getFeatureFlagResult(key, sendEvent:)`; Flutter 6.0 renames it to `sendFeatureFlagEvent`.
+
+#### Scenario: Suppressing the per-call option skips the flag called event (@both)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** cached feature flags are:
+  | key     | value |
+  | beta-ui | true  |
+- **WHEN** get feature flag result "beta-ui" is called with the feature flag event option disabled
+- **THEN** the returned result value should be true
+- **AND** no event named "$feature_flag_called" should be enqueued
+
+#### Scenario: The per-call feature flag event option defaults to sending (@both)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** cached feature flags are:
+  | key     | value |
+  | beta-ui | true  |
+- **WHEN** get feature flag result "beta-ui" is called without the feature flag event option
+- **THEN** the returned result value should be true
+- **AND** one event named "$feature_flag_called" should be enqueued

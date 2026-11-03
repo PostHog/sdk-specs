@@ -5,6 +5,30 @@
 **Audited against sdk-specs commit:** `c72e367`
 **Summary:** 21 ✅ · 29 🟡 · 6 ❌ · 8 ➖ · 0 ❓ (64 rows; previous audit 2026-08-06 at `05b53dc` scored 20/22/6/5/6 on 59 rows)
 
+**Pending re-audit — posthog_flutter 6.0.** This file scores 5.x at the commit above. 6.0
+([PostHog/posthog-flutter#637](https://github.com/PostHog/posthog-flutter/pull/637)) changes rows the next audit must
+re-verify; nothing below is re-scored yet:
+
+- **Before Send Hook** ([n3](#n3)): callbacks are synchronous, and run on the native-built event on iOS, macOS and
+  Android and on the merged event on Windows and Linux; `PosthogFlutterPlugin.addBeforeSend` (Swift/Kotlin) covers
+  native-initiated events. Web keeps the pre-enrichment subset.
+- **On Feature Flags** ([n22](#n22)): `PostHogConfig.onFeatureFlags` is removed; `Posthog().onFeatureFlags(callback)`
+  returns a `PostHogFeatureFlagsSubscription` — the remediation this row asks for.
+- **Opt In** ([n23](#n23)), **Consent Gating** ([n6](#n6)): `enable()`/`disable()` removed; platform interface renamed to
+  `optIn()`/`optOut()`.
+- **Setup** ([n31](#n31)): `PostHogConfig.apiKey` and the `API_KEY` manifest/Info.plist key removed; `setup()` skips a
+  `phx_` personal key.
+- **Get Feature Flag Payload** ([n14](#n14)): `getFeatureFlagPayload()` removed (use `getFeatureFlagResult(key,
+  sendFeatureFlagEvent: false)?.payload`). **Get Feature Flag Result** ([n15](#n15)): option renamed to
+  `sendFeatureFlagEvent`, falls back to `PostHogConfig.sendFeatureFlagEvent`, and a malformed payload is `null` on iOS,
+  macOS and Android (posthog-ios 4.0).
+- **Capture**, **HTTP Client** ([n19](#n19)), **Retry Queue** ([n38](#n38)): capture v1 (`/i/v1/analytics/events`) on
+  iOS, macOS, Android, Windows and Linux (web stays on posthog-js). Windows/Linux back off 1–30 s with jitter, skip
+  refused `/flags` connections, and repair lone UTF-16 surrogates to U+FFFD in names, ids, properties and the `/flags`
+  body — matching what the platform channel already sends on mobile, and deliberately unlike posthog-node's capture-v1
+  rule, which drops such an event.
+- Minimums: iOS 15, macOS 11, Xcode 26, Swift Package Manager only, Android minSdk 23.
+
 **Why this run:** rotation priority 2 — equally stale with react-native (2026-08-06) and the holder of
 **six of the seven ❓ Unknown cells the matrix carried** (posthog-react-native held the seventh).
 Draining those was the stated reason to spend a slot here. **All six are now resolved to a definite

@@ -38,11 +38,10 @@ The exact callback shape varies by SDK:
 - **js-core / react-native:** `onFeatureFlags(callback): () => void` with a simpler callback that receives the latest `featureFlags` map/list
 - **iOS:** `onFeatureFlags(callback) -> Subscription` with `unsubscribe()`, whose callback receives the enabled flag keys, their variants, and `errorsLoading`; also available from Objective-C as `onFeatureFlags:`
 - **Android:** `onFeatureFlags(PostHogFeatureFlagsCallback): PostHogFeatureFlagsSubscription` on the
-  instance and on the static `PostHog` facade (4.0+), whose handle exposes `unsubscribe()`;
-  `PostHogConfig.onFeatureFlags = callback` and `reloadFeatureFlags(onFeatureFlags?)` remain for the
-  single config-time callback. Before 4.0 the config field and the reload completion were the only
-  surfaces.
-- **Flutter:** `PostHogConfig(onFeatureFlags: ...)` / `config.onFeatureFlags = ...` during `setup(...)`
+  instance and on the static `PostHog` facade (4.0+), whose handle exposes `unsubscribe()`, and can
+  be called before `setup()`; `reloadFeatureFlags(onFeatureFlags?)` remains as a one-off completion.
+  4.0 removes `PostHogConfig.onFeatureFlags`.
+- **Flutter:** `Posthog().onFeatureFlags(callback): PostHogFeatureFlagsSubscription` (6.0+), which can be called before `setup(...)` and whose callback receives the enabled flag keys, their variants, and `errorsLoading`. 6.0 removes `PostHogConfig.onFeatureFlags`.
 - **Unity:** `PostHogConfig.OnFeatureFlagsLoaded = Action` and static event `PostHog.OnFeatureFlagsLoaded += handler`
 
 `on-feature-flags` is used as the canonical name because the majority of audited client surfaces use that phrase directly.
@@ -61,12 +60,11 @@ The exact callback shape varies by SDK:
      These are the **error-aware** listeners.
    - js-core / React Native expose a simpler callback shape centered on the latest feature-flag values,
      with no error indication.
-   - Browser, iOS, and js-core / React Native are the **payload-carrying** listeners.
-   - Android, Flutter, and Unity primarily expose a readiness signal with no direct payload; callers re-read flags through getter APIs when notified.
+   - Browser, iOS, Android 4.0+, Flutter 6.0+, and js-core / React Native are the **payload-carrying** listeners.
+   - Unity primarily exposes a readiness signal with no direct payload; callers re-read flags through getter APIs when notified.
 5. **Support immediate invocation when state is already loaded in some SDKs.**
-   - Browser, iOS, and Android's `onFeatureFlags(...)` registration (4.0+) call the callback once
-     with the current values if flags were already loaded. Android's config field and reload
-     completion are not part of this group.
+   - Browser, iOS, Android 4.0+, and Flutter 6.0+ call the callback once with the current values if
+     flags were already loaded. Android's reload completion is not part of this group.
    - Other SDKs may instead invoke only on the next load/update cycle.
 6. **Do not mutate flags by subscribing.** The callback only observes flag readiness/change notifications.
 7. **Handle missing/no-flag cases SDK-specifically.**
@@ -92,7 +90,7 @@ The exact callback shape varies by SDK:
 - They remain active until explicitly unsubscribed/removed, or until the SDK instance is torn down.
 - Startup flag preload paths may trigger the callback early in app lifecycle.
 - Cache-driven startups can also trigger the callback before a fresh network reload completes.
-- Wrapper SDKs may translate platform-native notifications into their own callback surface. Flutter maps native/browser flag-loaded signals into a Dart `onFeatureFlags` callback set during `setup(...)`.
+- Wrapper SDKs may translate platform-native notifications into their own callback surface. Flutter maps native/browser flag-loaded signals into the listeners registered with `Posthog().onFeatureFlags(...)`.
 
 ## Error handling
 
@@ -102,7 +100,7 @@ The exact callback shape varies by SDK:
 
 ## Concurrency & ordering guarantees
 
-- Callbacks are invoked after the corresponding flag update/load work has committed enough state for getters to read the new values. On SDKs with a main/UI thread, delivery happens on that thread; posthog-ios delivers on the main thread after its getters already return the new values. posthog-android 4.0 makes the same split: `onFeatureFlags(...)` listeners run on the main thread after its getters already return the new values, while `PostHogConfig.onFeatureFlags` and the `reloadFeatureFlags` completion stay on the SDK's background thread.
+- Callbacks are invoked after the corresponding flag update/load work has committed enough state for getters to read the new values. On SDKs with a main/UI thread, delivery happens on that thread; posthog-ios delivers on the main thread after its getters already return the new values. posthog-android 4.0 makes the same split: `onFeatureFlags(...)` listeners run on the main thread after its getters already return the new values, while the `reloadFeatureFlags` completion stays on the SDK's background thread.
 - Ordering between multiple callbacks follows the SDK's own listener/event registration model.
 - If flags update rapidly, callbacks may fire multiple times; callers should treat them as change notifications, not exactly-once events.
 
@@ -179,11 +177,7 @@ The SDK SHALL implement the canonical `on-feature-flags` behavior described by t
 
 ### Requirement: Lifetime of a runtime listener registration
 
-A runtime listener registration — a method that registers a callback and returns an unsubscribe
-handle or function, as posthog-js, posthog-ios 4.0 and posthog-android 4.0 do — SHALL stay active
-until the caller unsubscribes it, including across a `close()`/`setup()` cycle. Unsubscribing SHALL
-stop delivery for that registration only, and SHALL be safe to call more than once. A config-time
-callback field has no handle to outlive anything and is out of scope.
+A runtime listener registration — a method that registers a callback and returns an unsubscribe handle or function, as posthog-js, posthog-ios 4.0, posthog-android 4.0 and posthog_flutter 6.0 do — SHALL stay active until the caller unsubscribes it, including across a `close()`/`setup()` cycle. Unsubscribing SHALL stop delivery for that registration only, and SHALL be safe to call more than once. A config-time callback field has no handle to outlive anything and is out of scope.
 
 #### Scenario: A registration keeps receiving loads after a teardown and re-setup
 - **GIVEN** a fresh SDK acceptance test harness
@@ -203,10 +197,7 @@ callback field has no handle to outlive anything and is out of scope.
 
 ### Requirement: Loads discarded by reset or close reach no listener
 
-A flag load already in flight when `reset()` or `close()` ran SHALL NOT be delivered to a listener
-when it completes, and SHALL NOT be replayed to a listener registered afterwards: it carries the
-flags of the identity or instance the caller just discarded. The SDK MAY drop such a load by any
-means it chooses.
+A flag load already in flight when `reset()` or `close()` ran SHALL NOT be delivered to a listener when it completes, and SHALL NOT be replayed to a listener registered afterwards: it carries the flags of the identity or instance the caller just discarded. The SDK MAY drop such a load by any means it chooses.
 
 #### Scenario: A load in flight across reset is not delivered
 - **GIVEN** a fresh SDK acceptance test harness

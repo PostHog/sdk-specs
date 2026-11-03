@@ -61,8 +61,8 @@ isFeatureEnabled(
 ### Surface variants
 
 - **posthog-js core / browser / posthog-js-lite / react-native:** `isFeatureEnabled(key, { defaultValue })`
-- **flutter:** `isFeatureEnabled(key): Future<bool>`
-- **iOS:** `isFeatureEnabled(_ key: String)` and `isFeatureEnabled(_ key: String, sendFeatureFlagEvent: Bool)`
+- **flutter:** `isFeatureEnabled(key, {sendFeatureFlagEvent, defaultValue}): Future<bool>`
+- **iOS:** `isFeatureEnabled(_ key: String)`, `isFeatureEnabled(_ key: String, sendFeatureFlagEvent: Bool)`, `isFeatureEnabled(_ key: String, defaultValue: Bool)`, and `isFeatureEnabled(_ key: String, defaultValue: Bool, sendFeatureFlagEvent: Bool)`
 - **Android:** `isFeatureEnabled(key, defaultValue = false, sendFeatureFlagEvent = null)`
 - **Unity:** `IsFeatureEnabled(key, defaultValue = false)`
 - **Node:** `await isFeatureEnabled(key, distinctId, options?)`
@@ -136,7 +136,7 @@ isFeatureEnabled(
 
 The SDK SHALL implement the canonical `is-feature-enabled` behavior described by this spec. Implementations MAY adapt method names, parameter casing, type syntax, and lifecycle hooks to platform idioms where this spec explicitly allows variation, but MUST preserve the observable outcomes in the scenarios below.
 
-The SDK SHALL accept a caller-supplied boolean default (`defaultValue`; parameter placement per platform idiom — `{ defaultValue }` in the options object across the posthog-js family, a positional `defaultValue` on Android and Unity) and SHALL return it whenever the flag has no value: flags not loaded yet, a failed flags request, or no flag with that key in the loaded flags. A flag that has a value — including `false` and variant strings — always wins over the caller-supplied default.
+The SDK SHALL accept a caller-supplied boolean default (`defaultValue`; parameter placement per platform idiom — `{ defaultValue }` in the options object across the posthog-js family, a positional `defaultValue` on Android and Unity, a labeled `defaultValue:` on iOS, a named `defaultValue:` on Flutter) and SHALL return it whenever the flag has no value: flags not loaded yet, a failed flags request, or no flag with that key in the loaded flags. A flag that has a value — including `false` and variant strings — always wins over the caller-supplied default.
 
 Allowed variation for the no-default call: SDKs whose signature builds in a `false` default (Android, Unity) or hard-code `false` for missing values (iOS, Flutter) resolve missing flags to `false` by construction. SDKs whose boolean API is three-state (`boolean | undefined` — the posthog-js family) SHALL keep returning `undefined`/nullish when the caller supplies no default; collapsing that bare call to `false` is a breaking change reserved for their next major.
 

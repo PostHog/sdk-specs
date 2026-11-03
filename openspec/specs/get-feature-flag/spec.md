@@ -67,7 +67,7 @@ getFeatureFlag(
 - **posthog-js core / browser / react-native:** `getFeatureFlag(key)`
 - **flutter:** `getFeatureFlag(key): Future<Object?>`
 - **iOS:** `getFeatureFlag(_ key: String)` and `getFeatureFlag(_ key: String, sendFeatureFlagEvent: Bool)`
-- **Android:** `getFeatureFlag(key, defaultValue = null, sendFeatureFlagEvent = null)`
+- **Android:** `getFeatureFlag(key, sendFeatureFlagEvent = null)` (4.0 removes `defaultValue`; use `getFeatureFlag(key) ?: default`)
 - **Node:** `await getFeatureFlag(key, distinctId, options?)`
 - **Python:** `get_feature_flag(key, distinct_id, *, groups=None, person_properties=None, group_properties=None, only_evaluate_locally=False, send_feature_flag_events=True, disable_geoip=None, device_id=None)`
 - **Ruby:** `get_feature_flag(key, distinct_id, groups: {}, person_properties: {}, group_properties: {}, only_evaluate_locally: false, send_feature_flag_events: true)`

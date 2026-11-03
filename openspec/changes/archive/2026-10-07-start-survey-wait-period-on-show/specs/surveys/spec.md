@@ -44,12 +44,14 @@ the last-seen survey date along with the rest of locally owned survey history.
 - **WHEN** survey eligibility is evaluated
 - **THEN** survey display callback should be invoked for survey "survey-1"
 - **WHEN** the SDK is restarted against the same persistent storage without survey "survey-1" being submitted or dismissed
+- **AND** cached surveys include an active survey "survey-1" eligible for the current user with a seen-survey wait period of 7 days
 - **AND** cached surveys include an active survey "survey-2" eligible for the current user with a seen-survey wait period of 7 days
-- **AND** cached surveys include an active survey "survey-3" eligible for the current user with no seen-survey wait period
 - **AND** survey eligibility is evaluated
 - **THEN** survey display callback should not be invoked for survey "survey-1"
 - **AND** survey display callback should not be invoked for survey "survey-2"
-- **AND** survey display callback should be invoked for survey "survey-3"
+- **WHEN** cached surveys include an active survey "survey-3" eligible for the current user with no seen-survey wait period
+- **AND** survey eligibility is evaluated
+- **THEN** survey display callback should be invoked for survey "survey-3"
 
 #### Scenario: Dismissing a survey does not move the wait period
 - **GIVEN** a fresh SDK acceptance test harness
@@ -79,6 +81,7 @@ the last-seen survey date along with the rest of locally owned survey history.
 - **THEN** survey display callback should be invoked for survey "survey-1"
 - **WHEN** reset is called
 - **AND** the SDK is restarted against the same persistent storage
+- **AND** cached surveys include an active survey "survey-1" eligible for the current user with a seen-survey wait period of 7 days
 - **AND** survey eligibility is evaluated
 - **THEN** survey display callback should be invoked for survey "survey-1"
 
@@ -93,6 +96,7 @@ the last-seen survey date along with the rest of locally owned survey history.
 - **THEN** survey display callback should be invoked for survey "survey-1"
 - **AND** survey "survey-1" should not be marked seen
 - **WHEN** the SDK is restarted against the same persistent storage without survey "survey-1" being submitted or dismissed
+- **AND** cached surveys include an active survey "survey-1" eligible for the current user with no seen-survey wait period
 - **AND** survey eligibility is evaluated
 - **THEN** survey display callback should be invoked for survey "survey-1"
 
@@ -107,7 +111,9 @@ the last-seen survey date along with the rest of locally owned survey history.
 - **THEN** survey display callback should be invoked for survey "survey-1"
 - **WHEN** a partial response is recorded for survey "survey-1"
 - **AND** the SDK is restarted against the same persistent storage without survey "survey-1" being submitted or dismissed
-- **AND** cached surveys include an active survey "survey-3" eligible for the current user with no seen-survey wait period
+- **AND** cached surveys include an active survey "survey-1" eligible for the current user with a seen-survey wait period of 7 days
 - **AND** survey eligibility is evaluated
 - **THEN** survey display callback should not be invoked for survey "survey-1"
-- **AND** survey display callback should be invoked for survey "survey-3"
+- **WHEN** cached surveys include an active survey "survey-3" eligible for the current user with no seen-survey wait period
+- **AND** survey eligibility is evaluated
+- **THEN** survey display callback should be invoked for survey "survey-3"

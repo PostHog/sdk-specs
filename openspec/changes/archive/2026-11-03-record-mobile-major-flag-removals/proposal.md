@@ -7,7 +7,7 @@ posthog-ios 4.0, posthog-android 4.0 and posthog_flutter 6.0 remove `getFeatureF
 - `get-feature-flag-payload`: record the removals and add a requirement that SDKs without a payload getter meet the payload scenarios through a silent flag result read (`getFeatureFlagResult(key, sendFeatureFlagEvent: false)` and its payload).
 - `get-feature-flags`, `get-feature-flags-and-payloads`: record the mobile `getAllFeatureFlags()` that returns flag result objects.
 - `get-feature-flag`: record Flutter 6.0's `sendFeatureFlagEvent` option.
-- `feature-flag-cache`, `feature-flag-called-tracker`: record that Flutter's pure-Dart client on macOS, Windows and Linux owns its cache and tracker, and Flutter 6.0's per-call option on every flag read.
+- `feature-flag-cache`, `feature-flag-called-tracker`: record that Flutter's pure-Dart client on macOS, Windows and Linux owns its cache and tracker. Flutter's per-call option on flag reads is left to #153.
 
 ## Capabilities
 

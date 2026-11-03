@@ -49,3 +49,14 @@ Feature: Surveys
     Then no event should be enqueued
     And no response should be recorded for survey "survey-1"
     And the first question should now be shown
+
+  Scenario: Survey containing an undisplayable question type is not shown
+    Given the SDK is initialized with token "test-token" and surveys enabled
+    And cached surveys include an active survey "survey-1" eligible for the current user
+    And survey "survey-1" contains a question whose type the SDK cannot display
+    And cached surveys include an active survey "survey-2" eligible for the current user
+    And every question in survey "survey-2" has a type the SDK can display
+    When survey eligibility is evaluated
+    Then survey display callback should not be invoked for survey "survey-1"
+    And no survey response or display event should be enqueued for survey "survey-1"
+    And survey display callback should be invoked for survey "survey-2"

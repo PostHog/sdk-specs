@@ -91,6 +91,27 @@ Feature: Flag Definition Loader
     And shutdown should not throw because of the cache provider failure
     And the SDK should record a flag definition cache warning
 
+  Scenario: Keyless consumer reads the shared cache without a decision or a fetch
+    Given the SDK is initialized with token "test-token", local evaluation enabled, an external flag definition cache provider, and no privileged local evaluation auth
+    And the cache provider returns cached flag definitions:
+      | key     | active | rollout |
+      | beta-ui | true   | 100     |
+    When the flag definition loader refreshes
+    Then local feature flag definitions should include flag "beta-ui"
+    And the cache provider fetch-decision operation should not have been called
+    And the cache provider should not receive flag definition cache data
+    And no direct flag definition API request should be sent
+
+  Scenario: Keyless cache miss is not reported as an auth failure
+    Given the SDK is initialized with token "test-token", local evaluation enabled, an external flag definition cache provider, and no privileged local evaluation auth
+    And local feature flag definitions include flag "beta-ui"
+    And the cache provider read operation returns no cached data
+    When the flag definition loader refreshes
+    Then local feature flag definitions should still include flag "beta-ui"
+    And no direct flag definition API request should be sent
+    And the SDK should not record a flag definition authorization error
+    And the refresh should not throw
+
   # In version columns, omitted removes the top-level field from the response.
   Scenario Outline: Loader reads the matching selector from the definitions envelope
     Given the SDK is initialized with token "test-token" and local evaluation enabled

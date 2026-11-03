@@ -152,7 +152,7 @@ The SDK SHALL implement the canonical `http-client` behavior described by this s
 
 The SDK SHALL apply a bounded, endpoint-specific retry policy to feature flag evaluation requests sent to `/flags` or an equivalent flag-evaluation endpoint. This policy is separate from the durable ingestion retry queue and applies to both client-side flag reloads and server-side direct flag evaluation when they use the remote flags endpoint.
 
-A flag evaluation request SHALL retry when the SDK did not receive an HTTP/API response because request execution failed with a transient transport condition, such as a network error, connection reset/lost, timeout, DNS/socket/TLS transport failure, or equivalent platform error. A flag evaluation request SHALL also retry HTTP `502 Bad Gateway` and `504 Gateway Timeout` responses from the flags endpoint. SDKs MAY also treat response-body read failures before a valid flags response is available as transport failures. SDKs SHALL NOT retry serialization/programming errors that occur before a valid request can be sent.
+A flag evaluation request SHALL retry when the SDK did not receive an HTTP/API response because request execution failed with a transient transport condition, such as a network error, connection reset/lost, timeout, DNS/socket/TLS transport failure, or equivalent platform error. A flag evaluation request SHALL also retry HTTP `502 Bad Gateway` and `504 Gateway Timeout` responses from the flags endpoint. SDKs MAY also treat response-body read failures before a valid flags response is available as transport failures. SDKs SHALL NOT retry serialization/programming errors that occur before a valid request can be sent. A connection refused by the destination (the server actively rejected the connection, for example `ECONNREFUSED` or `java.net.ConnectException`) is not a transient transport condition: the SDK SHALL NOT retry it and SHALL surface it as the flag error immediately. DNS, TLS, timeout, and connection reset/lost failures still retry.
 
 A flag evaluation request SHALL NOT retry any HTTP/API status response from the flags endpoint other than `502 Bad Gateway` or `504 Gateway Timeout`. Non-retryable responses include `408 Request Timeout`, `429 Too Many Requests`, `500 Internal Server Error`, `503 Service Unavailable`, all other `5xx` responses, and all other non-2xx statuses. Those responses SHALL be surfaced to the feature-flag caller/cache layer according to the SDK's normal flag error behavior without issuing another flags request for the same evaluation.
 
@@ -177,6 +177,17 @@ Retries SHALL use exponential backoff starting at 300ms before the first retry, 
 - **AND** cached feature flags should include:
   | key     | value |
   | beta-ui | true  |
+
+#### Scenario: Flags request does not retry a refused connection (@both)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** the current distinct id is "user-123"
+- **AND** the next feature flag request will fail with connection refused before any HTTP response
+- **WHEN** feature flags are loaded from the remote flags endpoint
+- **THEN** exactly 1 feature flag request should be sent
 
 #### Scenario: Flags request retries transient gateway HTTP status errors by default (@both)
 - **GIVEN** a fresh SDK acceptance test harness
@@ -244,3 +255,57 @@ Retries SHALL use exponential backoff starting at 300ms before the first retry, 
 - **AND** cached feature flags should include:
   | key     | value |
   | beta-ui | true  |
+
+### Requirement: Request body compression and opt-out
+
+A client SDK that compresses outgoing request bodies SHALL use gzip, SHALL apply it by default, and SHALL expose a configuration option that turns compression off for the whole client. A client SDK MAY send uncompressed, or use another encoding the server advertises, when gzip is unavailable on the platform or the server's remote configuration does not advertise gzip. A compressed request SHALL declare gzip with the `Content-Encoding: gzip` header where the transport can set it. A browser transport that must keep a CORS-simple request MAY send the gzip body without a declaration and rely on the server detecting gzip bodies, as posthog-js does.
+
+The option MAY be an extensible encoding enum (`compression`, with a gzip default and a "none" member) or a boolean switch, named in the SDK's own style (for example `disable_compression`). New configuration surfaces SHOULD use the enum shape so further encodings can be added without another option. Whichever shape a client SDK ships, the default SHALL leave gzip enabled, so an app that sets nothing keeps the current behavior.
+
+Server SDKs MAY default to no compression, MAY offer other encodings, and MAY expose compression as a positive or negative boolean or as an enum. The rules below apply to every SDK that compresses request bodies.
+
+When compression is turned off, every request the SDK would otherwise have compressed SHALL carry the uncompressed body, plain JSON for JSON endpoints, and SHALL omit any gzip declaration. A browser unload beacon that must avoid a CORS preflight MAY instead send a CORS-simple body without gzip, such as base64 form data. Endpoints the SDK never compressed are unaffected. The set of compressed endpoints is SDK-specific and is not fixed by this requirement.
+
+A client SDK's opt-out SHALL be reachable through configuration. An SDK that reserves `Content-Encoding` against caller-supplied custom headers SHALL NOT treat overriding that header as the way to disable compression.
+
+When compression fails locally — for example a gzip encoder that throws — the SDK MAY send the uncompressed body instead of dropping the request. The SDK SHALL NOT silently downgrade to an uncompressed body and resend after a server rejects a compressed request; a server rejection is surfaced to the retry layer like any other failure, and opting out stays an explicit application decision.
+
+#### Scenario: Compression is on by default (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and no compression configuration
+- **AND** the event queue contains events:
+  | event | distinct_id |
+  | Save  | user-123    |
+- **WHEN** flush is called
+- **THEN** the ingestion request body should be gzip-compressed
+- **AND** the decompressed request body should contain event "Save"
+
+#### Scenario: Opting out sends a plain JSON body (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and compression turned off
+- **AND** the event queue contains events:
+  | event | distinct_id |
+  | Save  | user-123    |
+- **WHEN** flush is called
+- **THEN** the ingestion request should not declare gzip
+- **AND** the request body should parse as plain JSON containing event "Save"
+
+#### Scenario: Opting out covers every endpoint the SDK compresses (@client)
+- **GIVEN** the SDK is initialized with token "test-token" and compression turned off
+- **WHEN** the SDK sends requests to each endpoint whose body it compresses by default
+- **THEN** none of those requests should declare gzip
+- **AND** each request body should parse as plain JSON
+
+#### Scenario: A server rejection does not silently disable compression (@both)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and compression enabled
+- **AND** the mock server will fail the next ingestion request with status 400
+- **WHEN** capture is called with event "Save"
+- **AND** flush is called
+- **AND** capture is called with event "Next"
+- **AND** flush is called
+- **THEN** the SDK should not resend the "Save" payload uncompressed
+- **AND** the ingestion request containing event "Next" should still be compressed with the configured encoding

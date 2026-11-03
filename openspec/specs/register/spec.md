@@ -134,3 +134,18 @@ The SDK SHALL implement the canonical `register` behavior described by this spec
 - **WHEN** the SDK is initialized with token "test-token"
 - **AND** capture is called with event "Loaded"
 - **THEN** the enqueued event property "plan" should equal "pro"
+
+#### Scenario: Per-event property overrides a registered property
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** registered properties are:
+  | property | value |
+  | plan     | free  |
+- **WHEN** capture is called with event "Upgraded" and properties:
+  | property | value |
+  | plan     | pro   |
+- **THEN** the enqueued event property "plan" should equal "pro"
+- **AND** registered property "plan" should equal "free"

@@ -26,7 +26,10 @@ Capture API declarations are independent of client/server SDK type:
   analytics-v1 ordinary traffic.
 - `capture_ai_v1`: AI capture delivery on the capture v1 `/i/v1/ai/events` route; its
   no-reroute case expects analytics-v1 ordinary traffic. `capture-ai-v1-delivery.feature`
-  adds misroute, lane isolation, ceiling and batching cases under the same capability.
+  adds the lane isolation case under the same capability.
+- `capture_ai_v1_delivery`: the misroute report, ceiling and byte-batching cases in
+  `capture-ai-v1-delivery.feature`. No adapter declares it until the harness binds drop
+  reports, log read-back and generated payloads on the v2 runner.
 - `capture_ai_returns_uuid`: the AI method returns the admitted event's UUID
   (posthog-python, posthog-node, posthog-ios, posthog-android; not posthog-go or
   posthog-rs). `event_uuid_override`: the capture and AI methods accept a

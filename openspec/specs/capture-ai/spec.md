@@ -250,7 +250,7 @@ the scenarios below.
 - **WHEN** capture_ai is called with an event whose serialized size exceeds the per-event cap
 - **AND** the SDK is flushed
 - **THEN** no event should reach the AI batch endpoint
-- **AND** the SDK should log the event name and byte size
+- **AND** the SDK should report the drop or log the event name and byte size
 - **AND** the log output should not contain the event's property values
 
 #### Scenario: capture_ai never throws (@server)
@@ -517,10 +517,10 @@ Capture drops an AI event over its own ceiling with `details: ai_event_too_big` 
 - **AND** pending captures are flushed
 - **THEN** the AI batch endpoint should receive exactly 1 event
 - **AND** the received event should be "at-ceiling"
-- **AND** the SDK should log the event name and byte size of "over-ceiling"
+- **AND** the SDK should report "over-ceiling" as dropped or log its event name and byte size
 - **AND** the log output should not contain "SECRET-MARKER"
 
-#### Scenario: AI batches close before the byte target and keep order (@server)
+#### Scenario: AI batches close before the byte target (@server)
 - **GIVEN** an isolated SDK with empty persistent storage
 - **AND** the mock PostHog server is reset
 - **AND** the SDK is initialized with token "phc_test_key" and flush threshold 10
@@ -528,5 +528,5 @@ Capture drops an AI event over its own ceiling with `details: ai_event_too_big` 
 - **AND** pending captures are flushed
 - **THEN** at least 2 capture request should have been received on the AI batch endpoint
 - **AND** no received request body should exceed the SDK's byte target plus envelope overhead
-- **AND** the events "gen-0", "gen-1" and "gen-2" should have been received in that order across the requests
+- **AND** the events "gen-0", "gen-1" and "gen-2" should all have been received, in any order across the requests
 

@@ -12,6 +12,11 @@ write to submit or dismiss. Submit and dismiss SHALL NOT move the date; the wait
 the show. A survey's `seenSurveyWaitPeriodInDays` condition SHALL be evaluated against that date, so
 showing any survey starts the wait period for every survey that carries one.
 
+The wait-period check applies to automatic display and to programmatic display that respects survey
+conditions. An explicit condition override, such as `displaySurvey` with `ignoreConditions: true` or
+`renderSurvey`, bypasses eligibility by design, including the wait period. This requirement does not
+change those overrides.
+
 The per-survey seen key is unchanged: it SHALL still be written only when the survey is submitted or
 dismissed. Showing a survey SHALL NOT mark it seen, so an unanswered survey without a wait period
 can come back.

@@ -40,6 +40,8 @@ None.
 
 ## Impact
 
-No SDK that already exposes a method-style registration has to change. SDKs that expose only a
-config field (Flutter, Unity) are outside the registration-lifetime requirement; the discarded-load
+posthog-android 4.0 and posthog-js already meet both requirements. posthog-ios 4.0 meets the
+registration-lifetime requirement but still delivers a load that was in flight when `reset()` ran,
+so it has to change to meet the discarded-load requirement. SDKs that expose only a
+config field (Unity) are outside the registration-lifetime requirement; the discarded-load
 requirement applies to any listener surface.

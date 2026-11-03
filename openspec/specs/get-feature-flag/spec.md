@@ -65,7 +65,7 @@ getFeatureFlag(
 ### Surface variants
 
 - **posthog-js core / browser / react-native:** `getFeatureFlag(key)`
-- **flutter:** `getFeatureFlag(key): Future<Object?>`
+- **flutter:** `getFeatureFlag(key, {sendFeatureFlagEvent}): Future<Object?>` (6.0+; before 6.0 `getFeatureFlag(key)`)
 - **iOS:** `getFeatureFlag(_ key: String)` and `getFeatureFlag(_ key: String, sendFeatureFlagEvent: Bool)`
 - **Android:** `getFeatureFlag(key, sendFeatureFlagEvent = null)` (4.0 removes `defaultValue`; use `getFeatureFlag(key) ?: default`)
 - **Node:** `await getFeatureFlag(key, distinctId, options?)`

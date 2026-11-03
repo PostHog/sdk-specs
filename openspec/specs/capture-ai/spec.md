@@ -122,9 +122,11 @@ in posthog-python; `CaptureAICompression`, `CaptureAIMaxQueueSize`,
 in posthog-node; `captureAiCompression`, `captureAiMaxQueueSize`,
 `captureAiTimeout` and `captureAiMaxEventBytes` in posthog-ios, posthog-android
 and the posthog-flutter `PostHogConfig`). Server SDK defaults are a 1000-event queue and a 30 second timeout,
-longer than analytics because AI payloads are much larger. The compression
-default is the SDK's: none in posthog-python, posthog-go and posthog-rs, gzip
-in posthog-node. The analytics lane's compression and queue capacity never
+longer than analytics because AI payloads are much larger; posthog-ios,
+posthog-android and the posthog-flutter Windows and Linux lane default to 100
+events, 50 MiB on disk and a 60 second timeout. The compression default is the
+SDK's: none in posthog-python, posthog-go and posthog-rs, gzip in posthog-node
+and the mobile SDKs. The analytics lane's compression and queue capacity never
 reach the AI lane; batching settings may be shared. The per-event cap is
 optionally exposed (`capture_ai_max_event_bytes` in posthog-python) and can
 only be lowered; the batch target is an internal constant. See **AI
@@ -377,7 +379,7 @@ Where it applies:
 
 An SDK that delivers events through capture v1 and supports AI capture SHALL send events captured through its AI method with `POST {host}/i/v1/ai/events`, using the request body, headers, per-event results and retry rules defined for analytics capture in `capture` and `retry-queue`. The AI method SHALL send the event as given, with the same event-building order as `capture`, and SHALL NOT reroute by event name: a non-`$ai_` event captured through the AI method is sent to the AI endpoint, where capture drops it with `details: misrouted_event`, and an `$ai_*` event captured through `capture` is sent to the analytics endpoint. The SDK MAY log at debug level when the AI method receives a non-`$ai_` name.
 
-The AI lane SHALL have its own queue, flush cycle, retry state and in-flight request, started lazily on the first AI event, so that a slow or failing AI lane never delays, drops or resends analytics events, and the reverse. `flush()` and `shutdown()` SHALL signal both lanes before waiting on either, under one deadline. Client SDKs: the AI queue is durable (on disk), starts at launch so events left from an earlier launch are sent, and `flush()` and `close()` signal both lanes without blocking.
+The AI lane SHALL have its own queue, flush cycle, retry state and in-flight request, started lazily on the first AI event on server SDKs, so that a slow or failing AI lane never delays, drops or resends analytics events, and the reverse. `flush()` and `shutdown()` SHALL signal both lanes before waiting on either, under one deadline. Client SDKs: the AI queue is durable (on disk), starts at launch so events left from an earlier launch are sent, and `flush()` and `close()` signal both lanes without blocking.
 
 Every platform of an SDK that delivers events through capture v1 SHALL ship this lane and the AI method; a wrapper SDK SHALL NOT leave a capture v1 platform without them. On a platform still on legacy capture (posthog-flutter on the web, which sends through posthog-js), the AI method SHALL send nothing, log that AI capture is unsupported there, and return the SDK's not-admitted value, and SHALL NOT fall back to `capture`.
 

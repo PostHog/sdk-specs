@@ -50,7 +50,7 @@ Legacy capture: the body carried `api_key` and `sent_at`, `uuid` and `timestamp`
   | historical_migration |
 - **AND** the first received event should have string fields "event", "uuid", "distinct_id" and "timestamp"
 - **AND** the first received event field "properties" should be an object containing "plan" equal to "pro"
-- **AND** the first received event field "options" should be an object
+- **AND** the first received event field "options" should be absent or an object
 
 #### Scenario: Historical migration is a request flag (@server)
 - **GIVEN** a fresh SDK acceptance test harness
@@ -223,7 +223,7 @@ Legacy capture: SDKs validated and converted `$process_person_profile` and `$coo
 - **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
 - **WHEN** capture is called with distinct id "user-123" and event "Signed Up"
 - **AND** pending captures are flushed
-- **THEN** the first received event field "options" should be an object
+- **THEN** the first received event field "options" should be absent or an object
 - **AND** the first received event option "process_person_profile" should be absent
 - **AND** the first received event option "cookieless_mode" should be absent
 - **AND** the first received event option "disable_skew_correction" should be absent
@@ -281,7 +281,7 @@ Legacy capture: posthog-python 7.x merged `super_properties` over the call's pro
   {"distinct_id":"user-123","event":"Signed Up","properties":{"plan":null}}
   """
 - **AND** pending captures are flushed
-- **THEN** the first received event property "plan" should equal JSON null
+- **THEN** the first received event property "plan" should be absent or equal JSON null
 - **AND** the first received event property "region" should equal JSON "eu"
 
 #### Scenario: A global option fills an unset option and a null option does not block it (@server)

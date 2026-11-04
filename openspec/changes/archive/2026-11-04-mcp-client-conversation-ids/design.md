@@ -6,7 +6,7 @@ in what they send, so the design starts from what each one gives a server.
 | Client | Conversation id in `tools/call` `_meta` | `User-Agent` over HTTP | `clientInfo.name` | Evidence |
 |---|---|---|---|---|
 | ChatGPT | `openai/session`, a string documented as an anonymized conversation id; lifetime and format not stated | `openai-mcp/<version> (ChatGPT)` | unknown | docs; observed |
-| OpenAI Codex | `threadId` (UUIDv7) and `sessionId` (UUID), unprefixed keys | `codex-mcp-client/<version>` | `codex-mcp-client` | source |
+| OpenAI Codex | `threadId` and `sessionId`, both UUIDv7, unprefixed keys | `codex-mcp-client/<version>` from the CLI; `openai-mcp/<version> (Codex)` also observed | `codex-mcp-client` | source; observed |
 | VS Code (Copilot agent mode) | `vscode.conversationId`: the chat session id for local chats, a resource URI otherwise | `Visual Studio Code/<version>` | the product's long name | source |
 | Claude.ai and Claude Desktop | none found | `Claude-User` | `claude-ai` | user reports |
 | Claude Code | none; `claudecode/toolUseId` names the call, not the conversation | `claude-code/<version> (...)` | unknown | user reports; observed |
@@ -14,6 +14,8 @@ in what they send, so the design starts from what each one gives a server.
 | Gemini CLI | none; only `progressToken` | none set in its source | `gemini-cli-mcp-client` | source |
 
 "Observed" means the string appears among the User-Agents PostHog's MCP analytics already classifies.
+Those also include `openai-mcp/<version> (Agent Builder)` and `openai-mcp/<version> (Responses API)`:
+several OpenAI surfaces share the `openai-mcp` token and differ in the parenthetical.
 Sources:
 
 - ChatGPT: the [Apps SDK reference](https://developers.openai.com/apps-sdk/reference), section
@@ -21,9 +23,12 @@ Sources:
   `openai/userLocation`, and `openai/subject`, and says `openai/userAgent` is a best-effort hint, not a
   way to detect the calling surface.
 - Codex: `codex-rs/core/src/mcp_tool_call.rs` (`with_mcp_tool_call_ids_meta`) and
-  `codex-rs/rmcp-client/src/utils.rs` (`MCP_USER_AGENT`) in
+  `codex-rs/rmcp-client/src/utils.rs` (`MCP_USER_AGENT`), and `codex-rs/protocol/src/thread_id.rs` and
+  `session_id.rs` (`Uuid::now_v7`) in
   [openai/codex](https://github.com/openai/codex).
-- VS Code: `src/vs/workbench/contrib/mcp/common/mcpServer.ts` in
+- VS Code: `src/vs/workbench/contrib/mcp/common/mcpServer.ts` (`vscode.conversationId`),
+  `mcpServerRequestHandler.ts` in the same folder (`clientInfo`), and
+  `src/vs/workbench/api/common/extHostMcp.ts` (`user-agent`, `${product.nameLong}/${product.version}`) in
   [microsoft/vscode](https://github.com/microsoft/vscode).
 - Gemini CLI: `packages/core/src/tools/mcp-client.ts` in
   [google-gemini/gemini-cli](https://github.com/google-gemini/gemini-cli).
@@ -37,8 +42,10 @@ Three facts follow for the SDK:
    for clients that send no id.
 2. Each client uses its own key, and some keys are unprefixed (`threadId`). Reading an id needs a
    per-client table, not a guess at key names.
-3. Every HTTP client names itself in the `User-Agent` of every request. It is the one signal present
-   at `tools/list` on every protocol revision, which is where the SDK decides what to advertise.
+3. HTTP clients that name themselves do so in the `User-Agent`, on every request. It is the one
+   signal present at `tools/list` on every protocol revision, which is where the SDK decides what to
+   advertise. Not every client sets one (Gemini CLI does not), so it can recognize a client but never
+   rule one out.
 
 ## Goals / Non-Goals
 
@@ -93,13 +100,14 @@ For option B the SDK needs a signal present on the listing request. The candidat
 - `clientInfo` from `initialize`. A legacy stateful session has it, but a stateless HTTP request is
   bound to no handshake, and a 2026-07-28 client sends no `initialize`.
 - `clientInfo` in a 2026-07-28 request's `_meta`. Present only on that revision.
-- The HTTP `User-Agent`. Present on every HTTP request of every revision (fact 3).
+- The HTTP `User-Agent`. Sent on every HTTP request of every revision by the clients that set one
+  (fact 3).
 
 The ChatGPT row uses `User-Agent`, written as one anchored regex so every SDK parses it the same way:
 the header starts with the `openai-mcp/` token, and the first field of its parenthetical, split on `;`
 or `,` and trimmed, is `ChatGPT` in any case. Other OpenAI surfaces share the `openai-mcp` token with
-their own parenthetical, so the regex keeps them out. ChatGPT reaches servers only over HTTP, so a
-header rule loses nothing for it. Each row states its own recognition rule, so a client that is
+their own parenthetical (Context), so the regex keeps them out. ChatGPT runs in OpenAI's cloud and
+connects to a server by URL, never by starting a local process, so a header rule loses nothing for it. Each row states its own recognition rule, so a client that is
 reached over stdio can use a different signal.
 
 Recognition changes only what the SDK advertises and mints. A valid handle that a recognized client

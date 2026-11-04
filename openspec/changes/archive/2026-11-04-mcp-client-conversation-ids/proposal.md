@@ -1,8 +1,8 @@
 ## Why
 
 MCP clients differ in what they send a server, and the SDK treats them all alike. Some clients name
-the conversation themselves: ChatGPT sends `_meta["openai/session"]` on every tool call. Every
-client that reaches a server over HTTP names itself in the `User-Agent` of every request. The SDK
+the conversation themselves: ChatGPT sends `_meta["openai/session"]` on every tool call. Most
+clients that reach a server over HTTP name themselves in the `User-Agent` of every request. The SDK
 uses neither:
 
 - A client that already names the conversation still gets a `conversation_id` argument and a

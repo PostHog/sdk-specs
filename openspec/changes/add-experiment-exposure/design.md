@@ -104,7 +104,7 @@ The trigger does not look at whether an Experiment links to the rule, and ignore
 - If both events share one cache, the two namespaces stay distinct within it, for example by making the event name part of the key.
 - The two events dedupe independently: a repeated `$feature_flag_called` that the tracker suppresses does not suppress an exposure whose key is new, and the reverse.
 - Bootstrapped and overridden values never reserve an exposure key.
-- A key is added only after capture accepts its event, and each event is attempted independently. A failed or dropped capture adds no key.
+- A key is added only after capture handles its event, and each event is attempted independently. Capture handles an event when it accepts it or the application's before-send hook discards it. A failed capture (a throw, a full or closed queue, opt-out or a disabled SDK) adds no key.
 - A flags reload never clears the exposure namespace.
 
 **Why.**
@@ -116,7 +116,7 @@ The trigger does not look at whether an Experiment links to the rule, and ignore
 - The reason code and rule type are not in the exposure key. An exposure only exists for a split, where they are always `experiment_split` and `experiment`, so they would add nothing.
 - The exposure key always includes the distinct ID, even in client SDKs whose flag-called tracker leaves it out, because an exposure belongs to an identity.
 - A shared cache without the event name lets the flag-called entry suppress the exposure written right after it, so the experiment loses its first exposure.
-- Adding a key only after capture accepts the event means a one-off hook failure or dropped event does not cost the exposure for good: the next read tries again. Config version 1 flag-called events keep the tracker's existing rules.
+- Adding a key only after capture handles the event means a one-off failure, such as a throwing hook or a full queue, does not cost the exposure for good: the next read tries again. A before-send discard still uses the key: it is the application's own choice, a later read would usually be discarded again, and SDKs that run the hook after the capture call returns cannot see it. Config version 1 flag-called events keep the tracker's existing rules.
 - Keeping the namespace across a reload makes one assignment one exposure in every SDK. The key already names the rule and variant, so a reload that changes the assignment still gives a new key.
 
 ### 8. The feature flag event decision covers both events
@@ -141,7 +141,7 @@ Payload reads stay silent by default, as `get-feature-flag-payload` defines. A p
 
 ### 11. One best-effort step builds both events
 
-**Choice.** One step takes the flag key, the evaluation details that supplied the value, and the read's context: provenance (bootstrap or override), local or remote source, request and error context, capture context, event settings and the event decision. It returns the events to capture and their dedupe keys. It never reads the returned value, definitions or other cached results. Capturing is best-effort: it never changes the returned value and never makes a read throw or reject. Building the events never causes evaluation, a flags or definitions request, or a flags reload; the events then go through the normal capture pipeline.
+**Choice.** One step takes the flag key, the evaluation details that supplied the value, and the read's context: provenance (bootstrap or override), local or remote source, request and error context, capture context, event settings and the event decision. It returns the events to capture and their dedupe keys. It never reads the returned value, definitions or other cached results. Capturing is best-effort: it never changes the returned value and never makes a read throw or reject. Each event is attempted independently, and its dedupe key is added only once capture handles it (decision 7). Building the events never causes evaluation, a flags or definitions request, or a flags reload; the events then go through the normal capture pipeline.
 
 **Why.** One step keeps both events consistent: the exposure always pairs with the flag-called event built from the same details. A wrapper that holds the same details, such as an OpenFeature provider hook, can call the step and produce the same events. Reads are on the request path, so analytics must never break them.
 

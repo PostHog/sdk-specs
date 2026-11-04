@@ -214,7 +214,7 @@ The SDK SHALL dedupe `$experiment_exposure` in its own namespace, separate from 
 
 Nothing else SHALL be part of the key. In particular the value, its legacy rendering, the request ID, the evaluation time, the local or remote source and the flag's row version are left out. A remote result that repeats an earlier local assignment is therefore not a second exposure, while variants with equal values stay separate through their variant keys.
 
-A read SHALL emit the exposure only when its key is not yet in the namespace. The SDK SHALL add the key only after capture accepts the exposure for delivery, as "Exposure capture is built in one best-effort step" defines. An SDK SHOULD stop concurrent reads from emitting the same exposure twice, for example by holding the key while capture runs and releasing it when capture does not accept the event.
+A read SHALL emit the exposure only when its key is not yet in the namespace. The SDK SHALL add the key only after capture handles the exposure, as "Exposure capture is built in one best-effort step" defines. An SDK SHOULD stop concurrent reads from emitting the same exposure twice, for example by holding the key while capture runs and releasing it when capture fails.
 
 An SDK that stores both events' dedupe entries in one cache SHALL keep the two namespaces distinct within it, for example by making the event name part of each key, so an entry for `$feature_flag_called` never suppresses its exposure and the reverse.
 
@@ -359,7 +359,7 @@ The SDK SHALL build a read's `$feature_flag_called` and `$experiment_exposure` e
 
 The step SHALL NOT read the value the read returned, flag definitions, other flags' records, or results cached from other evaluations. A wrapper that holds the same evaluation details and context, such as an OpenFeature provider hook, can then reuse the step and produce the same events.
 
-Capturing both events SHALL be best-effort. It SHALL NOT change the value a read returns and SHALL NOT make a read throw or reject. Building the events and their dedupe keys SHALL NOT cause flag evaluation, a flags or definitions request, or a flags reload. The events then go through the SDK's normal capture pipeline, including its configured delivery behavior. The SDK SHALL attempt each event that the read emits independently: a failed or dropped capture of one event SHALL NOT stop the SDK from attempting the other. Capture accepts an event when the capture call returns without throwing and does not drop the event, for example through a before-send hook that discards it, an opt-out, or a full queue. The SDK SHALL add an event's dedupe key, in the exposure namespace or the flag-called tracker, only after capture accepts that event. A failed or dropped capture adds no key, so a later read attempts that event again. Retries after capture accepted an event belong to the capture pipeline. For a config version 1 event, the flag-called tracker keeps its existing rules.
+Capturing both events SHALL be best-effort. It SHALL NOT change the value a read returns and SHALL NOT make a read throw or reject. Building the events and their dedupe keys SHALL NOT cause flag evaluation, a flags or definitions request, or a flags reload. The events then go through the SDK's normal capture pipeline, including its configured delivery behavior. The SDK SHALL attempt each event that the read emits independently: a failed capture of one event SHALL NOT stop the SDK from attempting the other. Capture handles an event when it accepts the event for delivery, or when the application's before-send hook (`before_send`, or the SDK's equivalent) discards it. A discard by that hook is the application's own choice, a later read would usually be discarded again, and SDKs that run the hook after the capture call returns cannot see it. Capture fails when the capture call throws, or when the SDK drops the event because its queue is full or closed, or because the SDK is opted out or disabled. The SDK SHALL add an event's dedupe key, in the exposure namespace or the flag-called tracker, only after capture handles that event. A failed capture adds no key, so a later read attempts that event again. Retries after capture accepted an event belong to the capture pipeline. For a config version 1 event, the flag-called tracker keeps its existing rules.
 
 When capture fails, including when application code that runs during capture throws, the SDK SHALL log the failure and return the read's value.
 
@@ -378,14 +378,23 @@ When capture fails, including when application code that runs during capture thr
 - **THEN** no second `$feature_flag_called` event is enqueued
 - **AND** one `$experiment_exposure` event is enqueued with `$feature_flag_variant` "test"
 
-#### Scenario: A dropped flag-called capture reserves no key and does not stop the exposure
+#### Scenario: A flag-called event the queue rejects reserves no key and does not stop the exposure
 - **GIVEN** the record for "checkout-flow" is a complete config version 2 experiment split with value true, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
-- **AND** a before-send hook drops the first `$feature_flag_called` event and lets every other event through
+- **AND** the SDK's capture queue rejects the first `$feature_flag_called` event because it is full, and accepts every later event
 - **WHEN** "checkout-flow" is read for distinct id "user-123"
 - **THEN** no `$feature_flag_called` event is enqueued and one `$experiment_exposure` event is enqueued
 - **WHEN** "checkout-flow" is read again for "user-123"
 - **THEN** one `$feature_flag_called` event is enqueued
 - **AND** no second `$experiment_exposure` event is enqueued
+
+#### Scenario: An exposure that the before-send hook discards keeps its key
+- **GIVEN** the record for "checkout-flow" is a complete config version 2 experiment split with value true, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
+- **AND** the application's before-send hook discards every `$experiment_exposure` event and lets every other event through
+- **WHEN** "checkout-flow" is read for distinct id "user-123"
+- **THEN** one `$feature_flag_called` event is enqueued and no `$experiment_exposure` event is enqueued
+- **WHEN** "checkout-flow" is read again for "user-123"
+- **THEN** no event is enqueued for "checkout-flow"
+- **AND** the before-send hook is not called again for "checkout-flow"
 
 #### Scenario: Missing details are not fetched
 - **GIVEN** a client SDK restored flag state for "checkout-flow" that an older SDK version persisted without typed values or rule metadata

@@ -2,7 +2,7 @@
 
 ### Requirement: Experiment exposure trigger
 
-Every flag read that emits `$feature_flag_called` SHALL keep emitting it as the existing requirements define. The same read SHALL also emit one `$experiment_exposure` event when the evaluation details that supplied the read's value meet all of these conditions:
+A tracked read is a flag read on a path that reports `$feature_flag_called` and whose feature flag event decision is `true`. Every tracked read SHALL keep reporting `$feature_flag_called` as the existing requirements define. The same read SHALL also emit one `$experiment_exposure` event, subject to "Experiment exposure dedupe", when the evaluation details that supplied the read's value meet all of these conditions:
 
 - the record was read without a parse error and is not `failed`;
 - `metadata.config_version` is 2;
@@ -12,7 +12,7 @@ Every flag read that emits `$feature_flag_called` SHALL keep emitting it as the 
 - `metadata.variant_key` is present;
 - the value came from the flags service or from local evaluation, not from a bootstrapped value or a client-side override.
 
-"Present" means the member exists and is not `null`. This applies to every read path that emits `$feature_flag_called`: client getters such as `getFeatureFlag`, `isFeatureEnabled` and `getFeatureFlagResult`, server single-flag getters, snapshot enablement and value reads (see `evaluate-flags`), and typed value or details accessors where the SDK has them. Whether a read emits `$feature_flag_called` at all is decided as the existing requirements and "Feature flag event decision covers the exposure" define.
+"Present" means the member exists and is not `null`. This applies to every read path that reports `$feature_flag_called`: client getters such as `getFeatureFlag`, `isFeatureEnabled` and `getFeatureFlagResult`, server single-flag getters, snapshot enablement and value reads (see `evaluate-flags`), and typed value or details accessors where the SDK has them. Whether a read is tracked is decided as the existing requirements and "Feature flag event decision covers the exposure" define. The two events dedupe independently: a tracked read whose `$feature_flag_called` the tracker suppresses as a repeat SHALL still emit the exposure when the exposure key is new, and a tracked read whose exposure key is already present SHALL still emit `$feature_flag_called` when its tracker key is new.
 
 The trigger SHALL NOT depend on whether an experiment links to the rule. `metadata.has_experiment`, and any experiment the SDK knows about, are not inputs.
 
@@ -23,7 +23,7 @@ The decision SHALL use the evaluation details that supplied the value, not the v
 A typed read that returned the caller default because the value has another type than the read asks for (a type mismatch) SHALL emit neither `$feature_flag_called` nor `$experiment_exposure`, and SHALL NOT consult or update either dedupe namespace, so the next read of the right type emits both. The SDK logs the mismatch instead, as the typed accessors define.
 
 #### Scenario: An experiment split emits both events
-- **GIVEN** the record for "checkout-flow" has value true, `failed` false, reason code `experiment_split`, and metadata config version 2, rule type `experiment`, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
+- **GIVEN** the record for "checkout-flow" has value true, no `failed` member, reason code `experiment_split`, and metadata config version 2, rule type `experiment`, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
 - **WHEN** a read of "checkout-flow" emits `$feature_flag_called`
 - **THEN** exactly one `$feature_flag_called` event is enqueued for "checkout-flow"
 - **AND** exactly one `$experiment_exposure` event is enqueued for "checkout-flow" with `$feature_flag_variant` "test" and `$feature_flag_rule_id` "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13"
@@ -93,7 +93,7 @@ A typed read that returned the caller default because the value has another type
 
 ### Requirement: Malformed experiment splits fail closed
 
-The SDK SHALL treat a record with reason code `experiment_split` whose rule type is not `experiment`, or that has no rule ID or no variant key, as a malformed split. For a malformed split the SDK:
+The SDK SHALL treat a config version 2 record that it read without a parse error, that supplied the read's value, and that has reason code `experiment_split`, as a malformed split when its rule type is not `experiment`, or it has no rule ID or no variant key. A known field with the wrong JSON type, such as a rule type that is a number, is a per-record parse error as the wire reader contract defines, not a malformed split. For a malformed split the SDK:
 
 - SHALL NOT emit `$experiment_exposure`;
 - SHALL NOT change the value the read returns because of the missing fields;
@@ -115,6 +115,13 @@ The diagnostic event keeps config version 2 so that ingestion does not derive an
 - **WHEN** a read of "checkout-flow" emits `$feature_flag_called`
 - **THEN** no `$experiment_exposure` event is enqueued
 - **AND** the `$feature_flag_called` event has none of `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`
+
+#### Scenario: A rule type of the wrong JSON type is a parse error, not a malformed split
+- **GIVEN** the record for "checkout-flow" has reason code `experiment_split`, config version 2, the number 2 as rule type, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
+- **WHEN** "checkout-flow" is read
+- **THEN** the read handles the record as a per-record parse error
+- **AND** no `$experiment_exposure` event is enqueued
+- **AND** no `$feature_flag_called` event for "checkout-flow" carries `$feature_flag_config_version` 2
 
 #### Scenario: The SDK does not guess a missing rule ID from an earlier result
 - **GIVEN** an earlier read of "checkout-flow" reported a complete split with rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
@@ -201,7 +208,7 @@ Nothing else SHALL be part of the key. In particular the value, its legacy rende
 
 A read SHALL emit the exposure only when its key is not yet in the namespace, and SHALL then add the key. Check and add SHOULD be atomic, so concurrent reads do not emit the same exposure twice.
 
-An SDK that stores both events' dedupe entries in one cache SHALL make the event name part of each key, or check and mark both entries in one atomic step, so an entry for `$feature_flag_called` never suppresses its exposure.
+An SDK that stores both events' dedupe entries in one cache SHALL keep the two namespaces distinct within it, for example by making the event name part of each key, so an entry for `$feature_flag_called` never suppresses its exposure and the reverse.
 
 Bootstrapped and overridden values SHALL NOT add an exposure key.
 
@@ -234,6 +241,13 @@ The namespace SHALL be bounded and evicted like the flag-called tracker: when it
 - **GIVEN** a server SDK emitted an exposure for the group flag "checkout-flow", distinct id "user-123" and group "company" "company-123"
 - **WHEN** "checkout-flow" is read for "user-123" with group "company" "company-456" and the record is a split with the same rule id and variant key
 - **THEN** a second `$experiment_exposure` event is enqueued
+
+#### Scenario: A repeated flag-called event does not suppress a new exposure
+- **GIVEN** a read for distinct id "user-123" emitted `$feature_flag_called` and `$experiment_exposure` for "checkout-flow", a complete config version 2 experiment split with rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
+- **AND** the exposure namespace has since evicted that exposure key, while the flag-called tracker still holds its entry
+- **WHEN** "checkout-flow" is read again for "user-123" with the same record
+- **THEN** no second `$feature_flag_called` event is enqueued
+- **AND** one more `$experiment_exposure` event is enqueued with `$feature_flag_variant` "test"
 
 #### Scenario: The flag-called entry does not suppress its exposure
 - **GIVEN** an SDK stores flag-called and exposure dedupe entries in one cache
@@ -315,7 +329,7 @@ The SDK SHALL build a read's `$feature_flag_called` and `$experiment_exposure` e
 
 The step SHALL NOT read the value the read returned, flag definitions, other flags' records, or results cached from other evaluations. A wrapper that holds the same evaluation details and context, such as an OpenFeature provider hook, can then reuse the step and produce the same events.
 
-Capturing both events SHALL be best-effort. It SHALL NOT change the value a read returns, SHALL NOT make a read throw or reject, and SHALL NOT cause flag evaluation, network I/O or a flags reload. When capture fails, including when application code that runs during capture throws, the SDK SHALL log the failure and return the read's value.
+Capturing both events SHALL be best-effort. It SHALL NOT change the value a read returns and SHALL NOT make a read throw or reject. Building the events and their dedupe keys SHALL NOT cause flag evaluation, a flags or definitions request, or a flags reload. The events then go through the SDK's normal capture pipeline, including its configured delivery behavior. When capture fails, including when application code that runs during capture throws, the SDK SHALL log the failure and return the read's value.
 
 #### Scenario: A failing exposure capture does not break the read
 - **GIVEN** the record for "checkout-flow" is a complete config version 2 experiment split with value true and variant key "test"

@@ -100,7 +100,8 @@ The trigger does not look at whether an Experiment links to the rule, and ignore
 
 - `$feature_flag_called` keeps its existing key, and for config version 2 results the key also includes the config version, reason code, rule ID, rule type and variant key, as sent on the event.
 - `$experiment_exposure` has its own bounded namespace, keyed on the distinct ID (as the string the event carries), the canonical group context, the flag key, the config version, the rule ID and the variant key.
-- If both events share one cache, the event name is part of the key, or the SDK checks and marks both entries in one atomic step.
+- If both events share one cache, the two namespaces stay distinct within it, for example by making the event name part of the key.
+- The two events dedupe independently: a repeated `$feature_flag_called` that the tracker suppresses does not suppress an exposure whose key is new, and the reverse.
 - Bootstrapped and overridden values never reserve an exposure key.
 
 **Why.**
@@ -133,7 +134,7 @@ The trigger does not look at whether an Experiment links to the rule, and ignore
 
 ### 11. One best-effort step builds both events
 
-**Choice.** One step takes the flag key, the evaluation details that supplied the value, and the read's context: provenance (bootstrap or override), local or remote source, request and error context, capture context, event settings and the event decision. It returns the events to capture and their dedupe keys. It never reads the returned value, definitions or other cached results. Capturing is best-effort: it never changes the returned value, never makes a read throw or reject, and never causes evaluation, network I/O or a flags reload.
+**Choice.** One step takes the flag key, the evaluation details that supplied the value, and the read's context: provenance (bootstrap or override), local or remote source, request and error context, capture context, event settings and the event decision. It returns the events to capture and their dedupe keys. It never reads the returned value, definitions or other cached results. Capturing is best-effort: it never changes the returned value and never makes a read throw or reject. Building the events never causes evaluation, a flags or definitions request, or a flags reload; the events then go through the normal capture pipeline.
 
 **Why.** One step keeps both events consistent: the exposure always pairs with the flag-called event built from the same details. A wrapper that holds the same details, such as an OpenFeature provider hook, can call the step and produce the same events. Reads are on the request path, so analytics must never break them.
 

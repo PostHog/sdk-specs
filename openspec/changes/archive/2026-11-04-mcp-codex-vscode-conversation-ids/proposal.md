@@ -26,7 +26,8 @@ _None._
 
 ### Modified Capabilities
 
-- `mcp-analytics`: **Session identity**, **Arguments the SDK injects**, and the Configuration table.
+- `mcp-analytics`: **Session identity**, **Arguments the SDK injects**, **Manual capture**, the
+  Terminology list, and the Configuration table.
 
 ## Impact
 

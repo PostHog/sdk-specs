@@ -311,6 +311,17 @@ Feature: MCP analytics
     Then the MCP client result should end with a conversation_id text block
 
   @server
+  Scenario: An invalid id from a handle-free client gets no handle
+    Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
+    When the MCP client with User-Agent "openai-mcp/1.0.0 (ChatGPT)" calls tool "search_docs" with _meta {"openai/session":""} and JSON arguments:
+      """application/json
+      {"query":"flags"}
+      """
+    Then the MCP client result should not contain a conversation_id text block
+    When pending captures are flushed
+    Then the "$mcp_tool_call" event property "$session_id" should not equal "ses_2f5d35b7108d17c807766f2f769a1e8c"
+
+  @server
   Scenario: A Codex session id sets the session
     Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
     When the MCP client with User-Agent "codex-mcp-client/0.50.0" calls tool "search_docs" with _meta {"sessionId":"019A4F2E-1C3D-7B8A-9E0F-1A2B3C4D5E6F"} and JSON arguments:

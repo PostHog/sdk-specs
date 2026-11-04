@@ -52,7 +52,8 @@ documented in its README.
   Credentials, cookies, and client addresses are never transport sessions. A long-lived HTTP server
   without session ids has none: one process there serves every client.
 - **Client conversation id**: a value an MCP client sends in a tool call's `_meta` to name the
-  conversation, under a key listed in "Session identity".
+  conversation, under its own key in the table of "Session identity", from a request that table
+  recognizes as that client.
 - **Conversation handle**: a UUIDv7 the SDK returns to the agent and the agent echoes as the
   `conversation_id` argument, the only grouping the SDK itself can give a stateless HTTP request.
 - **Final outcome**: the result or error that ends a tool call, as opposed to an `input_required`
@@ -291,9 +292,11 @@ client that defines it:
 | OpenAI Codex | `sessionId` | a UUID | the HTTP `User-Agent` starts with `codex-mcp-client/`, or the client name is `codex-mcp-client` | fallback |
 | VS Code | `vscode.conversationId` | a UUID | the HTTP `User-Agent` starts with `Visual Studio Code/` or `Visual Studio Code - Insiders/`, or the client name is `Visual Studio Code` or `Visual Studio Code - Insiders` | fallback |
 
-The client name is `$mcp_client_name` as "Client and server identity" resolves it for the request. A
-UUID is 32 hexadecimal digits in the 8-4-4-4-12 hyphenated form, of any version, compared and derived
-lowercased.
+The client name is `$mcp_client_name` as "Client and server identity" resolves it for the request.
+Every recognition rule ignores case. Rows are checked in table order, and the first row that
+recognizes a request is its client's row: the SDK reads only that row's key and applies only that
+row's Handle. A UUID is 32 hexadecimal digits in the 8-4-4-4-12 hyphenated form, of any version, compared and derived
+lowercased; the nil UUID (all zeros) is not one.
 
 So `openai-mcp/1.0.0 (ChatGPT)` and `openai-mcp/1.0.0 ( chatgpt; web)` are recognized, and
 `openai-mcp/1.0.0 (Codex)`, `openai-mcp/1.0.0 (ChatGPT-Agent)`, and `Mozilla/5.0 openai-mcp/1.0.0
@@ -371,6 +374,13 @@ is not a token.
 - **GIVEN** an MCP server instrumented by the SDK with conversation anchoring enabled, on a transport that carries no session
 - **WHEN** an MCP client with `User-Agent` "codex-mcp-client/0.50.0" calls tool "search_docs" with `_meta` {"sessionId": "not-a-uuid"}
 - **THEN** the result's last content block should be a text block of the form `{"conversation_id":"<uuidv7>"}`
+
+#### Scenario: An invalid id from a handle-free client gets no handle
+- **GIVEN** an MCP server instrumented by the SDK with conversation anchoring enabled, on a transport that carries no session
+- **WHEN** an MCP client with `User-Agent` "openai-mcp/1.0.0 (ChatGPT)" calls tool "search_docs" with `_meta` {"openai/session": ""}
+- **THEN** the result should contain no `conversation_id` text block
+- **WHEN** the SDK is flushed
+- **THEN** the "$mcp_tool_call" event's "$session_id" should not be "ses_2f5d35b7108d17c807766f2f769a1e8c"
 
 #### Scenario: Codex and VS Code ids set the session
 - **GIVEN** an MCP server instrumented by the SDK with conversation anchoring enabled, on a transport that carries no session
@@ -541,7 +551,8 @@ events of "Optional events" it MAY offer capture methods. It SHALL work in three
 takes the server's tools and the listing request's HTTP headers when there are any, and returns them with the injected arguments advertised. A call step takes the
 tool's registered definition (input schema, description, `_meta`) when the tool exists, the arguments
 as the agent sent them, the request's `_meta`, the HTTP headers when there are any, the transport
-session when there is one, whether the tool exists (known to exist, known not to, or unknown for a
+session when there is one, the client's `initialize` `clientInfo` when the caller holds one bound to
+the request's transport session, whether the tool exists (known to exist, known not to, or unknown for a
 server with no registry), and the time the request started; it returns the arguments for the handler
 and a call context, and for a tool known not to exist it emits `$mcp_unknown_tool` where the SDK does.
 The transport session is either a raw id, derived per rule 3 of "Session identity", or a key the caller
@@ -554,8 +565,10 @@ intent and model, `$session_id`, person and client identity, failure capture, pr
 A lower-level method MAY also accept a finished call's fields directly, for a server that already holds
 them; it is exempt from producing the same events as automatic instrumentation. It sends
 `$mcp_parameters` and `$mcp_response` as the caller passes them and follows the rest of this spec for
-everything else. A `$session_id` the caller passes is sent unchanged as the transport session unless a
-client conversation id or a conversation handle applies; without any of these, each call gets a fresh
+everything else. A client conversation id applies only when the caller passes the request's `_meta`
+together with the `User-Agent` or client name that recognizes its client. A `$session_id` the caller
+passes is sent unchanged as the transport session unless a client conversation id or a conversation
+handle applies; without any of these, each call gets a fresh
 `ses_<UUIDv7>`, as rule 4 of
 "Session identity" gives a stateless request, so a server on a one-client connection SHOULD pass its
 connection's id.

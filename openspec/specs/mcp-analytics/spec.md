@@ -51,6 +51,8 @@ documented in its README.
 
   Credentials, cookies, and client addresses are never transport sessions. A long-lived HTTP server
   without session ids has none: one process there serves every client.
+- **Client conversation id**: a value an MCP client sends in a tool call's `_meta` to name the
+  conversation, under a key listed in "Session identity".
 - **Conversation handle**: a UUIDv7 the SDK returns to the agent and the agent echoes as the
   `conversation_id` argument, the only grouping a stateless HTTP request can carry.
 - **Final outcome**: the result or error that ends a tool call, as opposed to an `input_required`
@@ -66,7 +68,7 @@ table is the one place defaults are stated.
 | context (intent) | on | Injects the `context` argument and captures `$mcp_intent`; description configurable |
 | model capture | on | Reads the model from request metadata, or injects an `llm_model` argument for the agent to self-report |
 | intent fallback | none | Server callback that supplies intent when the agent does not (`$mcp_intent_source: "inferred"`) |
-| conversation anchoring | on | Injects `conversation_id`, mints handles, and derives `$session_id` from them |
+| conversation anchoring | on | Injects `conversation_id`, mints handles, and derives `$session_id` from them; never for a client that sends a client conversation id |
 | identify | none | Resolves `distinct_id`, `$set`, and `$groups` per request |
 | exception autocapture | on | Emits `$exception` next to failed calls |
 | initialize event | on | Sends `$mcp_initialize` for each legacy `initialize`; off sends none and changes nothing else |
@@ -257,9 +259,10 @@ Every MCP event SHALL carry a non-empty `$session_id` that groups one agent conv
 transport allows, and never groups requests from different clients. It comes from whoever groups the
 client's calls, first match wins:
 
-1. The agent: a conversation handle (see below), echoed by the agent or minted for this call and
+1. The client: a client conversation id (see below) in the tool call's `_meta`.
+2. The agent: a conversation handle (see below), echoed by the agent or minted for this call and
    delivered in its result.
-2. The transport: a transport session.
+3. The transport: a transport session.
    - An id: a legacy `Mcp-Session-Id` that decodes as a PostHog session token gives its `sid` unchanged;
      any other id is derived as below. An id the framework assigns afresh to every request is not a
      transport session.
@@ -268,7 +271,7 @@ client's calls, first match wins:
      new one, and so does the first tool call that arrives 30 minutes or more after the previous tool
      call on that connection ended, because a desktop app can keep one stdio process alive across many
      separate chats. Every event of a call uses the id resolved when the call arrived.
-3. Nobody: a stateless HTTP request carrying neither gets a fresh `ses_<UUIDv7>` of its own.
+4. Nobody: a stateless HTTP request carrying none of these gets a fresh `ses_<UUIDv7>` of its own.
 
 A derived `$session_id` is `"ses_" + H(x) + H(x + "::salt")`. `H` runs two 32-bit FNV-1a lanes over the
 input's characters (ASCII, so bytes, UTF-16 units, and code points agree), seeds `0x84222325` and
@@ -276,11 +279,29 @@ input's characters (ASCII, so bytes, UTF-16 units, and code points agree), seeds
 the two lanes as 8 lowercase hex digits each. Derivation is deterministic so replicas, restarts, and
 SDKs in different languages agree.
 
+A client conversation id is a value an MCP client puts in a `tools/call` request's `_meta` to name the
+conversation the call belongs to. The SDK SHALL read it only under a key in this table, which lists every
+known key, and SHALL treat a request as coming from a recognized client when it matches a row's
+recognition rule:
+
+| Client | `_meta` key | Recognized client when |
+|--------|-------------|------------------------|
+| ChatGPT | `openai/session` | the HTTP `User-Agent` has the product token `openai-mcp` and its first parenthetical, up to the first comma, is `ChatGPT` (case-insensitive), such as `openai-mcp/1.0.0 (ChatGPT)` |
+
+A value that is not a string of 1 to 128 printable ASCII characters (0x20 to 0x7E) is not a client
+conversation id. The SDK SHALL derive `$session_id` from `<key> + ":" + <value>`, so ids from two clients
+never derive the same session, and SHALL NOT send the value itself in any property. A client
+conversation id wins over a conversation handle: when a call carries both, the SDK SHALL ignore the
+handle for `$session_id` and `$mcp_conversation_id`. The client's id names the conversation from its
+first call, while a handle starts at the second call and holds only while the agent copies it. A call
+with a client conversation id SHALL NOT set `$mcp_conversation_id`, which holds only SDK-minted handles.
+
 Conversation anchoring exists because 2026-07-28 has no session: without it every request of a
 stateless HTTP client is its own session. When enabled, the SDK SHALL accept only UUIDv7-shaped handles
 (lowercased), set `$mcp_conversation_id` on the `$mcp_tool_call`, `$mcp_input_required`,
 `$mcp_unknown_tool`, the reports of "Optional events", and any `$exception`, and, for a tool call or
-virtual tool call with no valid handle and no transport session, mint a UUIDv7 handle and append to the
+virtual tool call with no client conversation id, no valid handle, and no transport session, from a
+client that is not recognized, mint a UUIDv7 handle and append to the
 result's content a text block whose text is the JSON object `{"conversation_id":"<handle>"}`
 (whitespace may vary). It MAY also mirror it into `structuredContent` as `{"_mcp_instructions":
 {"conversation_id": <handle>}}`, but only for a tool whose advertised output schema is a plain object
@@ -307,6 +328,27 @@ is not a token.
 - **AND** the SDK is flushed
 - **THEN** both "$mcp_tool_call" events should have the same "$session_id"
 - **AND** both should have "$mcp_conversation_id" equal to the handle
+
+#### Scenario: A client conversation id sets the session and adds no conversation_id block
+- **GIVEN** an MCP server instrumented by the SDK with conversation anchoring enabled, on a transport that carries no session
+- **WHEN** an MCP client calls tool "search_docs" with `_meta` {"openai/session": "v1/conv-example-0001"}
+- **THEN** the result should contain no `conversation_id` text block
+- **WHEN** the SDK is flushed
+- **THEN** the "$mcp_tool_call" event's "$session_id" should be "ses_2f5d35b7108d17c807766f2f769a1e8c"
+- **AND** it should have no "$mcp_conversation_id"
+
+#### Scenario: A client conversation id wins over a conversation handle
+- **GIVEN** an MCP server instrumented by the SDK with conversation anchoring enabled, on a transport that carries no session
+- **WHEN** an MCP client calls tool "search_docs" with arguments `{"query": "flags", "conversation_id": "0190f0e8-7a6b-7c3d-9e4f-5a6b7c8d9e0f"}` and `_meta` {"openai/session": "v1/conv-example-0001"}
+- **AND** the SDK is flushed
+- **THEN** the tool handler should receive arguments `{"query": "flags"}`
+- **AND** the "$mcp_tool_call" event's "$session_id" should be "ses_2f5d35b7108d17c807766f2f769a1e8c"
+- **AND** it should have no "$mcp_conversation_id"
+
+#### Scenario: A recognized client's call gets no conversation_id block without its id
+- **GIVEN** an MCP server instrumented by the SDK with conversation anchoring enabled, on a transport that carries no session
+- **WHEN** an MCP client with `User-Agent` "openai-mcp/1.0.0 (ChatGPT)" calls tool "search_docs" without `_meta` "openai/session"
+- **THEN** the result should contain no `conversation_id` text block
 
 #### Scenario: Session ids derive identically across SDKs
 - **GIVEN** a conversation handle "0190f0e8-7a6b-7c3d-9e4f-5a6b7c8d9e0f"
@@ -366,6 +408,10 @@ The SDK SHALL advertise each of these arguments that is enabled on every tool in
 the registered tool unchanged: `context` (the agent's reason for the call), `llm_model` (the agent's
 model), and `conversation_id`. The SDK SHALL:
 
+- leave `conversation_id`, and the `_mcp_instructions` output-schema declaration of "Session
+  identity", out of a listing requested by a recognized client of "Session identity". That client
+  names the conversation in `_meta`, so the argument would only add a second, weaker grouping key;
+
 - mark `context` and `llm_model` required where it removes them before the MCP framework validates
   arguments, because models fill required arguments, and optional otherwise, so no call is rejected
   for omitting them. `conversation_id` SHALL be optional: the agent has no handle on its first call;
@@ -391,8 +437,10 @@ intent (blank, or `"{}"`) SHALL be omitted. When a request carries a standardize
 (such as the proposed `io.modelcontextprotocol/aiInvocation` `userIntent`), the SDK SHOULD prefer it,
 with `$mcp_intent_source: "client_metadata"`. The default description of every free-text argument the
 SDK advertises (`context`, and the virtual tools' report arguments) SHALL tell the agent to leave out
-personal and identifying information, and the `context` one SHALL ask for the call's abstract purpose,
-describing people and entities by role ("a customer"), because pattern redaction misses names.
+personal and identifying information. The `context` one SHALL ask for a few words naming the call's
+purpose, describing people and entities by role ("a customer"), and SHALL tell the agent not to quote
+the user. `$mcp_intent` records why a tool was called. Quoted user text adds the conversation's
+content, including names that pattern redaction misses, and says nothing more about the purpose.
 
 #### Scenario: The context argument is advertised, captured, and removed
 - **GIVEN** an MCP server instrumented by the SDK with a tool "search_docs" whose schema declares only "query"
@@ -403,6 +451,14 @@ describing people and entities by role ("a customer"), because pattern redaction
 - **THEN** the tool handler should receive arguments `{"query": "flags"}`
 - **AND** the "$mcp_tool_call" event's property "$mcp_intent" should be "find the flags docs"
 - **AND** its property "$mcp_intent_source" should be "context_parameter"
+
+#### Scenario: A recognized client's listing has no conversation_id argument
+- **GIVEN** an MCP server instrumented by the SDK with conversation anchoring enabled and a tool "search_docs" whose schema declares only "query"
+- **WHEN** an MCP client with `User-Agent` "openai-mcp/1.0.0 (ChatGPT)" lists tools
+- **THEN** the advertised schema for "search_docs" should declare a string property "context"
+- **AND** it should not declare a property "conversation_id"
+- **WHEN** an MCP client with `User-Agent` "example-client/1.0" lists tools
+- **THEN** the advertised schema for "search_docs" should declare a property "conversation_id"
 
 #### Scenario: A fresh low-level server resolves injected argument ownership
 - **GIVEN** automatic instrumentation creates a fresh low-level server for `tools/call`
@@ -703,3 +759,22 @@ every enabled injected argument except `context`, whose place its own report arg
 - **THEN** no "$mcp_tools_list" event should be sent
 - **AND** the listed "search_docs" input schema should include `context`
 - **AND** the "$mcp_tool_call" event's property "$mcp_intent" should be "find flag docs"
+
+### Requirement: Virtual tool annotations
+
+The SDK SHALL advertise each virtual tool of "Optional events" with the annotations `readOnlyHint:
+false`, `destructiveHint: false`, `idempotentHint: false`, and `openWorldHint: false`, and SHALL NOT let
+host configuration change them. A call sends one event to the server owner's PostHog project, so it
+writes data outside the conversation. It deletes and overwrites nothing. Each repeated call sends
+another event. It reaches only that project, not open-ended external entities.
+
+#### Scenario: The missing-capability tool declares that it records data (@mcp_missing_capability_capable)
+- **GIVEN** an MCP server instrumented by the SDK with the missing-capability tool enabled
+- **WHEN** an MCP client lists tools
+- **THEN** the advertised "get_more_tools" tool should have annotations {"readOnlyHint": false, "destructiveHint": false, "idempotentHint": false, "openWorldHint": false}
+
+#### Scenario: The feedback tool declares that it records data (@mcp_feedback_capable)
+- **GIVEN** an MCP server instrumented by the SDK with the feedback tool enabled
+- **WHEN** an MCP client lists tools
+- **THEN** the advertised "send_feedback" tool should have annotations {"readOnlyHint": false, "destructiveHint": false, "idempotentHint": false, "openWorldHint": false}
+

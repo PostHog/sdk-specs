@@ -476,3 +476,59 @@ Feature: Analytics-v1 retries and mock response YAML parity
     And 5000 milliseconds elapse without a public SDK call
     Then at least 2 capture request should have been received
     And at least one recorded response should have status 200
+
+  # Source: openspec capture "Capture v1 request headers" (no YAML case). Waits on harness
+  # bindings for "the analytics capture requests should be, in order:" before it can run.
+  Scenario: Events captured during a retry wait go in their own request
+    Given the mock serves these ordered analytics responses:
+      | status | headers | body | event_results |
+      | 503 | {"Retry-After":"5"} | null | null |
+      | 200 | {} | null | null |
+      | 200 | {} | null | null |
+    And the SDK is initialized with token "phc_test_key" and flush threshold 10
+    When capture is called with JSON arguments:
+      """application/json
+      {"distinct_id":"test_user","event":"first_event"}
+      """
+    And pending captures are flushed
+    And 1000 milliseconds elapse without a public SDK call
+    And capture is called with JSON arguments:
+      """application/json
+      {"distinct_id":"test_user","event":"new_event"}
+      """
+    And pending captures are flushed
+    And 8000 milliseconds elapse without a public SDK call
+    Then the analytics capture requests should be, in order:
+      | events | posthog-attempt | posthog-request-id | created_at |
+      | ["first_event"] | 1 | A | A |
+      | ["first_event"] | 2 | A | A |
+      | ["new_event"] | 1 | B | B |
+    And the present event "uuid" lists in requests zero and one should be identical
+
+  # Source: openspec capture "Capture v1 request headers" (no YAML case). Waits on harness
+  # bindings for "the analytics capture requests should be, in order:" before it can run.
+  Scenario: Events captured during a per-event retry wait go in their own request
+    Given the mock serves these ordered analytics responses:
+      | status | headers | body | event_results |
+      | 200 | {"Retry-After":"5"} | null | ["ok","retry"] |
+      | 200 | {} | null | null |
+      | 200 | {} | null | null |
+    And the SDK is initialized with token "phc_test_key" and flush threshold 10
+    When capture is called sequentially 2 times with zero-based top-level index substitution:
+      """application/json
+      {"distinct_id":"test_user","event":"first_event_{index}"}
+      """
+    And pending captures are flushed
+    And 1000 milliseconds elapse without a public SDK call
+    And capture is called with JSON arguments:
+      """application/json
+      {"distinct_id":"test_user","event":"new_event"}
+      """
+    And pending captures are flushed
+    And 8000 milliseconds elapse without a public SDK call
+    Then the analytics capture requests should be, in order:
+      | events | posthog-attempt | posthog-request-id | created_at |
+      | ["first_event_0","first_event_1"] | 1 | A | A |
+      | ["first_event_1"] | 2 | A | A |
+      | ["new_event"] | 1 | B | B |
+    And the second request should retain first-response retry UUIDs and omit its terminal UUIDs

@@ -26,7 +26,6 @@ Feature: MCP analytics
     And the "$mcp_tool_call" event property "$mcp_duration_ms" should be a number
     And the "$mcp_tool_call" event property "$mcp_source" should equal "posthog_mcp_analytics"
     And the "$mcp_tool_call" event property "$session_id" should be a non-empty string
-    And the "$mcp_tool_call" event property "$lib" should end with "-mcp"
 
   @server
   Scenario: A tool result reaches the client unchanged

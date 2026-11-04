@@ -10,6 +10,7 @@
 - [x] 2.2 Draft the `retry-queue` delta: status classification, attempt budget, waits, `Retry-After`, no HTTP-library retries; narrative notes for `429` and `413`.
 - [x] 2.3 Draft the `http-client` delta: bearer token, header set, encodings, same-origin 307/308 redirects.
 - [x] 2.4 Draft the `event-batcher` delta: byte-aware check-before-append, no analytics per-event cap below capture's, `413` terminal.
+- [x] 2.5 Draft the `mcp-analytics` delta: **Library identity** for clients shared with the application and dedicated MCP clients.
 
 ## 3. Validation and archive
 

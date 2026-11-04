@@ -292,13 +292,40 @@ Feature: MCP analytics
     And the "$mcp_tool_call" event should not have property "$mcp_conversation_id"
 
   @server
-  Scenario: A recognized client's call gets no conversation_id block without its id
-    Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
-    When the MCP client with User-Agent "openai-mcp/1.0.0 (ChatGPT)" calls tool "search_docs" with JSON arguments:
+  Scenario: A client conversation id sets the session with conversation anchoring disabled
+    Given an instrumented MCP server with conversation anchoring disabled and a tool "search_docs" that returns the text "ok"
+    When the MCP client calls tool "search_docs" with _meta {"openai/session":"v1/conv-example-0001"} and JSON arguments:
       """application/json
       {"query":"flags"}
       """
-    Then the MCP client result should not contain a conversation_id text block
+    And pending captures are flushed
+    Then the "$mcp_tool_call" event property "$session_id" should equal "ses_2f5d35b7108d17c807766f2f769a1e8c"
+
+  @server
+  Scenario: An invalid client conversation id is ignored
+    Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
+    When the MCP client calls tool "search_docs" with _meta {"openai/session":""} and JSON arguments:
+      """application/json
+      {"query":"flags"}
+      """
+    Then the MCP client result should end with a conversation_id text block
+
+  @server
+  Scenario Outline: Only a recognized client's call goes without a conversation_id block
+    Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
+    When the MCP client with User-Agent "<user_agent>" calls tool "search_docs" with JSON arguments:
+      """application/json
+      {"query":"flags"}
+      """
+    Then the MCP client result <outcome>
+
+    Examples:
+      | user_agent                             | outcome                                         |
+      | openai-mcp/1.0.0 (ChatGPT)             | should not contain a conversation_id text block |
+      | openai-mcp/1.0.0 ( chatgpt; web)       | should not contain a conversation_id text block |
+      | openai-mcp/1.0.0 (Codex)               | should end with a conversation_id text block    |
+      | openai-mcp/1.0.0 (ChatGPT-Agent)       | should end with a conversation_id text block    |
+      | Mozilla/5.0 openai-mcp/1.0.0 (ChatGPT) | should end with a conversation_id text block    |
 
   @server
   Scenario: A recognized client's listing has no conversation_id argument

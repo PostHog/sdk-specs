@@ -79,8 +79,13 @@ For option B the SDK needs a signal present on ChatGPT's `tools/list`. The candi
   as `$mcp_client_user_agent`, and it tells ChatGPT apart from Codex and the other OpenAI surfaces,
   which share the `openai-mcp` token but carry their own parenthetical.
 
-The rule uses `User-Agent`. Each table row states its own recognition rule, so a future client can
-use whichever signal it sends.
+The rule uses `User-Agent`, written as one anchored regex so every SDK parses it the same way: the
+header starts with the `openai-mcp/` token, and the first field of its parenthetical, split on `;` or
+`,` and trimmed, is `ChatGPT` in any case. Each table row states its own recognition rule, so a future
+client can use whichever signal it sends.
+
+Recognition changes only what the SDK advertises and mints. A valid handle that a recognized client
+echoes still counts, so a stale listing cached from before this change keeps working.
 
 A recognized client's call that lacks its id gets no handle either. Minting one would put the block
 back in the results of the very client the rule is for, and that client's listing has no argument to
@@ -94,7 +99,14 @@ A listing now depends on the requesting client. A cache that serves one client's
 unrecognized client, which then loses anchoring, or shows it to ChatGPT, which is today's behavior.
 Neither corrupts data, so the spec adds no cache rule.
 
-### 4. Virtual tool annotations
+### 4. Client ids do not depend on the anchoring option
+
+The SDK reads client conversation ids with conversation anchoring on or off. The option controls what
+the SDK adds for the model to see: the argument, the handle, the result block. Reading an id the
+client already sends adds none of these, so a host that turns anchoring off for a directory submission
+keeps ChatGPT's grouping.
+
+### 5. Virtual tool annotations
 
 Earlier SDKs declared `readOnlyHint: true`, `idempotentHint: true`, and `openWorldHint: true`. Per the
 definitions in the Apps SDK reference:
@@ -106,11 +118,13 @@ definitions in the Apps SDK reference:
 
 The host cannot change them, because they describe what the SDK's own handler does.
 
-### 5. `context` asks for a few words
+### 6. `context` asks for a few words
 
 The value is recorded as `$mcp_intent`, the purpose of the call. A few words carry that purpose.
 Longer answers tend to restate the user's request, which adds conversation content and names the
-redaction pass cannot catch. The 2,048-character limit stays as the hard bound; the description sets
+redaction pass cannot catch. The rule covers the injected `context` only. `get_more_tools` declares
+its own `context` argument for a missing-capability report, which is a report, not a purpose, and
+keeps its description. The 2,048-character limit stays as the hard bound; the description sets
 the expectation.
 
 ## Risks / Trade-offs

@@ -33,7 +33,11 @@ recognition rule:
 
 | Client | `_meta` key | Recognized client when |
 |--------|-------------|------------------------|
-| ChatGPT | `openai/session` | the HTTP `User-Agent` has the product token `openai-mcp` and its first parenthetical, up to the first comma, is `ChatGPT` (case-insensitive), such as `openai-mcp/1.0.0 (ChatGPT)` |
+| ChatGPT | `openai/session` | the HTTP `User-Agent` matches `^openai-mcp/[^\s(]*\s*\(\s*chatgpt\s*[;,)]`, ignoring case |
+
+So `openai-mcp/1.0.0 (ChatGPT)` and `openai-mcp/1.0.0 ( chatgpt; web)` are recognized, and
+`openai-mcp/1.0.0 (Codex)`, `openai-mcp/1.0.0 (ChatGPT-Agent)`, and `Mozilla/5.0 openai-mcp/1.0.0
+(ChatGPT)` are not.
 
 A value that is not a string of 1 to 128 printable ASCII characters (0x20 to 0x7E) is not a client
 conversation id. The SDK SHALL derive `$session_id` from `<key> + ":" + <value>`, so ids from two clients
@@ -42,9 +46,12 @@ conversation id wins over a conversation handle: when a call carries both, the S
 handle for `$session_id` and `$mcp_conversation_id`. The client's id names the conversation from its
 first call, while a handle starts at the second call and holds only while the agent copies it. A call
 with a client conversation id SHALL NOT set `$mcp_conversation_id`, which holds only SDK-minted handles.
+The SDK SHALL read client conversation ids whether or not conversation anchoring is enabled: reading
+one adds nothing the client sees. Recognizing a client changes only what the SDK advertises and mints;
+a valid handle a recognized client echoes counts like any other.
 
 Conversation anchoring exists because 2026-07-28 has no session: without it every request of a
-stateless HTTP client is its own session. When enabled, the SDK SHALL accept only UUIDv7-shaped handles
+stateless HTTP client that sends no client conversation id is its own session. When enabled, the SDK SHALL accept only UUIDv7-shaped handles
 (lowercased), set `$mcp_conversation_id` on the `$mcp_tool_call`, `$mcp_input_required`,
 `$mcp_unknown_tool`, the reports of "Optional events", and any `$exception`, and, for a tool call or
 virtual tool call with no client conversation id, no valid handle, and no transport session, from a
@@ -92,6 +99,17 @@ is not a token.
 - **AND** the "$mcp_tool_call" event's "$session_id" should be "ses_2f5d35b7108d17c807766f2f769a1e8c"
 - **AND** it should have no "$mcp_conversation_id"
 
+#### Scenario: A client conversation id sets the session with conversation anchoring disabled
+- **GIVEN** an MCP server instrumented by the SDK with conversation anchoring disabled, on a transport that carries no session
+- **WHEN** an MCP client calls tool "search_docs" with `_meta` {"openai/session": "v1/conv-example-0001"}
+- **AND** the SDK is flushed
+- **THEN** the "$mcp_tool_call" event's "$session_id" should be "ses_2f5d35b7108d17c807766f2f769a1e8c"
+
+#### Scenario: An invalid client conversation id is ignored
+- **GIVEN** an MCP server instrumented by the SDK with conversation anchoring enabled, on a transport that carries no session
+- **WHEN** an MCP client calls tool "search_docs" with `_meta` {"openai/session": ""}
+- **THEN** the result's last content block should be a text block of the form `{"conversation_id":"<uuidv7>"}`
+
 #### Scenario: A recognized client's call gets no conversation_id block without its id
 - **GIVEN** an MCP server instrumented by the SDK with conversation anchoring enabled, on a transport that carries no session
 - **WHEN** an MCP client with `User-Agent` "openai-mcp/1.0.0 (ChatGPT)" calls tool "search_docs" without `_meta` "openai/session"
@@ -137,10 +155,12 @@ intent (blank, or `"{}"`) SHALL be omitted. When a request carries a standardize
 (such as the proposed `io.modelcontextprotocol/aiInvocation` `userIntent`), the SDK SHOULD prefer it,
 with `$mcp_intent_source: "client_metadata"`. The default description of every free-text argument the
 SDK advertises (`context`, and the virtual tools' report arguments) SHALL tell the agent to leave out
-personal and identifying information. The `context` one SHALL ask for a few words naming the call's
+personal and identifying information. The injected `context` one SHALL ask for a few words naming the call's
 purpose, describing people and entities by role ("a customer"), and SHALL tell the agent not to quote
 the user. `$mcp_intent` records why a tool was called. Quoted user text adds the conversation's
 content, including names that pattern redaction misses, and says nothing more about the purpose.
+This does not apply to the `context` report argument of `get_more_tools` (see "Optional events"),
+which holds a report, not a purpose.
 
 #### Scenario: The context argument is advertised, captured, and removed
 - **GIVEN** an MCP server instrumented by the SDK with a tool "search_docs" whose schema declares only "query"
@@ -169,6 +189,41 @@ content, including names that pattern redaction misses, and says nothing more ab
 - **THEN** the tool handler should receive arguments `{"query": "flags"}`
 - **AND** the "$mcp_tool_call" event's property "$mcp_intent" should be "find docs"
 - **AND** the "$mcp_tool_call" event's property "$mcp_llm_model" should be "model-a"
+
+### Requirement: Manual capture
+
+An SDK SHALL offer a manual API for servers it cannot instrument automatically, such as a custom
+dispatcher, a gateway, or a framework without an adapter. Given the same traffic, its step-based path
+SHALL produce the same `$mcp_tool_call` and `$exception` events as automatic instrumentation; for the
+events of "Optional events" it MAY offer capture methods. It SHALL work in three steps. A list step
+takes the server's tools and the listing request's HTTP headers when there are any, and returns them with the injected arguments advertised. A call step takes the
+tool's registered definition (input schema, description, `_meta`) when the tool exists, the arguments
+as the agent sent them, the request's `_meta`, the HTTP headers when there are any, the transport
+session when there is one, whether the tool exists (known to exist, known not to, or unknown for a
+server with no registry), and the time the request started; it returns the arguments for the handler
+and a call context, and for a tool known not to exist it emits `$mcp_unknown_tool` where the SDK does.
+The transport session is either a raw id, derived per rule 3 of "Session identity", or a key the caller
+keeps for the lifetime of a one-client connection, which the SDK tracks and rotates. A result step
+takes the call context and the outcome (the result or the error, an explicit error type if any, and
+when it ended); it sends the events and returns the result to deliver, with a minted handle appended.
+From these inputs the SDK applies every other rule of this spec itself: the `$mcp_parameters` shape,
+intent and model, `$session_id`, person and client identity, failure capture, privacy, and size bounds.
+
+A lower-level method MAY also accept a finished call's fields directly, for a server that already holds
+them; it is exempt from producing the same events as automatic instrumentation. It sends
+`$mcp_parameters` and `$mcp_response` as the caller passes them and follows the rest of this spec for
+everything else. A `$session_id` the caller passes is sent unchanged as the transport session unless a
+client conversation id or a conversation handle applies; without any of these, each call gets a fresh
+`ses_<UUIDv7>`, as rule 4 of
+"Session identity" gives a stateless request, so a server on a one-client connection SHOULD pass its
+connection's id.
+
+#### Scenario: A manually captured call matches the automatic one
+- **GIVEN** an MCP server that dispatches tool "search_docs" itself through the SDK's manual API
+- **WHEN** an MCP client calls tool "search_docs" with arguments `{"query": "flags", "context": "find the flags docs"}`
+- **AND** the SDK is flushed
+- **THEN** the "$mcp_tool_call" event's properties "$mcp_tool_name", "$mcp_intent", "$mcp_parameters", and "$mcp_is_error" should equal those automatic instrumentation sends for the same call
+- **AND** its property "$session_id" should be a non-empty string
 
 ## ADDED Requirements
 

@@ -5,12 +5,16 @@
 - [x] 1.2 Modify **Arguments the SDK injects**: no `conversation_id` in a recognized client's listing,
   and a few words of purpose in the `context` description
 - [x] 1.3 Add **Virtual tool annotations**
-- [x] 1.4 Add the matching scenarios to `acceptance/public/mcp-analytics.feature`
+- [x] 1.4 Modify **Manual capture**: the list step takes the listing's headers, the renumbered
+  "Session identity" rules, and the client id in the lower-level method
+- [x] 1.5 Add the matching scenarios to `acceptance/public/mcp-analytics.feature`
 
 ## 2. Prose alignment (applied at archive, outside the requirement-delta mechanism)
 
 - [x] 2.1 Add "Client conversation id" to Terminology
 - [x] 2.2 Update the conversation anchoring row of the Configuration table
+- [x] 2.3 Mark `$mcp_conversation_id` as unset on a call with a client conversation id in Property
+  reference
 
 ## 3. Validation
 

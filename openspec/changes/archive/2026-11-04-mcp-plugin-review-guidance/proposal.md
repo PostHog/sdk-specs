@@ -18,6 +18,8 @@ OpenAI's plugin review team gave guidance on all three. design.md records it.
 - Add client conversation ids to **Session identity**: a table of known `_meta` keys (today only
   ChatGPT's `openai/session`), ranked above the conversation handle. A call with one gets its
   `$session_id` from it and gets no `conversation_id` block. It wins over a handle.
+- **Manual capture**: the list step takes the listing request's headers, and the lower-level method
+  lets a client conversation id override a passed `$session_id`.
 - **Arguments the SDK injects**: leave `conversation_id` out of a listing requested by a recognized
   client, and ask for a few words of purpose in `context`, with no quoted user text.
 - Add **Virtual tool annotations**: `readOnlyHint`, `destructiveHint`, `idempotentHint`, and
@@ -32,8 +34,9 @@ _None._
 
 ### Modified Capabilities
 
-- `mcp-analytics`: **Session identity**, **Arguments the SDK injects**, a new **Virtual tool
-  annotations** requirement, the Terminology list, and the Configuration table.
+- `mcp-analytics`: **Session identity**, **Arguments the SDK injects**, **Manual capture**, a
+  new **Virtual tool annotations** requirement, the Terminology list, the Configuration table, and the
+  Property reference.
 
 ## Impact
 

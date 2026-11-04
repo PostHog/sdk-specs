@@ -270,7 +270,7 @@ Feature: MCP analytics
   @server
   Scenario: A client conversation id sets the session and adds no conversation_id block
     Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
-    When the MCP client calls tool "search_docs" with _meta {"openai/session":"v1/conv-example-0001"} and JSON arguments:
+    When the MCP client with User-Agent "openai-mcp/1.0.0 (ChatGPT)" calls tool "search_docs" with _meta {"openai/session":"v1/conv-example-0001"} and JSON arguments:
       """application/json
       {"query":"flags"}
       """
@@ -282,7 +282,7 @@ Feature: MCP analytics
   @server
   Scenario: A client conversation id wins over a conversation handle
     Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
-    When the MCP client calls tool "search_docs" with _meta {"openai/session":"v1/conv-example-0001"} and JSON arguments:
+    When the MCP client with User-Agent "openai-mcp/1.0.0 (ChatGPT)" calls tool "search_docs" with _meta {"openai/session":"v1/conv-example-0001"} and JSON arguments:
       """application/json
       {"query":"flags","conversation_id":"0190f0e8-7a6b-7c3d-9e4f-5a6b7c8d9e0f"}
       """
@@ -294,7 +294,7 @@ Feature: MCP analytics
   @server
   Scenario: A client conversation id sets the session with conversation anchoring disabled
     Given an instrumented MCP server with conversation anchoring disabled and a tool "search_docs" that returns the text "ok"
-    When the MCP client calls tool "search_docs" with _meta {"openai/session":"v1/conv-example-0001"} and JSON arguments:
+    When the MCP client with User-Agent "openai-mcp/1.0.0 (ChatGPT)" calls tool "search_docs" with _meta {"openai/session":"v1/conv-example-0001"} and JSON arguments:
       """application/json
       {"query":"flags"}
       """
@@ -302,16 +302,50 @@ Feature: MCP analytics
     Then the "$mcp_tool_call" event property "$session_id" should equal "ses_2f5d35b7108d17c807766f2f769a1e8c"
 
   @server
-  Scenario: An invalid client conversation id is ignored
+  Scenario: An invalid client conversation id falls back to a handle
     Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
-    When the MCP client calls tool "search_docs" with _meta {"openai/session":""} and JSON arguments:
+    When the MCP client with User-Agent "codex-mcp-client/0.50.0" calls tool "search_docs" with _meta {"sessionId":"not-a-uuid"} and JSON arguments:
       """application/json
       {"query":"flags"}
       """
     Then the MCP client result should end with a conversation_id text block
 
   @server
-  Scenario Outline: Only a recognized client's call goes without a conversation_id block
+  Scenario: A Codex session id sets the session
+    Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
+    When the MCP client with User-Agent "codex-mcp-client/0.50.0" calls tool "search_docs" with _meta {"sessionId":"019A4F2E-1C3D-7B8A-9E0F-1A2B3C4D5E6F"} and JSON arguments:
+      """application/json
+      {"query":"flags"}
+      """
+    Then the MCP client result should not contain a conversation_id text block
+    When pending captures are flushed
+    Then the "$mcp_tool_call" event property "$session_id" should equal "ses_0fdf126b8e2c1f9689ca12f3dd3383e6"
+
+  @server
+  Scenario: A VS Code conversation id sets the session for a client named in _meta
+    Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
+    When the MCP client on protocol revision "2026-07-28" with clientInfo name "Visual Studio Code" version "1.105.0" calls tool "search_docs" with _meta {"vscode.conversationId":"3f1c2b7e-8d4a-4c6b-9a1e-5f2d7c8b9a0e"} and JSON arguments:
+      """application/json
+      {"query":"flags"}
+      """
+    Then the MCP client result should not contain a conversation_id text block
+    When pending captures are flushed
+    Then the "$mcp_tool_call" event property "$session_id" should equal "ses_0571acb894e6753d33e37e5c2b327c59"
+
+  @server
+  Scenario: A key is read only from the client that defines it
+    Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
+    When the MCP client with User-Agent "example-client/1.0" calls tool "search_docs" with _meta {"sessionId":"019a4f2e-1c3d-7b8a-9e0f-1a2b3c4d5e6f","openai/session":"v1/conv-example-0001"} and JSON arguments:
+      """application/json
+      {"query":"flags"}
+      """
+    Then the MCP client result should end with a conversation_id text block
+    When pending captures are flushed
+    Then the "$mcp_tool_call" event property "$session_id" should not equal "ses_0fdf126b8e2c1f9689ca12f3dd3383e6"
+    And the "$mcp_tool_call" event property "$session_id" should not equal "ses_2f5d35b7108d17c807766f2f769a1e8c"
+
+  @server
+  Scenario Outline: Only a handle-free client's call goes without a conversation_id block
     Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
     When the MCP client with User-Agent "<user_agent>" calls tool "search_docs" with JSON arguments:
       """application/json
@@ -326,14 +360,17 @@ Feature: MCP analytics
       | openai-mcp/1.0.0 (Codex)               | should end with a conversation_id text block    |
       | openai-mcp/1.0.0 (ChatGPT-Agent)       | should end with a conversation_id text block    |
       | Mozilla/5.0 openai-mcp/1.0.0 (ChatGPT) | should end with a conversation_id text block    |
+      | codex-mcp-client/0.50.0                | should end with a conversation_id text block    |
 
   @server
-  Scenario: A recognized client's listing has no conversation_id argument
+  Scenario: Only a handle-free client's listing has no conversation_id argument
     Given an instrumented MCP server with a tool "search_docs" whose schema declares only "query"
     When the MCP client with User-Agent "openai-mcp/1.0.0 (ChatGPT)" lists tools
     Then the advertised schema for tool "search_docs" should declare a string property "context"
     And the advertised schema for tool "search_docs" should not declare a property "conversation_id"
     When the MCP client with User-Agent "example-client/1.0" lists tools
+    Then the advertised schema for tool "search_docs" should declare a property "conversation_id"
+    When the MCP client with User-Agent "codex-mcp-client/0.50.0" lists tools
     Then the advertised schema for tool "search_docs" should declare a property "conversation_id"
 
   @server

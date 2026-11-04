@@ -334,7 +334,7 @@ Legacy capture: posthog-python 7.x merged `super_properties` over the call's pro
 
 ### Requirement: Library identity comes from the request header
 
-An SDK that delivers events through capture v1 SHALL NOT send `$lib` or `$lib_version` in `properties`. The wire builder SHALL remove both keys after `before_send`, whoever set them, because capture derives them from `PostHog-Sdk-Info` and writes them after the event's own properties. `before_send` may still see a caller-supplied value. Built-in integrations (MCP servers, AI wrappers, framework middleware) SHALL NOT change the client's `PostHog-Sdk-Info` value.
+An SDK that delivers events through capture v1 SHALL NOT send `$lib` or `$lib_version` in `properties`. The wire builder SHALL remove both keys after `before_send`, whoever set them, because capture derives them from `PostHog-Sdk-Info` and writes them after the event's own properties. `before_send` may still see a caller-supplied value. Built-in integrations (MCP servers, AI wrappers, framework middleware) SHALL NOT change the client's `PostHog-Sdk-Info` value, except an MCP integration that labels a dedicated client (`mcp-analytics`, Library identity).
 
 Legacy capture: server SDKs stamped `$lib` and `$lib_version` into `properties`, and some integrations relabeled the client.
 

@@ -192,8 +192,9 @@ capture drops an event whose `properties` exceed 8 MiB
 (`ai_byte_rate_limited`); SDKs target about 5 MiB per request; retries follow
 `retry-queue`. Legacy capture: endpoint `/i/v0/ai/batch/` with the v0 batch
 wire shape, where a non-AI event rejected the whole batch. The exposure of the
-per-event cap (lower-only) and the lane configuration are normative (see the
-Requirements); the cap's value and the batch target are not.
+per-event cap (lower-only), the lane configuration, the 8 MiB ceiling and the
+5 MiB batch target are normative (see the Requirements); the deployed ingress
+limits quoted here are for information only.
 ## Requirements
 ### Requirement: Canonical capture_ai behavior
 

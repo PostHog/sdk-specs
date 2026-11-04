@@ -29,3 +29,5 @@
 - [ ] 4.4 posthog-ruby
 - [ ] 4.5 posthog-rs `posthog_rs::mcp`
 - [ ] 4.6 posthog-sdk-test-harness: step bindings for the new scenarios
+- [ ] 4.7 A Codex row (`threadId`), with reading gated on recognition (design.md, Decision 7)
+- [ ] 4.8 A VS Code row (`vscode.conversationId`), once its value is checked on a real connection

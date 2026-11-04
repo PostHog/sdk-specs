@@ -28,7 +28,7 @@ SDKs in different languages agree.
 
 A client conversation id is a value an MCP client puts in a `tools/call` request's `_meta` to name the
 conversation the call belongs to. The SDK SHALL read it only under a key in this table, which lists every
-known key, and SHALL treat a request as coming from a recognized client when it matches a row's
+key the SDK reads, and SHALL treat a request as coming from a recognized client when it matches a row's
 recognition rule:
 
 | Client | `_meta` key | Recognized client when |

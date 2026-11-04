@@ -1,6 +1,6 @@
 ## 1. Evidence and proposal
 
-- [x] 1.1 Read the public wire contract in posthog-sdk-test-harness 1.26.0 (`contracts/feature_flag_rules_v2`, contract 7.0.0): the response presence matrix, the `$feature_flag_called` and `$experiment_exposure` property projections, and the reader expectations for exposure.
+- [x] 1.1 Read the public wire contract in posthog-sdk-test-harness 1.27.0 (`contracts/feature_flag_rules_v2`, contract 8.0.0): the response presence matrix, the `$feature_flag_called` and `$experiment_exposure` property projections, and the reader expectations for exposure.
 - [x] 1.2 Read the existing flag specs on main: `feature-flag-called-tracker` (dedupe and minimal-event mode), `evaluate-flags` (lazy access tracking and the snapshot event control), `get-feature-flag`, `get-feature-flag-result` (per-call option), `is-feature-enabled`, `get-feature-flag-payload` and `bootstrap`.
 - [x] 1.3 Reconcile with `add-typed-flag-values` (#104) and the open client-level event default change (#153), so this change works whichever lands first.
 - [x] 1.4 Write the proposal, the design and the delta specs, and run `openspec validate add-experiment-exposure --strict`.

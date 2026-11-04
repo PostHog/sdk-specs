@@ -190,7 +190,7 @@ The exposure MAY also carry `$feature_flag_payload`, `$feature/<key>` and the ot
 
 The SDK SHALL dedupe `$experiment_exposure` in its own namespace, separate from the `$feature_flag_called` tracker entries. The key SHALL be:
 
-- the distinct ID, in the string form the event carries;
+- the distinct ID, as the string the event carries, so that reads which pass one identity as different types (for example the number 123 and the string "123") share one key;
 - the canonical group context, normalized as the flag-called tracker normalizes it;
 - the flag key;
 - the config version;

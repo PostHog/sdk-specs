@@ -54,7 +54,7 @@ The existing specs this change builds on:
 
 ### 2. One trigger: a complete experiment split
 
-**Choice.** A read emits the exposure only when the details that supplied its value have config version 2, reason code `experiment_split`, rule type `experiment`, a rule ID and a variant key, and the value was neither bootstrapped nor overridden.
+**Choice.** A read emits the exposure only when the details that supplied its value were parsed without error and are not `failed`, and have config version 2, reason code `experiment_split`, rule type `experiment`, a rule ID and a variant key, and the value was neither bootstrapped nor overridden.
 
 **Why.** This is the one outcome that assigns an arm. A holdout, a paused experiment and a rollout exclusion all name the rule but assign no arm, so they are not exposures. Targeted and percentage matches have no arm at all.
 
@@ -76,14 +76,16 @@ The trigger does not look at whether an Experiment links to the rule, and ignore
 
 ### 5. Attribution properties on `$feature_flag_called`
 
-**Choice.** For config version 2 results, `$feature_flag_called` carries `$feature_flag_config_version`, `$feature_flag_reason_code`, and `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant` when the reason code allows them, and no `$feature_flag_reason`. A per-reason table sets presence. Config version 1 events do not change.
+**Choice.** For config version 2 results, `$feature_flag_called` carries `$feature_flag_config_version`, `$feature_flag_reason_code`, and `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant` when the reason code allows them, and no `$feature_flag_reason`. A per-reason table sets presence. The rule ID and rule type are sent as a pair or not at all, and only when the rule type is one the reason code allows. Config version 1 events do not change.
 
 **Why.**
 
 - `$feature_flag_config_version` is separate from `$feature_flag_version`, which is the flag row's edit counter.
 - `$feature_flag_reason_code` is the machine-readable code, and it replaces `$feature_flag_reason`, the human-readable description, on config version 2 events. The description can be rebuilt from the code and the rule, and nothing analyses config version 2 events by it. Config version 1 events keep the description, so existing insights keep working.
 - The table follows `rules/response_presence.json`. Rule fields come only from the record, and a field the table forbids is dropped even if a record carries it, so events stay valid against the public projection.
+- A record that breaks the table, such as a rule ID without a rule type or a `targeting_match` that names an experiment rule, loses its whole rule pair, as a malformed split loses its whole tuple (decision 4). A half pair or a mismatched pair would look like real attribution to someone filtering flag analytics by rule; the reason code still shows the gap.
 - No event carries an experiment ID: the evaluator cannot know which Experiment links to the rule. No event carries a holdout ID: a holdout belongs to its rule and is identified by rule ID plus the `holdout` reason. No event carries an assignment seed: seeds are evaluation inputs for local evaluation, not outcomes, and in events they would leak into analytics storage and exports.
+- No config version 2 event carries `$feature_flag_forced_variant`. It marks a config version 1 condition override of the variant; a config version 2 arm comes only from `variant_key`.
 - Config version 1 events stay byte-for-byte the same, so nothing that reads them today changes.
 
 ### 6. `$feature_flag_response` keeps the legacy rendering
@@ -97,7 +99,7 @@ The trigger does not look at whether an Experiment links to the rule, and ignore
 **Choice.**
 
 - `$feature_flag_called` keeps its existing key, and for config version 2 results the key also includes the config version, reason code, rule ID, rule type and variant key, as sent on the event.
-- `$experiment_exposure` has its own bounded namespace, keyed on the distinct ID, the canonical group context, the flag key, the config version, the rule ID and the variant key.
+- `$experiment_exposure` has its own bounded namespace, keyed on the distinct ID (as the string the event carries), the canonical group context, the flag key, the config version, the rule ID and the variant key.
 - If both events share one cache, the event name is part of the key, or the SDK checks and marks both entries in one atomic step.
 - Bootstrapped and overridden values never reserve an exposure key.
 
@@ -125,7 +127,7 @@ The trigger does not look at whether an Experiment links to the rule, and ignore
 
 ### 10. Minimal-event mode keeps the attribution
 
-**Choice.** Minimal-event mode adds the attribution properties to its allowlist. It does not apply to `$experiment_exposure`.
+**Choice.** Minimal-event mode adds the attribution properties to its allowlist for config version 2 events only. A minimized config version 1 event keeps today's allowlist, so a super property that happens to use one of these names is still stripped. Minimal-event mode does not apply to `$experiment_exposure`.
 
 **Why.** A config version 2 flag can report `has_experiment` false while an experiment rule assigns an arm, because nothing has linked an Experiment to the rule yet. Such an event can be minimized, and without the properties ingestion would copy it again and analysis would lose the rule context. Exposures are rare (one per assignment, after dedupe), so minimizing them saves little.
 
@@ -152,7 +154,7 @@ This change works whichever lands first.
 
 ### 14. The exposure carries the assignment, not constants
 
-**Choice.** `$experiment_exposure` carries `$feature_flag`, `$feature_flag_response` (the legacy rendering, diagnostic only), `$feature_flag_variant`, `$feature_flag_rule_id` and `locally_evaluated`, plus the flag ID, version, request ID, evaluation time and groups when available. It carries no `$feature_flag_rule_type`, `$feature_flag_reason_code`, `$feature_flag_config_version` or `$experiment_exposure_source`. `$feature_flag_called` keeps all of its attribution properties, by its per-reason table. The exposure dedupe key does not change.
+**Choice.** `$experiment_exposure` carries `$feature_flag`, `$feature_flag_response` (the legacy rendering, diagnostic only), `$feature_flag_variant`, `$feature_flag_rule_id` and `locally_evaluated`, plus, when available, the flag ID, version, request ID, evaluation time, definitions-loaded time (for locally evaluated results), library identity (`$lib`, `$lib_version`) and groups. It carries no `$feature_flag_rule_type`, `$feature_flag_reason_code`, `$feature_flag_config_version` or `$experiment_exposure_source`. `$feature_flag_called` keeps all of its attribution properties, by its per-reason table. The exposure dedupe key does not change.
 
 **Why.**
 

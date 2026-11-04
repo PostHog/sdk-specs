@@ -20,11 +20,15 @@ The rule fields depend on the reason code:
 | --- | --- | --- |
 | `experiment_split` with rule type `experiment`, a rule ID and a variant key | sent | sent |
 | `experiment_split` with any of those three missing (a malformed split, see `experiment-exposure`) | not sent | not sent |
-| `targeting_match` (a targeted release or percentage rollout match) | sent when present | not sent |
-| `rollout_miss` (a terminal rollout exclusion), `experiment_paused`, `holdout` | sent when present | not sent |
+| `targeting_match` with rule type `targeted_release` or `percentage_rollout` and a rule ID | sent | not sent |
+| `rollout_miss` with rule type `percentage_rollout` or `experiment` and a rule ID | sent | not sent |
+| `experiment_paused` or `holdout` with rule type `experiment` and a rule ID | sent | not sent |
+| `targeting_match`, `rollout_miss`, `experiment_paused` or `holdout` with no rule ID, no rule type, or a rule type the row above does not allow (for example `targeting_match` with rule type `experiment`) | not sent | not sent |
 | `no_rule_match`, `missing_group_key`, `flag_disabled`, `dependency_error`, `error`, any `failed` record, and any other reason code | not sent | not sent |
 
 The SDK SHALL take these values only from the record that supplied the value. It SHALL NOT send a field that the table marks "not sent", even when the record carries it.
+
+`$feature_flag_rule_id` and `$feature_flag_rule_type` SHALL be sent together or not at all. A record whose rule fields do not form one of the pairs above is invalid producer output: its event keeps `$feature_flag_config_version` and `$feature_flag_reason_code`, omits both rule fields and `$feature_flag_variant`, and the value the read returns does not change. The SDK SHALL NOT fill in a missing rule field from the value, the flag key, another flag's record or an earlier result. A rule ID without its rule type, or a pair that names the wrong kind of rule, would look like real attribution in flag analytics; dropping it leaves the reason code to show the gap.
 
 A config version 2 `$feature_flag_called` event SHALL NOT carry `$feature_flag_experiment_id`, a holdout ID, `$feature_flag_forced_variant`, or an assignment seed anywhere in the event.
 
@@ -88,6 +92,20 @@ The SDK SHALL NOT add any of these properties for a config version 1 record, a r
 - **WHEN** a read of "beta-ui" emits `$feature_flag_called`
 - **THEN** the event has `$feature_flag_config_version` 2 and `$feature_flag_reason_code` "dependency_error"
 - **AND** it has none of `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`
+
+#### Scenario: A rule ID without a rule type is not sent
+- **GIVEN** the record for "beta-ui" has value true, reason code `targeting_match`, config version 2 and rule id "c41f9e07-2d6b-4a83-b5e1-7f0a3c8d2e96", and no rule type
+- **WHEN** a read of "beta-ui" emits `$feature_flag_called`
+- **THEN** the read returns true
+- **AND** the event has `$feature_flag_config_version` 2 and `$feature_flag_reason_code` "targeting_match"
+- **AND** it has none of `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`
+
+#### Scenario: A targeting match that names an experiment rule is not attributed
+- **GIVEN** the record for "checkout-flow" has value true, reason code `targeting_match`, config version 2, rule type `experiment` and rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13"
+- **WHEN** a read of "checkout-flow" emits `$feature_flag_called`
+- **THEN** the event has `$feature_flag_config_version` 2 and `$feature_flag_reason_code` "targeting_match"
+- **AND** it has none of `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`
+- **AND** no `$experiment_exposure` event is enqueued
 
 #### Scenario: A forbidden field in the record is not sent
 - **GIVEN** the record for "checkout-flow" has reason code `holdout`, config version 2, rule type `experiment`, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and also a variant key "test"
@@ -161,7 +179,7 @@ As a result, a repeated read of the same outcome emits no second event, while ea
 
 The SDK SHALL support a server-controlled "minimal event" mode that reduces `$feature_flag_called` event properties to a fixed allowlist instead of the full enriched properties dict, when both of the following hold:
 
-- **The server has enabled the gate for the team.** Reported as `minimalFlagCalledEvents: true` on the remote `/flags` (v2) response, or `minimal_flag_called_events: true` on the local-evaluation flag-definitions payload used by SDKs that support local evaluation. Absent, falsy, or unrecognized-shape responses mean the gate is off.
+- **The server has enabled the gate for the team.** Reported as `minimalFlagCalledEvents: true` on the remote `/flags` response (API `v=2` and later), or `minimal_flag_called_events: true` on the local-evaluation flag-definitions payload used by SDKs that support local evaluation. Absent, falsy, or unrecognized-shape responses mean the gate is off.
 - **The evaluated flag's server-reported experiment linkage is exactly `false`.** Flags report `has_experiment` as part of their evaluation metadata. If `has_experiment` is `true` (flag linked to an experiment), or unknown/missing (legacy response shape, stale cache, older server), the SDK MUST NOT minimize — it sends the full event. Only an explicit `false` triggers minimization.
 
 When gated on, the event's properties SHALL be reduced to an allowlist covering, at minimum, these categories:
@@ -172,11 +190,11 @@ When gated on, the event's properties SHALL be reduced to an allowlist covering,
 - **Session/SDK linkage** (e.g. `$session_id`, `$lib`, `$lib_version`) and, on server SDKs, the server marker (e.g. `$is_server`).
 - **Static, low-cardinality platform/runtime identity properties** the SDK already attaches to every event, kept for platform/runtime breakdowns on flag-call debugging (e.g. `$os`/`$python_version` on posthog-python; the equivalent OS/runtime identity fields on other SDKs).
 - **Session-attribution properties** — `$referring_domain` and the canonical campaign/click-id params the SDK already registers as super properties (e.g. `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`, `gad_source`, `mc_cid`, and click-id params such as `gclid`/`fbclid`). Web-analytics session-initial attribution (UTM values, channel type) is read from the **first event in a session**, and a minimized event can be that first event; stripping these would silently null out the whole session's attribution. Full `$referrer` remains excluded — only `$referring_domain` and the bare campaign-param keys survive minimization.
-- **Config version 2 attribution** — `$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`, whenever the event carries them (see "Config version 2 attribution on `$feature_flag_called`"). A config version 2 flag can report `has_experiment` as `false` while one of its experiment rules assigns an arm, because no experiment links to that rule yet, so a minimized event can be the only flag-called record of the rule and the arm. Ingestion also relies on `$feature_flag_config_version` to tell these events apart from config version 1 events.
+- **Config version 2 attribution** — on a config version 2 event only, `$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`, whenever the event carries them (see "Config version 2 attribution on `$feature_flag_called`"). A minimized config version 1 event keeps the allowlist it has today and strips these names like any other property, even when a super property or caller property uses one of them. A config version 2 flag can report `has_experiment` as `false` while one of its experiment rules assigns an arm, because no experiment links to that rule yet, so a minimized event can be the only flag-called record of the rule and the arm. Ingestion also relies on `$feature_flag_config_version` to tell these events apart from config version 1 events.
 
 Everything else — including super properties, custom event properties passed by the caller, and other enriched context tags — SHALL be stripped from a minimized event.
 
-> Note (non-normative): the exact property allowlist is stated here at the category level, not as one fixed literal list, because SDKs differ in exactly which static platform fields they attach. posthog-python's allowlist (`$feature_flag`, `$feature_flag_response`, `$feature_flag_has_experiment`, `$feature_flag_id`, `$feature_flag_version`, `$feature_flag_reason`, `$feature_flag_request_id`, `$feature_flag_evaluated_at`, `$feature_flag_error`, `locally_evaluated`, `$groups`, `$process_person_profile`, `$session_id`, `$lib`, `$lib_version`, `$is_server`, `$geoip_disable`, `$os`, `$os_version`, `$os_distro`, `$python_runtime`, `$python_version`) is the reference implementation other SDKs describe mirroring. Every SDK's allowlist also includes the config version 2 attribution properties listed above. `$feature_flag_reason` stays on the allowlist for config version 1 events; config version 2 events never carry it.
+> Note (non-normative): the exact property allowlist is stated here at the category level, not as one fixed literal list, because SDKs differ in exactly which static platform fields they attach. posthog-python's allowlist (`$feature_flag`, `$feature_flag_response`, `$feature_flag_has_experiment`, `$feature_flag_id`, `$feature_flag_version`, `$feature_flag_reason`, `$feature_flag_request_id`, `$feature_flag_evaluated_at`, `$feature_flag_error`, `locally_evaluated`, `$groups`, `$process_person_profile`, `$session_id`, `$lib`, `$lib_version`, `$is_server`, `$geoip_disable`, `$os`, `$os_version`, `$os_distro`, `$python_runtime`, `$python_version`) is the reference implementation other SDKs describe mirroring. For config version 2 events only, every SDK's allowlist also includes the config version 2 attribution properties listed above; config version 1 events use the allowlist above unchanged. `$feature_flag_reason` stays on the allowlist for config version 1 events; config version 2 events never carry it.
 
 If the gate is absent, the `has_experiment` signal is missing/unknown, or the flag is linked to an experiment, the SDK SHALL send the full, unminimized event unchanged — minimization fails safe to "send everything" rather than risk silently dropping properties a consumer depends on.
 
@@ -290,3 +308,19 @@ The gate SHALL persist alongside cached flag/local-evaluation definition state (
   | $feature_flag_variant        | test                                 |
 - **AND** the enqueued event properties should not include "team"
 - **AND** the enqueued event properties should not include "$feature_flag_reason"
+
+#### Scenario: A minimized config version 1 event does not keep attribution names (@both)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** the server reports the minimal-event gate as enabled
+- **AND** cached feature flags are:
+  | key     | value |
+  | beta-ui | true  |
+- **AND** the flag "beta-ui" is a config version 1 flag that reports `has_experiment` as false
+- **AND** a super property "$feature_flag_rule_id" with value "c41f9e07-2d6b-4a83-b5e1-7f0a3c8d2e96" is registered
+- **WHEN** get feature flag "beta-ui" is called
+- **THEN** the enqueued "$feature_flag_called" event should be minimized per the allowlist
+- **AND** the enqueued event properties should not include "$feature_flag_rule_id"
+- **AND** the enqueued event properties should not include "$feature_flag_config_version"

@@ -20,7 +20,7 @@ Each event SHALL be a JSON object with the fields `event`, `uuid`, `distinct_id`
 
 Session replay stays outside capture v1. Client SDKs keep sending `$snapshot` data to `/s/` with `api_key` in the body, and these rules do not apply to it.
 
-Capture v1 parses the request with one strict JSON parse and rejects the whole request with `400 request_parsing_error` when any field has the wrong JSON type, a required field is missing, or the body is not valid JSON. The SDK SHALL therefore guarantee these types on the wire, including after `before_send`: an event whose hook leaves `distinct_id` or `event` non-string, or whose serialization fails, is dropped locally and reported through the SDK's error surface or a log line, and never sent.
+Capture v1 rejects the whole request with `400 request_parsing_error` when the body is not valid JSON, a required field is missing, or a string field (`created_at`, `event`, `uuid`, `distinct_id`, `timestamp`, `session_id`, `window_id`) has another JSON type. It checks `properties` and `options` per event: a `properties` value that is not an object, or an invalid option, drops only that event (`malformed_event_properties`, `invalid_options`) and the rest of the request is processed. The SDK SHALL therefore guarantee these types on the wire, including after `before_send`: an event whose hook leaves `distinct_id` or `event` non-string, or whose serialization fails, is dropped locally and reported through the SDK's error surface or a log line, and never sent.
 
 Legacy capture: the body carried `api_key` and `sent_at`, `uuid` and `timestamp` were optional, and a non-string `distinct_id` was converted to text.
 

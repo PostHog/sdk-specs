@@ -70,7 +70,7 @@ The trigger does not look at whether an Experiment links to the rule, and ignore
 
 ### 4. Malformed splits fail closed
 
-**Choice.** A split that lacks rule type `experiment`, a rule ID or a variant key emits no exposure. Its `$feature_flag_called` keeps config version 2 and reason code `experiment_split`, and omits the whole rule tuple. The SDK never fills a gap from the value, the flag key, a linked experiment or an earlier result.
+**Choice.** A split that lacks rule type `experiment`, a rule ID or a variant key emits no exposure. A rule ID that is not a string in the hyphenated 8-4-4-4-12 hexadecimal UUID form counts as missing. Its `$feature_flag_called` keeps config version 2 and reason code `experiment_split`, and omits the whole rule tuple. The SDK never fills a gap from the value, the flag key, a linked experiment or an earlier result.
 
 **Why.** A wrong variant corrupts an experiment; a missing exposure only loses one data point. Keeping config version 2 on the diagnostic stops ingestion from deriving an exposure from it, and the reason code keeps the gap visible. A partial tuple would look like real attribution, so the event carries all of it or none of it. The contract's reader fixtures expect exactly this: the value stays usable and no exposure is emitted.
 
@@ -83,7 +83,8 @@ The trigger does not look at whether an Experiment links to the rule, and ignore
 - `$feature_flag_config_version` is separate from `$feature_flag_version`, which is the flag row's edit counter.
 - `$feature_flag_reason_code` is the machine-readable code, and it replaces `$feature_flag_reason`, the human-readable description, on config version 2 events. The description can be rebuilt from the code and the rule, and nothing analyses config version 2 events by it. Config version 1 events keep the description, so existing insights keep working.
 - The table follows `rules/response_presence.json`. Rule fields come only from the record, and a field the table forbids is dropped even if a record carries it, so events stay valid against the public projection.
-- A record that breaks the table, such as a rule ID without a rule type or a `targeting_match` that names an experiment rule, loses its whole rule pair, as a malformed split loses its whole tuple (decision 4). A half pair or a mismatched pair would look like real attribution to someone filtering flag analytics by rule; the reason code still shows the gap.
+- A record that breaks the table, such as a rule ID without a rule type, a rule ID that is not a UUID, or a `targeting_match` that names an experiment rule, loses its whole rule pair, as a malformed split loses its whole tuple (decision 4). A half pair or a mismatched pair would look like real attribution to someone filtering flag analytics by rule; the reason code still shows the gap.
+- A config version 2 record with a missing or unknown reason code keeps config version 2 and the raw code, if any, with no rule attribution and no exposure. Mapping the code to `error` would hide what the server sent, and dropping the config version would let ingestion copy the event. Contract 9.0.0 ([posthog-sdk-test-harness#101](https://github.com/PostHog/posthog-sdk-test-harness/pull/101)) accepts these events.
 - No event carries an experiment ID: the evaluator cannot know which Experiment links to the rule. No event carries a holdout ID: a holdout belongs to its rule and is identified by rule ID plus the `holdout` reason. No event carries an assignment seed: seeds are evaluation inputs for local evaluation, not outcomes, and in events they would leak into analytics storage and exports.
 - No config version 2 event carries `$feature_flag_forced_variant`. It marks a config version 1 condition override of the variant; a config version 2 variant comes only from `variant_key`.
 - Config version 1 events stay byte-for-byte the same, so nothing that reads them today changes.
@@ -103,6 +104,8 @@ The trigger does not look at whether an Experiment links to the rule, and ignore
 - If both events share one cache, the two namespaces stay distinct within it, for example by making the event name part of the key.
 - The two events dedupe independently: a repeated `$feature_flag_called` that the tracker suppresses does not suppress an exposure whose key is new, and the reverse.
 - Bootstrapped and overridden values never reserve an exposure key.
+- A key is added only after capture accepts its event, and each event is attempted independently. A failed or dropped capture adds no key.
+- A flags reload never clears the exposure namespace.
 
 **Why.**
 
@@ -113,12 +116,16 @@ The trigger does not look at whether an Experiment links to the rule, and ignore
 - The reason code and rule type are not in the exposure key. An exposure only exists for a split, where they are always `experiment_split` and `experiment`, so they would add nothing.
 - The exposure key always includes the distinct ID, even in client SDKs whose flag-called tracker leaves it out, because an exposure belongs to an identity.
 - A shared cache without the event name lets the flag-called entry suppress the exposure written right after it, so the experiment loses its first exposure.
+- Adding a key only after capture accepts the event means a one-off hook failure or dropped event does not cost the exposure for good: the next read tries again. Config version 1 flag-called events keep the tracker's existing rules.
+- Keeping the namespace across a reload makes one assignment one exposure in every SDK. The key already names the rule and variant, so a reload that changes the assignment still gives a new key.
 
 ### 8. The feature flag event decision covers both events
 
 **Choice.** The existing decision (per-read option, then the client-level default, then send) governs both events. A `false` decision emits neither event and touches neither dedupe namespace. There is no separate exposure option.
 
 **Why.** Customers turn these events off to cut volume and noise. They would not expect a new event to appear from the same reads. A second option would double the configuration surface for one choice. A suppressed read must not reserve a key, for the same reason the existing event control gives: a later opted-in read would lose its events. The trade-off: a customer who turns events off for an experiment flag gets no exposures, exactly as today.
+
+Payload reads stay silent by default, as `get-feature-flag-payload` defines. A payload read that opts in to flag events and evaluates the flag follows the trigger like any other read. A caller-supplied match value is not an evaluation, so it never sends an exposure or reserves its key.
 
 ### 9. Bootstrap and client-side overrides
 
@@ -180,4 +187,4 @@ This change works whichever lands first.
 ## Open Questions
 
 - A later change may replace `$feature_flag_response` on config version 2 events with a typed value property, together with the PostHog features that read it. That is out of scope here.
-- Should SDKs that persist their flag-called dedupe state across page loads (posthog-js browser) persist the exposure namespace the same way? This change allows it but does not require it.
+- Should SDKs that persist their flag-called dedupe state across page loads (posthog-js browser) persist the exposure namespace the same way? This change allows it but does not require it. A flags reload never clears it.

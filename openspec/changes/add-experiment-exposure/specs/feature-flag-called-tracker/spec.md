@@ -24,9 +24,11 @@ The rule fields depend on the reason code:
 | `rollout_miss` with rule type `percentage_rollout` or `experiment` and a rule ID | sent | not sent |
 | `experiment_paused` or `holdout` with rule type `experiment` and a rule ID | sent | not sent |
 | `targeting_match`, `rollout_miss`, `experiment_paused` or `holdout` with no rule ID, no rule type, or a rule type the row above does not allow (for example `targeting_match` with rule type `experiment`) | not sent | not sent |
-| `no_rule_match`, `missing_group_key`, `flag_disabled`, `dependency_error`, `error`, any `failed` record, and any other reason code | not sent | not sent |
+| `no_rule_match`, `missing_group_key`, `flag_disabled`, `dependency_error`, `error`, any `failed` record, any other reason code, and a record with no reason code | not sent | not sent |
 
-The SDK SHALL take these values only from the record that supplied the value. It SHALL NOT send a field that the table marks "not sent", even when the record carries it.
+In this table a rule ID counts as present only when it is a string in the hyphenated 8-4-4-4-12 hexadecimal UUID form, the form the event schemas require. A rule ID in any other form counts as missing, so its event omits the rule pair. The SDK SHALL take these values only from the record that supplied the value. It SHALL NOT send a field that the table marks "not sent", even when the record carries it.
+
+A config version 2 record whose reason code is missing or is not one this table names (for example a code a newer server adds) is still a config version 2 result. Its `$feature_flag_called` event SHALL carry `$feature_flag_config_version` 2 and, when the record has a reason code, that code unchanged in `$feature_flag_reason_code`. It SHALL carry no `$feature_flag_rule_id`, `$feature_flag_rule_type` or `$feature_flag_variant`, and the read SHALL NOT emit `$experiment_exposure`. The SDK SHALL NOT map the code to another code. Contract 9.0.0 ([posthog-sdk-test-harness#101](https://github.com/PostHog/posthog-sdk-test-harness/pull/101)) accepts these events.
 
 `$feature_flag_rule_id` and `$feature_flag_rule_type` SHALL be sent together or not at all. A record whose rule fields do not form one of the pairs above is invalid producer output: its event keeps `$feature_flag_config_version` and `$feature_flag_reason_code`, omits both rule fields and `$feature_flag_variant`, and the value the read returns does not change. The SDK SHALL NOT fill in a missing rule field from the value, the flag key, another flag's record or an earlier result. A rule ID without its rule type, or a pair that names the wrong kind of rule, would look like real attribution in flag analytics; dropping it leaves the reason code to show the gap.
 
@@ -93,6 +95,21 @@ The SDK SHALL NOT add any of these properties for a config version 1 record, a r
 - **THEN** the event has `$feature_flag_config_version` 2 and `$feature_flag_reason_code` "dependency_error"
 - **AND** it has none of `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`
 
+#### Scenario: An unknown reason code is sent unchanged without rule identity
+- **GIVEN** the record for "beta-ui" has value true, reason code "future_reason", config version 2, rule type `targeted_release` and rule id "c41f9e07-2d6b-4a83-b5e1-7f0a3c8d2e96"
+- **WHEN** a read of "beta-ui" emits `$feature_flag_called`
+- **THEN** the read returns true
+- **AND** the event has `$feature_flag_config_version` 2 and `$feature_flag_reason_code` "future_reason"
+- **AND** it has none of `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`
+- **AND** no `$experiment_exposure` event is enqueued
+
+#### Scenario: A record without a reason code keeps its config version
+- **GIVEN** the record for "beta-ui" has value true, config version 2 and no reason
+- **WHEN** a read of "beta-ui" emits `$feature_flag_called`
+- **THEN** the event has `$feature_flag_config_version` 2
+- **AND** it has none of `$feature_flag_reason_code`, `$feature_flag_reason`, `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`
+- **AND** no `$experiment_exposure` event is enqueued
+
 #### Scenario: A rule ID without a rule type is not sent
 - **GIVEN** the record for "beta-ui" has value true, reason code `targeting_match`, config version 2 and rule id "c41f9e07-2d6b-4a83-b5e1-7f0a3c8d2e96", and no rule type
 - **WHEN** a read of "beta-ui" emits `$feature_flag_called`
@@ -134,7 +151,7 @@ For a `$feature_flag_called` event that carries `$feature_flag_config_version` 2
 - the rule type, as sent on the event;
 - the variant key, as sent on the event.
 
-An absent reason code, rule ID, rule type or variant key SHALL be a key component distinct from every present value. The key SHALL be the same on every read path, so typed and legacy reads of the same flag and outcome dedupe together. The local or remote source, the request ID and the evaluation time SHALL NOT be part of the key. The key for every other event, including every config version 1 event, does not change, and the tracker's reset, eviction and event-decision rules do not change.
+An absent reason code, rule ID, rule type or variant key SHALL be a key component distinct from every present value. The key SHALL be the same on every read path, so typed and legacy reads of the same flag and outcome dedupe together. The local or remote source, the request ID and the evaluation time SHALL NOT be part of the key. For these events the tracker SHALL add the key only after capture accepts the event, and a failed or dropped capture adds no key, as "Exposure capture is built in one best-effort step" in `experiment-exposure` defines. The key for every other event, including every config version 1 event, does not change, and the tracker's reset, eviction and event-decision rules do not change.
 
 As a result, a repeated read of the same outcome emits no second event, while each of these emits a new event for the same identity, flag and value: another variant of an A/A test, another experiment rule, a holdout after a variant of the same rule, another outcome of the same rule with no variant (for example a holdout, then a paused experiment), a release rule that ships an experiment's winning value, and a flag that moves from config version 1 to config version 2.
 

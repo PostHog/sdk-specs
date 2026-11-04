@@ -1,12 +1,12 @@
 ## Context
 
-Experiment analysis counts `$experiment_exposure` events. Today ingestion creates them: it copies some multivariate `$feature_flag_called` events and takes the arm from the string in `$feature_flag_response`. That works for config version 1 multivariate flags, where the variant key is the value. It does not work for config version 2 flags:
+Experiment analysis counts `$experiment_exposure` events. Today ingestion creates them: it copies some multivariate `$feature_flag_called` events and takes the variant from the string in `$feature_flag_response`. That works for config version 1 multivariate flags, where the variant key is the value. It does not work for config version 2 flags:
 
-- An arm's value can be a boolean, a string, a number or an object. A string value is not necessarily an arm, and a non-string value is invisible to the inference.
-- Two arms can return the same value. An A/A test is the extreme case.
-- One flag can hold several experiment rules, and a holdout or a rollout exclusion can return the same value as an arm.
+- A variant's value can be a boolean, a string, a number or an object. A string value is not necessarily a variant, and a non-string value is invisible to the inference.
+- Two variants can return the same value. An A/A test is the extreme case.
+- One flag can hold several experiment rules, and a holdout or a rollout exclusion can return the same value as a variant.
 
-A `/flags?v=4` record carries `value`, `failed`, `reason` (`code`, `condition_index`, `description`) and `metadata` (`id`, `version`, `description`, `has_experiment`, `config_version`, `rule_type`, `rule_id`, `variant_key`, `forced_variant`, `payload`). For a config version 2 flag the record says exactly which rule ended evaluation and, for an experiment split, which arm. The SDK holds that record when application code reads the flag, so it can send the exposure itself.
+A `/flags?v=4` record carries `value`, `failed`, `reason` (`code`, `condition_index`, `description`) and `metadata` (`id`, `version`, `description`, `has_experiment`, `config_version`, `rule_type`, `rule_id`, `variant_key`, `forced_variant`, `payload`). For a config version 2 flag the record says exactly which rule ended evaluation and, for an experiment split, which variant. The SDK holds that record when application code reads the flag, so it can send the exposure itself.
 
 The public wire contract is `contracts/feature_flag_rules_v2` in [posthog-sdk-test-harness 1.27.0](https://github.com/PostHog/posthog-sdk-test-harness/releases/tag/1.27.0) (contract 8.0.0). This change relies on four of its files:
 
@@ -15,7 +15,7 @@ The public wire contract is `contracts/feature_flag_rules_v2` in [posthog-sdk-te
 - `schemas/experiment_exposure_properties.schema.json`: the closed projection of the required `$experiment_exposure` properties.
 - `fixtures/wire/readers.json`: for each reader case, whether a reader emits an exposure.
 
-This change turns the contract into SDK behaviour: when to emit, what each event carries, and how dedupe works. Contract 8.0.0 ([posthog-sdk-test-harness#98](https://github.com/PostHog/posthog-sdk-test-harness/pull/98)) already matches it: the exposure projection requires only the properties decision 14 keeps, and the `$feature_flag_called` projection rejects `$feature_flag_reason` on config version 2 calls.
+This change turns the contract into SDK behaviour: when to emit, what each event carries, and how dedupe works. Contract 8.0.0 ([posthog-sdk-test-harness#98](https://github.com/PostHog/posthog-sdk-test-harness/pull/98)) already matches it: the exposure projection requires only the properties decision 14 keeps, and the `$feature_flag_called` projection rejects `$feature_flag_reason` on config version 2 calls. One gap remains: contract 8.0.0 accepts a `$feature_flag_called` without rule fields only for a malformed `experiment_split`, so the rule-pair rule in decision 5 also needs contract 9.0.0 ([posthog-sdk-test-harness#101](https://github.com/PostHog/posthog-sdk-test-harness/pull/101)), which accepts it for `targeting_match`, `rollout_miss`, `experiment_paused` and `holdout` too.
 
 Ingestion already supports SDK-sent exposures. It does not touch a directly captured `$experiment_exposure`, and it does not copy a `$feature_flag_called` that carries `$feature_flag_config_version` 2 ([PostHog/posthog#125449](https://github.com/PostHog/posthog/pull/125449)).
 
@@ -34,7 +34,7 @@ The existing specs this change builds on:
 **Goals:**
 
 - An exact exposure for every config version 2 experiment assignment that application code reads, and no exposure for anything else.
-- Rule and arm attribution on `$feature_flag_called`, so flag analytics can tell rules and arms apart.
+- Rule and variant attribution on `$feature_flag_called`, so flag analytics can tell rules and variants apart.
 - Dedupe that keeps distinct assignments apart and does not double-count one assignment.
 - No change for config version 1 flags or for SDKs that do not read `/flags?v=4`.
 
@@ -56,7 +56,7 @@ The existing specs this change builds on:
 
 **Choice.** A read emits the exposure only when the details that supplied its value were parsed without error and are not `failed`, and have config version 2, reason code `experiment_split`, rule type `experiment`, a rule ID and a variant key, and the value was neither bootstrapped nor overridden.
 
-**Why.** This is the one outcome that assigns an arm. A holdout, a paused experiment and a rollout exclusion all name the rule but assign no arm, so they are not exposures. Targeted and percentage matches have no arm at all.
+**Why.** This is the one outcome that assigns a variant. A holdout, a paused experiment and a rollout exclusion all name the rule but assign no variant, so they are not exposures. Targeted and percentage matches have no variant at all.
 
 The trigger does not look at whether an Experiment links to the rule, and ignores `has_experiment`. An Experiment links to its rule from the Experiment side, so an evaluator cannot tell whether one links to a given rule. A rule that no Experiment links to is a plain variant split; its exposures are cheap and nobody analyses them. Linking an Experiment to a running rule then needs no SDK change, and exposures recorded before the link are already there.
 
@@ -64,15 +64,15 @@ The trigger does not look at whether an Experiment links to the rule, and ignore
 
 **Choice.** The decision and both events read the evaluation details that supplied the value. The value the read returned is not an input.
 
-**Why.** The returned value can differ from the record. A typed read can return its caller default because the value is `null` or is `false` read as another type, and a legacy read renders number and object values as `true`. The user was still assigned the arm, and experiment analysis counts assignment. An arm whose value is `false` is still an arm.
+**Why.** The returned value can differ from the record. A typed read can return its caller default because the value is `null` or is `false` read as another type, and a legacy read renders number and object values as `true`. The user was still assigned the variant, and experiment analysis counts assignment. A variant whose value is `false` is still a variant.
 
-**Exception: a read of the wrong type.** A typed read that returns its caller default because the value has another type sends neither event and takes no dedupe slot, so the next read of the right type sends both. The SDK logs an error instead (#104). A wrong-type read is a bug in the calling code: the application got its own default, not the arm's value, so counting it would record an exposure the user never saw, and its dedupe slot would hide the first correct read.
+**Exception: a read of the wrong type.** A typed read that returns its caller default because the value has another type sends neither event and takes no dedupe slot, so the next read of the right type sends both. The SDK logs an error instead (#104). A wrong-type read is a bug in the calling code: the application got its own default, not the variant's value, so counting it would record an exposure the user never saw, and its dedupe slot would hide the first correct read.
 
 ### 4. Malformed splits fail closed
 
 **Choice.** A split that lacks rule type `experiment`, a rule ID or a variant key emits no exposure. Its `$feature_flag_called` keeps config version 2 and reason code `experiment_split`, and omits the whole rule tuple. The SDK never fills a gap from the value, the flag key, a linked experiment or an earlier result.
 
-**Why.** A wrong arm corrupts an experiment; a missing exposure only loses one data point. Keeping config version 2 on the diagnostic stops ingestion from deriving an exposure from it, and the reason code keeps the gap visible. A partial tuple would look like real attribution, so the event carries all of it or none of it. The contract's reader fixtures expect exactly this: the value stays usable and no exposure is emitted.
+**Why.** A wrong variant corrupts an experiment; a missing exposure only loses one data point. Keeping config version 2 on the diagnostic stops ingestion from deriving an exposure from it, and the reason code keeps the gap visible. A partial tuple would look like real attribution, so the event carries all of it or none of it. The contract's reader fixtures expect exactly this: the value stays usable and no exposure is emitted.
 
 ### 5. Attribution properties on `$feature_flag_called`
 
@@ -85,14 +85,14 @@ The trigger does not look at whether an Experiment links to the rule, and ignore
 - The table follows `rules/response_presence.json`. Rule fields come only from the record, and a field the table forbids is dropped even if a record carries it, so events stay valid against the public projection.
 - A record that breaks the table, such as a rule ID without a rule type or a `targeting_match` that names an experiment rule, loses its whole rule pair, as a malformed split loses its whole tuple (decision 4). A half pair or a mismatched pair would look like real attribution to someone filtering flag analytics by rule; the reason code still shows the gap.
 - No event carries an experiment ID: the evaluator cannot know which Experiment links to the rule. No event carries a holdout ID: a holdout belongs to its rule and is identified by rule ID plus the `holdout` reason. No event carries an assignment seed: seeds are evaluation inputs for local evaluation, not outcomes, and in events they would leak into analytics storage and exports.
-- No config version 2 event carries `$feature_flag_forced_variant`. It marks a config version 1 condition override of the variant; a config version 2 arm comes only from `variant_key`.
+- No config version 2 event carries `$feature_flag_forced_variant`. It marks a config version 1 condition override of the variant; a config version 2 variant comes only from `variant_key`.
 - Config version 1 events stay byte-for-byte the same, so nothing that reads them today changes.
 
 ### 6. `$feature_flag_response` keeps the legacy rendering
 
 **Choice.** Both events send the legacy rendering: `true` or `false` for booleans, the string for strings, `false` for `null`, `true` for numbers and objects. Never the caller default.
 
-**Why.** The event schema accepts only a boolean or a non-empty string in `$feature_flag_response`, and #104 already fixes this rendering for typed reads. On the exposure the property is diagnostic only. The arm is `$feature_flag_variant`, which separates arms whose values are equal. A number and object event schema can come later without changing the trigger or the dedupe.
+**Why.** The event schema accepts only a boolean or a non-empty string in `$feature_flag_response`, and #104 already fixes this rendering for typed reads. On the exposure the property is diagnostic only. The variant is `$feature_flag_variant`, which separates variants whose values are equal. A number and object event schema can come later without changing the trigger or the dedupe.
 
 ### 7. Dedupe: extend the flag-called key, add a separate exposure namespace
 
@@ -105,9 +105,9 @@ The trigger does not look at whether an Experiment links to the rule, and ignore
 
 **Why.**
 
-- Without rule context, the flag-called key collapses distinct outcomes that share a value: two A/A arms, a holdout and an arm, two successive experiments, an experiment and the release rule that ships its winner. Including the config version also gives a flag that moves from config version 1 to 2 a fresh event.
+- Without rule context, the flag-called key collapses distinct outcomes that share a value: two A/A variants, a holdout and a variant, two successive experiments, an experiment and the release rule that ships its winner. Including the config version also gives a flag that moves from config version 1 to 2 a fresh event.
 - The flag-called key includes the reason code and rule type too, which are exactly the attribution the event carries. Two outcomes of one rule that have no variant and share a value (for example a holdout, then a paused experiment) then stay apart. A new event appears only when the reported outcome changes, so the extra fields cost nothing on repeated reads.
-- The exposure key leaves out the value: equal-valued arms are already separated by the variant key, and the legacy rendering of number and object values is not an identity.
+- The exposure key leaves out the value: equal-valued variants are already separated by the variant key, and the legacy rendering of number and object values is not an identity.
 - The exposure key leaves out the request ID, the evaluation time and the local or remote source. Otherwise a remote fallback after a local result, or a second request for the same user, would count one assignment twice.
 - The reason code and rule type are not in the exposure key. An exposure only exists for a split, where they are always `experiment_split` and `experiment`, so they would add nothing.
 - The exposure key always includes the distinct ID, even in client SDKs whose flag-called tracker leaves it out, because an exposure belongs to an identity.
@@ -129,7 +129,7 @@ The trigger does not look at whether an Experiment links to the rule, and ignore
 
 **Choice.** Minimal-event mode adds the attribution properties to its allowlist for config version 2 events only. A minimized config version 1 event keeps today's allowlist, so a super property that happens to use one of these names is still stripped. Minimal-event mode does not apply to `$experiment_exposure`.
 
-**Why.** A config version 2 flag can report `has_experiment` false while an experiment rule assigns an arm, because nothing has linked an Experiment to the rule yet. Such an event can be minimized, and without the properties ingestion would copy it again and analysis would lose the rule context. Exposures are rare (one per assignment, after dedupe), so minimizing them saves little.
+**Why.** A config version 2 flag can report `has_experiment` false while an experiment rule assigns a variant, because nothing has linked an Experiment to the rule yet. Such an event can be minimized, and without the properties ingestion would copy it again and analysis would lose the rule context. Exposures are rare (one per assignment, after dedupe), so minimizing them saves little.
 
 ### 11. One best-effort step builds both events
 
@@ -174,7 +174,7 @@ This change works whichever lands first.
 
 1. Review this change and settle the decisions.
 2. Add the acceptance scenarios and the README index entry, then apply and archive in the same PR, as the repository requires.
-3. SDKs implement against the archived spec. posthog-python is first: draft PostHog/posthog-python#1154, stacked on posthog-python#1031.
+3. SDKs implement against the archived spec. posthog-python is first: draft PostHog/posthog-python#1154, based on main; it builds on posthog-python#1031, released in posthog 7.83.0.
 
 ## Open Questions
 

@@ -136,20 +136,20 @@ For a `$feature_flag_called` event that carries `$feature_flag_config_version` 2
 
 An absent reason code, rule ID, rule type or variant key SHALL be a key component distinct from every present value. The key SHALL be the same on every read path, so typed and legacy reads of the same flag and outcome dedupe together. The local or remote source, the request ID and the evaluation time SHALL NOT be part of the key. The key for every other event, including every config version 1 event, does not change, and the tracker's reset, eviction and event-decision rules do not change.
 
-As a result, a repeated read of the same outcome emits no second event, while each of these emits a new event for the same identity, flag and value: another arm of an A/A test, another experiment rule, a holdout after an arm of the same rule, another outcome of the same rule with no variant (for example a holdout, then a paused experiment), a release rule that ships an experiment's winning value, and a flag that moves from config version 1 to config version 2.
+As a result, a repeated read of the same outcome emits no second event, while each of these emits a new event for the same identity, flag and value: another variant of an A/A test, another experiment rule, a holdout after a variant of the same rule, another outcome of the same rule with no variant (for example a holdout, then a paused experiment), a release rule that ships an experiment's winning value, and a flag that moves from config version 1 to config version 2.
 
 #### Scenario: A repeated read of the same outcome emits one event
 - **GIVEN** the record for "checkout-flow" is a complete config version 2 experiment split with value true, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
 - **WHEN** "checkout-flow" is read twice for distinct id "user-123"
 - **THEN** exactly one `$feature_flag_called` event is enqueued for "checkout-flow"
 
-#### Scenario: Another A/A arm with the same value emits a new event
+#### Scenario: Another A/A variant with the same value emits a new event
 - **GIVEN** a read for distinct id "user-123" emitted `$feature_flag_called` for "pricing-page" with value true, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "control"
 - **WHEN** a later evaluation assigns "user-123" variant key "test" in the same rule, still with value true
 - **AND** "pricing-page" is read again
 - **THEN** a second `$feature_flag_called` event is enqueued with `$feature_flag_variant` "test"
 
-#### Scenario: A holdout after an arm of the same rule emits a new event
+#### Scenario: A holdout after a variant of the same rule emits a new event
 - **GIVEN** a read for distinct id "user-123" emitted `$feature_flag_called` for "checkout-flow" with value false, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "control"
 - **WHEN** a later evaluation puts "user-123" in the holdout of the same rule, with value false
 - **AND** "checkout-flow" is read again
@@ -190,7 +190,7 @@ When gated on, the event's properties SHALL be reduced to an allowlist covering,
 - **Session/SDK linkage** (e.g. `$session_id`, `$lib`, `$lib_version`) and, on server SDKs, the server marker (e.g. `$is_server`).
 - **Static, low-cardinality platform/runtime identity properties** the SDK already attaches to every event, kept for platform/runtime breakdowns on flag-call debugging (e.g. `$os`/`$python_version` on posthog-python; the equivalent OS/runtime identity fields on other SDKs).
 - **Session-attribution properties** — `$referring_domain` and the canonical campaign/click-id params the SDK already registers as super properties (e.g. `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`, `gad_source`, `mc_cid`, and click-id params such as `gclid`/`fbclid`). Web-analytics session-initial attribution (UTM values, channel type) is read from the **first event in a session**, and a minimized event can be that first event; stripping these would silently null out the whole session's attribution. Full `$referrer` remains excluded — only `$referring_domain` and the bare campaign-param keys survive minimization.
-- **Config version 2 attribution** — on a config version 2 event only, `$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`, whenever the event carries them (see "Config version 2 attribution on `$feature_flag_called`"). A minimized config version 1 event keeps the allowlist it has today and strips these names like any other property, even when a super property or caller property uses one of them. A config version 2 flag can report `has_experiment` as `false` while one of its experiment rules assigns an arm, because no experiment links to that rule yet, so a minimized event can be the only flag-called record of the rule and the arm. Ingestion also relies on `$feature_flag_config_version` to tell these events apart from config version 1 events.
+- **Config version 2 attribution** — on a config version 2 event only, `$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`, whenever the event carries them (see "Config version 2 attribution on `$feature_flag_called`"). A minimized config version 1 event keeps the allowlist it has today and strips these names like any other property, even when a super property or caller property uses one of them. A config version 2 flag can report `has_experiment` as `false` while one of its experiment rules assigns a variant, because no experiment links to that rule yet, so a minimized event can be the only flag-called record of the rule and the variant. Ingestion also relies on `$feature_flag_config_version` to tell these events apart from config version 1 events.
 
 Everything else — including super properties, custom event properties passed by the caller, and other enriched context tags — SHALL be stripped from a minimized event.
 

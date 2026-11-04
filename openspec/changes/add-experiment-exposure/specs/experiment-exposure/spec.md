@@ -18,7 +18,7 @@ The trigger SHALL NOT depend on whether an experiment links to the rule. `metada
 
 No other outcome SHALL emit `$experiment_exposure`: not a targeting match, a percentage rollout match, a terminal rollout miss (including an experiment rule's rollout exclusion), a holdout, a paused experiment, a no-rule match or flag default, a missing flag, a failed or unreadable record, a bootstrapped value, a client-side override, a config version 1 record, or a record from a server that does not send typed values (which reads as config version 1).
 
-The decision SHALL use the evaluation details that supplied the value, not the value the read returned. A read that returned a caller-supplied default instead of the flag's value, because the value is `null` or is `false` read as another type, SHALL still emit the exposure when the details meet the conditions. An arm whose value is `false` is still an assignment.
+The decision SHALL use the evaluation details that supplied the value, not the value the read returned. A read that returned a caller-supplied default instead of the flag's value, because the value is `null` or is `false` read as another type, SHALL still emit the exposure when the details meet the conditions. A variant whose value is `false` is still an assignment.
 
 A typed read that returned the caller default because the value has another type than the read asks for (a type mismatch) SHALL emit neither `$feature_flag_called` nor `$experiment_exposure`, and SHALL NOT consult or update either dedupe namespace, so the next read of the right type emits both. The SDK logs the mismatch instead, as the typed accessors define.
 
@@ -28,7 +28,7 @@ A typed read that returned the caller default because the value has another type
 - **THEN** exactly one `$feature_flag_called` event is enqueued for "checkout-flow"
 - **AND** exactly one `$experiment_exposure` event is enqueued for "checkout-flow" with `$feature_flag_variant` "test" and `$feature_flag_rule_id` "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13"
 
-#### Scenario: An arm whose value is false is still exposed
+#### Scenario: A variant whose value is false is still exposed
 - **GIVEN** the record for "checkout-flow" is a complete config version 2 experiment split with variant key "control" and value false
 - **WHEN** an enablement read of "checkout-flow" returns false and emits `$feature_flag_called`
 - **THEN** one `$experiment_exposure` event is enqueued with `$feature_flag_variant` "control" and `$feature_flag_response` false
@@ -69,7 +69,7 @@ A typed read that returned the caller default because the value has another type
 - **WHEN** a read of "legacy-layout" emits `$feature_flag_called`
 - **THEN** no `$experiment_exposure` event is enqueued
 
-#### Scenario: A read that returns its caller default for a false arm still reports the assignment
+#### Scenario: A read that returns its caller default for a false variant still reports the assignment
 - **GIVEN** the record for "checkout-flow" is a complete config version 2 experiment split with value false, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "control"
 - **WHEN** an accessor that asks for a string value reads "checkout-flow" with caller default "blue"
 - **AND** it returns "blue" because the value is `false`
@@ -135,7 +135,7 @@ Each `$experiment_exposure` event SHALL carry these properties:
 | `$feature_flag_rule_id` | `metadata.rule_id` |
 | `locally_evaluated` | `true` when local evaluation produced the details, otherwise `false`. Client SDKs, whose values come from the flags service, send `false`. |
 
-`$feature_flag_response` on the exposure is diagnostic only. The arm is `$feature_flag_variant`, which separates arms whose values are equal. The rule ID identifies the experiment rule, and its presence marks the exposure as sent by the SDK.
+`$feature_flag_response` on the exposure is diagnostic only. The variant is `$feature_flag_variant`, which separates variants whose values are equal. The rule ID identifies the experiment rule, and its presence marks the exposure as sent by the SDK.
 
 The exposure SHALL NOT carry `$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_type` or `$experiment_exposure_source`. The SDK sends the exposure only for a config version 2 experiment split, so their values would be constants. The paired `$feature_flag_called` event keeps them (see `feature-flag-called-tracker`).
 
@@ -169,7 +169,7 @@ The exposure MAY also carry `$feature_flag_payload`, `$feature/<key>` and the ot
 - **AND** it has none of `$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_type` and `$experiment_exposure_source`
 - **AND** its event UUID differs from the UUID of the paired `$feature_flag_called` event
 
-#### Scenario: A number-valued arm is rendered as true
+#### Scenario: A number-valued variant is rendered as true
 - **GIVEN** the record for "search-ranking" is a complete config version 2 experiment split with variant key "boosted" and the number value 25
 - **WHEN** a read of "search-ranking" emits `$feature_flag_called`
 - **THEN** the `$experiment_exposure` event has `$feature_flag_response` true and `$feature_flag_variant` "boosted"
@@ -197,7 +197,7 @@ The SDK SHALL dedupe `$experiment_exposure` in its own namespace, separate from 
 - the rule ID;
 - the variant key.
 
-Nothing else SHALL be part of the key. In particular the value, its legacy rendering, the request ID, the evaluation time, the local or remote source and the flag's row version are left out. A remote result that repeats an earlier local assignment is therefore not a second exposure, while arms with equal values stay separate through their variant keys.
+Nothing else SHALL be part of the key. In particular the value, its legacy rendering, the request ID, the evaluation time, the local or remote source and the flag's row version are left out. A remote result that repeats an earlier local assignment is therefore not a second exposure, while variants with equal values stay separate through their variant keys.
 
 A read SHALL emit the exposure only when its key is not yet in the namespace, and SHALL then add the key. Check and add SHOULD be atomic, so concurrent reads do not emit the same exposure twice.
 
@@ -217,8 +217,8 @@ The namespace SHALL be bounded and evicted like the flag-called tracker: when it
 - **WHEN** a later read for "user-123" is answered by remote evaluation with the same rule id and variant key, a new request id and a new evaluation time
 - **THEN** no second `$experiment_exposure` event is enqueued for "checkout-flow" and "user-123"
 
-#### Scenario: A/A arms with equal values stay separate
-- **GIVEN** the flag "pricing-page" has an experiment rule whose arms "control" and "test" both return true
+#### Scenario: A/A variants with equal values stay separate
+- **GIVEN** the flag "pricing-page" has an experiment rule whose variants "control" and "test" both return true
 - **AND** a read for distinct id "user-123" emitted an exposure for variant key "control"
 - **WHEN** a later evaluation for "user-123" assigns variant key "test" in the same rule, still with value true
 - **AND** "pricing-page" is read again

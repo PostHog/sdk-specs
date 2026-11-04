@@ -16,6 +16,25 @@ permissions:
   contents: read
 
 jobs:
+  check-archived:
+    name: Require archived changes
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        # actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Check for unarchived OpenSpec changes
+        shell: bash
+        run: |
+          unarchived="$(find openspec/changes -mindepth 1 -maxdepth 1 -type d ! -name archive -print)"
+          if [[ -n "$unarchived" ]]; then
+            echo "::error::Unarchived OpenSpec changes remain. Apply and archive them in this PR before merging."
+            printf '%s\n' "$unarchived"
+            exit 1
+          fi
+
   validate:
     name: Validate specs
     runs-on: ubuntu-latest

@@ -5,14 +5,16 @@
 A failed call (an `isError` result or a thrown error) SHALL set `$mcp_is_error: true` and:
 
 - `$mcp_error_type`: a low-cardinality label, never containing the message. An explicit type wins: one
-  the caller passes to the manual API, one the error classifier returns, or one the SDK assigns (such
-  as `validation` for a framework validation error it recognizes), in that order; explicit types
-  SHOULD come from the shared vocabulary `validation`, `permission`, `missing_context`, `not_found`,
-  `timeout`, `rate_limited`, `api_4xx`, `api_5xx`, `cancelled`, `input_required`, and `internal`, so
-  failures group the same way across servers. Otherwise it is the thrown error's own type name (in
-  JavaScript, its `name` unless that is the generic `"Error"`, then its constructor's name), looking
-  past wrappers the SDK, standard library, or MCP framework add; otherwise `"Error"`, which is also the
-  type of an `isError` result without an explicit type.
+  the caller passes to the manual API, one the error classifier returns, or one the SDK assigns (such as
+  `validation` for a framework validation error it recognizes), in that order; explicit types SHOULD
+  come from the shared vocabulary `validation`, `permission`, `missing_context`, `not_found`, `timeout`,
+  `rate_limited`, `api_4xx`, `api_5xx`, `cancelled`, `input_required`, and `internal`, so failures group
+  the same way across servers. An empty or blank type from any source is no type, so the next source
+  applies, and an explicit type is sanitized as free text per "Payload privacy" like any other captured
+  string. Otherwise it is the thrown error's own type name (in JavaScript, its `name` unless that is the
+  generic `"Error"`, then its constructor's name), looking past wrappers the SDK, standard library, or
+  MCP framework add; otherwise `"Error"`, which is also the type of an `isError` result without an
+  explicit type.
 - `$mcp_error_message`: the thrown message or the text of the tool's own `isError` content (never
   the SDK's appended handle), sanitized per "Payload privacy".
 
@@ -20,22 +22,21 @@ The SDK MAY set `$mcp_error_status` to an upstream HTTP status code.
 
 A failure can be expected: an outcome the server returns by design for the agent to act on, such as a
 rate limit, a record that does not exist, or arguments the agent must fix. Only the server knows which
-failures are expected, so the SDK SHALL offer the error classifier option (see "Configuration"): a
-server callback that receives one value holding the tool name, the `$mcp_error_type` and
-`$mcp_error_message` the call would carry without a classifier, and the failure itself when the SDK
+failures are expected, so automatic instrumentation SHALL offer the error classifier option (see
+"Configuration"): a server callback that receives one value holding the tool name, the `$mcp_error_type`
+and `$mcp_error_message` the call would carry without a classifier, and the failure itself when the SDK
 holds it. The failure is the tool's own thrown error, looking past the same wrappers as
 `$mcp_error_type`, else the `isError` result as the tool produced it, before the SDK appends a
 conversation handle. The classifier may return an explicit error type, whether the failure is expected,
-both, or nothing. The SDK SHALL call it at most once per tool call, for a failed call that ends in a
-thrown error or an `isError` result, and for nothing else: never for a failed or cancelled task or an
-`input_required` sequence the framework ends, whose types "Tool call event" and "Optional events" fix.
-On the manual step path the SDK calls it only when the caller leaves the type or the expected flag
-unset, and the caller's values win; the lower-level method never calls it. When the classifier or the
-manual API's caller says whether the failure is expected, the SDK SHALL set `$mcp_error_expected` to
-that JSON boolean; otherwise it SHALL NOT set it. An expected
-failure is still a failed call: it keeps `$mcp_is_error: true` and every other rule of this
-requirement. A classifier that fails or returns nothing leaves the call as it would be without one, and
-SHALL NOT change the response.
+both, or nothing. The SDK SHALL call it exactly once for each failed call that ends in a thrown error or
+an `isError` result, and for nothing else: never for a failed or cancelled task or an `input_required`
+sequence the framework ends, whose types "Tool call event" and "Optional events" fix. The manual API
+never calls it: its caller holds the failure and passes the type and the expected flag itself. When the
+classifier or the manual API's caller says whether the failure is expected, the SDK SHALL set
+`$mcp_error_expected` to that JSON boolean; otherwise it SHALL NOT set it. An expected failure is still
+a failed call: it keeps `$mcp_is_error: true` and every other rule of this requirement. A classifier
+that fails or returns nothing leaves the call as it would be without one, and SHALL NOT change the
+response.
 
 When the SDK emits `$exception`, the event SHALL follow the `exception-event-metadata` capability, with
 `$exception_source: "mcp.tool_call"`, `mechanism.handled: true` (the framework turns the failure into a
@@ -87,7 +88,7 @@ takes the call context and the outcome (the result or the error, an explicit err
 failure is expected if the caller knows them, and when it ended); it sends the events and returns the
 result to deliver, with a minted handle appended. From these inputs the SDK applies every other rule of
 this spec itself: the `$mcp_parameters` shape, intent and model, `$session_id`, person and client
-identity, failure capture (including the error classifier), privacy, and size bounds.
+identity, failure capture (apart from the error classifier), privacy, and size bounds.
 
 A lower-level method MAY also accept a finished call's fields directly, for a server that already holds
 them; it is exempt from producing the same events as automatic instrumentation. It sends

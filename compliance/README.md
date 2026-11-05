@@ -145,7 +145,7 @@ the single most widely-shared non-compliance in the matrix.
 |---|---|---|---|---|---|---|---|---|---|
 | posthog-js | 26/64 fully compliant (41%) | 26 | 21 | 12 | 5 | 0 | 2026-10-05 · `6538babc` (targeted re-audit; most of the 59 pre-existing rows carried from 2026-08-10, see file header) | 33 | [posthog-js.md](posthog-js.md) |
 | posthog-python | 13/64 fully compliant (20%; 30 contracts N/A on a server SDK) | 13 | 16 | 5 | 30 | 0 | 2026-10-12 · `509c8525` | 21 | [posthog-python.md](posthog-python.md) |
-| posthog-android | 37/64 fully compliant (58%) | 37 | 16 | 5 | 6 | 0 | 2026-10-19 · `c5e788bd` (targeted re-audit — see file header) | 21 | [posthog-android.md](posthog-android.md) |
+| posthog-android | 35/64 fully compliant (55%) | 35 | 19 | 5 | 5 | 0 | 2026-11-05 · `be3ed4b4` (4.0: Capture, Capture AI, Event Batcher, HTTP Client, Retry Queue only); other rows 2026-10-19 · `c5e788bd` — see file header | 24 | [posthog-android.md](posthog-android.md) |
 | posthog-ios | 38/64 fully compliant (59%) | 38 | 16 | 4 | 6 | 0 | 2026-10-08 · `f5cbe87c` + PostHog/posthog-ios#924–#934 (out-of-cycle refresh, see below) | 20 | [posthog-ios.md](posthog-ios.md) |
 | posthog-node | 9/64 fully compliant (14%; 29 contracts N/A on a server SDK) | 9 | 21 | 4 | 29 | 1 | 2026-10-12 · `4f590b36` (posthog-js monorepo; Traces row corrected 2026-10-19) | 25 (+1 ❓) | [posthog-node.md](posthog-node.md) |
 | posthog-flutter | 21/64 fully compliant (33%) | 21 | 29 | 6 | 8 | 0 | 2026-10-19 · `1032c102` | 35 | [posthog-flutter.md](posthog-flutter.md) |
@@ -171,6 +171,22 @@ audit missed with unchanged code (Flush, HTTP Client, Get Session ID, Is Feature
 MCP Analytics ➖, Session Replay Debug Properties 🟡. Details in [posthog-ios.md](posthog-ios.md).
 The roll-up counts include the fixes from PostHog/posthog-ios#924–#934: Shutdown ❌→✅ and five 🟡→✅
 (Group, Group Identify, Stop Session Recording, Feature Flag Called Tracker, HTTP Client); see the "posthog-ios PRs included" table in the per-SDK file.
+
+**2026-11-05 out-of-cycle refresh — posthog-android 4.0:** re-audited the five rows the capture v1
+specs change (Capture, Capture AI, Event Batcher, HTTP Client, Retry Queue) at `be3ed4b4`, the head of
+the 4.0 integration PR PostHog/posthog-android#871. They were scored against the open
+[#146](https://github.com/PostHog/sdk-specs/pull/146) (capture v1 delivery) and
+[#147](https://github.com/PostHog/sdk-specs/pull/147) (capture v1 AI lane; adds posthog-android 4.0 to
+`capture-ai`'s Applicability). **Capture AI ➖→🟡**: the row applies now, and every AI-lane requirement
+conforms. **Capture ✅→🟡** and, through the same pipeline, Capture AI's 🟡: after `beforeSend`, the SDK
+puts back the capture's uuid, and when a hook returns an event whose `options` is `null`, it restores
+the options the hook was given. Both are documented in the 4.0 migration guide and break the spec's
+"the SDK SHALL NOT add or re-add any value after the hook". **HTTP Client ✅→🟡**: a caller-supplied
+`httpClient` loses its own redirect policy on capture requests. **Event Batcher** stays 🟡 on its
+old `Timer` finding; byte-aware batching passes. **Retry Queue** stays ✅. Keeping 404'd events queued
+with no attempt limit is what #146 allows for a durable client queue, so it isn't scored. Every other
+row carries forward from 2026-10-19. Details in
+[posthog-android.md](posthog-android.md#posthog-android-40-re-audit-2026-11-05).
 
 **Row-count note:** **seven of twelve SDKs now carry the full 64-row matrix** — posthog-js,
 posthog-go, posthog-dotnet, posthog-ios, and, after this run, posthog-react-native, posthog-flutter,
@@ -314,6 +330,8 @@ stalest pointer and its only 59-row file.
 | posthog-node | MCP Analytics | Backward-compatible | **New this run** — `@posthog/mcp` emits neither optional event and misreports an unknown tool as a failed `$mcp_tool_call`; see the ownership question above about whether this row belongs to node or js — [posthog-node.md#n26](posthog-node.md) |
 | posthog-node | Local Feature Flag Evaluator | Backward-compatible | Holdouts **are** implemented in `@posthog/core`, and the acceptance-asset sync gap is unchanged; new this run, a non-scalar group key buckets on `"true"` / `"[object Object]"` instead of going inconclusive — [posthog-node.md#n24](posthog-node.md) |
 | posthog-ios | Exception Event Metadata | Backward-compatible | Chain linkage, 50-entry cap, `$exception_source`, empty `value` and UUID-less image filtering land in PostHog/posthog-ios#931; caller properties can still override `$exception_level`/`$exception_source` on purpose (no typed level parameter yet, and Android/JS behave the same) — [posthog-ios.md#n19](posthog-ios.md) |
+| posthog-android | Capture | Needs deprecation path | **4.0 re-audit (2026-11-05)** — capture v1 conforms except that, after `beforeSend`, the SDK re-imposes the capture's uuid and restores the hook's input `options` when it returns an event with `null` options; documented 4.0 behavior — [posthog-android.md#n24](posthog-android.md#n24) |
+| posthog-android | HTTP Client | Backward-compatible | **4.0 re-audit (2026-11-05)** — capture v1 transport conforms; a caller-supplied `httpClient` gets `followRedirects(false)` and the SDK's same-origin rule on capture requests instead of its own redirect policy — [posthog-android.md#n26](posthog-android.md#n26) |
 | posthog-android | Consent Gating | Backward-compatible | `optOut()` never stops an active replay session, and session-replay start/stop never check `isOptedOut()`, despite session replay being named in this spec's own scope — [posthog-android.md#n5](posthog-android.md#n5) |
 | posthog-android | Session Replay Debug Properties | Backward-compatible | **New this run** — the most complete implementation outside the browser, but no required/optional tiering and no 30s throttle (the whole bundle rides every event) — [posthog-android.md#n17](posthog-android.md#n17) |
 | posthog-android | Exception Event Metadata | Needs deprecation path | **New this run** — linkage, 50-cap and cycle detection are all correct, but `synthetic` is a hardcoded `false` (the spec's explicit "MUST NOT represent unknown with false"), causes inherit `handled`, no `mechanism.source`/`$exception_source`, and `$exception_level` is a *documented* caller override — [posthog-android.md#n7](posthog-android.md#n7) |
@@ -368,7 +386,7 @@ stalest pointer and its only 59-row file.
 | posthog-js | Exception Event Metadata | Backward-compatible | **New this run** — the most complete producer envelope audited (full `exception_id`/`parent_id` linkage, canonical sources, correct nested-`handled` omission, spec-exact caps), missing only `$exception_source` and a capture category on the two global handlers, which fall back to `generic` — [posthog-js.md#n35](posthog-js.md) |
 | posthog-js | Session Replay Debug Properties | Backward-compatible | **New this run** — re-scored against `d078270` after #96; tiering, the `$`-prefix gate, and the 30 s throttle conform, but after `stopSessionRecording()` on a loaded recorder events keep `active`/`buffering` instead of `$recording_status: disabled` — [posthog-js.md#n36](posthog-js.md) |
 
-Full contract-by-contract detail (33 posthog-js, 21 posthog-python, 23 posthog-android, 20
+Full contract-by-contract detail (33 posthog-js, 21 posthog-python, 24 posthog-android, 20
 posthog-ios, 26 posthog-node, 34 posthog-flutter, 31 posthog-react-native, 19 posthog-php, 21
 posthog-ruby, 23 posthog-go, 19 posthog-java, and 29 posthog-dotnet non-Pass/non-N/A cells) is in
 the respective per-SDK files.

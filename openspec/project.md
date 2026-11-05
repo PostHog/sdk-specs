@@ -22,9 +22,9 @@ Specs now cover three groups of canonical SDK behavior:
   opt-in/out, session-replay controls, setup, flush, shutdown, property registration, and
   server-side AI datasets, AI scorers, offline evaluation uploads, and transactional email.
 - **Internal SDK components** such as lifecycle handling, autocapture, batching, retry queues,
-  persistent storage, remote config, feature-flag caches/evaluators, exception-event metadata,
-  session management, surveys, consent gating, replay privacy, and client/server tracing-header
-  correlation.
+  persistent storage, remote config, feature-flag caches/evaluators, experiment exposure,
+  exception-event metadata, session management, surveys, consent gating, replay privacy, and
+  client/server tracing-header correlation.
 - **Product pipelines** such as logs, whose records are enriched, batched, and shipped as
   OpenTelemetry Logs (OTLP/HTTP JSON) at `POST {host}/i/v1/logs`, and traces, whose spans are
   shipped as OpenTelemetry Traces (OTLP/HTTP JSON) at `POST {host}/i/v1/traces`, and MCP analytics,

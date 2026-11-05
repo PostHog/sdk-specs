@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-ios](https://github.com/PostHog/posthog-ios)
 **Audited commit:** `3460e534a9d07bc8e826205d27d68cafaf1294ff` ([commit](https://github.com/PostHog/posthog-ios/commit/3460e534a9d07bc8e826205d27d68cafaf1294ff)) on the 4.0 release branch `chore/v4-remove-deprecated` ([PostHog/posthog-ios#873](https://github.com/PostHog/posthog-ios/pull/873)) — audited on 2026-11-05, before 4.0.0 is published
 **Audited against sdk-specs commit:** `dd11a6b`
-**Summary:** 40 ✅ · 17 🟡 · 1 ❌ · 11 ➖ (69 rows; previous audit 2026-10-08 at `f5cbe87c` + posthog-ios#924–#934 scored 38/16/4/6 on 64 rows)
+**Summary:** 39 ✅ · 18 🟡 · 1 ❌ · 11 ➖ (69 rows; previous audit 2026-10-08 at `f5cbe87c` + posthog-ios#924–#934 scored 38/16/4/6 on 64 rows)
 
 Note on repo layout: `posthog-ios` is a single-package repo, distributed through Swift Package Manager
 only from 4.0. Core SDK logic lives at `PostHog/` (flat files: `PostHogSDK.swift` — the main public
@@ -34,8 +34,9 @@ Net changes vs. the previous audit:
   are read with `getFeatureFlagResult(_:sendFeatureFlagEvent: false)?.payload`, which the new "Payload
   reads through the flag result getter" requirement permits), Get Feature Flag Result and Feature Flag
   Cache 🟡→✅ (a malformed, empty or whitespace-only payload is `nil`; bootstrapped payloads are decoded
-  once), Is Feature Enabled 🟡→✅ (`isFeatureEnabled(_:defaultValue:)`), Session Replay Privacy ❌→✅
-  (4.0 records masked screenshots only, so the leaking wireframe path is gone), Get Feature Flags and
+  once), Is Feature Enabled 🟡→✅ (`isFeatureEnabled(_:defaultValue:)`), Session Replay Privacy ❌→🟡
+  (4.0 records masked screenshots only, so the leaking wireframe path is gone; SwiftUI's explicit mask
+  still wins over an enclosing `postHogNoMask()`, the reverse of the spec's precedence), Get Feature Flags and
   Get Feature Flags And Payloads ❌→🟡 (the specs now record iOS 4.0's `getAllFeatureFlags()` list of
   results, with per-entry payload decoding, as its surface; it is still not the canonical map shape).
 - **New spec requirements unmet (3):** On Feature Flags ✅→🟡 (a `/flags` load in flight across
@@ -133,7 +134,7 @@ this records what the audited branch does so the next audit can score it once #1
 | 57 | Retry Queue | ✅ | new jitter requirement met: factor `[0.75, 1.25)`, capped at 30 s, `Retry-After` floor applied after jitter (`PostHog/PostHogQueue.swift:14-43`, `:247-256`) |
 | 58 | Session Manager | ✅ | |
 | 59 | Session Replay Ingestion Controls | ✅ | |
-| 60 | Session Replay Privacy | ✅ | was ❌; 4.0 removes wireframe mode, the only path that leaked — [n24] |
+| 60 | Session Replay Privacy | 🟡 | was ❌; 4.0 removes wireframe mode, the only path that leaked; SwiftUI `postHogMask()` wins over an enclosing `postHogNoMask()` (over-masks, not a leak) — [n24] |
 | 61 | Surveys | 🟡 | was ✅; new popup-delay requirement (#121) — [n29] |
 | 62 | Bootstrap | 🟡 | [n25] |
 | 63 | MCP Analytics | ➖ | Applicability is `server` add-on; no iOS package |
@@ -483,7 +484,7 @@ this records what the audited branch does so the next audit can score it once #1
 - **Backwards compatibility:** Backward-compatible.
 - **Remediation:** Log storage write failures with `hedgeLogWarning` (or another always-on signal).
 
-### n24 — Session Replay Privacy (✅ Pass; was ❌)
+### n24 — Session Replay Privacy (🟡 Partial; was ❌)
 - **Spec requires:** no-capture elements (`ph-no-capture`, `postHogMask()`) and all their descendants
   are masked even with broad masking off; screenshot replay paints masks before encoding and drops a
   frame whose masks are unreliable (Behavior 2, 4, 6; scenario "Replay privacy excludes no-capture
@@ -503,8 +504,16 @@ this records what the audited branch does so the next audit can score it once #1
   `isNoMask()` is checked first (`:896-903`), so a `ph-no-capture` view inside a `ph-no-mask` subtree
   is not masked; the spec's "explicit unmask markers take precedence over explicit mask markers"
   allows that, and secure-entry fields stay masked there (`:900`, `findSecureTextEntries`).
-- **Backwards compatibility:** The fix ships in 4.0's breaking replay change (screenshot-only),
-  already called out in the changeset.
+  Gap: SwiftUI reverses that precedence. `postHogMask()` documents that "an explicit `postHogMask()`
+  always masks its region, even inside an area marked with `postHogNoMask()` — the explicit mask wins"
+  (`PostHog/SwiftUI/PostHogMaskViewModifier.swift:25-26`), `collectMaskedRegions` appends the registry's
+  regions regardless of an enclosing no-mask (`PostHog/Replay/PostHogReplayIntegration.swift:1179-1192`),
+  and `PostHogTests/PostHogMaskScenarioTest.swift:111-129` asserts a masked child inside a
+  `postHogNoMask()` container stays masked. This over-masks; it does not leak.
+- **Backwards compatibility:** The leak fix ships in 4.0's breaking replay change (screenshot-only),
+  already called out in the changeset. Letting `postHogNoMask()` win would reveal content apps mask today.
+- **Remediation:** None in the SDK is proposed; revealing more content is not wanted. Either keep the row
+  🟡 or have the spec permit the conservative SwiftUI variant (explicit mask wins).
 
 ### n25 — Bootstrap (🟡 Partial)
 - **Spec requires:** (MAY) `bootstrap.sessionID` (UUIDv7) adopted as the session id, invalid values

@@ -28,7 +28,11 @@ They check delivery rather than private queue state. Group-identify cases check
 group identity and supplied scalar or nested properties under `$group_set`. Server cases in
 `acceptance/public/capture-exception.feature` report a native handled exception,
 flush, and check the received structured exception summary, handled state, stack
-frames, identity and caller properties. Migrated server scenarios use `@sdk:server` for adapter-declared SDK type
+frames, identity and caller properties. Additional cases cover nonstandard inputs,
+existing stack preservation and order, causes and aggregate members, null-property
+serialization, reserved metadata precedence and synthetic provenance. Selecting a
+case does not imply that an SDK conforms: failed wire assertions remain visible
+in the run and its nonzero exit. Migrated server scenarios use `@sdk:server` for adapter-declared SDK type
 selection; the parameterized examples have per-row `@case:` labels. An ordinary
 single-case scenario needs no authored case ID. Unmigrated client and negative
 scenarios retain their preconditions and are not selected by the opt-in tags.

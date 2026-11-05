@@ -67,9 +67,9 @@ this records what the audited branch does so the next audit can score it once #1
   (4.0 release blocker) stops removing them, so 4.0.0 will send per-event `$lib`/`$lib_version` as 3.x
   did; that differs from #146's "Library identity comes from the request header" as drafted.
 - Matches #146: retried statuses (404/408/429/500/502/503/504 and network errors), `Retry-After` as a
-  floor clamped to 30 s, byte-aware 5 MiB batches, same-origin 307/308 redirects only.
-  Differs from #146: a durable mobile queue with no attempt limit and 1–30 s jittered backoff (#146:
-  four attempts from 100 ms), and 413 halves the batch (#146: 413 terminal).
+  floor clamped to 30 s, byte-aware 5 MiB batches, same-origin 307/308 redirects only, and the client-SDK
+  retry policy #146 names iOS 4.0 for: a durable queue with no attempt limit, 1–30 s jittered backoff, and
+  halving a multi-event batch on 413 (a single-event 413 is terminal).
 - `captureAi` sends AI events on their own lane to `POST /i/v1/ai/events` (see [n27]).
 
 | # | Contract | Status | Note |

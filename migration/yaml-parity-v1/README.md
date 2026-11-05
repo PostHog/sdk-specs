@@ -29,8 +29,14 @@ Capture API declarations are independent of client/server SDK type:
 - `encoding_gzip`, `encoding_deflate`, `encoding_br`, `encoding_zstd`: independent
   encoding requirements for scenarios that explicitly configure compression.
 
+`@excludes:<capability>` tags name capabilities that replace a scenario. The
+harness does not select a scenario when the SDK declares any capability it excludes.
+Pair each excluded scenario with a replacement that requires the same capability.
+
 Remote flag scenarios require `flags_v2` and `@sdk:server`. The repeated-getter
-scenario additionally requires `flags_getter_remote_uncached`. Local flag scenarios
+scenario additionally requires `flags_getter_remote_uncached`. An SDK that declares
+`flags_response_v4` sends `?v=4` on remote `/flags` requests. That capability
+replaces the `?v=2` query check with a `?v=4` check. Local flag scenarios
 require `feature_flags_local_evaluation_v1` without an SDK-type restriction.
 `@sdk:client` or `@sdk:server` restricts applicability when specified; no such tag
 means no SDK-type restriction. Existing category tags describe behavior areas.

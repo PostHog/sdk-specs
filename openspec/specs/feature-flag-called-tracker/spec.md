@@ -60,7 +60,7 @@ In some SDKs, `shouldTrack` and `markSeen` are combined into one atomic "add if 
 - Capacity-based eviction SHOULD remove only selected old/LRU entries instead of clearing the entire tracker.
 - SDKs that support identity reset flows MUST clear the tracker because the relevant flag-evaluation context changed.
 - SDK close/shutdown flows MUST clear the tracker so in-memory dedupe state does not outlive the SDK instance.
-- Wrapper SDKs may not own a separate tracker at all. Flutter mostly inherits tracker lifecycle from the underlying mobile/browser SDKs it delegates to.
+- Wrapper SDKs may not own a separate tracker at all. Flutter inherits tracker lifecycle from the underlying native/browser SDKs on iOS, macOS, Android and web; on Windows and Linux its pure-Dart client owns the tracker.
 
 ## Error handling
 

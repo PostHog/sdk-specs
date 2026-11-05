@@ -222,7 +222,7 @@ conversations.
 - **THEN** exactly one event named "$mcp_tool_call" should be sent
 
 #### Scenario: A call to a tool the server never registered is not counted
-- **GIVEN** an MCP server instrumented by the SDK with a tool "search_docs"
+- **GIVEN** an MCP server instrumented by the SDK with a tool "search_docs", whose tool registry the SDK can read
 - **WHEN** an MCP client calls tool "no_such_tool" with arguments `{}`
 - **AND** the SDK is flushed
 - **THEN** no event named "$mcp_tool_call" should be sent

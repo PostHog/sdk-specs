@@ -469,6 +469,43 @@ Feature: MCP analytics
     And the "$mcp_tool_call" event property "$mcp_response" should not contain "hunter2"
 
   @server
+  Scenario: Personal data in arguments and results is redacted by default
+    Given an instrumented MCP server with a tool "lookup_customer" that returns the text "Customer ada@example.com last seen from 203.0.113.7"
+    When the MCP client calls tool "lookup_customer" with JSON arguments:
+      """application/json
+      {"email":"ada@example.com","limit":5}
+      """
+    And pending captures are flushed
+    Then the "$mcp_tool_call" event property "$mcp_parameters" should not contain "ada@example.com"
+    And the "$mcp_tool_call" event property "$mcp_parameters" should include JSON {"request":{"params":{"arguments":{"limit":5}}}}
+    And the "$mcp_tool_call" event property "$mcp_parameters" should contain "email"
+    And the "$mcp_tool_call" event property "$mcp_response" should not contain "ada@example.com"
+    And the "$mcp_tool_call" event property "$mcp_response" should not contain "203.0.113.7"
+
+  @server
+  Scenario: Personal data in error text and exceptions is redacted by default
+    Given an instrumented MCP server with a tool "lookup_customer" that fails with message "No account for ada@example.com"
+    When the MCP client calls tool "lookup_customer" with JSON arguments:
+      """application/json
+      {}
+      """
+    And pending captures are flushed
+    Then the "$mcp_tool_call" event property "$mcp_error_message" should not contain "ada@example.com"
+    And no received event should contain "ada@example.com"
+
+  @server
+  Scenario: Turning payload personal data redaction off keeps it in payloads but not in intent
+    Given an instrumented MCP server with payload personal data redaction disabled and a tool "lookup_customer" that returns the text "Customer ada@example.com"
+    When the MCP client calls tool "lookup_customer" with JSON arguments:
+      """application/json
+      {"email":"ada@example.com","context":"look up ada@example.com"}
+      """
+    And pending captures are flushed
+    Then the "$mcp_tool_call" event property "$mcp_parameters" should contain "ada@example.com"
+    And the "$mcp_tool_call" event property "$mcp_response" should contain "ada@example.com"
+    And the "$mcp_tool_call" event property "$mcp_intent" should not contain "ada@example.com"
+
+  @server
   Scenario: A PostHog token is redacted only as a whole word
     Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
     When the MCP client calls tool "search_docs" with JSON arguments:

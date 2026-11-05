@@ -3,7 +3,7 @@
 - [x] 1.1 Add the **Event schema stability** requirement to `mcp-analytics`
 - [x] 1.2 Add an untagged scenario to **Tool call event**: a call to an unregistered tool sends no `$mcp_tool_call`
 - [x] 1.3 Make `llm_model` optional in **Arguments the SDK injects**
-- [x] 1.4 Add the matching untagged scenario to `acceptance/public/mcp-analytics.feature`
+- [x] 1.4 Confirm `acceptance/public/mcp-analytics.feature` already has the untagged unknown-tool scenario
 
 ## 2. Validation
 

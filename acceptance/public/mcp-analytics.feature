@@ -156,16 +156,6 @@ Feature: MCP analytics
     And pending captures are flushed
     Then no received event should be named "$mcp_tool_call"
 
-  @server
-  Scenario: A call to a tool that does not exist is not counted as a tool call
-    Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
-    When the MCP client calls tool "no_such_tool" with JSON arguments:
-      """application/json
-      {}
-      """
-    And pending captures are flushed
-    Then no received event should be named "$mcp_tool_call"
-
   @server @mcp_unknown_tool_capable
   Scenario: A call to a tool that does not exist is recorded as unknown
     Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"

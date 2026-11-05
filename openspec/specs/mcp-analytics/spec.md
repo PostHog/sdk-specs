@@ -849,14 +849,15 @@ another event. It reaches only that project, not open-ended external entities.
 
 ### Requirement: Event schema stability
 
-An SDK release SHALL NOT rename or remove an event or property this spec defines, change its type, or
-change which requests emit an event, because saved insights and the product's queries read them by
-name and count them. A release MAY add events, properties, and enumerated values, and MAY redact or cut
-more of a captured string. A spec change that would break a name SHALL add a new one and keep the old.
+From an SDK's stable release on (`@posthog/mcp` 1.0.0, and the `posthog.mcp` release that declares
+it), a release SHALL NOT rename or remove an event or property this spec defines, change its type, or
+change which requests emit an event. It MAY add events, properties, and enumerated values, and redact,
+cut, or drop values per "Payload privacy" and "Event size bounds". It MAY break these to meet a rule of
+this spec it did not meet before, and SHALL say so in its release notes.
 
 #### Scenario: A later release keeps every name, type, and count
 - **GIVEN** an MCP server instrumented by one SDK release, and the same server instrumented by a later release
 - **WHEN** an MCP client makes the same requests against each
 - **AND** the SDK is flushed
 - **THEN** the later release should send every event the earlier one sent, as many times
-- **AND** every property the earlier release sent should be sent with the same type
+- **AND** every property the earlier release sent should be sent with the same type, unless "Event size bounds" dropped it

@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-ios](https://github.com/PostHog/posthog-ios)
 **Audited commit:** `3460e534a9d07bc8e826205d27d68cafaf1294ff` ([commit](https://github.com/PostHog/posthog-ios/commit/3460e534a9d07bc8e826205d27d68cafaf1294ff)) on the 4.0 release branch `chore/v4-remove-deprecated` ([PostHog/posthog-ios#873](https://github.com/PostHog/posthog-ios/pull/873)) — audited on 2026-11-05, before 4.0.0 is published
 **Audited against sdk-specs commit:** `dd11a6b`
-**Summary:** 41 ✅ · 16 🟡 · 1 ❌ · 11 ➖ (69 rows; previous audit 2026-10-08 at `f5cbe87c` + posthog-ios#924–#934 scored 38/16/4/6 on 64 rows)
+**Summary:** 40 ✅ · 17 🟡 · 1 ❌ · 11 ➖ (69 rows; previous audit 2026-10-08 at `f5cbe87c` + posthog-ios#924–#934 scored 38/16/4/6 on 64 rows)
 
 Note on repo layout: `posthog-ios` is a single-package repo, distributed through Swift Package Manager
 only from 4.0. Core SDK logic lives at `PostHog/` (flat files: `PostHogSDK.swift` — the main public
@@ -38,15 +38,16 @@ Net changes vs. the previous audit:
   (4.0 records masked screenshots only, so the leaking wireframe path is gone), Get Feature Flags and
   Get Feature Flags And Payloads ❌→🟡 (the specs now record iOS 4.0's `getAllFeatureFlags()` list of
   results, with per-entry payload decoding, as its surface; it is still not the canonical map shape).
-- **New spec requirements unmet (2):** On Feature Flags ✅→🟡 (a `/flags` load in flight across
-  `reset()` still reaches listeners) and Surveys ✅→🟡 (popup delay: a close reported before display
-  marks the survey seen and sends `survey dismissed`; `reset()` doesn't cancel a pending delayed display).
+- **New spec requirements unmet (3):** On Feature Flags ✅→🟡 (a `/flags` load in flight across
+  `reset()` still reaches listeners), Surveys ✅→🟡 (popup delay: a close reported before display
+  marks the survey seen and sends `survey dismissed`; `reset()` doesn't cancel a pending delayed display)
+  and HTTP Client ✅→🟡 (`compression = .none` leaves `captureAi` requests gzipped, so there is no
+  whole-client opt-out).
 - **Note-only changes:** Capture stays 🟡, but empty event names are now dropped; only the `NSNull`
   gap remains. Capture AI stays ➖ because its Applicability is still `server`, but iOS 4.0 now ships
   `captureAi` on `/i/v1/ai/events`; [n27] records its conformance. Shutdown, HTTP Client, Group, Group
   Identify, Stop Session Recording and Feature Flag Called Tracker no longer depend on pending PRs.
-  New requirements met without a status change: request body compression and its opt-out (HTTP
-  Client), jittered retry backoff (Retry Queue), identify while opted out (Identify, Consent Gating),
+  New requirements met without a status change: jittered retry backoff (Retry Queue), identify while opted out (Identify, Consent Gating),
   `$group_set` nesting (Group Identify), caller-property precedence (Capture, Register, Session Replay
   Debug Properties), build-invariant lifecycle properties (Application Lifecycle).
 
@@ -125,7 +126,7 @@ this records what the audited branch does so the next audit can score it once #1
 | 50 | Feature Flag Cache | ✅ | was 🟡; malformed → `nil`, bootstrap payloads decoded once — [n20] |
 | 51 | Feature Flag Called Tracker | ✅ | [n21]; config-version-2 attribution needs `/flags?v=4`, which iOS does not request |
 | 52 | Flag Definition Loader | ➖ | unchanged: new keyless-provider and polling-opt-out requirements are server-only |
-| 53 | HTTP Client | ✅ | [n22]; new compression requirement met (gzip default, `compression = .none` opt-out) |
+| 53 | HTTP Client | 🟡 | was ✅; [n22]; gzip by default, but `compression = .none` doesn't turn off `captureAi` compression, so the opt-out is not whole-client |
 | 54 | Local Feature Flag Evaluator | ➖ | unchanged: no local rule engine |
 | 55 | Persistent Storage | 🟡 | [n23] |
 | 56 | Remote Config | ✅ | |
@@ -451,7 +452,7 @@ this records what the audited branch does so the next audit can score it once #1
   attribution rules have nothing to act on (the spec: such an SDK "sees config version 2 flags as legacy
   values").
 
-### n22 — HTTP Client (✅ Pass)
+### n22 — HTTP Client (🟡 Partial; was ✅)
 - **Spec requires:** flags retry policy (transient transport errors incl. DNS/TLS; refused connections not
   retried; 502/504 only; one retry, 300 ms doubling) and (new, #81) gzip by default with a client-wide opt-out,
   raw JSON without `Content-Encoding` when off, and no silent downgrade after a server rejection.
@@ -462,8 +463,16 @@ this records what the audited branch does so the next audit can score it once #1
   `.gzip` (`PostHog/PostHogConfig.swift:491`); `requestAndPayload` sends the raw body with no `Content-Encoding`
   when off and falls back to raw only on a local gzip error (`PostHog/PostHogApi.swift:144-157`), used by capture
   v1, snapshot, logs and push (`:236`, `:475`, `:504`, `:580`). A server rejection is handed to the retry layer, not
-  resent uncompressed. `captureAi` has its own `captureAiCompression` (`PostHog/PostHogConfig.swift:496`), which the
-  spec's enum shape allows.
+  resent uncompressed. Gap: `captureAi` requests use their own `captureAiCompression`, also defaulting to `.gzip`
+  (`PostHog/PostHogConfig.swift:484-496`), and `uploadCaptureV1` passes it for the AI path (`PostHog/PostHogApi.swift:235-240`),
+  which `requestAndPayload` prefers over `compression` (`:148`). So `compression = .none` alone still gzips AI
+  requests; the spec requires an option that turns compression off "for the whole client", covering every
+  endpoint the SDK would otherwise compress. Setting both properties to `.none` works around it.
+- **Backwards compatibility:** Backward-compatible if `compression = .none` also turns off AI compression unless
+  `captureAiCompression` is set explicitly (for example, make `captureAiCompression` optional and fall back to
+  `compression`).
+- **Remediation:** Make `compression` the whole-client switch, with `captureAiCompression` an optional per-lane
+  override.
 
 ### n23 — Persistent Storage (🟡 Partial)
 - **Spec requires:** "Storage failures do not crash SDK calls" — no throw **and** a recorded storage warning.

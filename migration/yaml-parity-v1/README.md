@@ -41,6 +41,22 @@ require `feature_flags_local_evaluation_v1` without an SDK-type restriction.
 `@sdk:client` or `@sdk:server` restricts applicability when specified; no such tag
 means no SDK-type restriction. Existing category tags describe behavior areas.
 
+The `/flags?v=4` read scenarios require `flags_response_v4` and `@sdk:server`. Each
+one serves a single v4 response body and makes one remote read:
+
+- `remote-flags-v4-legacy-getter.feature`: the existing flag getter returns the
+  legacy rendering of the record.
+- `remote-flags-v4-legacy-payload.feature`: additionally requires
+  `feature_flag_payloads`. The SDK's existing payload getter, called with the same
+  arguments as the flag getter, returns the payload as a decoded JSON value.
+
+A getter that has no value or payload may return the SDK's native undefined result
+or JSON null. These two features are generated from the SDK test harness's feature
+flag rules v2 contract fixtures (the reader fixtures and the value corpus). Do not
+edit them by hand: change the contract in the harness and regenerate them with the
+harness's `bin/update-flags-v4-features.py --specs <this checkout>`. The harness
+checks that the pinned features match its contract.
+
 Capabilities describe actual SDK support; they do not configure SDK behavior or
 supply omitted arguments. Explicitly requested cases retain missing prerequisites
 as gaps rather than passing or disappearing from the report.

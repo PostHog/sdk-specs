@@ -148,7 +148,7 @@ Feature: MCP analytics
 
   @server
   Scenario: The error classifier labels an isError result as an expected failure
-    Given an instrumented MCP server with an error classifier that returns error type "not_found" and expected true and a tool "get_record" that returns a result with isError true and the text "record not found"
+    Given an instrumented MCP server with conversation anchoring disabled, an error classifier that returns error type "not_found" and expected true, and a tool "get_record" that returns a result with isError true and the text "record not found"
     When the MCP client calls tool "get_record" with JSON arguments:
       """application/json
       {"id":"rec_1"}
@@ -158,6 +158,7 @@ Feature: MCP analytics
     And the "$mcp_tool_call" event property "$mcp_error_type" should equal "not_found"
     And the "$mcp_tool_call" event property "$mcp_error_expected" should equal JSON true
     And the "$mcp_tool_call" event property "$mcp_error_message" should equal "record not found"
+    And the MCP client should receive a result with exactly one text block "record not found" and isError true
 
   @server
   Scenario: A failed call without a classification has no expected flag

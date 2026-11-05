@@ -20,7 +20,8 @@ re-verify; nothing below is re-scored yet:
   `phx_` personal key.
 - **Get Feature Flag Payload** ([n14](#n14)): `getFeatureFlagPayload()` removed (use `getFeatureFlagResult(key,
   sendFeatureFlagEvent: false)?.payload`). **Get Feature Flag Result** ([n15](#n15)): option renamed to
-  `sendFeatureFlagEvent`, falls back to `PostHogConfig.sendFeatureFlagEvent`, and a malformed payload is `null` on iOS,
+  `sendFeatureFlagEvent`, falls back to `PostHogConfig.sendFeatureFlagEvent` (except on Web, which
+  leaves the default to posthog-js), and a malformed payload is `null` on iOS,
   macOS and Android (posthog-ios 4.0).
 - **Capture**, **HTTP Client** ([n19](#n19)), **Retry Queue** ([n38](#n38)): capture v1 (`/i/v1/analytics/events`) on
   iOS, macOS, Android, Windows and Linux (web stays on posthog-js). Windows/Linux back off 1–30 s with jitter, skip

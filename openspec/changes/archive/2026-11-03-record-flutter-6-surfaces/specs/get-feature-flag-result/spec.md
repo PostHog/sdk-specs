@@ -1,6 +1,6 @@
 ## Narrative alignment
 
-When syncing this delta, update the Flutter surface variant to `getFeatureFlagResult(key, { bool? sendFeatureFlagEvent })` (6.0+, falling back to `PostHogConfig.sendFeatureFlagEvent` when omitted), with 5.x taking `{ sendEvent = true }`.
+When syncing this delta, update the Flutter surface variant to `getFeatureFlagResult(key, { bool? sendFeatureFlagEvent })` (6.0+; when omitted, falling back to `PostHogConfig.sendFeatureFlagEvent` on iOS, macOS, Android, Windows and Linux, while Web leaves the default to posthog-js), with 5.x taking `{ sendEvent = true }`.
 
 ## MODIFIED Requirements
 

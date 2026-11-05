@@ -78,7 +78,7 @@ type FeatureFlagResult = {
 ### Surface variants
 
 - **posthog-js core / browser / react-native:** `getFeatureFlagResult(key, options?)`
-- **flutter:** `getFeatureFlagResult(key, { bool? sendFeatureFlagEvent }): Future<PostHogFeatureFlagResult?>` (6.0+, falls back to `PostHogConfig.sendFeatureFlagEvent` when omitted); 5.x takes `{ sendEvent = true }`
+- **flutter:** `getFeatureFlagResult(key, { bool? sendFeatureFlagEvent }): Future<PostHogFeatureFlagResult?>` (6.0+; when omitted, falls back to `PostHogConfig.sendFeatureFlagEvent` on iOS, macOS, Android, Windows and Linux, while Web leaves the default to posthog-js); 5.x takes `{ sendEvent = true }`
 - **Node:** `await getFeatureFlagResult(key, distinctId, options?)`
 - **Python:** `get_feature_flag_result(key, distinct_id, *, ...)`
 - **Ruby:** `get_feature_flag_result(key, distinct_id, groups: {}, person_properties: {}, group_properties: {}, only_evaluate_locally: false, send_feature_flag_events: true)`

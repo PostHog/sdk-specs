@@ -10,7 +10,7 @@ posthog_flutter 6.0 ([PostHog/posthog-flutter#637](https://github.com/PostHog/po
 - `remote-config`: name `sendFeatureFlagEvent` and the `Posthog().onFeatureFlags(callback)` listener instead of the removed `sendFeatureFlagEvents` and config callback.
 - `flag-definition-loader`: name `projectToken` instead of the removed `apiKey`.
 - `get-feature-flag-payload`, `local-feature-flag-evaluator`, `feature-flag-called-tracker`: record that Flutter 6.0 removes `getFeatureFlagPayload`.
-- `get-feature-flag-result`: record Flutter 6.0's `sendFeatureFlagEvent` option and its fallback to `PostHogConfig.sendFeatureFlagEvent`, and update the recorded-divergence sentence in the option-name requirement.
+- `get-feature-flag-result`: record Flutter 6.0's `sendFeatureFlagEvent` option and its fallback to `PostHogConfig.sendFeatureFlagEvent` on iOS, macOS, Android, Windows and Linux (Web leaves the default to posthog-js), and update the recorded-divergence sentence in the option-name requirement.
 
 ## Capabilities
 

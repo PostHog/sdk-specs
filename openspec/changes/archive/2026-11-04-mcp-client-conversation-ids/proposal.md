@@ -7,7 +7,7 @@ uses neither:
 
 - A client that already names the conversation still gets a `conversation_id` argument and a
   `{"conversation_id": "..."}` block in its results. The handle duplicates a grouping key the client
-  sends on every call, and starts one call later.
+  sends on every call, and groups calls only while the agent copies it.
 - The SDK cannot leave the argument out of a listing for such a client, because it never looks at
   who is listing.
 
@@ -47,8 +47,9 @@ _None._
 ## Impact
 
 For a ChatGPT conversation, `$session_id` now comes from ChatGPT's own id, so one conversation is one
-session from its first call. Before, a conversation grouped by handle split off its first call, and a
-transport session could span several conversations. No event carries
+session however the agent treats the handle. Before, a conversation grouped by handle split
+whenever the agent dropped or reused the handle, and a transport session could span several
+conversations. No event carries
 `$mcp_conversation_id` for those calls. Every other client sees no change apart from the `context`
 description and the virtual tools' annotations. `llm_model` is unchanged. The JavaScript, Python, Go,
 Ruby, and Rust SDKs implement this in separate PRs.

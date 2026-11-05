@@ -37,10 +37,10 @@ Sources:
 
 Three facts follow for the SDK:
 
-1. Some clients name the conversation on every call. Their id starts at the first call and does not
-   depend on the agent copying anything, which the SDK's own handle does. The handle is the fallback
+1. Some clients name the conversation on every call. Their id does not depend on the agent copying
+   anything, which the SDK's own handle does. The handle is the fallback
    for clients that send no id.
-2. Each client uses its own key, and some keys are unprefixed (`threadId`). Reading an id needs a
+2. Each client uses its own key, and some keys are unprefixed (Codex's `sessionId`). Reading an id needs a
    per-client table, not a guess at key names.
 3. HTTP clients that name themselves do so in the `User-Agent`, on every request. It is the one
    signal present at `tools/list` on every protocol revision, which is where the SDK decides what to
@@ -66,9 +66,9 @@ shorter `context` request.
 When a call carries both, `$session_id` comes from the client's id and the handle is ignored for
 `$session_id` and `$mcp_conversation_id`. The SDK still strips the handle argument, which it owns.
 
-The client's id names the conversation from its first call. A handle exists only after the first
-result reaches the agent, and holds only while the agent copies it, so a conversation grouped by
-handle splits its first call off and splits again whenever the agent drops or reuses the handle.
+The client sends its id on every call. A handle reaches the agent in the first call's result and
+holds only while the agent copies it into each later call, so a conversation grouped by handle
+splits whenever the agent drops or reuses the handle.
 Taking the client's id whenever it is present makes every call of the conversation carry one key.
 Taking the handle when present would mix the two keys within one conversation.
 
@@ -157,8 +157,8 @@ the expectation.
 Codex and VS Code also send a conversation id, but a row for each needs answers this change does not
 have:
 
-- Codex's key `threadId` is unprefixed, so another client could send a `threadId` that means something
-  else. The SDK reads a key from any request today. A Codex row needs reading gated on recognition,
+- Codex's key `sessionId` is unprefixed, so another client could send a `sessionId` that means
+  something else. The SDK reads a key from any request today. A Codex row needs reading gated on recognition,
   and recognition over stdio, where there is no `User-Agent`, needs `clientInfo`.
 - VS Code sends a resource URI instead of a session id for chats that are not local. Whether that URI
   is stable for a conversation and fits 128 characters is not checked.
@@ -168,8 +168,8 @@ connection.
 
 ## Risks / Trade-offs
 
-- ChatGPT conversations change how they are grouped. A conversation that was split by its first call,
-  or by a dropped handle, becomes one session. Session counts for ChatGPT traffic go down and sessions
+- ChatGPT conversations change how they are grouped. A conversation that was split by a dropped or
+  reused handle becomes one session. Session counts for ChatGPT traffic go down and sessions
   get longer, which is the more accurate count.
 - The recognition rule depends on ChatGPT's `User-Agent`. If it changes, the SDK falls back to
   advertising `conversation_id`, which is today's behavior.

@@ -43,8 +43,8 @@ A value that is not a string of 1 to 128 printable ASCII characters (0x20 to 0x7
 conversation id. The SDK SHALL derive `$session_id` from `<key> + ":" + <value>`, so ids from two clients
 never derive the same session, and SHALL NOT send the value itself in any property. A client
 conversation id wins over a conversation handle: when a call carries both, the SDK SHALL ignore the
-handle for `$session_id` and `$mcp_conversation_id`. The client's id names the conversation from its
-first call, while a handle starts at the second call and holds only while the agent copies it. A call
+handle for `$session_id` and `$mcp_conversation_id`. The client sends its id on every call, while a handle
+groups calls only while the agent copies it into each one. A call
 with a client conversation id SHALL NOT set `$mcp_conversation_id`, which holds only SDK-minted handles.
 The SDK SHALL read client conversation ids whether or not conversation anchoring is enabled: reading
 one adds nothing the client sees. Recognizing a client changes only what the SDK advertises and mints;

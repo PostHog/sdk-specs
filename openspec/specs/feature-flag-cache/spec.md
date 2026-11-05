@@ -41,7 +41,7 @@ clear(): void
    - richer `flags` / metadata entries for id/version/reason/payload access
 3. **Normalize server responses before caching.** When the API response shape differs by backend version (for example legacy vs. richer V4 details), the cache normalizes it into a stable local format.
 4. **Serve flag reads from local memory first.** `getFlag`, `getPayload`, and `getDetails` should be cheap, local reads.
-5. **Allow wrapper SDKs to delegate to an underlying cache instead of owning a second one.** On iOS, Android and web, Flutter's Dart layer forwards flag reads to the native/browser SDKs' caches rather than maintaining an independent Dart-side feature-flag store. On macOS, Windows and Linux there is no native SDK, so Flutter's pure-Dart client owns the cache and follows this spec directly.
+5. **Allow wrapper SDKs to delegate to an underlying cache instead of owning a second one.** On iOS, macOS, Android and web, Flutter's Dart layer forwards flag reads to the native/browser SDKs' caches rather than maintaining an independent Dart-side feature-flag store. On Windows and Linux there is no native SDK, so Flutter's pure-Dart client owns the cache and follows this spec directly.
 6. **Persist updated cache state.** After successful reloads, the cache writes the normalized values back to persistent storage so they survive restarts.
 7. **Handle partial responses carefully.** If the backend reports "errors while computing flags," some SDKs merge successful keys into the existing cache instead of replacing everything.
 8. **Handle quota-limited / empty states explicitly.** When the backend indicates quota limiting or "no active flags," implementations either preserve prior details with an error marker or clear the cached flags, depending on SDK semantics.
@@ -71,7 +71,7 @@ clear(): void
 - Reload/update operations replace or merge cache contents.
 - `reset()` or dedicated clear paths remove cached flags.
 - Some SDKs preserve cached flags across process restarts by writing them to disk/state storage.
-- Wrapper SDKs may surface cache updates through callbacks instead of exposing the cache directly. Flutter wires `onFeatureFlags` to Android/iOS native notifications and browser `posthog.onFeatureFlags(...)`, while continuing to read values from the underlying platform caches; on desktop its Dart client notifies from its own cache.
+- Wrapper SDKs may surface cache updates through callbacks instead of exposing the cache directly. Flutter wires `onFeatureFlags` to Android/iOS/macOS native notifications and browser `posthog.onFeatureFlags(...)`, while continuing to read values from the underlying platform caches; on Windows and Linux its Dart client notifies from its own cache.
 
 ## Error handling
 

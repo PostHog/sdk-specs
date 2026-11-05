@@ -1,11 +1,12 @@
 ## 1. Spec delta
 
-- [x] 1.1 Extend **Payload privacy** so the personal data pass covers `$mcp_parameters`, `$mcp_response`, `$mcp_error_message` and `$exception` values, keeping keys, numbers and booleans
-- [x] 1.2 Add the payload personal data option to the Configuration table
-- [x] 1.3 Add scenarios for default redaction in payloads and errors, and for the opt-out
-- [x] 1.4 Add the matching scenarios to `acceptance/public/mcp-analytics.feature`
+- [x] 1.1 Extend **Payload privacy** so the personal data pass covers payload strings and keys, card-number numbers, `$mcp_error_message`, resource read URIs, and `$exception` values and source lines
+- [x] 1.2 Order the pass before the URL pass, and count names it changes as unrecorded in `$mcp_input_keys`
+- [x] 1.3 Add the payload personal data option to the Configuration table
+- [x] 1.4 Mark `$mcp_feedback_<name>` JSON text sanitized, and fix the stale reason in **Optional events**
+- [x] 1.5 Add scenarios to the spec and to `acceptance/public/mcp-analytics.feature`
 
 ## 2. Validation
 
-- [x] 2.1 Run `openspec validate --strict` on the change
-- [x] 2.2 Run `openspec archive` to sync the delta into `specs/mcp-analytics/spec.md` and archive the change
+- [x] 2.1 Run `openspec validate --strict`
+- [x] 2.2 Sync the delta into `specs/mcp-analytics/spec.md` and archive the change

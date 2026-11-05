@@ -25,11 +25,17 @@ sending, the SDK SHALL:
   from one alphabet: base64 with `\r` and `\n`, because MIME and PEM base64 break lines, or base64url;
 - redact email addresses, IP addresses, Luhn-valid card numbers, US social security numbers, and phone
   numbers from `$mcp_intent` and every property "Property reference" marks sanitized as free text;
-- unless the payload personal data option is off, apply that same personal data pass to every string
-  value at any depth of `$mcp_parameters` and `$mcp_response`, text blocks and their JSON text copies
-  included, to `$mcp_error_message`, and to each exception's `value` in the `$exception` sibling.
-  Object keys, JSON numbers, and booleans are kept, so the shape of the payload survives: a key
-  names a field, and redacting keys would merge an object's entries.
+- unless the payload personal data option is off, apply that same personal data pass to:
+  - every string value and object key at any depth of `$mcp_parameters` and `$mcp_response`, text
+    blocks and their JSON text copies included;
+  - every number in them whose digits form a Luhn-valid card number, replaced by the string
+    `"[redacted]"`, which JSON text writes with its quotes so it stays valid JSON;
+  - `$mcp_error_message`, and `$mcp_resource_name` on a resource read, where it holds the URI;
+  - each exception's `value` in the `$exception` sibling, and the stack-frame source lines it sends
+    (such as `pre_context`, `context_line`, and `post_context`), each first cut to 2,048 characters.
+
+  Other numbers and booleans are kept. The pass matches text as captured, so an address written as
+  `%40` or `\u0040` is not recognized.
 
 Object keys inside `$mcp_parameters` and `$mcp_response` are captured strings too, because a result
 keyed by data (a link check keyed by signed URL) carries the credential in the key. The key list is
@@ -38,8 +44,8 @@ binary passes, with the key limit of "Property reference" in place of the string
 other credential-shaped values below does not extend to keys, because entropy detectors read field names
 such as `Get_Organization_Memberships` as credentials. When cutting or redaction makes keys of one object
 equal, the SDK SHALL keep the entry whose key as received sorts first by Unicode code point.
-`$mcp_input_keys` SHALL count a name the PostHog token or URL pass would change as a name that was not
-recorded.
+`$mcp_input_keys` SHALL count a name the PostHog token, URL, or payload personal data pass would
+change as a name that was not recorded.
 
 These passes SHALL cost in proportion to the property limits, not to the payload. The SDK SHALL first
 apply the entry and nesting limits of "Property reference" and the key-based redaction. For each
@@ -54,7 +60,8 @@ the end of the second result, so the common prefix holds neither. Scanning the w
 one large result cost hundreds of milliseconds.
 
 The personal data pass on payloads is one of the remaining passes of the cut above, so it costs in
-proportion to the property limits too, and a match that crosses a string's limit is redacted whole.
+proportion to the property limits too, and a match that crosses a string's limit is redacted whole. It
+runs before the URL pass, because that pass percent-encodes `@` and would hide an address in a query.
 Turning the option off changes only payloads, error text, and exception values: intent and free-text
 properties keep the pass, and the credential passes still apply everywhere.
 
@@ -116,6 +123,14 @@ drops its `$exception`.
 - **AND** the "$mcp_response" should not contain "ada@example.com"
 - **AND** the "$mcp_response" should not contain "203.0.113.7"
 
+#### Scenario: A personal key and a card number in a result are redacted and its JSON stays valid
+- **GIVEN** an MCP server instrumented by the SDK with a tool "list_accounts" that returns `structuredContent` `{"accounts":{"ada@example.com":{"plan":"pro"}},"card":4111111111111111,"count":3}` and the same JSON as a text block
+- **WHEN** an MCP client calls tool "list_accounts"
+- **AND** the SDK is flushed
+- **THEN** the "$mcp_response" should not contain "ada@example.com"
+- **AND** the "$mcp_response" should not contain "4111111111111111"
+- **AND** the first text block in "$mcp_response" should parse as JSON with "count" equal to 3
+
 #### Scenario: Personal data in error text and exceptions is redacted by default
 - **GIVEN** an MCP server instrumented by the SDK with a tool "lookup_customer" that fails with message "No account for ada@example.com"
 - **WHEN** an MCP client calls tool "lookup_customer"
@@ -130,3 +145,93 @@ drops its `$exception`.
 - **THEN** the "$mcp_parameters" should contain "ada@example.com"
 - **AND** the "$mcp_response" should contain "ada@example.com"
 - **AND** the "$mcp_intent" should not contain "ada@example.com"
+
+### Requirement: Optional events
+
+Every event below SHALL carry the properties of "Client and server identity" and "Session identity",
+and SHALL come only from a request the client sent: never from a request the framework dispatches
+internally, and never `$mcp_initialize` without an `initialize`. Automatic instrumentation SHOULD emit
+`$mcp_input_required` and `$mcp_unknown_tool`, and MAY emit the others; a manual API MAY offer capture
+methods for any of them. An SDK declares which of these events it emits as the acceptance capability
+tags `@mcp_input_required_capable`, `@mcp_unknown_tool_capable`, `@mcp_tools_list_capable`, and
+`@mcp_initialize_capable`, and
+whether it observes task stores ("Tool call event") as `@mcp_task_store_capable`. The rules that no
+`$mcp_tool_call` is sent for a round, a task handle, or an unknown tool apply to every SDK.
+
+- `$mcp_tools_list` for `tools/list`, with `$mcp_listed_tool_names` as a JSON array of the names on
+  that page. It describes the server's catalogue: a `tools/list` request cannot carry a conversation
+  handle, so where calls are anchored (no transport session) its `$session_id` does not match
+  theirs. Its `$mcp_response` SHALL keep only the result envelope (such as `nextCursor`, `ttlMs`,
+  `cacheScope`, `_meta`), never the `tools` array, and is omitted when the envelope is empty; the
+  response capture option does not apply to it.
+  With the tools list event option off (see "Configuration"), the SDK SHALL NOT send
+  `$mcp_tools_list`, nor the `$exception` of a failed listing, and SHALL change nothing else: the
+  listing keeps its injected arguments and virtual tools.
+- `$mcp_input_required` for each `input_required` result a client receives: `$mcp_tool_name`,
+  `$mcp_duration_ms` for that round, and `$mcp_input_request_methods`, never the requests' or answers'
+  content. It records every round, including rounds whose call never completes. Not rounds: a round a
+  framework shim fulfils for a legacy client (any `input_required` returned for a legacy-revision
+  request), in-call elicitation on legacy revisions, and a task's own `input_required` status. For a
+  shim, the SDK keys the handler's re-entries on the transport session and the client's JSON-RPC
+  request id, takes the call's `timestamp` from the first, and emits once when a re-entry returns a
+  final outcome. A sequence the framework ends without one (a round cap, a timeout, or a disabled shim)
+  is a failed call with `$mcp_error_type: "input_required"` where the SDK can observe it; otherwise its
+  state is evicted with the session's.
+- `$mcp_unknown_tool` for a call that names a tool the server does not have (see "Tool call event"),
+  with the requested name as `$mcp_tool_name`; a call naming no tool emits nothing. It records what the
+  agent looked for and did not find.
+- `$mcp_missing_capability` from the SDK's `get_more_tools` virtual tool and `$mcp_feedback` from its
+  `send_feedback` virtual tool (names configurable). `get_more_tools` declares a required `context`
+  argument, the agent's report, which becomes `$mcp_intent`. `send_feedback` declares `feedback_type`
+  and `summary` (required), and `details`, `friction_points`, `suggested_improvement`, `tool_name`,
+  `sentiment`, and `task_completed`; they become the `$mcp_feedback_*` properties of "Property
+  reference" (`tool_name` as `$mcp_feedback_tool`), and the non-empty of `summary` and `details`,
+  joined by a blank line (`"\n\n"`), become `$mcp_intent`. Both use `$mcp_intent_source:
+  "context_parameter"`. Neither event carries `$mcp_parameters`, because the report already becomes the
+  `$mcp_feedback_*` properties and `$mcp_intent`. A report argument the host declares becomes
+  `$mcp_feedback_<name>`; the SDK SHALL reject at configuration one whose property a built-in field
+  uses (`type`, `tool`, `summary`, ...) or that reuses an injected argument's name, SHALL NOT capture
+  arguments the tool does not declare, and SHALL send the event even when the host's report handler
+  fails.
+- `$mcp_initialize` for a legacy `initialize`, unless the host turns the initialize event option
+  off (see "Configuration"). With the option off, the SDK SHALL NOT send `$mcp_initialize`, and SHALL
+  change nothing else: the session token, `$session_id`, and the client and server identity of later
+  events stay the same. The SDK SHALL NOT send an `$exception` for a failed `initialize`, with the
+  option on or off.
+- `$mcp_resource_read` and `$mcp_resources_list` for resource requests. `$mcp_resource_read` SHALL
+  NOT carry the resource's contents.
+
+A virtual tool SHALL NOT be advertised when the server already registers a tool of that name. It gets
+every enabled injected argument except `context`, whose place its own report arguments take, follows
+"Session identity" like any tool call, and emits its own event, not `$mcp_tool_call`.
+
+#### Scenario: A tool listing keeps names and only the result envelope (@mcp_tools_list_capable)
+- **GIVEN** an MCP server instrumented by the SDK with 101 tools and a page size of 100
+- **WHEN** an MCP client lists tools
+- **AND** the SDK is flushed
+- **THEN** the "$mcp_tools_list" event's property "$mcp_listed_tool_names" should be an array of the 100 tool names on the first page
+- **AND** its property "$mcp_response" should include "nextCursor"
+- **AND** its property "$mcp_response" should not include "tools"
+
+#### Scenario: Each legacy initialize sends one $mcp_initialize (@mcp_initialize_capable)
+- **GIVEN** an MCP server instrumented by the SDK with default options
+- **WHEN** an MCP client on protocol revision "2025-11-25" sends `initialize`
+- **AND** the SDK is flushed
+- **THEN** exactly one "$mcp_initialize" event should be sent
+
+#### Scenario: With the initialize event option off, no $mcp_initialize is sent and the session holds (@mcp_initialize_capable)
+- **GIVEN** a stateless HTTP MCP server instrumented by the SDK with the initialize event option off
+- **WHEN** an MCP client on protocol revision "2025-11-25" sends `initialize`
+- **AND** calls tool "search_docs" with the session token from the `initialize` response
+- **AND** the SDK is flushed
+- **THEN** no "$mcp_initialize" event should be sent
+- **AND** the "$mcp_tool_call" event's "$session_id" should equal the session in that token
+
+#### Scenario: With the tools list event option off, a listing sends no $mcp_tools_list and keeps injected arguments (@mcp_tools_list_capable)
+- **GIVEN** an MCP server instrumented by the SDK with the tools list event option off and a tool "search_docs"
+- **WHEN** an MCP client lists tools
+- **AND** calls tool "search_docs" with arguments `{"query": "flags", "context": "find flag docs"}`
+- **AND** the SDK is flushed
+- **THEN** no "$mcp_tools_list" event should be sent
+- **AND** the listed "search_docs" input schema should include `context`
+- **AND** the "$mcp_tool_call" event's property "$mcp_intent" should be "find flag docs"

@@ -483,6 +483,24 @@ Feature: MCP analytics
     And the "$mcp_tool_call" event property "$mcp_response" should not contain "203.0.113.7"
 
   @server
+  Scenario: A personal key and a card number in a result are redacted and its JSON stays valid
+    Given an instrumented MCP server with a tool "list_accounts" that returns structured content and a text block, both:
+      """application/json
+      {"accounts":{"ada@example.com":{"plan":"pro"}},"card":4111111111111111,"count":3}
+      """
+    When the MCP client calls tool "list_accounts" with JSON arguments:
+      """application/json
+      {}
+      """
+    And pending captures are flushed
+    Then the "$mcp_tool_call" event property "$mcp_response" should not contain "ada@example.com"
+    And the "$mcp_tool_call" event property "$mcp_response" should not contain "4111111111111111"
+    And the first text block in the "$mcp_tool_call" event property "$mcp_response" should be:
+      """application/json
+      {"accounts":{"[redacted]":{"plan":"pro"}},"card":"[redacted]","count":3}
+      """
+
+  @server
   Scenario: Personal data in error text and exceptions is redacted by default
     Given an instrumented MCP server with a tool "lookup_customer" that fails with message "No account for ada@example.com"
     When the MCP client calls tool "lookup_customer" with JSON arguments:

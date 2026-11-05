@@ -47,7 +47,7 @@ clear(): void
 8. **Handle quota or auth errors specially.** Some implementations clear definitions or back off polling when the API key is invalid, quota limited, or not authorized.
 9. **Expose readiness to higher layers.** Callers can ask whether local evaluation is ready and then use the loaded definitions in the evaluator.
 10. **Clear definitions on explicit reset/clear.** When local evaluation is disabled, quota limited, or reset, the loader drops the in-memory definitions and associated ETag state.
-11. **Distinguish local-evaluation definition loading from ordinary feature-flag preloading.** Some wrappers expose only end-user flag preload/config knobs, not the privileged definition-loader itself. Flutter's Dart config includes the project `apiKey` and a `preloadFeatureFlags` toggle, and its setup path forwards those into the platform SDKs or hooks into an existing browser SDK, but it exposes no Dart-side personal/admin API key, ETag state, or definition-polling API for local-evaluation rule documents.
+11. **Distinguish local-evaluation definition loading from ordinary feature-flag preloading.** Some wrappers expose only end-user flag preload/config knobs, not the privileged definition-loader itself. Flutter's Dart config includes the `projectToken` and a `preloadFeatureFlags` toggle, and its setup path forwards those into the platform SDKs or hooks into an existing browser SDK, but it exposes no Dart-side personal/admin API key, ETag state, or definition-polling API for local-evaluation rule documents.
 
 ## State & lifecycle
 

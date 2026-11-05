@@ -221,6 +221,12 @@ conversations.
 - **AND** the SDK is flushed
 - **THEN** exactly one event named "$mcp_tool_call" should be sent
 
+#### Scenario: A call to a tool the server never registered is not counted
+- **GIVEN** an MCP server instrumented by the SDK with a tool "search_docs"
+- **WHEN** an MCP client calls tool "no_such_tool" with arguments `{}`
+- **AND** the SDK is flushed
+- **THEN** no event named "$mcp_tool_call" should be sent
+
 ### Requirement: Failure capture
 
 A failed call (an `isError` result or a thrown error) SHALL set `$mcp_is_error: true` and:
@@ -465,9 +471,11 @@ model), and `conversation_id`. The SDK SHALL:
   identity", out of a listing requested by a handle-free client of "Session identity". That client
   names the conversation in `_meta`, so the argument would only add a second, weaker grouping key;
 
-- mark `context` and `llm_model` required where it removes them before the MCP framework validates
-  arguments, because models fill required arguments, and optional otherwise, so no call is rejected
-  for omitting them. `conversation_id` SHALL be optional: the agent has no handle on its first call;
+- mark `context` required where it removes it before the MCP framework validates arguments, because
+  models fill required arguments, and optional otherwise, so no call is rejected for omitting it.
+  `llm_model` SHALL be optional: an agent that does not know its model would otherwise guess one, and
+  the model a client sends in `_meta` ("Tool call event") takes precedence anyway. `conversation_id`
+  SHALL be optional: the agent has no handle on its first call;
 - skip injecting an argument into a tool that already declares that name, and skip all three for a
   tool whose root schema uses `$ref`, `oneOf`, `anyOf`, or `allOf` (logging a warning);
 - remove injected arguments before the handler runs and keep them out of `$mcp_parameters`;
@@ -839,3 +847,16 @@ another event. It reaches only that project, not open-ended external entities.
 - **WHEN** an MCP client lists tools
 - **THEN** the advertised "send_feedback" tool should have annotations {"readOnlyHint": false, "destructiveHint": false, "idempotentHint": false, "openWorldHint": false}
 
+### Requirement: Event schema stability
+
+An SDK release SHALL NOT rename or remove an event or property this spec defines, change its type, or
+change which requests emit an event, because saved insights and the product's queries read them by
+name and count them. A release MAY add events, properties, and enumerated values, and MAY redact or cut
+more of a captured string. A spec change that would break a name SHALL add a new one and keep the old.
+
+#### Scenario: A later release keeps every name, type, and count
+- **GIVEN** an MCP server instrumented by one SDK release, and the same server instrumented by a later release
+- **WHEN** an MCP client makes the same requests against each
+- **AND** the SDK is flushed
+- **THEN** the later release should send every event the earlier one sent, as many times
+- **AND** every property the earlier release sent should be sent with the same type

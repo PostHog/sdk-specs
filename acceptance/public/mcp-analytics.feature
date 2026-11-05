@@ -268,6 +268,75 @@ Feature: MCP analytics
     Then the "$mcp_tool_call" event property "$session_id" should equal "ses_6df45f0102a182bcd5e8dd5dad6c65a0"
 
   @server
+  Scenario: A client conversation id sets the session and adds no conversation_id block
+    Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
+    When the MCP client calls tool "search_docs" with _meta {"openai/session":"v1/conv-example-0001"} and JSON arguments:
+      """application/json
+      {"query":"flags"}
+      """
+    Then the MCP client result should not contain a conversation_id text block
+    When pending captures are flushed
+    Then the "$mcp_tool_call" event property "$session_id" should equal "ses_2f5d35b7108d17c807766f2f769a1e8c"
+    And the "$mcp_tool_call" event should not have property "$mcp_conversation_id"
+
+  @server
+  Scenario: A client conversation id wins over a conversation handle
+    Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
+    When the MCP client calls tool "search_docs" with _meta {"openai/session":"v1/conv-example-0001"} and JSON arguments:
+      """application/json
+      {"query":"flags","conversation_id":"0190f0e8-7a6b-7c3d-9e4f-5a6b7c8d9e0f"}
+      """
+    And pending captures are flushed
+    Then the tool handler for "search_docs" should have received JSON arguments {"query":"flags"}
+    And the "$mcp_tool_call" event property "$session_id" should equal "ses_2f5d35b7108d17c807766f2f769a1e8c"
+    And the "$mcp_tool_call" event should not have property "$mcp_conversation_id"
+
+  @server
+  Scenario: A client conversation id sets the session with conversation anchoring disabled
+    Given an instrumented MCP server with conversation anchoring disabled and a tool "search_docs" that returns the text "ok"
+    When the MCP client calls tool "search_docs" with _meta {"openai/session":"v1/conv-example-0001"} and JSON arguments:
+      """application/json
+      {"query":"flags"}
+      """
+    And pending captures are flushed
+    Then the "$mcp_tool_call" event property "$session_id" should equal "ses_2f5d35b7108d17c807766f2f769a1e8c"
+
+  @server
+  Scenario: An invalid client conversation id is ignored
+    Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
+    When the MCP client calls tool "search_docs" with _meta {"openai/session":""} and JSON arguments:
+      """application/json
+      {"query":"flags"}
+      """
+    Then the MCP client result should end with a conversation_id text block
+
+  @server
+  Scenario Outline: Only a recognized client's call goes without a conversation_id block
+    Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
+    When the MCP client with User-Agent "<user_agent>" calls tool "search_docs" with JSON arguments:
+      """application/json
+      {"query":"flags"}
+      """
+    Then the MCP client result <outcome>
+
+    Examples:
+      | user_agent                             | outcome                                         |
+      | openai-mcp/1.0.0 (ChatGPT)             | should not contain a conversation_id text block |
+      | openai-mcp/1.0.0 ( chatgpt; web)       | should not contain a conversation_id text block |
+      | openai-mcp/1.0.0 (Codex)               | should end with a conversation_id text block    |
+      | openai-mcp/1.0.0 (ChatGPT-Agent)       | should end with a conversation_id text block    |
+      | Mozilla/5.0 openai-mcp/1.0.0 (ChatGPT) | should end with a conversation_id text block    |
+
+  @server
+  Scenario: A recognized client's listing has no conversation_id argument
+    Given an instrumented MCP server with a tool "search_docs" whose schema declares only "query"
+    When the MCP client with User-Agent "openai-mcp/1.0.0 (ChatGPT)" lists tools
+    Then the advertised schema for tool "search_docs" should declare a string property "context"
+    And the advertised schema for tool "search_docs" should not declare a property "conversation_id"
+    When the MCP client with User-Agent "example-client/1.0" lists tools
+    Then the advertised schema for tool "search_docs" should declare a property "conversation_id"
+
+  @server
   Scenario: An anonymous call does not create a person
     Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
     When the MCP client calls tool "search_docs" with JSON arguments:
@@ -425,6 +494,18 @@ Feature: MCP analytics
     When the MCP client lists tools
     Then the MCP client should not see a tool named "send_feedback"
     And the MCP client should not see a tool named "get_more_tools"
+
+  @server @mcp_missing_capability_capable
+  Scenario: The missing-capability tool declares that it records data
+    Given an instrumented MCP server with missing-capability reporting enabled
+    When the MCP client lists tools
+    Then the advertised tool "get_more_tools" should have annotations JSON {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":false,"openWorldHint":false}
+
+  @server @mcp_feedback_capable
+  Scenario: The feedback tool declares that it records data
+    Given an instrumented MCP server with feedback reporting enabled
+    When the MCP client lists tools
+    Then the advertised tool "send_feedback" should have annotations JSON {"readOnlyHint":false,"destructiveHint":false,"idempotentHint":false,"openWorldHint":false}
 
   @server @mcp_feedback_capable
   Scenario: A feedback report becomes one feedback event

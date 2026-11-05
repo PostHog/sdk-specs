@@ -24,11 +24,14 @@ expected, and it does not change what the client receives.
 - **Only failures the tool produced.** A failed or cancelled task and an `input_required` sequence the
   framework ends are failures the SDK observes and types itself, with no thrown error or `isError`
   result to hand over. The classifier is not called for them, so their fixed types stand in every SDK.
-- **Where it runs.** Automatic instrumentation and the manual step path call it. The step path calls it
-  only for what the caller leaves unset. The lower-level method takes finished fields and has no
-  failure to hand over, so it never calls it.
-- **Explicit values win.** A type or flag the caller passes to the manual API wins over the classifier,
-  and the classifier's type wins over the thrown type, the same precedence explicit types already have.
+- **Automatic instrumentation only.** A manual API caller already holds the failure and passes the
+  type and the expected flag itself, so a callback adds nothing there. It would also run on different
+  paths in different SDKs, because not every SDK's manual result step sends events.
+- **Explicit types are data like any other.** A classifier can derive its label from the raw failure,
+  so an explicit type is sanitized as free text, and an empty or blank one counts as no type. Without
+  that rule, today's SDKs send a blank type in some cases and drop the property in others.
+- **Explicit values win.** The classifier's type wins over the type the SDK assigns and the thrown type,
+  the same precedence explicit types already have.
   The classifier's type never renames the `$exception` type, so error tracking still groups by real
   types.
 - **`$exception` is unchanged.** Whether an expected failure should still emit `$exception` is open

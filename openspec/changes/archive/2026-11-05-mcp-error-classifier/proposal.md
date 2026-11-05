@@ -17,7 +17,8 @@ expected (PostHog/posthog#113659).
   An expected failure is still a failed call: `$mcp_is_error` stays `true`, and `$exception` is
   unchanged. Add `not_found` to the shared type vocabulary.
 - Modify **Manual capture**. The result step and the lower-level method take whether the failure is
-  expected, next to the explicit error type.
+  expected, next to the explicit error type. The manual API never calls the classifier.
+- An empty or blank explicit type is no type, and every explicit type is sanitized as free text.
 - Add scenarios for a classified `isError` result and a manually captured expected failure.
 
 ## Capabilities

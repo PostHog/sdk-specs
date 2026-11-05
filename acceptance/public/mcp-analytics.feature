@@ -147,6 +147,38 @@ Feature: MCP analytics
     And the "$exception" event's first exception type should name the type "UpstreamTimeout"
 
   @server
+  Scenario: The error classifier labels an isError result as an expected failure
+    Given an instrumented MCP server with an error classifier that returns error type "not_found" and expected true and a tool "get_record" that returns a result with isError true and the text "record not found"
+    When the MCP client calls tool "get_record" with JSON arguments:
+      """application/json
+      {"id":"rec_1"}
+      """
+    And pending captures are flushed
+    Then the "$mcp_tool_call" event property "$mcp_is_error" should equal JSON true
+    And the "$mcp_tool_call" event property "$mcp_error_type" should equal "not_found"
+    And the "$mcp_tool_call" event property "$mcp_error_expected" should equal JSON true
+    And the "$mcp_tool_call" event property "$mcp_error_message" should equal "record not found"
+
+  @server
+  Scenario: A failed call without a classification has no expected flag
+    Given an instrumented MCP server with a tool "get_record" that returns a result with isError true and the text "record not found"
+    When the MCP client calls tool "get_record" with JSON arguments:
+      """application/json
+      {"id":"rec_1"}
+      """
+    And pending captures are flushed
+    Then the "$mcp_tool_call" event property "$mcp_is_error" should equal JSON true
+    And the "$mcp_tool_call" event should not have property "$mcp_error_expected"
+
+  @server
+  Scenario: A manually captured failure can be marked expected
+    Given the SDK's manual MCP capture API records a failed call to tool "query" with error type "rate_limited" and expected true
+    And pending captures are flushed
+    Then the "$mcp_tool_call" event property "$mcp_is_error" should equal JSON true
+    And the "$mcp_tool_call" event property "$mcp_error_type" should equal "rate_limited"
+    And the "$mcp_tool_call" event property "$mcp_error_expected" should equal JSON true
+
+  @server
   Scenario: A call to a tool that does not exist is not counted as a call
     Given an instrumented MCP server with a tool "search_docs" that returns the text "ok"
     When the MCP client calls tool "no_such_tool" with JSON arguments:

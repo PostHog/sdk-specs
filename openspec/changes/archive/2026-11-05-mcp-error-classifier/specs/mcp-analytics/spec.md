@@ -20,14 +20,19 @@ The SDK MAY set `$mcp_error_status` to an upstream HTTP status code.
 
 A failure can be expected: an outcome the server returns by design for the agent to act on, such as a
 rate limit, a record that does not exist, or arguments the agent must fix. Only the server knows which
-failures are expected, so the SDK SHALL offer the error classifier option (see "Configuration") on
-automatic instrumentation: a server callback that receives the tool name and the failure, and may
-return an explicit error type, whether the failure is expected, both, or nothing. The failure is the
-thrown value when the SDK has one, else the `isError` result as the tool produced it, before the SDK
-appends a conversation handle. The SDK SHALL call it once for each failed tool call that reaches a
-final outcome, and for nothing else. When the classifier, or the caller of the manual API, says whether
-the failure is expected, the SDK SHALL set `$mcp_error_expected` to that JSON boolean; otherwise it
-SHALL NOT set it. A value the caller passes to the manual API wins over the classifier's. An expected
+failures are expected, so the SDK SHALL offer the error classifier option (see "Configuration"): a
+server callback that receives one value holding the tool name, the `$mcp_error_type` and
+`$mcp_error_message` the call would carry without a classifier, and the failure itself when the SDK
+holds it. The failure is the tool's own thrown error, looking past the same wrappers as
+`$mcp_error_type`, else the `isError` result as the tool produced it, before the SDK appends a
+conversation handle. The classifier may return an explicit error type, whether the failure is expected,
+both, or nothing. The SDK SHALL call it at most once per tool call, for a failed call that ends in a
+thrown error or an `isError` result, and for nothing else: never for a failed or cancelled task or an
+`input_required` sequence the framework ends, whose types "Tool call event" and "Optional events" fix.
+On the manual step path the SDK calls it only when the caller leaves the type or the expected flag
+unset, and the caller's values win; the lower-level method never calls it. When the classifier or the
+manual API's caller says whether the failure is expected, the SDK SHALL set `$mcp_error_expected` to
+that JSON boolean; otherwise it SHALL NOT set it. An expected
 failure is still a failed call: it keeps `$mcp_is_error: true` and every other rule of this
 requirement. A classifier that fails or returns nothing leaves the call as it would be without one, and
 SHALL NOT change the response.
@@ -82,8 +87,7 @@ takes the call context and the outcome (the result or the error, an explicit err
 failure is expected if the caller knows them, and when it ended); it sends the events and returns the
 result to deliver, with a minted handle appended. From these inputs the SDK applies every other rule of
 this spec itself: the `$mcp_parameters` shape, intent and model, `$session_id`, person and client
-identity, failure capture (including the error classifier, for what the caller leaves unset), privacy,
-and size bounds.
+identity, failure capture (including the error classifier), privacy, and size bounds.
 
 A lower-level method MAY also accept a finished call's fields directly, for a server that already holds
 them; it is exempt from producing the same events as automatic instrumentation. It sends

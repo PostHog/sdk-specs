@@ -10,13 +10,23 @@ expected, and it does not change what the client receives.
   (the `beforeSend` workaround in the issue, which sets `$mcp_is_error` to `false`) loses the fact that
   the client received an error. A separate property keeps both facts, so anyone reading the data can
   count failures with or without expected ones.
-- **The callback sees the failure, not only the result.** It gets the tool name and the failure: the
-  thrown value when the SDK has one, else the `isError` result. A thrown error's own type is the most
-  reliable thing to classify on (`instanceof RateLimitError`). On frameworks that turn a throw into an
-  `isError` result before the SDK sees it, the result is all there is. The result is the one the tool
+- **The callback always gets the type and message, and the failure when the SDK holds it.** The type
+  and message `$mcp_error_type` and `$mcp_error_message` would carry exist for every failed call in
+  every SDK, so a classifier keyed on them works the same everywhere. The failure itself is richer: a
+  thrown error's own type is the most reliable thing to classify on (`instanceof RateLimitError`). It
+  is the tool's own error, past the same wrappers `$mcp_error_type` looks past, because Python's
+  FastMCP re-raises every tool error as a `ToolError` and a classifier would never match the tool's
+  type. On frameworks that turn a throw into an `isError` result before the SDK sees it, the result is
+  all there is, and some manual APIs keep only a type name and message. The result is the one the tool
   produced, before the SDK appends a conversation handle, the same rule `$mcp_error_message` follows.
-- **One object argument.** Platforms pass the failure as one value (an object, a struct, a dataclass)
-  so it can gain fields later without breaking callbacks.
+- **One object argument.** Platforms pass these as one value (an object, a struct, a dataclass) so it
+  can gain fields later without breaking callbacks.
+- **Only failures the tool produced.** A failed or cancelled task and an `input_required` sequence the
+  framework ends are failures the SDK observes and types itself, with no thrown error or `isError`
+  result to hand over. The classifier is not called for them, so their fixed types stand in every SDK.
+- **Where it runs.** Automatic instrumentation and the manual step path call it. The step path calls it
+  only for what the caller leaves unset. The lower-level method takes finished fields and has no
+  failure to hand over, so it never calls it.
 - **Explicit values win.** A type or flag the caller passes to the manual API wins over the classifier,
   and the classifier's type wins over the thrown type, the same precedence explicit types already have.
   The classifier's type never renames the `$exception` type, so error tracking still groups by real

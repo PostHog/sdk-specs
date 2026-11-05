@@ -2,8 +2,8 @@
 
 OpenAI Codex and VS Code name the conversation on every tool call, as ChatGPT does: Codex in
 `_meta.sessionId`, VS Code in `_meta["vscode.conversationId"]`. The SDK reads only ChatGPT's key, so
-their calls are grouped by the SDK's handle, which starts one call later and holds only while the
-agent copies it. Codex's key has no prefix, so the SDK cannot read it from every client the way it
+their calls are grouped by the SDK's handle, which holds only while the agent copies it into each
+call. Codex's key has no prefix, so the SDK cannot read it from every client the way it
 reads `openai/session`.
 
 ## What Changes

@@ -51,8 +51,8 @@ So `openai-mcp/1.0.0 (ChatGPT)` and `openai-mcp/1.0.0 ( chatgpt; web)` are recog
 A value that is not a string of its row's value shape is not a client conversation id. The SDK SHALL derive `$session_id` from `<key> + ":" + <value>`, so ids from two clients
 never derive the same session, and SHALL NOT send the value itself in any property. A client
 conversation id wins over a conversation handle: when a call carries both, the SDK SHALL ignore the
-handle for `$session_id` and `$mcp_conversation_id`. The client's id names the conversation from its
-first call, while a handle starts at the second call and holds only while the agent copies it. A call
+handle for `$session_id` and `$mcp_conversation_id`. The client sends its id on every call, while a handle
+groups calls only while the agent copies it into each one. A call
 with a client conversation id SHALL NOT set `$mcp_conversation_id`, which holds only SDK-minted handles.
 The SDK SHALL read client conversation ids whether or not conversation anchoring is enabled: reading
 one adds nothing the client sees. A handle-free client is a recognized client whose row's Handle is
@@ -123,10 +123,10 @@ is not a token.
 
 #### Scenario: An invalid id from a handle-free client gets no handle
 - **GIVEN** an MCP server instrumented by the SDK with conversation anchoring enabled, on a transport that carries no session
-- **WHEN** an MCP client with `User-Agent` "openai-mcp/1.0.0 (ChatGPT)" calls tool "search_docs" with `_meta` {"openai/session": ""}
-- **THEN** the result should contain no `conversation_id` text block
+- **WHEN** an MCP client with `User-Agent` "openai-mcp/1.0.0 (ChatGPT)" calls tool "search_docs" with `_meta` {"openai/session": ""} twice
+- **THEN** neither result should contain a `conversation_id` text block
 - **WHEN** the SDK is flushed
-- **THEN** the "$mcp_tool_call" event's "$session_id" should not be "ses_2f5d35b7108d17c807766f2f769a1e8c"
+- **THEN** the two "$mcp_tool_call" events should have different "$session_id" values
 
 #### Scenario: Codex and VS Code ids set the session
 - **GIVEN** an MCP server instrumented by the SDK with conversation anchoring enabled, on a transport that carries no session

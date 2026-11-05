@@ -318,8 +318,14 @@ Feature: MCP analytics
       {"query":"flags"}
       """
     Then the MCP client result should not contain a conversation_id text block
+    When the MCP client with User-Agent "openai-mcp/1.0.0 (ChatGPT)" calls tool "search_docs" with _meta {"openai/session":""} and JSON arguments:
+      """application/json
+      {"query":"flags"}
+      """
+    Then the MCP client result should not contain a conversation_id text block
     When pending captures are flushed
-    Then the "$mcp_tool_call" event property "$session_id" should not equal "ses_2f5d35b7108d17c807766f2f769a1e8c"
+    Then exactly 2 received events should be named "$mcp_tool_call"
+    And the two "$mcp_tool_call" events should have different "$session_id" values
 
   @server
   Scenario: A Codex session id sets the session

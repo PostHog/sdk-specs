@@ -377,10 +377,10 @@ is not a token.
 
 #### Scenario: An invalid id from a handle-free client gets no handle
 - **GIVEN** an MCP server instrumented by the SDK with conversation anchoring enabled, on a transport that carries no session
-- **WHEN** an MCP client with `User-Agent` "openai-mcp/1.0.0 (ChatGPT)" calls tool "search_docs" with `_meta` {"openai/session": ""}
-- **THEN** the result should contain no `conversation_id` text block
+- **WHEN** an MCP client with `User-Agent` "openai-mcp/1.0.0 (ChatGPT)" calls tool "search_docs" with `_meta` {"openai/session": ""} twice
+- **THEN** neither result should contain a `conversation_id` text block
 - **WHEN** the SDK is flushed
-- **THEN** the "$mcp_tool_call" event's "$session_id" should not be "ses_2f5d35b7108d17c807766f2f769a1e8c"
+- **THEN** the two "$mcp_tool_call" events should have different "$session_id" values
 
 #### Scenario: Codex and VS Code ids set the session
 - **GIVEN** an MCP server instrumented by the SDK with conversation anchoring enabled, on a transport that carries no session

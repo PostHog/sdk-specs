@@ -469,65 +469,8 @@ Feature: MCP analytics
     And the "$mcp_tool_call" event property "$mcp_response" should not contain "hunter2"
 
   @server
-  Scenario: Personal data in arguments and results is redacted by default
-    Given an instrumented MCP server with a tool "lookup_customer" that returns the text "Customer ada@example.com last seen from 203.0.113.7"
-    When the MCP client calls tool "lookup_customer" with JSON arguments:
-      """application/json
-      {"email":"ada@example.com","limit":5}
-      """
-    And pending captures are flushed
-    Then the "$mcp_tool_call" event property "$mcp_parameters" should not contain "ada@example.com"
-    And the "$mcp_tool_call" event property "$mcp_parameters" should include JSON {"request":{"params":{"arguments":{"limit":5}}}}
-    And the "$mcp_tool_call" event property "$mcp_parameters" should contain "email"
-    And the "$mcp_tool_call" event property "$mcp_response" should not contain "ada@example.com"
-    And the "$mcp_tool_call" event property "$mcp_response" should not contain "203.0.113.7"
-
-  @server
-  Scenario: A personal key and a card number in a result are redacted and its JSON stays valid
-    Given an instrumented MCP server with a tool "list_accounts" that returns structured content and a text block, both:
-      """application/json
-      {"accounts":{"ada@example.com":{"plan":"pro"}},"card":4111111111111111,"count":3}
-      """
-    When the MCP client calls tool "list_accounts" with JSON arguments:
-      """application/json
-      {}
-      """
-    And pending captures are flushed
-    Then the "$mcp_tool_call" event property "$mcp_response" should not contain "ada@example.com"
-    And the "$mcp_tool_call" event property "$mcp_response" should not contain "4111111111111111"
-    And the first text block in the "$mcp_tool_call" event property "$mcp_response" should be:
-      """application/json
-      {"accounts":{"[redacted]":{"plan":"pro"}},"card":"[redacted]","count":3}
-      """
-
-  @server
-  Scenario: Identifiers that only look like personal data are kept in payloads
-    Given an instrumented MCP server with a tool "deploy_status" that returns the text "Order 415-555-0142 built with v22.11.0.3, db at 127.0.0.1:5432, client ip:203.0.113.7, support +1 415 555 0142"
-    When the MCP client calls tool "deploy_status" with JSON arguments:
-      """application/json
-      {}
-      """
-    And pending captures are flushed
-    Then the "$mcp_tool_call" event property "$mcp_response" should contain "Order 415-555-0142"
-    And the "$mcp_tool_call" event property "$mcp_response" should contain "v22.11.0.3"
-    And the "$mcp_tool_call" event property "$mcp_response" should contain "127.0.0.1:5432"
-    And the "$mcp_tool_call" event property "$mcp_response" should not contain "203.0.113.7"
-    And the "$mcp_tool_call" event property "$mcp_response" should not contain "+1 415 555 0142"
-
-  @server
-  Scenario: Personal data in error text and exceptions is redacted by default
-    Given an instrumented MCP server with a tool "lookup_customer" that fails with message "No account for ada@example.com"
-    When the MCP client calls tool "lookup_customer" with JSON arguments:
-      """application/json
-      {}
-      """
-    And pending captures are flushed
-    Then the "$mcp_tool_call" event property "$mcp_error_message" should not contain "ada@example.com"
-    And no received event should contain "ada@example.com"
-
-  @server
-  Scenario: Turning payload personal data redaction off keeps it in payloads but not in intent
-    Given an instrumented MCP server with payload personal data redaction disabled and a tool "lookup_customer" that returns the text "Customer ada@example.com"
+  Scenario: Personal data in tool payloads is relayed as captured
+    Given an instrumented MCP server with a tool "lookup_customer" that returns the text "Customer ada@example.com"
     When the MCP client calls tool "lookup_customer" with JSON arguments:
       """application/json
       {"email":"ada@example.com","context":"look up ada@example.com"}

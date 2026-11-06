@@ -76,7 +76,6 @@ table is the one place defaults are stated.
 | tools list event | on | Sends `$mcp_tools_list` for each `tools/list`; off sends none and changes nothing else |
 | parameter capture | on | Sends `$mcp_parameters` |
 | response capture | on | Sends `$mcp_response` on `$mcp_tool_call`, including successful calls, where a wrong or empty result is the failure no error flag shows |
-| payload personal data | on | Applies the payload personal data pass of "Payload privacy" to `$mcp_parameters`, `$mcp_response`, `$mcp_error_message`, resource read URIs, and `$exception` values; off leaves them with the credential passes only, while intent and free-text properties keep the full personal data pass |
 | before-send hook | none | Modifies or drops each MCP event before capture |
 | missing-capability tool | off | Adds a virtual tool that emits `$mcp_missing_capability` |
 | feedback tool | off | Adds a virtual tool that emits `$mcp_feedback`; the host may declare extra report arguments and a handler for reports |
@@ -613,30 +612,12 @@ sending, the SDK SHALL:
   once any trailing run of `=` is set aside, is not empty and has first and last 1,024 characters all
   from one alphabet: base64 with `\r` and `\n`, because MIME and PEM base64 break lines, or base64url;
 - redact email addresses, IP addresses, Luhn-valid card numbers, US social security numbers, and phone
-  numbers from `$mcp_intent` and every property "Property reference" marks sanitized as free text;
-- unless the payload personal data option is off, apply the payload personal data pass to:
-  - every string value and object key at any depth of `$mcp_parameters` and `$mcp_response`, text
-    blocks and their JSON text copies included;
-  - every number in them whose digits form a Luhn-valid card number, replaced by the string
-    `"[redacted]"`, which JSON text writes with its quotes so it stays valid JSON;
-  - `$mcp_error_message`, and `$mcp_resource_name` on a resource read, where it holds the URI;
-  - each exception's `value` in the `$exception` sibling, and the stack-frame source lines it sends
-    (such as `pre_context`, `context_line`, and `post_context`), each first cut to 2,048 characters.
+  numbers from `$mcp_intent` and every property "Property reference" marks sanitized as free text.
 
-  Other numbers and booleans are kept. The pass matches text as captured, so an address written as
-  `%40` or `\u0040` is not recognized.
-
-  The payload personal data pass is the personal data pass above, narrowed because payloads carry
-  identifiers that only look like personal data. It redacts email addresses, Luhn-valid card numbers,
-  US social security numbers, and IPv6 addresses as that pass does. It redacts an IPv4 address only
-  when the address is not loopback (`127.0.0.0/8`), private (`10.0.0.0/8`, `172.16.0.0/12`,
-  `192.168.0.0/16`), link-local (`169.254.0.0/16`), or `0.0.0.0`, and is not glued to a version: it
-  does not directly follow a letter, digit, or `.`, and is not directly followed by a digit or by `.`
-  and a digit. So `v1.2.3.4` and `1.2.3.4.5` are kept, and `ip:203.0.113.7`, `user@203.0.113.7`, and
-  `http://203.0.113.7/` are not; a version written `node:22.11.0.3` is redacted too, because it reads
-  exactly like `ip:203.0.113.7`. It redacts a phone number only when it starts with an international
-  prefix (`+`, `00`, or `011`) and a country code, or has its area code in parentheses, so
-  `415-555-0142` is kept and `+1 415 555 0142`, `0044 20 7946 0958`, and `(415) 555-0142` are not.
+The personal data pass SHALL NOT apply to `$mcp_parameters`, `$mcp_response`, `$mcp_error_message`, or
+`$exception` values. They carry what the server's own tools received and returned, data the host
+already holds, and the SDK relays it as captured, after the credential passes above. A host that must
+not send it turns off parameter or response capture, or edits events in the before-send hook.
 
 Object keys inside `$mcp_parameters` and `$mcp_response` are captured strings too, because a result
 keyed by data (a link check keyed by signed URL) carries the credential in the key. The key list is
@@ -645,8 +626,8 @@ binary passes, with the key limit of "Property reference" in place of the string
 other credential-shaped values below does not extend to keys, because entropy detectors read field names
 such as `Get_Organization_Memberships` as credentials. When cutting or redaction makes keys of one object
 equal, the SDK SHALL keep the entry whose key as received sorts first by Unicode code point.
-`$mcp_input_keys` SHALL count a name the PostHog token, URL, or payload personal data pass would
-change as a name that was not recorded.
+`$mcp_input_keys` SHALL count a name the PostHog token or URL pass would change as a name that was not
+recorded.
 
 These passes SHALL cost in proportion to the property limits, not to the payload. The SDK SHALL first
 apply the entry and nesting limits of "Property reference" and the key-based redaction. For each
@@ -659,12 +640,6 @@ recognized whole. A match split by the cut at the limit can be left raw in the s
 first redacts it, and a match no longer than the margin that is split by the cut at the margin lies past
 the end of the second result, so the common prefix holds neither. Scanning the whole payload first makes
 one large result cost hundreds of milliseconds.
-
-The personal data pass on payloads is one of the remaining passes of the cut above, so it costs in
-proportion to the property limits too, and a match that crosses a string's limit is redacted whole. It
-runs before the URL pass, because that pass percent-encodes `@` and would hide an address in a query.
-Turning the option off changes only payloads, error text, and exception values: intent and free-text
-properties keep the pass, and the credential passes still apply everywhere.
 
 The SDK SHOULD also redact other credential-shaped values (known key formats, long high-entropy
 tokens). It SHALL expose a before-send hook that can modify or drop each MCP event after this
@@ -715,42 +690,8 @@ drops its `$exception`.
 - **AND** the SDK is flushed
 - **THEN** the first text block in "$mcp_response" should be "[binary data redacted - not supported by PostHog MCP analytics]"
 
-#### Scenario: Personal data in arguments and results is redacted by default
-- **GIVEN** an MCP server instrumented by the SDK with a tool "lookup_customer" that returns the text "Customer ada@example.com last seen from 203.0.113.7"
-- **WHEN** an MCP client calls tool "lookup_customer" with arguments `{"email": "ada@example.com", "limit": 5}`
-- **AND** the SDK is flushed
-- **THEN** the "$mcp_parameters" should not contain "ada@example.com"
-- **AND** the "$mcp_parameters" arguments should have key "email" and "limit" equal to the number 5
-- **AND** the "$mcp_response" should not contain "ada@example.com"
-- **AND** the "$mcp_response" should not contain "203.0.113.7"
-
-#### Scenario: A personal key and a card number in a result are redacted and its JSON stays valid
-- **GIVEN** an MCP server instrumented by the SDK with a tool "list_accounts" that returns `structuredContent` `{"accounts":{"ada@example.com":{"plan":"pro"}},"card":4111111111111111,"count":3}` and the same JSON as a text block
-- **WHEN** an MCP client calls tool "list_accounts"
-- **AND** the SDK is flushed
-- **THEN** the "$mcp_response" should not contain "ada@example.com"
-- **AND** the "$mcp_response" should not contain "4111111111111111"
-- **AND** the first text block in "$mcp_response" should parse as JSON with "count" equal to 3
-
-#### Scenario: Identifiers that only look like personal data are kept in payloads
-- **GIVEN** an MCP server instrumented by the SDK with a tool "deploy_status" that returns the text "Order 415-555-0142 built with v22.11.0.3, db at 127.0.0.1:5432, client ip:203.0.113.7, support +1 415 555 0142"
-- **WHEN** an MCP client calls tool "deploy_status"
-- **AND** the SDK is flushed
-- **THEN** the "$mcp_response" should contain "Order 415-555-0142"
-- **AND** the "$mcp_response" should contain "v22.11.0.3"
-- **AND** the "$mcp_response" should contain "127.0.0.1:5432"
-- **AND** the "$mcp_response" should not contain "203.0.113.7"
-- **AND** the "$mcp_response" should not contain "+1 415 555 0142"
-
-#### Scenario: Personal data in error text and exceptions is redacted by default
-- **GIVEN** an MCP server instrumented by the SDK with a tool "lookup_customer" that fails with message "No account for ada@example.com"
-- **WHEN** an MCP client calls tool "lookup_customer"
-- **AND** the SDK is flushed
-- **THEN** the "$mcp_error_message" should not contain "ada@example.com"
-- **AND** the "$exception" event should not contain "ada@example.com"
-
-#### Scenario: Turning the option off keeps personal data in payloads but not in intent
-- **GIVEN** an MCP server instrumented by the SDK with the payload personal data option off and a tool "lookup_customer" that returns the text "Customer ada@example.com"
+#### Scenario: Personal data in tool payloads is relayed as captured
+- **GIVEN** an MCP server instrumented by the SDK with a tool "lookup_customer" that returns the text "Customer ada@example.com"
 - **WHEN** an MCP client calls tool "lookup_customer" with arguments `{"email": "ada@example.com", "context": "look up ada@example.com"}`
 - **AND** the SDK is flushed
 - **THEN** the "$mcp_parameters" should contain "ada@example.com"

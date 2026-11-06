@@ -630,10 +630,13 @@ sending, the SDK SHALL:
   identifiers that only look like personal data. It redacts email addresses, Luhn-valid card numbers,
   US social security numbers, and IPv6 addresses as that pass does. It redacts an IPv4 address only
   when the address is not loopback (`127.0.0.0/8`), private (`10.0.0.0/8`, `172.16.0.0/12`,
-  `192.168.0.0/16`), link-local (`169.254.0.0/16`), or `0.0.0.0`, and does not directly follow a
-  letter, digit, `.`, `:`, or `@`, so `node:22.11.0.3` and `pkg@1.2.3.4` are kept. It redacts a phone
-  number only when it starts with `+` and a country code or has its area code in parentheses, so
-  `415-555-0142` is kept and `+1 415 555 0142` and `(415) 555-0142` are not.
+  `192.168.0.0/16`), link-local (`169.254.0.0/16`), or `0.0.0.0`, and is not glued to a version: it
+  does not directly follow a letter, digit, or `.`, and is not directly followed by a digit or by `.`
+  and a digit. So `v1.2.3.4` and `1.2.3.4.5` are kept, and `ip:203.0.113.7`, `user@203.0.113.7`, and
+  `http://203.0.113.7/` are not; a version written `node:22.11.0.3` is redacted too, because it reads
+  exactly like `ip:203.0.113.7`. It redacts a phone number only when it starts with an international
+  prefix (`+`, `00`, or `011`) and a country code, or has its area code in parentheses, so
+  `415-555-0142` is kept and `+1 415 555 0142`, `0044 20 7946 0958`, and `(415) 555-0142` are not.
 
 Object keys inside `$mcp_parameters` and `$mcp_response` are captured strings too, because a result
 keyed by data (a link check keyed by signed URL) carries the credential in the key. The key list is
@@ -730,12 +733,13 @@ drops its `$exception`.
 - **AND** the first text block in "$mcp_response" should parse as JSON with "count" equal to 3
 
 #### Scenario: Identifiers that only look like personal data are kept in payloads
-- **GIVEN** an MCP server instrumented by the SDK with a tool "deploy_status" that returns the text "Order 415-555-0142 built with node:22.11.0.3, db at 127.0.0.1:5432, support +1 415 555 0142"
+- **GIVEN** an MCP server instrumented by the SDK with a tool "deploy_status" that returns the text "Order 415-555-0142 built with v22.11.0.3, db at 127.0.0.1:5432, client ip:203.0.113.7, support +1 415 555 0142"
 - **WHEN** an MCP client calls tool "deploy_status"
 - **AND** the SDK is flushed
 - **THEN** the "$mcp_response" should contain "Order 415-555-0142"
-- **AND** the "$mcp_response" should contain "node:22.11.0.3"
+- **AND** the "$mcp_response" should contain "v22.11.0.3"
 - **AND** the "$mcp_response" should contain "127.0.0.1:5432"
+- **AND** the "$mcp_response" should not contain "203.0.113.7"
 - **AND** the "$mcp_response" should not contain "+1 415 555 0142"
 
 #### Scenario: Personal data in error text and exceptions is redacted by default

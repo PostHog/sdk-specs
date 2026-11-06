@@ -502,15 +502,16 @@ Feature: MCP analytics
 
   @server
   Scenario: Identifiers that only look like personal data are kept in payloads
-    Given an instrumented MCP server with a tool "deploy_status" that returns the text "Order 415-555-0142 built with node:22.11.0.3, db at 127.0.0.1:5432, support +1 415 555 0142"
+    Given an instrumented MCP server with a tool "deploy_status" that returns the text "Order 415-555-0142 built with v22.11.0.3, db at 127.0.0.1:5432, client ip:203.0.113.7, support +1 415 555 0142"
     When the MCP client calls tool "deploy_status" with JSON arguments:
       """application/json
       {}
       """
     And pending captures are flushed
     Then the "$mcp_tool_call" event property "$mcp_response" should contain "Order 415-555-0142"
-    And the "$mcp_tool_call" event property "$mcp_response" should contain "node:22.11.0.3"
+    And the "$mcp_tool_call" event property "$mcp_response" should contain "v22.11.0.3"
     And the "$mcp_tool_call" event property "$mcp_response" should contain "127.0.0.1:5432"
+    And the "$mcp_tool_call" event property "$mcp_response" should not contain "203.0.113.7"
     And the "$mcp_tool_call" event property "$mcp_response" should not contain "+1 415 555 0142"
 
   @server

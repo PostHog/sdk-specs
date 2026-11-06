@@ -7,7 +7,7 @@
 
 ## 2. Extend the Metrics specification
 
-- [ ] 2.1 Archive this OpenSpec change so its Network Request Timing requirement is synced into `openspec/specs/metrics/spec.md`; verify `openspec validate --specs --strict` passes.
+- [x] 2.1 Archive this OpenSpec change so its Network Request Timing requirement is synced into `openspec/specs/metrics/spec.md`; verify `openspec validate --specs --strict` passes.
 - [ ] 2.2 Keep the requirement scenarios in the Metrics spec as the contract test cases, matching the Metrics product-pipeline precedent; verify each scenario is testable against an SDK implementation.
 - [ ] 2.3 Update the Metrics capability description only if its scope needs to name automatic network-request timing; verify the root capability list remains a single Metrics entry.
 

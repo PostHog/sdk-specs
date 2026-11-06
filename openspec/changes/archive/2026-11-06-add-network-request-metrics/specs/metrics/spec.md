@@ -34,9 +34,9 @@ outside this optional feature's conformance scope.
 
 ### Requirement: Safe network request metric dimensions
 
-The optional network request timing metric MAY contain only the HTTP method, a
-normalized route or host category, a bounded response-status class, and a bounded error
-class when each value is available. It MUST NOT contain a request or response body,
+The SDK MUST limit network request timing attributes to the HTTP method, a normalized
+route or host category, a bounded response-status class, and a bounded error class, each
+only when its value is available. It MUST NOT contain a request or response body,
 header, query-string value, full URL, session id, distinct id, request id, or another
 unbounded or sensitive value. A dimension which cannot be safely observed SHALL be
 omitted; the SDK MUST NOT invent a value.
@@ -51,7 +51,7 @@ omitted; the SDK MUST NOT invent a value.
 
 ### Requirement: Network request timing enablement and failure isolation
 
-A SDK that declares network request timing support SHALL capture no timing data while
+An SDK that declares network request timing support SHALL capture no timing data while
 the feature is disabled, while Metrics is disabled, or after the user has opted out.
 Installation, observation, encoding, and export failures SHALL not change application
 request behaviour or throw into application code. The SDK SHALL remove or deactivate

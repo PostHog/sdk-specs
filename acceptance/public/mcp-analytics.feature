@@ -278,6 +278,7 @@ Feature: MCP analytics
     When pending captures are flushed
     Then the "$mcp_tool_call" event property "$session_id" should equal "ses_2f5d35b7108d17c807766f2f769a1e8c"
     And the "$mcp_tool_call" event should not have property "$mcp_conversation_id"
+    And the "$mcp_tool_call" event property "$mcp_session_source" should equal "client_metadata"
 
   @server
   Scenario: A client conversation id wins over a conversation handle
@@ -360,6 +361,7 @@ Feature: MCP analytics
     When pending captures are flushed
     Then the "$mcp_tool_call" event property "$session_id" should not equal "ses_0fdf126b8e2c1f9689ca12f3dd3383e6"
     And the "$mcp_tool_call" event property "$session_id" should not equal "ses_2f5d35b7108d17c807766f2f769a1e8c"
+    And the "$mcp_tool_call" event property "$mcp_session_source" should equal "conversation"
 
   @server
   Scenario Outline: Only a handle-free client's call goes without a conversation_id block

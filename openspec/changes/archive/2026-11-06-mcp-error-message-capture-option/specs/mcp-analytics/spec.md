@@ -22,7 +22,8 @@ SDK SHALL NOT send any part of the thrown message or the `isError` content in th
 repeat their arguments, and "Payload privacy" redacts only credentials from them, so this is how a
 host that turns parameter and response capture off keeps argument values out of failures too.
 `$mcp_is_error`, `$mcp_error_type`, the exception's type, and whether `$exception` is sent stay the
-same.
+same. `$mcp_response` stays under the response capture option, including the content of an `isError`
+result, so a host that wants no failure text turns both off.
 
 The SDK MAY set `$mcp_error_status` to an upstream HTTP status code. When it emits `$exception`, the
 event SHALL follow the `exception-event-metadata` capability, with `$exception_source:

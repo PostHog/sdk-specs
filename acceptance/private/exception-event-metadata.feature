@@ -128,3 +128,55 @@ Feature: Exception Event Metadata
     Then the generated event should omit "$exception_level", "$exception_source", "$exception_fingerprint", and "$debug_images"
     And the generated mechanism should have "exception_id" equal to 0
     And the generated mechanism should omit "type", "handled", "source", "synthetic", and "parent_id"
+
+  @server
+  Scenario: Exception inside an active span carries trace and span IDs
+    Given an OpenTelemetry span with trace ID "4bf92f3577b34da6a3ce929d0e0e4736" and span ID "00f067aa0ba902b7" is active
+    When capture exception is called for a caught exception without explicit overrides
+    Then one event named "$exception" should be enqueued
+    And the enqueued event property "$trace_id" should equal "4bf92f3577b34da6a3ce929d0e0e4736"
+    And the enqueued event property "$span_id" should equal "00f067aa0ba902b7"
+
+  @server
+  Scenario: Leading zeros in trace and span IDs are kept
+    Given an OpenTelemetry span with trace ID "00000000000000000000000000000001" and span ID "0000000000000002" is active
+    When capture exception is called for a caught exception without explicit overrides
+    Then the enqueued event property "$trace_id" should equal "00000000000000000000000000000001"
+    And the enqueued event property "$span_id" should equal "0000000000000002"
+
+  @server
+  Scenario: A span that is not sampled still sets the IDs
+    Given an active OpenTelemetry span with trace ID "4bf92f3577b34da6a3ce929d0e0e4736" and span ID "00f067aa0ba902b7" whose trace flags mark it as not sampled
+    When capture exception is called for a caught exception without explicit overrides
+    Then the enqueued event property "$trace_id" should equal "4bf92f3577b34da6a3ce929d0e0e4736"
+    And the enqueued event property "$span_id" should equal "00f067aa0ba902b7"
+
+  @server
+  Scenario: Exception outside any span omits trace context
+    Given no OpenTelemetry span is active
+    And no span from the SDK's own span API is active
+    When capture exception is called for a caught exception without explicit overrides
+    Then one event named "$exception" should be enqueued
+    And the enqueued event should omit "$trace_id"
+    And the enqueued event should omit "$span_id"
+
+  @server
+  Scenario Outline: Invalid span context omits trace context
+    Given an active span context with trace ID "<trace_id>" and span ID "<span_id>"
+    When capture exception is called for a caught exception without explicit overrides
+    Then the enqueued event should omit "$trace_id"
+    And the enqueued event should omit "$span_id"
+
+    Examples:
+      | trace_id                         | span_id          |
+      | 00000000000000000000000000000000 | 00f067aa0ba902b7 |
+      | 4bf92f3577b34da6a3ce929d0e0e4736 | 0000000000000000 |
+
+  @server
+  Scenario: An application without an ambient tracing API still captures exceptions
+    Given the application provides neither an OpenTelemetry API nor a permitted native tracing API
+    And no span from the SDK's own span API is active
+    When capture exception is called for a caught exception without explicit overrides
+    Then one event named "$exception" should be enqueued
+    And the enqueued event should omit "$trace_id"
+    And the enqueued event should omit "$span_id"

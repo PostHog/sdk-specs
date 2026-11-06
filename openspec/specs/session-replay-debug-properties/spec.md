@@ -615,9 +615,11 @@ SDK whose platform ships the replay module SHALL include it in the no-integratio
 stays in the crash-context snapshot. `$sdk_debug_replay_throttle_delay_ms` (the configured
 mutation-throttle delay) MUST NOT be attached by any SDK.
 
-SDK-computed `$recording_status` and `$sdk_debug_*` values SHALL take precedence over a
-caller-supplied event property or a registered super property of the same name; the merge writes
-the debug map last.
+`$recording_status` and the `$sdk_debug_*` keys are properties the SDK sets itself, so they follow
+capture's **Caller-supplied event properties take precedence**: a registered (super) property of
+the same name overrides the SDK-computed value, a caller-supplied event property overrides both,
+and `before_send` can change any of them. The override applies to that event only; the next event
+without that key carries the SDK-computed value again.
 
 Reference: posthog-js `origin/main` `928990ded` â€” `REQUIRED_REPLAY_PROPERTIES`
 (`packages/browser/src/posthog-core.ts:190-200`); the recorder getter
@@ -635,8 +637,7 @@ session-start source `sessionid.ts:25`. posthog-ios `origin/main` `88f4b6b56` â€
 (`PostHog/Replay/PostHogReplayIntegration.swift:1899-1956`: status `:1918-1920`, hold reason
 `:1921-1923`, capture mode `:1927`, buffer length `:1930`, trigger statuses `:1945-1946`, pending
 conditions `:1948-1953`); `captureMode(config:)` (`:1862-1864`); the session start from the
-session manager's start snapshot (`PostHog/PostHogSDK.swift:633-635`); the debug map merged so it
-overrides a same-named property (`:705`, `:714`, `{ _, new in new }`). The required/optional tiers,
+session manager's start snapshot (`PostHog/PostHogSDK.swift:633-635`). The required/optional tiers,
 the two removed keys, and the capture-mode classification are the contract mobile SDKs port; no
 mobile code is cited for them.
 
@@ -644,10 +645,11 @@ Covering test: posthog-js `packages/browser/src/__tests__/posthog-core-also.test
 required/optional split, including the trigger statuses on every event and
 `$sdk_debug_replay_pending_trigger_conditions` / `$sdk_debug_session_start` only on
 bundle-carrying events). posthog-ios `PostHogTests/PostHogSDKTest.swift:441` ("reports screenshot capture mode for the
-flutter host"), `:457` ("SDK-computed debug keys win over a same-named registered super
-property"), and `PostHogTests/PostHogSessionReplayEventTriggersTest.swift:235` ("trigger status
+flutter host"), and `PostHogTests/PostHogSessionReplayEventTriggersTest.swift:235` ("trigger status
 reflects pending state before either trigger resolves, then activation as each fires") at
-`88f4b6b56`. Planned (mobile): the required/optional split on a custom event, and the `wireframe`
+`88f4b6b56`; the merge order is covered by posthog-ios 4.0 (PostHog/posthog-ios#938)
+`PostHogTests/PostHogSDKTest.swift:1293` ("registered debug properties override the SDK's, and
+caller ones override both"). Planned (mobile): the required/optional split on a custom event, and the `wireframe`
 default. No test on either mobile SDK derives the session start from a caller-supplied UUIDv7
 `$session_id` (iOS reads the manager's snapshot at `PostHog/PostHogSDK.swift:633-635`); that
 scenario remains planned.
@@ -736,10 +738,21 @@ posthog-ios `88f4b6b56` reads the manager's start snapshot unconditionally).
 - **WHEN** an eligible SDK event that the window allows is captured
 - **THEN** `$sdk_debug_replay_pending_trigger_conditions` lists the unsatisfied trigger kinds
 
-#### Scenario: Debug values win over same-named caller or registered properties
-- **GIVEN** a super property or a caller-supplied event property named `$recording_status`
-- **WHEN** any event other than `$snapshot` is captured
-- **THEN** the event's `$recording_status` is the SDK-computed value, not the supplied one
+#### Scenario: A registered property overrides the SDK-computed debug value
+- **GIVEN** a super property named `$recording_status` is registered
+- **WHEN** an event other than `$snapshot` is captured
+- **THEN** the event's `$recording_status` is the registered value
+
+#### Scenario: A caller-supplied property overrides registered and SDK-computed debug values
+- **GIVEN** a super property named `$recording_status` is registered
+- **WHEN** an event other than `$snapshot` is captured with a caller-supplied `$recording_status`
+- **THEN** the event's `$recording_status` is the caller-supplied value
+
+#### Scenario: A caller-supplied debug value applies to that event only
+- **GIVEN** no super property named `$recording_status` is registered
+- **WHEN** an event other than `$snapshot` is captured with a caller-supplied `$recording_status`
+- **AND** a second event is captured without `$recording_status`
+- **THEN** the second event's `$recording_status` is the SDK-computed value
 
 #### Scenario: Capture mode reflects the screenshot flag or the Flutter host name
 - **GIVEN** screenshot-recording mode is off

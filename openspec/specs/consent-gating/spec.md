@@ -34,7 +34,7 @@ shouldEnqueue(eventType): boolean
 3. **Log or emit a reason when dropped.** Implementations often log a diagnostic message when an event is skipped because the SDK is opted out.
 4. **Apply richer consent semantics where supported.** Browser-class SDKs may include tri-state consent, Do Not Track, and cookieless-mode logic instead of a simple boolean gate.
 5. **Gate more than events.** Consent gating may also control installation of integrations, persistence, session replay, surveys, or exception capture.
-   - Flutter adds a wrapper-layer gate here: `disable()` explicitly uninstalls its Dart-side error autocapture integration before delegating to the platform SDK, so consent changes affect wrapper-managed integrations as well as the underlying native/browser capture path.
+   - Flutter adds a wrapper-layer gate here: `optOut()` explicitly uninstalls its Dart-side error autocapture integration before delegating to the platform SDK, so consent changes affect wrapper-managed integrations as well as the underlying native/browser capture path.
 6. **React immediately to consent changes.** Once the opt state changes, future operations use the new gating decision without waiting for network confirmation.
 
 ## State & lifecycle
@@ -77,7 +77,7 @@ Usually none directly; this component mostly reads state written by `optIn` / `o
 - **exception capture** — often separately gated to avoid collecting crash data while opted out.
 - **persistent storage** — browser consent gating may also influence whether persistence itself remains enabled.
 - **session replay / integrations** — may be stopped, skipped, or restarted based on consent state.
-- **wrapper-managed integrations** — Flutter's error autocapture integration is installed during setup and explicitly uninstalled on `disable()`, so consent gating also controls wrapper-owned exception interception.
+- **wrapper-managed integrations** — Flutter's error autocapture integration is installed during setup and explicitly uninstalled on `optOut()`, so consent gating also controls wrapper-owned exception interception.
 
 ## Requirements
 

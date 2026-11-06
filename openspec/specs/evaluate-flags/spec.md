@@ -20,13 +20,14 @@ For server SDKs, the snapshot API supersedes these older call patterns (names va
 | --- | --- |
 | `isFeatureEnabled(...)` / `feature_enabled(...)` / `is_feature_enabled(...)` | `evaluateFlags(...).isEnabled(key)` |
 | `getFeatureFlag(...)` / `get_feature_flag(...)` | `evaluateFlags(...).getFlag(key)` |
+| `getFeatureFlag(key, id, { sendFeatureFlagEvents: x })` and the same per-call option on the other single-flag getters | `evaluateFlags(id).getFlag(key, { sendFeatureFlagEvents: x })`; the option moves to the snapshot read |
 | `getFeatureFlagPayload(...)` / `get_feature_flag_payload(...)` | `evaluateFlags(...).getFlagPayload(key)` (a silent payload lookup) |
 | `getFeatureFlagResult(...)` / `get_feature_flag_result(...)` | read the value and payload from the same snapshot (or use the platform's rich snapshot result) |
 | `getAllFlags(...)` / `get_all_flags(...)` | enumerate snapshot keys and read their values; each value read is tracked as access |
 | `getAllFlagsAndPayloads(...)` / `get_all_flags_and_payloads(...)` | enumerate snapshot keys and read values plus payloads; value reads are tracked and payload-only reads are silent |
 | `capture(..., sendFeatureFlags: true)` / `send_feature_flags` and equivalents | evaluate once, then pass the snapshot to `capture(..., flags: snapshot)` |
 
-This is a functional migration map, not a promise to preserve every legacy side effect. Snapshot `isEnabled(...)` / `getFlag(...)` calls report access through `$feature_flag_called`, while key enumeration and payload-only reads are silent. Consequently, folding a data-only bulk map into per-key `getFlag(...)` reads deliberately reports each value used, and migrating Go's historically event-emitting payload getter to snapshot `getFlagPayload(...)` deliberately makes payload-only access silent. Callers that require a legacy data-only bulk shape MAY continue using a retained compatibility method.
+This is a functional migration map. It preserves the caller's control over exposure events, but not every other legacy side effect. A per-call `sendFeatureFlagEvents` value moves to the matching snapshot read, as the snapshot feature flag event control defines, so a migrated call sends the same `$feature_flag_called` events. Snapshot `isEnabled(...)` / `getFlag(...)` calls otherwise report access through `$feature_flag_called`, while key enumeration and payload-only reads are silent. Consequently, folding a data-only bulk map into per-key `getFlag(...)` reads deliberately reports each value used, and migrating Go's historically event-emitting payload getter to snapshot `getFlagPayload(...)` deliberately makes payload-only access silent. Callers that require a legacy data-only bulk shape MAY continue using a retained compatibility method.
 
 Server SDKs MAY retain any of these APIs for compatibility, and formal deprecation status MAY vary by SDK and release policy. Documentation SHALL present `evaluateFlags(...)` as the preferred server composition when flag reads or event enrichment share one identity/evaluation context.
 
@@ -322,9 +323,11 @@ Filtering by runtime follows the in-memory filtering rules: it SHALL use only th
 
 ### Requirement: Lazy feature-flag access tracking
 
-Creating a `FeatureFlagEvaluations` snapshot SHALL NOT by itself emit `$feature_flag_called`, because evaluation does not prove that application code used a flag. Calling the snapshot's enablement or value accessor SHALL mark that key as accessed and SHALL route `$feature_flag_called` through the SDK's normal feature-flag-called dedupe tracker using the snapshot's canonical value and retained evaluation context.
+Creating a `FeatureFlagEvaluations` snapshot SHALL NOT by itself emit `$feature_flag_called`, because evaluation does not prove that application code used a flag. Calling the snapshot's enablement or value accessor SHALL mark that key as accessed. Unless the read's feature flag event decision is `false`, it SHALL also route `$feature_flag_called` through the SDK's normal feature-flag-called dedupe tracker using the snapshot's canonical value and retained evaluation context. The snapshot feature flag event control defines that decision and what a read does when it is `false`.
 
-Repeated enablement/value reads for the same identity, group context, key, and canonical value SHALL follow the existing tracker dedupe contract rather than emit one event per accessor call. On an original evaluation snapshot, reading a key absent from the evaluated set SHALL be treated as an attempted access and, when a distinct id is available, SHALL report the `flag_missing` error through the normal event metadata. Ancillary event metadata and the null/false response sentinel for a missing flag MAY vary by platform.
+Repeated enablement/value reads for the same identity, group context, key, and canonical value SHALL follow the existing tracker dedupe contract rather than emit one event per accessor call. On an original evaluation snapshot, reading a key absent from the evaluated set SHALL be treated as an attempted access and, when a distinct id is available and the read's feature flag event decision is `true`, SHALL report the `flag_missing` error through the normal event metadata, except where the next paragraph replaces it with `local_evaluation_inconclusive`. Ancillary event metadata and the null/false response sentinel for a missing flag MAY vary by platform.
+
+When the key read on an original evaluation snapshot is unresolved, as defined in "Snapshot unresolved flag reporting", an SDK that evaluates flags locally SHOULD report the `local_evaluation_inconclusive` error in place of the `flag_missing` error, whether or not it exposes unresolved flags; an SDK that exposes unresolved flags SHALL. Any other error reported for the same read, such as a response-level error, is unchanged. The returned enablement/value still follows the missing-key contract.
 
 Filtered snapshots returned by `only(...)` / `onlyAccessed()` are intended to scope capture enrichment rather than support further branching. When a key was present in the original evaluation but excluded from a filtered snapshot, the SDK MAY suppress a missing-key event instead of reporting `flag_missing`; the excluded key is not evidence that the flag was absent from the evaluation.
 
@@ -345,6 +348,147 @@ Filtered snapshots returned by `only(...)` / `onlyAccessed()` are intended to sc
 - **WHEN** the enablement or value accessor is called for "typo-flag"
 - **THEN** the returned enablement/value follows the missing-key contract
 - **AND** `$feature_flag_called` metadata identifies "typo-flag" as `flag_missing`
+
+#### Scenario: Reading a flag the remote fallback resolved reports no inconclusive error (@unresolved_flags_capable)
+- **GIVEN** the local feature flag definition for "checkout" has experience continuity enabled
+- **AND** remote feature flag evaluation for distinct id "user-123" returns:
+  | key      | value |
+  | checkout | true  |
+- **WHEN** evaluate flags is called for distinct id "user-123"
+- **AND** snapshot enablement is read for "checkout"
+- **THEN** the returned enabled value for "checkout" should be true
+- **AND** a "$feature_flag_called" event should be enqueued for flag "checkout" with value "true"
+- **AND** the "$feature_flag_called" event for flag "checkout" should not report error "local_evaluation_inconclusive"
+- **AND** the "$feature_flag_called" event for flag "checkout" should not report error "flag_missing"
+
+#### Scenario: Reading an unresolved flag reports an inconclusive local evaluation (@unresolved_flags_capable)
+- **GIVEN** the local feature flag definition for "checkout" has experience continuity enabled
+- **WHEN** evaluate flags is called for distinct id "user-123" with local-only evaluation enabled
+- **AND** snapshot enablement is read for "checkout"
+- **THEN** the returned enabled value for "checkout" should be false
+- **AND** the "$feature_flag_called" event for flag "checkout" should report error "local_evaluation_inconclusive"
+- **AND** the "$feature_flag_called" event for flag "checkout" should not report error "flag_missing"
+
+### Requirement: Snapshot feature flag event control
+
+The snapshot's enablement and value accessors, including a value accessor that returns a rich result object, SHALL accept an optional per-read feature flag event option. The option SHALL be named `sendFeatureFlagEvents`, adapted to platform casing (for example `send_feature_flag_events`), and passed in the platform's idiomatic optional-argument form. It has the meaning of the per-call option on the server SDK's single-flag getters: `true` sends `$feature_flag_called` for the read and `false` suppresses it. The payload accessor, key enumeration and in-memory filters SHALL NOT take the option, because they never report `$feature_flag_called`.
+
+For each enablement or value read, the SDK SHALL decide whether to send `$feature_flag_called` in this order, which is the order the single-flag getters use:
+
+1. the per-read option, when the caller supplies it;
+2. otherwise the SDK's client-level feature flag event default, when the SDK has one;
+3. otherwise `true`.
+
+`evaluateFlags(...)` SHALL NOT take a per-snapshot feature flag event option. One snapshot serves reads that need exposure events and reads that do not, so the choice belongs to each read.
+
+When the decision is `true`, the read follows the lazy access tracking rules unchanged. When the decision is `false`, the read:
+
+- SHALL NOT emit `$feature_flag_called`, including the `flag_missing` event for a key absent from an original snapshot;
+- SHALL NOT consult or update the feature-flag-called dedupe tracker, so a later read of the same key whose decision is `true`, on the snapshot or through a single-flag getter, still emits;
+- SHALL still mark the key as accessed for `onlyAccessed()`, because access scopes capture enrichment and is separate from exposure reporting.
+
+The option SHALL NOT change the returned value, cause evaluation or network I/O, or change the records the snapshot retains.
+
+A scenario in this specification that sets neither the per-read option nor a client-level default describes reads whose decision is `true`.
+
+#### Scenario: Client-level default off silences snapshot reads (@server @requires:flag_event_default)
+- **GIVEN** a fresh isolated server SDK and mock ingestion service
+- **AND** the SDK is initialized with its client-level feature flag event default disabled and a flush threshold larger than the exposure count
+- **AND** remote evaluation for distinct id "snapshot-user" returns "beta-ui" as true and "checkout" as variant "control"
+- **WHEN** the public evaluation method is called for "snapshot-user" with remote fallback enabled
+- **AND** the returned snapshot's enablement accessor is called for "beta-ui" and its value accessor for "checkout", without the per-read option
+- **THEN** the caller-visible semantic results are true and "control", in that order
+- **WHEN** the SDK is explicitly flushed through its public method
+- **THEN** exactly one remote evaluation request has been received for "snapshot-user"
+- **AND** no delivered event is named "$feature_flag_called"
+
+#### Scenario: Per-read option overrides a disabled client-level default (@server @requires:flag_event_default)
+- **GIVEN** a fresh isolated server SDK and mock ingestion service
+- **AND** the SDK is initialized with its client-level feature flag event default disabled and a flush threshold larger than the exposure count
+- **AND** remote evaluation for distinct id "snapshot-user" returns "beta-ui" as true, "checkout" as variant "control", and "search" as false
+- **WHEN** the public evaluation method is called for "snapshot-user" with remote fallback enabled
+- **AND** the returned snapshot's enablement accessor is called for "beta-ui" and its value accessor for "checkout", each with the per-read option `true`
+- **AND** its value accessor is called for "search" without the per-read option
+- **THEN** the caller-visible semantic results are true, "control", and false, in that order
+- **WHEN** the SDK is explicitly flushed through its public method
+- **THEN** exactly one remote evaluation request has been received for "snapshot-user"
+- **AND** exactly two delivered events are named "$feature_flag_called" and carry distinct id "snapshot-user"
+- **AND** exactly one exposure identifies "beta-ui" with canonical response true
+- **AND** exactly one exposure identifies "checkout" with canonical response "control"
+- **AND** no exposure identifies "search"
+
+#### Scenario: Per-read option silences one read on a default-on client (@server)
+- **GIVEN** a fresh isolated server SDK and mock ingestion service
+- **AND** the SDK is initialized with a flush threshold larger than the exposure count and no client-level feature flag event setting
+- **AND** remote evaluation for distinct id "snapshot-user" returns "beta-ui" as true and "checkout" as variant "control"
+- **WHEN** the public evaluation method is called for "snapshot-user" with remote fallback enabled
+- **AND** the returned snapshot's enablement accessor is called for "beta-ui" with the per-read option `false`
+- **AND** its value accessor is called for "checkout" without the per-read option
+- **THEN** the caller-visible semantic results are true and "control", in that order
+- **WHEN** the SDK is explicitly flushed through its public method
+- **THEN** exactly one remote evaluation request has been received for "snapshot-user"
+- **AND** exactly one delivered "$feature_flag_called" event identifies "checkout" with canonical response "control" and distinct id "snapshot-user"
+- **AND** no exposure identifies "beta-ui"
+
+#### Scenario: Per-read option overrides an enabled client-level default (@server @requires:flag_event_default)
+- **GIVEN** a fresh isolated server SDK and mock ingestion service
+- **AND** the SDK is initialized with its client-level feature flag event default explicitly enabled and a flush threshold larger than the exposure count
+- **AND** remote evaluation for distinct id "snapshot-user" returns "beta-ui" as true and "checkout" as variant "control"
+- **WHEN** the public evaluation method is called for "snapshot-user" with remote fallback enabled
+- **AND** the returned snapshot's enablement accessor is called for "beta-ui" with the per-read option `false`
+- **AND** its value accessor is called for "checkout" without the per-read option
+- **THEN** the caller-visible semantic results are true and "control", in that order
+- **WHEN** the SDK is explicitly flushed through its public method
+- **THEN** exactly one remote evaluation request has been received for "snapshot-user"
+- **AND** exactly one delivered "$feature_flag_called" event identifies "checkout" with canonical response "control" and distinct id "snapshot-user"
+- **AND** no exposure identifies "beta-ui"
+
+#### Scenario: Suppressed read leaves exposure dedupe untouched (@server)
+- **GIVEN** a fresh isolated server SDK and mock ingestion service
+- **AND** the SDK is initialized with a flush threshold larger than the exposure count and no client-level feature flag event setting
+- **AND** remote evaluation for distinct id "snapshot-user" returns "beta-ui" as true
+- **WHEN** the public evaluation method is called for "snapshot-user" with remote fallback enabled
+- **AND** the returned snapshot's enablement accessor is called for "beta-ui" with the per-read option `false`
+- **AND** its value and enablement accessors are then called in order for "beta-ui" without the per-read option
+- **THEN** the three caller-visible semantic results are true
+- **WHEN** the SDK is explicitly flushed through its public method
+- **THEN** exactly one remote evaluation request has been received for "snapshot-user"
+- **AND** exactly one delivered "$feature_flag_called" event identifies "beta-ui" with canonical response true and distinct id "snapshot-user"
+
+#### Scenario: Suppressed snapshot read leaves the single-flag getter's exposure intact (@server)
+- **GIVEN** a fresh isolated server SDK and mock ingestion service
+- **AND** the SDK is initialized with a flush threshold larger than the exposure count and no client-level feature flag event setting
+- **AND** remote evaluation for distinct id "snapshot-user" returns "beta-ui" as true
+- **WHEN** the public evaluation method is called for "snapshot-user" with remote fallback enabled
+- **AND** the returned snapshot's enablement accessor is called for "beta-ui" with the per-read option `false`
+- **AND** the SDK's single-flag value getter is then called for "beta-ui" and "snapshot-user" without the per-call option
+- **THEN** both caller-visible semantic results are true
+- **WHEN** the SDK is explicitly flushed through its public method
+- **THEN** exactly one delivered "$feature_flag_called" event identifies "beta-ui" with canonical response true and distinct id "snapshot-user"
+
+#### Scenario: Suppressed reads still count for only accessed (@server)
+- **GIVEN** a fresh isolated server SDK and mock ingestion service
+- **AND** the SDK is initialized with a flush threshold larger than the exposure count and no client-level feature flag event setting
+- **AND** remote evaluation for distinct id "snapshot-user" returns "beta-ui" as true, "checkout" as variant "control", and "search" as false
+- **WHEN** the public evaluation method is called for "snapshot-user" with remote fallback enabled
+- **AND** the returned snapshot's enablement accessor is called for "beta-ui" and its value accessor for "search", each with the per-read option `false`
+- **AND** its accessed-key filter is called and the filtered keys are enumerated
+- **THEN** the enablement and value results are true and false, in that order
+- **AND** the accessed-filter key set is exactly "beta-ui" and "search"
+- **WHEN** the SDK is explicitly flushed through its public method
+- **THEN** exactly one remote evaluation request has been received for "snapshot-user"
+- **AND** no delivered event is named "$feature_flag_called"
+
+#### Scenario: Missing-key read with the option disabled reports no missing flag (@server)
+- **GIVEN** a fresh isolated server SDK and mock ingestion service
+- **AND** the SDK is initialized with a flush threshold larger than the exposure count and no client-level feature flag event setting
+- **AND** remote evaluation for distinct id "snapshot-user" returns "beta-ui" as true and omits "missing"
+- **WHEN** the public evaluation method is called for "snapshot-user" with remote fallback enabled
+- **AND** the returned snapshot's enablement and value accessors are called for "missing", each with the per-read option `false`
+- **THEN** "missing" returns false enablement and the platform's native nullish missing value
+- **WHEN** the SDK is explicitly flushed through its public method
+- **THEN** exactly one remote evaluation request has been received for "snapshot-user"
+- **AND** no delivered event is named "$feature_flag_called", including flag_missing metadata
 
 ### Requirement: Reuse snapshot for capture enrichment
 
@@ -663,3 +807,239 @@ Public results SHALL be compared by their canonical semantics using the SDK's do
 - **AND** the getters and filters made no additional evaluation request
 - **AND** exactly one delivered "$feature_flag_called" event identifies "checkout" for "snapshot-user", carries flag_missing metadata, and uses the documented missing response sentinel
 
+### Requirement: Snapshot unresolved flag reporting
+
+A server SDK that loads local flag definitions MAY expose the unresolved flags of a snapshot. It lets a caller detect a flag that exists but has no value, which is otherwise indistinguishable from a flag that does not exist. An SDK that exposes unresolved flags SHALL follow the rules below.
+
+A flag is unresolved when it has a loaded local definition, is inside the requested key scope, local evaluation for it was inconclusive, and the snapshot holds no value for it. When the call is unscoped, every loaded definition is in scope. A definition outside the requested scope that the evaluator inspects only to resolve a dependency is not in scope.
+
+A flag that a remote `/flags` (or equivalent) fallback resolved is not unresolved. A flag that has no value because the fallback failed or did not return it is unresolved. A key with no loaded local definition is never unresolved; it remains a missing flag. An inactive flag resolves to `false` locally and is never unresolved.
+
+The snapshot SHALL expose each unresolved key with a reason (member name and shape per platform convention). The reason SHALL be one of the values below, chosen by what the caller can do about it. The reason describes the flag's own definition and the call that evaluated it, not a dependency's.
+
+- `experience_continuity`: the flag's definition has experience continuity enabled. Local evaluation never resolves it; the fix is to change the flag.
+- `unsupported_definition`: the flag's definition uses something the local evaluator does not support, such as a static cohort, an unrecognized operator, a malformed value, a dependency with no loaded definition, or a circular dependency. The fix is to change the flag or upgrade the SDK.
+- `missing_context`: the call did not supply a property, group key, group property or device id the flag needs, or supplied it in a form the evaluator cannot use. The fix is to pass it.
+- `unresolved_dependency`: a flag the definition depends on has a loaded definition but was unresolved. The dependency's own entry carries its reason when the dependency is in the requested scope.
+
+When more than one cause applies to a flag, the SDK SHALL report the first applicable reason in this order: `experience_continuity`, `unsupported_definition`, `unresolved_dependency`, `missing_context`. An SDK SHALL NOT report a reason this spec does not define. A new cause lands in this spec before an SDK reports it.
+
+Unresolved flags SHALL stay absent from the snapshot's flags. Exposing them SHALL NOT change the snapshot's key list, the values returned by the enablement, value and payload accessors, or the flags attached by capture enrichment.
+
+Reading the unresolved flags SHALL use only the snapshot and SHALL NOT issue a flag-evaluation request, mark any flag as accessed for `onlyAccessed()`, or emit `$feature_flag_called`.
+
+Filtered snapshots returned by `only(...)` / `onlyAccessed()` scope capture enrichment and SHALL NOT carry unresolved entries. The in-memory filters SHALL treat an unresolved key as any other key absent from the source snapshot. The original snapshot is the surface for inspecting unresolved flags.
+
+#### Scenario: Local-only evaluation reports an experience continuity flag as unresolved (@unresolved_flags_capable)
+- **GIVEN** local feature flag definitions resolve "beta-ui" for distinct id "user-123" as true
+- **AND** the local feature flag definition for "checkout" has experience continuity enabled
+- **WHEN** evaluate flags is called for distinct id "user-123" with local-only evaluation enabled
+- **THEN** the snapshot should contain "beta-ui" with value true
+- **AND** the snapshot should not contain "checkout"
+- **AND** the snapshot unresolved flags should contain "checkout" with reason "experience_continuity"
+- **AND** no remote feature flag evaluation request should have been sent
+- **AND** no event named "$feature_flag_called" should be enqueued
+- **AND** snapshot only accessed should return no flags
+- **WHEN** snapshot only is called with flag keys "beta-ui" and "checkout"
+- **THEN** the filtered snapshot unresolved flags should be empty
+
+#### Scenario Outline: Each inconclusive cause reports its unresolved reason (@unresolved_flags_capable)
+- **GIVEN** <definition>
+- **AND** the local feature flag definition for "checkout" has experience continuity disabled
+- **WHEN** evaluate flags is called for distinct id "user-123" <call> and with local-only evaluation enabled
+- **THEN** the snapshot should not contain "checkout"
+- **AND** the snapshot unresolved flags should contain "checkout" with reason "<reason>"
+
+  | definition | call | reason |
+  | local feature flag definitions include a flag "checkout" matching person property "plan" with operator "exact" and value "pro" | without person property "plan" | missing_context |
+  | local feature flag definitions include a device-bucketed flag "checkout" with only person-aggregated conditions | without a device id | missing_context |
+  | local feature flag definitions include a flag "checkout" matching person property "plan" with an operator this SDK version does not recognize | with person property "plan" equal to "enterprise" | unsupported_definition |
+  | local feature flag definitions include a flag "checkout" matching a static cohort | without person properties | unsupported_definition |
+  | local feature flag definitions include a flag "checkout" matching a static cohort and person property "plan" with operator "exact" and value "pro" | without person property "plan" | unsupported_definition |
+
+#### Scenario: A flag blocked by an unresolved dependency reports the dependency (@unresolved_flags_capable)
+- **GIVEN** the local feature flag definition for "checkout" has experience continuity enabled
+- **AND** local feature flag definitions include a flag "beta-ui" that depends on "checkout" equaling true
+- **WHEN** evaluate flags is called for distinct id "user-123" with flag key "beta-ui" and local-only evaluation enabled
+- **THEN** the snapshot should not contain "beta-ui"
+- **AND** the snapshot unresolved flags should contain "beta-ui" with reason "unresolved_dependency"
+- **AND** the snapshot unresolved flags should not contain "checkout"
+
+#### Scenario: A flag that depends on a flag with no loaded definition reports an unsupported definition (@unresolved_flags_capable)
+- **GIVEN** no local feature flag definition is loaded for "checkout"
+- **AND** local feature flag definitions include a flag "beta-ui" that depends on "checkout" equaling true
+- **WHEN** evaluate flags is called for distinct id "user-123" with flag key "beta-ui" and local-only evaluation enabled
+- **THEN** the snapshot should not contain "beta-ui"
+- **AND** the snapshot unresolved flags should contain "beta-ui" with reason "unsupported_definition"
+- **AND** the snapshot unresolved flags should not contain "checkout"
+
+#### Scenario: A flag resolved by remote fallback is not unresolved (@unresolved_flags_capable)
+- **GIVEN** the local feature flag definition for "checkout" has experience continuity enabled
+- **AND** remote feature flag evaluation for distinct id "user-123" returns:
+  | key      | value |
+  | checkout | true  |
+- **WHEN** evaluate flags is called for distinct id "user-123"
+- **THEN** the snapshot should contain "checkout" with value true
+- **AND** the snapshot unresolved flags should be empty
+
+#### Scenario Outline: A remote fallback that does not resolve the flag leaves it unresolved (@unresolved_flags_capable)
+- **GIVEN** the local feature flag definition for "checkout" has experience continuity enabled
+- **AND** <fallback outcome>
+- **WHEN** evaluate flags is called for distinct id "user-123"
+- **THEN** the snapshot should not contain "checkout"
+- **AND** the snapshot unresolved flags should contain "checkout" with reason "experience_continuity"
+- **WHEN** snapshot enablement is read for "checkout"
+- **THEN** the "$feature_flag_called" event for flag "checkout" should report error "local_evaluation_inconclusive"
+- **AND** the "$feature_flag_called" event for flag "checkout" should not report error "flag_missing"
+
+  | fallback outcome |
+  | the next remote feature flag evaluation request fails |
+  | remote feature flag evaluation for distinct id "user-123" returns no flags |
+
+#### Scenario: A key without a local definition is missing, not unresolved (@unresolved_flags_capable)
+- **GIVEN** local feature flag definitions resolve "beta-ui" for distinct id "user-123" as true
+- **AND** no local feature flag definition is loaded for "typo-flag"
+- **AND** remote feature flag evaluation for distinct id "user-123" returns no flags
+- **WHEN** evaluate flags is called for distinct id "user-123" with flag keys:
+  | key       |
+  | beta-ui   |
+  | typo-flag |
+- **AND** snapshot enablement is read for "typo-flag"
+- **THEN** the snapshot unresolved flags should be empty
+- **AND** the "$feature_flag_called" event for flag "typo-flag" should report error "flag_missing"
+
+#### Scenario: A flag outside the requested keys is not unresolved (@unresolved_flags_capable)
+- **GIVEN** local feature flag definitions resolve "beta-ui" for distinct id "user-123" as true
+- **AND** the local feature flag definition for "checkout" has experience continuity enabled
+- **WHEN** evaluate flags is called for distinct id "user-123" with flag keys:
+  | key     |
+  | beta-ui |
+- **THEN** the snapshot should contain "beta-ui" with value true
+- **AND** the snapshot unresolved flags should be empty
+- **AND** no remote feature flag evaluation request should have been sent
+
+#### Scenario: An inactive flag is resolved as false, not unresolved (@unresolved_flags_capable)
+- **GIVEN** the local feature flag definition for "checkout" has experience continuity enabled
+- **AND** the local feature flag definition for "checkout" is inactive
+- **WHEN** evaluate flags is called for distinct id "user-123" with local-only evaluation enabled
+- **THEN** the snapshot should contain "checkout" with value false
+- **AND** the snapshot unresolved flags should be empty
+
+### Requirement: Warning for flags local evaluation never resolves
+
+An SDK that evaluates flags locally SHOULD log a diagnostic warning, when the platform exposes SDK logging, for each loaded definition that local evaluation can never resolve: a flag whose unresolved reason would be `experience_continuity` or `unsupported_definition`. These causes come from the definition, so the SDK knows them when definitions load. A flag that can be unresolved only for `missing_context` or `unresolved_dependency` does not trigger the warning, because those causes depend on the call or on another flag. This applies whether or not the SDK exposes unresolved flags. An SDK that logs the warning SHALL follow the rules below.
+
+For server SDKs, the definition-load warning SHALL exclude flags whose `evaluation_runtime` is `"client"`. This exclusion applies to both `experience_continuity` and `unsupported_definition`, for API and shared-cache loads. Flags with runtime `"server"` or `"all"`, a null runtime, or no runtime field remain eligible for the warning. SDKs SHALL retain the runtime metadata needed to make this distinction when decoding or hydrating definitions. Treating a null or absent runtime as eligible for this warning does not change "Snapshot evaluation runtime access", where a flag with an unknown runtime matches no runtime criterion.
+
+The SDK SHALL retain client-only definitions and their normal local evaluation behavior. Suppressing this warning SHALL NOT remove definitions, change evaluation results, or prevent a caller from evaluating a client-only flag locally for browser bootstrapping.
+
+The warning SHALL name the flag and the reason. The SDK SHALL NOT repeat the warning for the same flag until that flag's definition changes. A refresh that leaves the definition unchanged, including a not-modified response or a shared-cache load, SHALL NOT repeat it.
+
+A server SDK SHALL stop tracking a flag as warned when its definition becomes client-only. If that flag's `evaluation_runtime` later changes to anything other than `"client"` (including null or removal of the field) and it remains unresolvable from its definition, the SDK SHALL warn again.
+
+The warning helps a developer notice the flag early. It does not replace the per-snapshot reporting in "Snapshot unresolved flag reporting", which also covers `missing_context`.
+
+#### Scenario Outline: Loading a definition that local evaluation never resolves logs one warning (@unresolvable_flag_warning_capable)
+- **GIVEN** SDK logging is enabled
+- **AND** the local feature flag definition for "checkout" has experience continuity enabled
+- **WHEN** local feature flag definitions are refreshed successfully using "<refresh result>"
+- **THEN** exactly one warning naming "checkout" and reason "experience_continuity" should be logged
+- **AND** no remote feature flag evaluation request should have been sent
+
+  | refresh result |
+  | unchanged definitions |
+  | 304 not modified |
+  | successful shared-cache load |
+
+#### Scenario: A changed definition that local evaluation never resolves logs the warning again (@unresolvable_flag_warning_capable)
+- **GIVEN** SDK logging is enabled
+- **AND** the local feature flag definition for "checkout" has experience continuity enabled
+- **WHEN** local feature flag definitions are refreshed successfully with a changed definition for "checkout" that still has experience continuity enabled
+- **THEN** exactly two warnings naming "checkout" and reason "experience_continuity" should be logged
+
+#### Scenario Outline: Server definition loads do not warn about client-only flags (@unresolvable_flag_warning_capable)
+- **GIVEN** SDK logging is enabled
+- **AND** <definition>
+- **AND** the local feature flag definition for "checkout" reports evaluation runtime "client"
+- **WHEN** local feature flag definitions are refreshed successfully using "<refresh result>"
+- **THEN** no warning naming "checkout" should be logged
+- **AND** no remote feature flag evaluation request should have been sent
+
+  | definition | refresh result |
+  | the local feature flag definition for "checkout" has experience continuity enabled | changed definitions |
+  | the local feature flag definition for "checkout" has experience continuity enabled | successful shared-cache load |
+  | local feature flag definitions include a flag "checkout" matching a static cohort | changed definitions |
+  | local feature flag definitions include a flag "checkout" matching a static cohort | successful shared-cache load |
+
+#### Scenario Outline: Definitions not restricted to client runtime still log warnings (@unresolvable_flag_warning_capable)
+- **GIVEN** SDK logging is enabled
+- **AND** <definition>
+- **AND** the local feature flag definition for "checkout" <runtime step>
+- **WHEN** local feature flag definitions are refreshed successfully using "changed definitions"
+- **THEN** exactly one warning naming "checkout" and reason "<reason>" should be logged
+- **AND** no remote feature flag evaluation request should have been sent
+
+  | definition | runtime step | reason |
+  | the local feature flag definition for "checkout" has experience continuity enabled | reports evaluation runtime "server" | experience_continuity |
+  | the local feature flag definition for "checkout" has experience continuity enabled | reports evaluation runtime "all" | experience_continuity |
+  | the local feature flag definition for "checkout" has experience continuity enabled | reports evaluation runtime null | experience_continuity |
+  | the local feature flag definition for "checkout" has experience continuity enabled | reports no evaluation runtime | experience_continuity |
+  | local feature flag definitions include a flag "checkout" matching a static cohort | reports evaluation runtime "server" | unsupported_definition |
+
+#### Scenario Outline: Suppressing client-only warnings preserves local evaluation (@unresolvable_flag_warning_capable)
+- **GIVEN** SDK logging is enabled
+- **AND** local feature flag definitions resolve "client-flag" for distinct id "user-123" as true
+- **AND** the local feature flag definition for "client-flag" reports evaluation runtime "client"
+- **AND** the local feature flag definition for "checkout" has experience continuity enabled
+- **AND** the local feature flag definition for "checkout" reports evaluation runtime "client"
+- **WHEN** local feature flag definitions are refreshed successfully using "<refresh result>"
+- **AND** evaluate flags is called for distinct id "user-123" with local-only evaluation enabled
+- **THEN** the snapshot should contain "client-flag" with value true
+- **AND** the snapshot unresolved flags should contain "checkout" with reason "experience_continuity"
+- **AND** no warning naming "checkout" should be logged
+- **AND** no remote feature flag evaluation request should have been sent
+
+  | refresh result |
+  | changed definitions |
+  | successful shared-cache load |
+
+#### Scenario: A flag returning from client-only to server runtime warns again (@unresolvable_flag_warning_capable)
+- **GIVEN** SDK logging is enabled
+- **AND** the local feature flag definition for "checkout" has experience continuity enabled
+- **AND** the local feature flag definition for "checkout" reports evaluation runtime "server"
+- **WHEN** local feature flag definitions are refreshed successfully using "changed definitions"
+- **THEN** exactly one warning naming "checkout" and reason "experience_continuity" should be logged
+- **WHEN** local feature flag definitions are refreshed successfully with a changed definition for "checkout" that reports evaluation runtime "client"
+- **THEN** exactly one warning naming "checkout" and reason "experience_continuity" should be logged
+- **WHEN** local feature flag definitions are refreshed successfully with a changed definition for "checkout" that reports evaluation runtime "server"
+- **THEN** exactly two warnings naming "checkout" and reason "experience_continuity" should be logged
+- **AND** no remote feature flag evaluation request should have been sent
+
+### Requirement: Snapshot reads report experiment exposure
+
+The snapshot SHALL retain, with each evaluated record, the evaluation details that `experiment-exposure` and the config version 2 attribution on `$feature_flag_called` need: the config version, the reason code, the rule ID, the rule type, the variant key, whether the record was read without a parse error and is not `failed`, whether local evaluation produced it, and, in an SDK that can put a bootstrapped or overridden value in a snapshot, that the value came from there. The flag ID, version, request ID, evaluation time and definitions-loaded time that the exposure copies from the paired `$feature_flag_called` event are already retained as the evaluation metadata of "Point-in-time flag values and enablement". Like the snapshot's values, these details SHALL NOT change after the snapshot is created.
+
+A snapshot enablement or value read, or a typed read where the SDK has one, whose feature flag event decision is `true` SHALL apply the `experiment-exposure` rules to the details retained for that key, in the same step that reports `$feature_flag_called` under "Lazy feature-flag access tracking". The exposure therefore reports the assignment that the snapshot's evaluation produced, even when flag definitions or remote results changed after it. A read whose decision is `false` emits neither event, as "Snapshot feature flag event control" and `experiment-exposure` define.
+
+Creating a snapshot, enumerating its keys, filtering it with `only(...)` or `onlyAccessed()`, reading a payload, and passing the snapshot to `capture(...)` SHALL NOT emit `$experiment_exposure`.
+
+#### Scenario: Evaluation emits no experiment exposure until a flag is read
+- **GIVEN** remote evaluation for distinct id "user-123" returns "checkout-flow" as a complete config version 2 experiment split with value true, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
+- **WHEN** `evaluateFlags("user-123")` is called and no accessor is called
+- **THEN** no `$experiment_exposure` event is emitted
+- **WHEN** `isEnabled("checkout-flow")` is then called on the snapshot
+- **THEN** one `$feature_flag_called` and one `$experiment_exposure` event are emitted for "checkout-flow" with `$feature_flag_variant` "test"
+
+#### Scenario: The exposure reports the snapshot's assignment
+- **GIVEN** a snapshot for distinct id "user-123" retains "checkout-flow" as a split with rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
+- **AND** a later definitions refresh would assign "user-123" variant key "control"
+- **WHEN** `getFlag("checkout-flow")` is called on the original snapshot
+- **THEN** the `$experiment_exposure` event has `$feature_flag_variant` "test"
+- **AND** the read makes no feature-flag evaluation request
+
+#### Scenario: Capture with a snapshot emits no exposure
+- **GIVEN** a snapshot for distinct id "user-123" retains "checkout-flow" as a complete config version 2 experiment split with variant key "test"
+- **AND** no accessor has been called on the snapshot
+- **WHEN** an event is captured with the snapshot
+- **THEN** the captured event has `$feature/checkout-flow` set from the snapshot
+- **AND** no `$feature_flag_called` and no `$experiment_exposure` event is emitted

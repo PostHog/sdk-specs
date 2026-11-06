@@ -37,3 +37,14 @@ Feature: Register
     When the SDK is initialized with token "test-token"
     And capture is called with event "Loaded"
     Then the enqueued event property "plan" should equal "pro"
+
+  Scenario: Per-event property overrides a registered property
+    Given the SDK is initialized with token "test-token"
+    And registered properties are:
+      | property | value |
+      | plan     | free  |
+    When capture is called with event "Upgraded" and properties:
+      | property | value |
+      | plan     | pro   |
+    Then the enqueued event property "plan" should equal "pro"
+    And registered property "plan" should equal "free"

@@ -56,6 +56,7 @@ getAllFlags(
 ### Surface variants
 
 - **posthog-js core / browser / react-native:** `getFeatureFlags()`
+- **iOS (4.0+), Android (4.0+), flutter (6.0+):** `getAllFeatureFlags()` returns a list of flag result objects (key, enabled, variant, payload), or `null` when flags are unavailable, instead of a key-to-value map. It never sends `$feature_flag_called`.
 - **Node:** `getAllFlags(distinctId, options?)`
 - **Python:** `get_all_flags(distinct_id, *, ...)`
 - **Ruby:** `get_all_flags(distinct_id, groups: {}, person_properties: {}, group_properties: {}, only_evaluate_locally: false)`

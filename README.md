@@ -44,6 +44,9 @@ capability-driven selection.
 
 | Capability | Spec | Scope | Status |
 |------------|------|-------|--------|
+| AI Datasets | [`openspec/specs/ai-datasets/spec.md`](openspec/specs/ai-datasets/spec.md) | public API (server) | Canonical |
+| AI Scorers | [`openspec/specs/ai-scorers/spec.md`](openspec/specs/ai-scorers/spec.md) | public API (server) | Canonical |
+| Offline Evaluations | [`openspec/specs/offline-evaluations/spec.md`](openspec/specs/offline-evaluations/spec.md) | public API (server) | Canonical |
 | Logs | [`openspec/specs/logs/spec.md`](openspec/specs/logs/spec.md) | product | Canonical |
 | Traces | [`openspec/specs/traces/spec.md`](openspec/specs/traces/spec.md) | product | Canonical |
 | MCP Analytics | [`openspec/specs/mcp-analytics/spec.md`](openspec/specs/mcp-analytics/spec.md) | product | Canonical |
@@ -55,6 +58,7 @@ capability-driven selection.
 | Capture Exception | [`openspec/specs/capture-exception/spec.md`](openspec/specs/capture-exception/spec.md) | public API | Canonical |
 | Create Person Profile | [`openspec/specs/create-person-profile/spec.md`](openspec/specs/create-person-profile/spec.md) | public API | Canonical |
 | Debug | [`openspec/specs/debug/spec.md`](openspec/specs/debug/spec.md) | public API | Canonical |
+| Emails | [`openspec/specs/emails/spec.md`](openspec/specs/emails/spec.md) | public API (server) | Canonical |
 | Exception Steps | [`openspec/specs/exception-steps/spec.md`](openspec/specs/exception-steps/spec.md) | public API | Canonical |
 | Flush | [`openspec/specs/flush/spec.md`](openspec/specs/flush/spec.md) | public API | Canonical |
 | Get Anonymous ID | [`openspec/specs/get-anonymous-id/spec.md`](openspec/specs/get-anonymous-id/spec.md) | public API | Canonical |
@@ -95,6 +99,7 @@ capability-driven selection.
 | Device ID Generator | [`openspec/specs/device-id-generator/spec.md`](openspec/specs/device-id-generator/spec.md) | internal behavior | Canonical |
 | Event Batcher | [`openspec/specs/event-batcher/spec.md`](openspec/specs/event-batcher/spec.md) | internal behavior | Canonical |
 | Exception Event Metadata | [`openspec/specs/exception-event-metadata/spec.md`](openspec/specs/exception-event-metadata/spec.md) | internal behavior (client/server) | Canonical |
+| Experiment Exposure | [`openspec/specs/experiment-exposure/spec.md`](openspec/specs/experiment-exposure/spec.md) | internal behavior | Canonical |
 | Feature Flag Cache | [`openspec/specs/feature-flag-cache/spec.md`](openspec/specs/feature-flag-cache/spec.md) | internal behavior | Canonical |
 | Feature Flag Called Tracker | [`openspec/specs/feature-flag-called-tracker/spec.md`](openspec/specs/feature-flag-called-tracker/spec.md) | internal behavior | Canonical |
 | Flag Definition Loader | [`openspec/specs/flag-definition-loader/spec.md`](openspec/specs/flag-definition-loader/spec.md) | internal behavior | Canonical |

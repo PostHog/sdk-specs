@@ -135,10 +135,9 @@ lane configuration is scoped to the AI lane**.
 ## Behavior
 
 1. **Admission.** Same enrichment pipeline as `capture` (distinct id,
-   timestamp, the layer order, `before_send`, hoisting of the legacy option
-   properties; on capture v1 the library identity comes from the
-   `PostHog-Sdk-Info` header, not from properties), differing only in the
-   delivery route.
+   timestamp, the layer order, `$lib`/`$lib_version` as in `capture`'s
+   **Events name their own library**, `before_send`, hoisting of the legacy
+   option properties), differing only in the delivery route.
 2. **UUID.** The SDK attaches a client-generated UUID to every event on the
    AI path when the caller supplies no UUID. Where the AI method returns a
    value (posthog-python, posthog-node), it returns the attached UUID to the

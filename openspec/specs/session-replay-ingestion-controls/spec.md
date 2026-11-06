@@ -32,11 +32,13 @@ sessionRecording: {
 }
 ```
 
+The same response also carries a top-level `quotaLimited` array of billing resources whose ingestion quota the project has exhausted (for example `feature_flags`, `recordings`, `mobile_recordings`); see "Mobile recording quota limiting".
+
 Local replay configuration (e.g. browser `session_recording`, native `sessionReplayConfig`) supplies the local master switch and a sample-rate fallback. These controls have no caller-facing method; their observable effect is whether replay is active, which the `is-session-replay-active` API reports.
 
 ## Behavior
 
-1. **Resolve replay enablement.** Replay is gated first on the local replay configuration **and** the remote `sessionRecording` config both being active. If either disables replay, no recording occurs and no further controls are evaluated.
+1. **Resolve replay enablement.** Replay is gated first on the local replay configuration **and** the remote `sessionRecording` config both being active. If either disables replay, no recording occurs and no further controls are evaluated. A mobile-source replay SDK also treats the replay resource for its recordings named in the response's `quotaLimited` array as disabling replay here, even when `sessionRecording` is active.
 2. **Evaluate the linked feature flag.** When `linkedFlag` is set, resolve it against the loaded feature flags: a boolean flag must be `true`; a `{ flag, variant }` must resolve to the configured variant; a string flag pointing at a multivariate flag is satisfied for any present variant; a missing or quota-limited flag is not satisfied. Where the SDK tracks feature-flag usage, evaluating the linked flag reports it as called.
 3. **Make the sampling decision.** When `sampleRate` is set, compute a deterministic decision keyed on the current session id, persist it for the session, and re-decide when the session id rotates or the rate changes. The remote rate is delivered as a string (a decimal between `"0.0"` and `"1.0"`) and is parsed to a number before comparison. `0.0` never samples in; `1.0` (or an absent rate) always samples in.
 4. **Track event triggers.** When `eventTriggers` is set, watch events captured on the client (emitted through the capture API or by autocapture); the first such event whose name matches any configured trigger activates replay for the current session. Matching is by event name as the event passes through the capture pipeline — triggers are not evaluated server-side. Activation persists for that session and is re-armed on a new session.
@@ -81,6 +83,7 @@ Local replay configuration (e.g. browser `session_recording`, native `sessionRep
 - The gating decision never throws into the host app.
 - Malformed or out-of-range config values are ignored with a logged warning (for example, a sample rate outside `0.0`–`1.0` or a negative minimum duration) and treated as unconfigured.
 - A missing or quota-limited linked flag is treated as not satisfied (fail closed).
+- A replay resource named in `quotaLimited` disables replay for the SDKs that emit that recording source and evicts their cached recording config; an absent `quotaLimited` field means no quota limiting.
 - Before a configured trigger activates, SDKs either buffer captured activity (web) or stay stopped (mobile); neither emits replay until the session is eligible.
 
 ## Concurrency & ordering guarantees
@@ -91,7 +94,7 @@ Local replay configuration (e.g. browser `session_recording`, native `sessionRep
 
 ## Interactions
 
-- **remote config** — delivers the `sessionRecording` controls, resolved together with feature flags.
+- **remote config** — delivers the `sessionRecording` controls, resolved together with feature flags, and the `quotaLimited` resource array on both the project config and flags responses.
 - **feature flags** — supply the linked-flag value; evaluating the linked flag reports the flag as called where usage is tracked.
 - **session manager** — supplies the session id that keys sampling and trigger activation; rotation re-arms triggers and re-decides sampling.
 - **before-send hook** — runs inside the capture pipeline before an event reaches event-trigger matching, so an event it drops cannot activate a trigger; see the before-send hook spec.
@@ -123,6 +126,46 @@ This requirement applies to all replay-capable SDKs.
 #### Scenario: Both local and remote enable replay with no other controls
 - **GIVEN** session replay is configured locally
 - **AND** the remote config reports session recording as active with no linked flag, sampling, or triggers
+- **WHEN** the SDK resolves whether to record the current session
+- **THEN** session recording should be active
+
+### Requirement: Mobile recording quota limiting
+
+A remote-config or flags response MAY carry a top-level `quotaLimited` array naming the billing resources whose ingestion quota the project has exhausted. The resources are reported independently: `recordings` for web session replay, `mobile_recordings` for mobile session replay, and `feature_flags` for flag evaluation. A replay-capable SDK SHALL read `quotaLimited` from the project remote-config response as well as the flags response, because either may carry it.
+
+An SDK whose replay capture produces mobile-source recordings — the native mobile SDKs and the native replay layer that `posthog-react-native` and `posthog-flutter` embed — SHALL treat `mobile_recordings` in `quotaLimited` as replay disabled for the enablement gate, exactly as a falsy `sessionRecording`, even when the response's `sessionRecording` resolves to active. The server deliberately keeps `sessionRecording` active in this case, because web recording on the same project is still allowed; the SDK, not the server, is responsible for stopping the mobile capture path. The SDK SHALL also evict its cached recording configuration, so a cold start before the next response does not re-enable replay from cache, and SHOULD log that replay stopped because of the quota.
+
+The condition SHALL NOT be sticky beyond the responses that report it: when a later remote-config or flags response does not name `mobile_recordings`, the SDK SHALL resolve enablement from that response as usual. An absent `quotaLimited` field SHALL mean no quota limiting, so a server that never sends the field leaves replay enablement unchanged.
+
+Because the resources are independent, `recordings` alone SHALL NOT disable mobile replay, and `mobile_recordings` alone SHALL NOT disable web replay or change feature-flag handling. Quota limiting is evaluated as part of the enablement gate, so a quota-limited session records nothing regardless of linked flag, sampling, or triggers.
+
+#### Scenario: Mobile recordings quota disables replay despite an active recording config
+- **GIVEN** a mobile-source replay SDK with session replay configured locally
+- **AND** the response reports session recording as active with no linked flag, sampling, or triggers
+- **AND** the same response reports `quotaLimited` containing `mobile_recordings`
+- **WHEN** the SDK resolves whether to record the current session
+- **THEN** session recording should not be active
+
+#### Scenario: A quota-limited response evicts the cached recording config
+- **GIVEN** a mobile-source replay SDK that has cached an active recording config
+- **WHEN** it processes a response reporting `quotaLimited` containing `mobile_recordings`
+- **THEN** the cached recording config is removed
+- **AND** a restart that resolves enablement from cache before the next response does not record
+
+#### Scenario: A later response without the resource restores normal enablement
+- **GIVEN** a mobile-source replay SDK whose replay was disabled by `mobile_recordings` quota limiting
+- **WHEN** it processes a later response that reports session recording as active and does not name `mobile_recordings`
+- **THEN** session recording should be active
+
+#### Scenario: An absent quota field leaves enablement unchanged
+- **GIVEN** a mobile-source replay SDK talking to a server that never sends `quotaLimited`
+- **AND** the response reports session recording as active with no other controls
+- **WHEN** the SDK resolves whether to record the current session
+- **THEN** session recording should be active
+
+#### Scenario: A web recordings limit does not disable mobile replay
+- **GIVEN** a mobile-source replay SDK with session replay configured locally
+- **AND** the response reports session recording as active and `quotaLimited` containing `recordings` but not `mobile_recordings`
 - **WHEN** the SDK resolves whether to record the current session
 - **THEN** session recording should be active
 

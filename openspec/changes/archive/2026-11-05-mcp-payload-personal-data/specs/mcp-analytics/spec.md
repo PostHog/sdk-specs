@@ -25,7 +25,7 @@ sending, the SDK SHALL:
   from one alphabet: base64 with `\r` and `\n`, because MIME and PEM base64 break lines, or base64url;
 - redact email addresses, IP addresses, Luhn-valid card numbers, US social security numbers, and phone
   numbers from `$mcp_intent` and every property "Property reference" marks sanitized as free text;
-- unless the payload personal data option is off, apply that same personal data pass to:
+- unless the payload personal data option is off, apply the payload personal data pass to:
   - every string value and object key at any depth of `$mcp_parameters` and `$mcp_response`, text
     blocks and their JSON text copies included;
   - every number in them whose digits form a Luhn-valid card number, replaced by the string
@@ -36,6 +36,15 @@ sending, the SDK SHALL:
 
   Other numbers and booleans are kept. The pass matches text as captured, so an address written as
   `%40` or `\u0040` is not recognized.
+
+  The payload personal data pass is the personal data pass above, narrowed because payloads carry
+  identifiers that only look like personal data. It redacts email addresses, Luhn-valid card numbers,
+  US social security numbers, and IPv6 addresses as that pass does. It redacts an IPv4 address only
+  when the address is not loopback (`127.0.0.0/8`), private (`10.0.0.0/8`, `172.16.0.0/12`,
+  `192.168.0.0/16`), link-local (`169.254.0.0/16`), or `0.0.0.0`, and does not directly follow a
+  letter, digit, `.`, `:`, or `@`, so `node:22.11.0.3` and `pkg@1.2.3.4` are kept. It redacts a phone
+  number only when it starts with `+` and a country code or has its area code in parentheses, so
+  `415-555-0142` is kept and `+1 415 555 0142` and `(415) 555-0142` are not.
 
 Object keys inside `$mcp_parameters` and `$mcp_response` are captured strings too, because a result
 keyed by data (a link check keyed by signed URL) carries the credential in the key. The key list is
@@ -130,6 +139,15 @@ drops its `$exception`.
 - **THEN** the "$mcp_response" should not contain "ada@example.com"
 - **AND** the "$mcp_response" should not contain "4111111111111111"
 - **AND** the first text block in "$mcp_response" should parse as JSON with "count" equal to 3
+
+#### Scenario: Identifiers that only look like personal data are kept in payloads
+- **GIVEN** an MCP server instrumented by the SDK with a tool "deploy_status" that returns the text "Order 415-555-0142 built with node:22.11.0.3, db at 127.0.0.1:5432, support +1 415 555 0142"
+- **WHEN** an MCP client calls tool "deploy_status"
+- **AND** the SDK is flushed
+- **THEN** the "$mcp_response" should contain "Order 415-555-0142"
+- **AND** the "$mcp_response" should contain "node:22.11.0.3"
+- **AND** the "$mcp_response" should contain "127.0.0.1:5432"
+- **AND** the "$mcp_response" should not contain "+1 415 555 0142"
 
 #### Scenario: Personal data in error text and exceptions is redacted by default
 - **GIVEN** an MCP server instrumented by the SDK with a tool "lookup_customer" that fails with message "No account for ada@example.com"

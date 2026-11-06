@@ -4,11 +4,12 @@ The personal data pass (emails, IP addresses, card numbers, US social security n
 
 ## What Changes
 
-- **Payload privacy.** The personal data pass also runs, by default, on:
+- **Payload privacy.** A narrower payload personal data pass runs, by default, on:
   - every string value and object key at any depth of `$mcp_parameters` and `$mcp_response`, JSON text copies included
   - numbers that are Luhn-valid card numbers, written as the string `"[redacted]"` so a JSON text copy stays valid JSON
   - `$mcp_error_message`, and `$mcp_resource_name` on a resource read (the URI)
   - each `$exception` value and the stack-frame source lines it sends, each cut to 2,048 characters first
+- **The narrower pass.** Email addresses, Luhn-valid card numbers, US SSNs and IPv6 as the intent pass does. IPv4 only when it isn't loopback, private, link-local or `0.0.0.0`, and isn't glued to a letter, digit, `.`, `:` or `@` (so `node:22.11.0.3` and `pkg@1.2.3.4` survive). Phone numbers only with a `+` country code or a parenthesized area code, so `415-555-0142` order numbers survive. Intent and free-text properties keep the full pass.
 - **Kept.** Other numbers and booleans. Colliding keys follow the existing rule, which keeps the entry whose key sorts first.
 - **Order and cost.** The pass runs before the URL pass, which percent-encodes `@`, and inside the existing margin cut, so its cost follows the property limits.
 - **`$mcp_input_keys`** treats a name the pass would change as not recorded.
@@ -30,15 +31,13 @@ _None._
 
 - Every SDK runs its existing intent personal data pass over payload strings and keys. Each SDK needs the new option.
 - Event schema stability: no name, type or emission changes. Only captured values change, which the stability rule allows.
-- Measured on every SDK's current personal data patterns (identical across all five), these ordinary values are redacted by default:
+- Measured on every SDK's current personal data patterns, the full pass redacts ordinary identifiers: all `ddd-ddd-dddd` references, all four-part versions, all private and loopback IPs, and about 10% of 13 to 19 digit ids (Luhn). The narrower payload pass keeps `ddd-ddd-dddd` references, private and loopback IPs, and versions glued to a letter, `:` or `@`. It still redacts:
 
   | Value | Redacted |
   | --- | --- |
-  | `ddd-ddd-dddd` references (order and ticket numbers) | 100% |
-  | four-part versions `a.b.c.d` (read as IPv4) | 100% |
   | `ddd-dd-dddd` references (read as US SSNs) | 100% |
+  | a four-part version after a space (`version 1.2.3.4`) | 100% |
   | 13 to 19 digit numeric ids and epoch-ms strings (Luhn) | about 10% |
-  | loopback and private IPs in error text (`127.0.0.1:5432`) | 100% |
 
   ISO timestamps, UUIDs and hex hashes are not affected. Servers that depend on these values turn the option off. The privacy docs list these classes.
 - A percent-encoded or JSON-escaped address isn't recognized. The spec says so.

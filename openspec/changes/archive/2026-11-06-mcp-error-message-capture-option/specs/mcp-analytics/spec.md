@@ -19,8 +19,9 @@ A failed call (an `isError` result or a thrown error) SHALL set `$mcp_is_error: 
 With the error message capture option off (see "Configuration"), `$mcp_error_message` and the
 `$exception` value SHALL be `Tool <name> returned an error`, with the call's `$mcp_tool_name`, and the
 SDK SHALL NOT send any part of the thrown message or the `isError` content in them. Tool errors often
-repeat their arguments, and "Payload privacy" redacts only credentials from them, so this is how a
-host that turns parameter and response capture off keeps argument values out of failures too.
+repeat their arguments, and "Payload privacy" redacts only credentials and personal data shapes from
+them, not resource names, identifiers, or configuration values, so this is how a host that turns
+parameter and response capture off keeps argument values out of failures too.
 `$mcp_is_error`, `$mcp_error_type`, the exception's type, and whether `$exception` is sent stay the
 same. `$mcp_response` stays under the response capture option, including the content of an `isError`
 result, so a host that wants no failure text turns both off.

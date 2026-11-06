@@ -21,9 +21,9 @@ text. It is a switch on where the message comes from, not a change to what count
 
 ## Alternatives Considered
 
-- **Redact personal data from error messages like free text.** Rejected because argument values are
-  not limited to personal-data shapes (resource names, IDs, variable values), and free-text
-  redaction would still let them through.
+- **Rely on the payload personal data pass.** It already runs on `$mcp_error_message` by default,
+  but argument values are not limited to personal data shapes (resource names, IDs, variable
+  values), and that pass lets them through.
 - **Drop `$mcp_error_message` with the option off.** Rejected because the property is listed for
   failed calls, and dashboards and error tracking expect a message.
 

@@ -14,7 +14,7 @@ Four server SDKs are moving event delivery to capture v1 in their next majors: p
 - Add the capture v1 status and retry rules to `retry-queue` (404/408/429/500/502/503/504 and network errors retried; 402/413 terminal; four attempts with 100 ms doubling waits and jitter; `Retry-After` as a clamped floor; no HTTP-library retries; events whose last attempt got no HTTP response may go back to the queue), and mark "shrink on 413" as legacy behavior.
 - Add the capture v1 transport rules to `http-client`: bearer token, the required header set, same-origin 307/308 redirects only, the accepted `Content-Encoding` values.
 - Add byte-aware batching for capture v1 to `event-batcher`: check before append against a target of at most 5 MiB, an oversize event ships alone, order is kept, no per-event analytics cap below capture's, 413 is terminal.
-- Modify `mcp-analytics`'s **Library identity**: MCP events are identified by `$mcp_` events and `$mcp_source`, an SDK whose MCP instrumentation shares the application's client does not relabel it, and a whole-client `posthog-<runtime>-mcp` label is allowed when the SDK documents a dedicated client (and, for posthog-node 6, instrumenting before the client captures).
+- Modify `mcp-analytics`'s **Library identity**: MCP events are identified by `$mcp_` events and `$mcp_source` and carry a `posthog-<runtime>-mcp` `$lib`, set one event at a time as an integration label so the application's own events keep the SDK's `$lib`. A whole-client label is allowed when the SDK documents a dedicated client (and, for posthog-node 6, instrumenting before the client captures).
 
 ## Capabilities
 
@@ -29,7 +29,7 @@ _None._
 - `retry-queue`: status classification, attempt budget, backoff and `Retry-After` on capture v1; 429 and 413 handling.
 - `http-client`: capture v1 request headers, authentication, redirects and encodings.
 - `event-batcher`: byte-aware batching and the end of 413 batch shrinking on capture v1.
-- `mcp-analytics`: **Library identity**: MCP events are identified by `$mcp_` events and `$mcp_source`; an SDK whose MCP instrumentation shares the application's client keeps that client's `$lib`.
+- `mcp-analytics`: **Library identity**: MCP events are identified by `$mcp_` events and `$mcp_source`, and label themselves `posthog-<runtime>-mcp` one event at a time.
 
 ## Impact
 

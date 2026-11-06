@@ -100,9 +100,9 @@ The following steps are the canonical flow for a single capture call. Client and
      1. Properties the SDK sets itself, such as SDK environment and feature flag properties, `$groups` from registered groups (the event's group wins per group type), `$is_identified`, and person processing (on capture v1 the `process_person_profile` option; on legacy capture the `$process_person_profile` property).
      2. Super/registered properties.
      3. Caller-supplied `properties`. These win over everything above, and `before_send` (step 6) can change the result (see **Caller-supplied event properties take precedence**).
-   - **Server, capture v1:** the call's `properties` and `options` win. The ambient request context, then the SDK-level default properties and options, then the values the SDK adds itself (`$is_server`, `$geoip_disable` from the client setting, system context, the `$feature/<key>` and `$active_feature_flags` properties derived from a flags snapshot or `send_feature_flags`, `$release_id`, and `$trace_id` with `$span_id` where the SDK derives them) fill only the keys the layers above left unset. `$groups` comes from the `groups` option, merged key by key over a `$groups` property. See **Server SDKs build every event in one layer order**.
+   - **Server, capture v1:** the call's `properties` and `options` win. The ambient request context, then the SDK-level default properties and options, then the values the SDK adds itself (`$is_server`, `$geoip_disable` from the client setting, system context, the `$feature/<key>` and `$active_feature_flags` properties derived from a flags snapshot or `send_feature_flags`, `$release_id`, and `$trace_id` with `$span_id` where the SDK derives them) fill only the keys the layers above left unset. A built-in integration's library label fills before the ambient context, and the SDK's own `$lib` and `$lib_version` fill last (see **Events name their own library**). `$groups` comes from the `groups` option, merged key by key over a `$groups` property. See **Server SDKs build every event in one layer order**.
    - **Server, legacy capture:** request-context properties, then caller-supplied `properties`, then SDK-stamped properties. Server SDKs on legacy capture stamp `$lib` and `$lib_version` over the caller's values, and posthog-python 7.x, posthog-go 1.x, dotnet (`SuperProperties`) and elixir (`global_properties`) apply their SDK-level default properties after the caller's properties too.
-5. **Attach envelope fields.** Assign `timestamp` (caller override or `now()`, serialized in ISO 8601 and normalized to its equivalent UTC instant regardless of the input's original timezone/offset, preserving sub-second precision when the input carries it), `uuid` (caller override or a freshly generated UUIDv7; server SDKs normalize it to canonical lowercase hyphenated form), `distinct_id`, and `event` to the message. Server SDKs on legacy capture additionally stamp `$lib` / `$lib_version` onto properties here if not already present. On capture v1 the SDK never writes `$lib` or `$lib_version` into `properties`; the server derives them from the `PostHog-Sdk-Info` request header (see **Library identity comes from the request header**).
+5. **Attach envelope fields.** Assign `timestamp` (caller override or `now()`, serialized in ISO 8601 and normalized to its equivalent UTC instant regardless of the input's original timezone/offset, preserving sub-second precision when the input carries it), `uuid` (caller override or a freshly generated UUIDv7; server SDKs normalize it to canonical lowercase hyphenated form), `distinct_id`, and `event` to the message. Server SDKs on legacy capture additionally stamp `$lib` / `$lib_version` onto properties here if not already present. On capture v1 the SDK fills `$lib` and `$lib_version` from its own identity as a pair, after every other layer, and only where the event does not already name its library (see **Events name their own library**).
 6. **Run `before_send` hook.** If the SDK has been configured with a `before_send` callback (Python, Go, posthog-js, .NET), invoke it with the fully-assembled message. The callback may return a modified message, or return `null`/`None` to drop the event. If the callback throws, log a warning, stop the hook chain, and drop the event. Never enqueue the original or partially processed message after a hook failure. Server SDKs re-normalize the message `uuid` after the hook returns, because the hook may have replaced it with another accepted form. On capture v1 the legacy option properties are hoisted into `options` after the hook returns (see **Per-event options replace the legacy option properties**). The SDK sends the message the callback returns as it is: a callback that returns a new message without `options` sends none, including the SDK's personless `process_person_profile: false`, and the SDK does not restore them. SDK docs and migration guides SHALL tell callers to keep `options` when a hook builds a new message, and to change a setting through `options`, because a legacy option property the hook adds does not replace an option that is already set.
 7. **Deliver.**
    - **Server (and `posthog-node`, `posthog-js/core` stateless):** push onto an in-memory queue (`max_queue_size` default 10,000). If the queue is full, drop the oldest element and log a warning (posthog-js core; `posthog-python` drops the new element). If queue size ≥ `flush_at` (default 20 client/core, 100 python-server), kick off a background flush. A periodic timer (`flush_interval`, typically 10s client / 10s–30s server) also triggers flushes. On capture v1 the SDK keeps one queue, flush cycle and retry state per delivery lane (analytics and AI), so a slow or failing AI lane never delays or resends analytics events.
@@ -405,7 +405,7 @@ The project token is request routing, not an event property. Where an SDK carrie
 
 A group the caller passes for the event SHALL win over a registered group of the same type.
 
-This requirement does not apply to server SDKs. Server SDKs that deliver through capture v1 follow **Server SDKs build every event in one layer order**: the call's values win, and `$lib` and `$lib_version` come from the request header. Server SDKs still on legacy capture set `$lib` and `$lib_version` after the caller's properties, and python 7.x, go 1.x, dotnet and elixir apply their SDK-level default properties after the caller's properties as well.
+This requirement does not apply to server SDKs. Server SDKs that deliver through capture v1 follow **Server SDKs build every event in one layer order**: the call's values win, including a caller's `$lib` and `$lib_version`, and the SDK's own identity fills only what the event leaves unset. Server SDKs still on legacy capture set `$lib` and `$lib_version` after the caller's properties, and python 7.x, go 1.x, dotnet and elixir apply their SDK-level default properties after the caller's properties as well.
 
 #### Scenario: Caller property overrides an SDK context property (@client)
 - **GIVEN** a fresh SDK acceptance test harness
@@ -695,7 +695,7 @@ An SDK that delivers events through capture v1 SHALL send these headers on every
 - `Authorization: Bearer <project token>`. The token is never placed in the body.
 - `Content-Type: application/json`.
 - `User-Agent`, equal to the `PostHog-Sdk-Info` value.
-- `PostHog-Sdk-Info: <library>/<version>`, where `<library>` is the SDK's own canonical `$lib` name (`posthog-python`, `posthog-go`, `posthog-rs`, `posthog-node`, `posthog-ios`, `posthog-android`, `posthog-flutter`) and `<version>` is the package version actually shipped. Capture derives `$lib` and `$lib_version` from this header, so a built-in integration SHALL NOT relabel the client. A wrapper SDK whose events a native SDK delivers (posthog-flutter on iOS, macOS and Android, KMP, and the React Native plugin, which uses `posthog-react-native`) configures the native SDK with its own library name and version, as `$lib` did on legacy capture. posthog-flutter on Windows and Linux has its own transport and sends `posthog-flutter` directly.
+- `PostHog-Sdk-Info: <library>/<version>`, where `<library>` is the SDK's own canonical `$lib` name (`posthog-python`, `posthog-go`, `posthog-rs`, `posthog-node`, `posthog-ios`, `posthog-android`, `posthog-flutter`) and `<version>` is the package version actually shipped. The header names the SDK that sent the request. Capture uses it to fill `$lib` and `$lib_version` only on an event that does not name its own library (see **Events name their own library**), so a built-in integration labels its own events through `$lib` rather than relabeling the client. A wrapper SDK whose events a native SDK delivers (posthog-flutter on iOS, macOS and Android, KMP, and the React Native plugin, which uses `posthog-react-native`) configures the native SDK with its own library name and version, as `$lib` did on legacy capture. posthog-flutter on Windows and Linux has its own transport and sends `posthog-flutter` directly.
 - `PostHog-Request-Id`: a UUID minted once per batch and kept across every retry of that batch.
 - `PostHog-Attempt`: `1` on the first attempt, incremented by one on each retry of the same batch.
 - `PostHog-Request-Timestamp`: the send time of this attempt as an RFC 3339 string with an explicit offset and at least three fractional-second digits (see **Timestamps on capture v1**), taken from the same clock as the event timestamps and stamped again on every attempt.
@@ -916,9 +916,9 @@ A server SDK that delivers events through capture v1 SHALL build each event in t
 
 1. **Identity resolves first.** The distinct id comes from the call, then the ambient request context, then a generated personless id (or the SDK's existing error for a missing id). A context session id becomes `$session_id` unless the event has its own.
 2. **The call's own values.** The call's `properties` and `options`, and typed call values (`groups`, a typed `$set` or `$set_once`), which win key by key over the same key in `properties`.
-3. **Fill-only defaults**, each layer filling only what the layers above left unset: the ambient request context, then the SDK-level default properties and options, then the values the SDK adds itself (`$is_server`, `$geoip_disable` from the client setting, system context, the `$feature/<key>` and `$active_feature_flags` properties derived from a flags snapshot or `send_feature_flags`, `$release_id`, the `process_person_profile: false` option for a personless event, and `$trace_id` with `$span_id` from an active OpenTelemetry span, added as a pair only when no layer set either key). A property is unset only when its key is missing, so a `null` property blocks the fill; an option is unset when it is missing or `null`. `$set`, `$set_once`, `$groups` and `$group_set` fill one level deep when both values are objects.
+3. **Fill-only defaults**, each layer filling only what the layers above left unset: a built-in integration's library label (`$lib` with `$lib_version`, see **Events name their own library**), then the ambient request context, then the SDK-level default properties and options, then the values the SDK adds itself (`$is_server`, `$geoip_disable` from the client setting, system context, the `$feature/<key>` and `$active_feature_flags` properties derived from a flags snapshot or `send_feature_flags`, `$release_id`, the `process_person_profile: false` option for a personless event, `$trace_id` with `$span_id` from an active OpenTelemetry span, added as a pair only when no layer set either key, and last the SDK's own `$lib` and `$lib_version`, filled as a pair by the rule in **Events name their own library**). A property is unset only when its key is missing, so a `null` property blocks the fill, except `$lib` and `$lib_version`, which count as set only when they are non-empty strings; an option is unset when it is missing or `null`. `$set`, `$set_once`, `$groups` and `$group_set` fill one level deep when both values are objects.
 4. **`before_send`** runs on an isolated copy of the assembled event, including `options`, and has the final say. The SDK SHALL NOT add or re-add any value after the hook, with two allowances: it MAY re-impose the uuid it generated before the hook, because a hook must not resend an SDK-generated uuid (see **Event uuid is sent in canonical form**), and it MAY treat a returned event whose `options` is absent as keeping the pre-hook options, while an empty `options` map still clears them. Where a minimized `$feature_flag_called` event is built, its allowlist SHALL be applied after step 3 and before step 4, and SHALL keep the legacy option properties, `$session_id` and `$window_id`.
-5. **Hoisting**, once, in the wire builder: the legacy option properties move into `options`, `$session_id` and `$window_id` move to their top-level fields, and `$lib` and `$lib_version` are removed.
+5. **Hoisting**, once, in the wire builder: the legacy option properties move into `options`, `$session_id` and `$window_id` move to their top-level fields. `$lib` and `$lib_version` stay in `properties`.
 
 In a wrapper whose events a native SDK delivers (posthog-flutter on iOS, macOS and Android), the wrapper's hook runs first, then the native SDK adds its own values, then the native SDK's `before_send` runs and has the final say. The wrapper's hooks do not run on every event type (see `before-send-hook`).
 
@@ -1000,13 +1000,25 @@ Legacy capture: posthog-python 7.x merged `super_properties` over the call's pro
 - **THEN** the first received event property "$groups" should equal JSON `{"company":"acme"}`
 - **AND** the first received event option "process_person_profile" should be absent
 
-### Requirement: Library identity comes from the request header
+### Requirement: Events name their own library
 
-An SDK that delivers events through capture v1 SHALL NOT send `$lib` or `$lib_version` in `properties`. The wire builder SHALL remove both keys after `before_send`, whoever set them, because capture derives them from `PostHog-Sdk-Info` and writes them after the event's own properties. `before_send` may still see a caller-supplied value. Built-in integrations (MCP servers, AI wrappers, framework middleware) SHALL NOT change the client's `PostHog-Sdk-Info` value, except an MCP integration that labels a dedicated client (`mcp-analytics`, Library identity).
+An SDK that delivers events through capture v1 SHALL send `$lib` and `$lib_version` in `properties`, and the wire builder SHALL NOT remove them. `$lib` names the library that produced the event and `$lib_version` its version; `PostHog-Sdk-Info` names the SDK that sent the request. `$lib` and `$lib_version` count as set only when they are non-empty strings.
 
-Legacy capture: server SDKs stamped `$lib` and `$lib_version` into `properties`, and some integrations relabeled the client.
+The SDK SHALL fill the pair from its own identity as the last fill-only layer (step 3 of **Server SDKs build every event in one layer order**), before `before_send`:
 
-#### Scenario: A caller-set $lib never reaches the wire (@server)
+- When `$lib` is not set, the SDK SHALL set both `$lib` and `$lib_version`, replacing a `$lib_version` set without `$lib`, and a `$lib` that is `null`, empty or not a string.
+- When `$lib` is the SDK's own library name and `$lib_version` is not set, the SDK SHALL set `$lib_version`.
+- Otherwise the SDK SHALL leave both as they are. It SHALL NOT add its own `$lib_version` to another library's `$lib`.
+
+A built-in integration or wrapper (MCP instrumentation, AI wrappers, framework middleware) MAY label the events it captures with its own `$lib` and `$lib_version`. It SHALL set both, as the first fill-only layer of step 3, so a `$lib` in the call's `properties` wins over its label. Built-in integrations SHALL NOT change the client's `PostHog-Sdk-Info` value, except an MCP integration that labels a dedicated client (`mcp-analytics`, Library identity).
+
+`before_send` sees the filled values and MAY change or remove them; the SDK sends what the hook returns.
+
+Capture keeps the event's values. When the event's `$lib` is not set, capture sets both properties from `PostHog-Sdk-Info`. When `$lib` equals the header's library and `$lib_version` is not set, capture sets `$lib_version` from the header. Otherwise capture stores both as sent. Capture fills nothing when the header value does not split at its last `/` into a library and a version that are both non-empty after trimming, or when it is longer than 200 characters.
+
+Legacy capture: server SDKs stamped `$lib` and `$lib_version` over the caller's values, and some integrations relabeled the client.
+
+#### Scenario: A caller-set library identity reaches the wire (@server)
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the mock PostHog server is reset
 - **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
@@ -1015,9 +1027,31 @@ Legacy capture: server SDKs stamped `$lib` and `$lib_version` into `properties`,
   | $lib         | custom-lib |
   | $lib_version | 9.9.9      |
 - **AND** pending captures are flushed
-- **THEN** the first received event property "$lib" should be absent
-- **AND** the first received event property "$lib_version" should be absent
+- **THEN** the first received event property "$lib" should equal "custom-lib"
+- **AND** the first received event property "$lib_version" should equal "9.9.9"
 - **AND** the first request header "PostHog-Sdk-Info" should match "<library>/<version>" for the SDK under test
+
+#### Scenario: Another library's $lib does not get the SDK's version (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **WHEN** capture is called with distinct id "user-123", event "Signed Up", and properties:
+  | property | value      |
+  | $lib     | custom-lib |
+- **AND** pending captures are flushed
+- **THEN** the first received event property "$lib" should equal "custom-lib"
+- **AND** the first received event property "$lib_version" should be absent
+
+#### Scenario: The SDK fills its own identity when the event names none (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **WHEN** capture is called with distinct id "user-123", event "Signed Up", and properties:
+  | property     | value |
+  | $lib         |       |
+  | $lib_version | 9.9.9 |
+- **AND** pending captures are flushed
+- **THEN** the first received event properties "$lib" and "$lib_version" should match "<library>/<version>" for the SDK under test
 
 ### Requirement: Session and window ids are lifted only as strings
 

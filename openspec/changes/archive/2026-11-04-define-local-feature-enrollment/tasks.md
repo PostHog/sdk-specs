@@ -9,3 +9,9 @@
 - [x] 2.2 Validate the delta and discover all expanded cases with no missing harness bindings.
 - [x] 2.3 Archive the change and sync the canonical specification.
 - [x] 2.4 Validate all canonical specs strictly and check the final diff.
+
+## 3. Clarify evaluation boundaries
+
+- [x] 3.1 Preserve inactive and continuity guards; define applicable unresolved causes and conditional group-context support.
+- [x] 3.2 Add inactive-without-context, continuity, skipped-cohort, and missing-group acceptance coverage; document Python implementation scope with pinned sources.
+- [x] 3.3 Validate the revised delta, expanded JSON fixtures, and pinned harness bindings.

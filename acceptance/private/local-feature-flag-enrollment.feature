@@ -39,6 +39,7 @@ Feature: Local feature flag enrollment
       | enrolled-holdout   | true   | true   | {"id":727,"exclusion_percentage":100} | 0       | {"$feature_enrollment/beta-feature":true}      | true     |
       | opted-out-holdout  | true   | true   | {"id":727,"exclusion_percentage":100} | 100     | {"$feature_enrollment/beta-feature":false}     | false    |
       | inactive-flag      | false  | true   | null                                  | 100     | {"$feature_enrollment/beta-feature":true}      | false    |
+      | inactive-missing   | false  | true   | null                                  | 100     | {}                                            | false    |
       | disabled-marker   | true   | false  | null                                  | 100     | {}                                            | true     |
       | null-marker       | true   | null   | null                                  | 100     | {}                                            | true     |
 
@@ -121,6 +122,54 @@ Feature: Local feature flag enrollment
       """
     Then the public flag getter should return JSON false
     And exactly 1 requests containing /flags should have been received
+
+  @case:<case_id>
+  Scenario Outline: Enrollment and continuity bypass unsupported release conditions
+    Given the definitions service serves this typed document:
+      """application/json
+      {"definitions":{"flags":[{"id":1,"key":"beta-feature","active":true,"ensure_experience_continuity":<continuity>,"filters":{"feature_enrollment":true,"groups":[{"properties":[{"key":"id","type":"cohort","operator":"in","value":123}],"rollout_percentage":100}]}},{"id":2,"key":"control","active":true,"filters":{"groups":[{"properties":[],"rollout_percentage":100}]}}]}}
+      """
+    And the SDK is initialized for native local evaluation with JSON arguments:
+      """application/json
+      {"project_token":"phc_test_key","config":{"secret_key":"phx_test_key"}}
+      """
+    When evaluate flags and read is called with JSON arguments:
+      """application/json
+      {"distinct_id":"user-123","options":{"only_evaluate_locally":true,"person_properties":<properties>},"reads":[{"method":"get_flag","key":"control"},{"method":"get_flag","key":"beta-feature"}]}
+      """
+    Then the public snapshot outcomes should have these semantics:
+      """application/json
+      {"results":[{"value":true},<outcome>]}
+      """
+    And no remote flag evaluation path should have been requested
+
+    Examples:
+      | case_id             | continuity | properties                                 | outcome          |
+      | continuity-missing  | true       | {}                                         | {"missing":true} |
+      | continuity-enrolled | true       | {"$feature_enrollment/beta-feature":true}  | {"missing":true} |
+      | continuity-opt-out  | true       | {"$feature_enrollment/beta-feature":false} | {"missing":true} |
+      | cohort-enrolled     | false      | {"$feature_enrollment/beta-feature":true}  | {"value":true}   |
+      | cohort-opt-out      | false      | {"$feature_enrollment/beta-feature":false} | {"value":false}  |
+      | cohort-missing      | false      | {}                                         | {"missing":true} |
+
+  Scenario: Person enrollment remains effective without group context
+    Given the definitions service serves this typed document:
+      """application/json
+      {"definitions":{"group_type_mapping":{"0":"company"},"flags":[{"id":1,"key":"beta-feature","active":true,"filters":{"aggregation_group_type_index":0,"feature_enrollment":true,"groups":[{"properties":[],"rollout_percentage":0}]}}]}}
+      """
+    And remote snapshot fixtures are:
+      """application/json
+      {"identities":{"user-123":{"beta-feature":{"value":true}}}}
+      """
+    And the SDK is initialized for native local evaluation with JSON arguments:
+      """application/json
+      {"project_token":"phc_test_key","config":{"secret_key":"phx_test_key"}}
+      """
+    When get feature flag is called with JSON arguments:
+      """application/json
+      {"key":"beta-feature","distinct_id":"user-123","person_properties":{"$feature_enrollment/beta-feature":true}}
+      """
+    Then the public flag getter should return JSON true
 
   Scenario: A group definition cannot turn a person's opt-out into enrollment
     Given the definitions service serves this typed document:

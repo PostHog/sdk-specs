@@ -730,6 +730,8 @@ Feature: Local Feature Flag Evaluator
       | "regex"     | ""               | "admin@example.com" | true    |
       | "not_regex" | ""               | "admin@example.com" | false   |
       | "regex"     | "\\[1,2\\]"     | [1,2]                | true    |
+      | "regex"     | "^foo$"         | "foo\n"             | false   |
+      | "not_regex" | "^foo$"         | "foo\n"             | true    |
 
   @server
   Scenario Outline: Unsupported regex execution is inconclusive
@@ -744,6 +746,32 @@ Feature: Local Feature Flag Evaluator
       | operator    |
       | "regex"     |
       | "not_regex" |
+
+  @server
+  Scenario Outline: Engine-divergent regex evaluation defers to the service
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag "regex-divergent" has a person property condition with operator <operator> and pattern <pattern>
+    When local feature flag "regex-divergent" is evaluated with supplied property value <property>
+    Then local evaluation should be inconclusive
+    And the SDK should request remote evaluation when remote fallback is permitted
+    And local-only evaluation should remain unresolved rather than returning a definitive result
+    And neither a negative operator nor cohort negation should turn the deferral into a match
+
+    Examples:
+      | operator    | pattern        | property                        |
+      | "regex"     | "^\\d+$"       | "١٢٣"                           |
+      | "not_regex" | "^\\d+$"       | "١٢٣"                           |
+      | "regex"     | "^\\p{L}+$"    | "café"                          |
+      | "regex"     | "^a\\b$"       | "a"                             |
+      | "regex"     | "^(a+)+$"      | "aaaaaaaaaaaaaaaaaaaaaaaaaaa\n" |
+
+  @server
+  Scenario: Portable ASCII regex criteria stay local
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag "regex-portable" has a person property condition with operator "regex" and pattern "example\\.com"
+    When local feature flag "regex-portable" is evaluated with supplied property value "admin@example.com"
+    Then the criterion match result should be true
+    And no remote flag evaluation request should be sent
 
   @server
   Scenario Outline: Numeric ordering uses complete finite binary64 semantics

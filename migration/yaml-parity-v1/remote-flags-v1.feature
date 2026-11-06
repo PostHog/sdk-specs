@@ -31,6 +31,7 @@ Feature: Native server remote flag getters
     And the first flags request field "geoip_disable" should equal JSON true
     And the first flags request field "flag_keys_to_evaluate" should equal JSON ["signup-aa-test"]
 
+  @excludes:flags_response_v4
   Scenario: Remote flag requests use the v2 query parameter
     When the SDK is initialized with token "phc_test_key" and no additional configuration
     And get feature flag is called with JSON arguments:
@@ -277,3 +278,16 @@ Feature: Native server remote flag getters
     And exactly 1 received events should be named "$feature_flag_called"
     And a received event named "$feature_flag_called" should have property "$feature_flag" equal to JSON "my-flag"
     And a received event named "$feature_flag_called" should have property "$feature_flag_response" equal to JSON true
+
+  @requires:flags_response_v4
+  Scenario: Remote flag requests use the v4 query parameter
+    When the SDK is initialized with token "phc_test_key" and no additional configuration
+    And get feature flag is called with JSON arguments:
+      """application/json
+      {
+        "distinct_id": "user_1",
+        "key": "any-flag"
+      }
+      """
+    And exactly 1 requests containing /flags should have been received
+    And the first flags request query parameter "v" should equal "4"

@@ -33,7 +33,7 @@ beforeSend: BeforeSendFn | BeforeSendFn[]
 ## Behavior
 
 1. **Run after event assembly.** The hook usually sees the event after the SDK has resolved identity, merged properties, added SDK metadata, and attached timestamps/uuids (or a user-facing subset of that final event).
-   - Some wrappers expose an earlier approximation instead of the fully-enriched native event. In Flutter, Dart `beforeSend` callbacks only see the user-provided event name/properties before native or browser SDK enrichment adds system fields like `$device_type` or `$session_id`.
+   - Some wrappers expose an earlier approximation instead of the fully-enriched native event. On Flutter Web, Dart `beforeSend` callbacks only see the user-provided event name, properties and options before posthog-js enrichment adds system fields like `$device_type` or `$session_id`. Flutter 6.0 passes the callbacks the event the native SDK built on iOS, macOS and Android, including its system and registered properties, options, `uuid`, `distinctId` and `timestamp`, and on Windows and Linux the event after the Dart core merges SDK, registered and event properties. Before 6.0 every Flutter platform exposed only the user-provided subset.
 2. **Allow mutation.** The hook may return a modified event.
 3. **Allow dropping.** Returning `null` / `nil` rejects the event and prevents enqueue/send.
 4. **Support hook chaining when configured as an array.** Multiple hooks run in order; each receives the previous hook's output.
@@ -57,8 +57,8 @@ Usually none directly. The hook returns a transformed event object that higher l
 
 - Hooks are configured during SDK setup or configuration mutation.
 - They are applied to every eligible event passing through the capture pipeline.
-- Eligibility is SDK-specific. For example, Flutter's Dart-layer hooks apply to `capture()`, `screen()`, and `captureException()`, but not to `identify()`, `alias()`, `group()`, `setPersonProperties()`, native-initiated lifecycle/replay events, survey events, or `$feature_flag_called` events.
-- Because they run late, they can usually see and modify derived fields like `$set`, `$set_once`, timestamps, flag metadata, and SDK-added properties — except in wrapper-layer implementations like Flutter where the Dart hook runs before native/browser enrichment.
+- Eligibility is SDK-specific. For example, Flutter's Dart-layer hooks apply to `capture()`, `screen()`, and `captureException()`, but not to `identify()`, `alias()`, `group()`, `setPersonProperties()`, native-initiated lifecycle/replay events, survey events, or `$feature_flag_called` events. Since 6.0 those native-initiated events (crashes, app lifecycle, `$feature_flag_called`) can be filtered on iOS, macOS and Android through `PosthogFlutterPlugin.addBeforeSend` in Swift or Kotlin.
+- Because they run late, they can usually see and modify derived fields like `$set`, `$set_once`, timestamps, flag metadata, and SDK-added properties — except in wrapper-layer implementations like Flutter Web, where the Dart hook runs before browser enrichment.
 
 ## Error handling
 
@@ -78,7 +78,7 @@ Usually none directly. The hook returns a transformed event object that higher l
 - **capture / identify / alias / group-identify** — many SDKs route these through the hook once the event is assembled, but wrapper SDKs may only hook a subset of public APIs.
 - **retry-queue / event-batcher** — only see the hook-transformed event, or nothing if it was dropped.
 - **consent-gating** — usually runs earlier; opted-out events are typically blocked before the hook is invoked.
-- **feature-flag-called tracking** — hook can mutate or drop these events too if they pass through the same pipeline, though Flutter explicitly excludes Dart-layer hooks from `$feature_flag_called` events.
+- **feature-flag-called tracking** — hook can mutate or drop these events too if they pass through the same pipeline, though Flutter's Dart-layer hooks exclude `$feature_flag_called` events; Flutter 6.0 reaches them through the native `PosthogFlutterPlugin.addBeforeSend` hooks on iOS, macOS and Android instead.
 
 ## Requirements
 

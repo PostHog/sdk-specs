@@ -849,9 +849,9 @@ another event. It reaches only that project, not open-ended external entities.
 
 ### Requirement: Event schema stability
 
-From an SDK's stable release on (`@posthog/mcp` 1.0.0, and the `posthog.mcp` release that declares
-it), a release SHALL NOT rename or remove an event or property this spec defines, change its type, or
-change which requests emit an event. It MAY add events, properties, and enumerated values, and redact,
+A release SHALL NOT rename or remove an event or property this spec defines, change its type, or
+change which requests emit an event, once its SDK has had a stable release (`@posthog/mcp` 1.0.0, and
+the `posthog.mcp` release that declares it). It MAY add events, properties, and enumerated values, and redact,
 cut, or drop values per "Payload privacy" and "Event size bounds". It MAY break these to meet a rule of
 this spec it did not meet before, and SHALL say so in its release notes.
 

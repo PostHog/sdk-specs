@@ -2,18 +2,19 @@
 
 ### Requirement: Library identity
 
-MCP events SHALL be identified by their `$mcp_` event name prefix and `$mcp_source`; `$lib` and `$lib_version`
-name the SDK client that sent them. An SDK whose MCP instrumentation shares the application's client SHALL
-NOT relabel that client, so its MCP events carry the SDK's own `$lib` (`posthog-python`, `posthog-go`,
-`posthog-rs`). An SDK MAY instead label a whole client `posthog-<runtime>-mcp`, with `$lib_version` the
-version of the package that ships the instrumentation (`posthog-node-mcp` and the `@posthog/mcp` version),
-when it documents that MCP analytics needs a dedicated client; where the SDK fixes its identity when the
+MCP events SHALL be identified by their `$mcp_` event name prefix and `$mcp_source`, and SHALL carry `$lib`
+as `posthog-<runtime>-mcp` (such as `posthog-node-mcp`, `posthog-python-mcp`, `posthog-rs-mcp`,
+`posthog-go-mcp`) with `$lib_version` the version of the installed package that ships the instrumentation.
+The SDK SHOULD label MCP events one by one, as an integration label (`capture`, **Events name their own
+library**), so events the host application captures through the same client keep the SDK's own `$lib`. Where
+the platform can only label the whole client, the SDK MAY label a dedicated client `posthog-<runtime>-mcp`
+and SHALL document that MCP analytics needs a dedicated client; where the SDK fixes its identity when the
 client first sends (posthog-node 6), it SHALL also document that the instrumentation must be applied before
-the client captures. An SDK on legacy capture that labels events one by one MAY keep a `-mcp` `$lib` on its
-MCP events only.
+the client captures. A `$lib` in the call's `properties`, and `before_send`, win over the label.
 
 #### Scenario: Events name the MCP instrumentation
 - **GIVEN** an MCP server instrumented by the SDK
 - **WHEN** an MCP client calls tool "search_docs"
 - **AND** the SDK is flushed
 - **THEN** the "$mcp_tool_call" event's property "$mcp_source" should be the string "posthog_mcp_analytics"
+- **AND** the "$mcp_tool_call" event's property "$lib" should end with "-mcp"

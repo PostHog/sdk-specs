@@ -718,19 +718,21 @@ limits of "Property reference" first, then measure) rather than re-serializing r
 
 ### Requirement: Library identity
 
-MCP events SHALL carry `$lib` as `posthog-<runtime>-mcp` (such as `posthog-node-mcp`,
-`posthog-python-mcp`, `posthog-rs-mcp`) and `$lib_version` as the version of the installed package that
-ships the instrumentation (for Python, `posthog`; for Go, `posthog-go`, which builds the events for both
-`posthogmcp` and `posthogmcpsdk`; for Rust, `posthog-rs`, which ships `posthog_rs::mcp` behind its
-`mcp` feature). `$lib` marks an event as coming from the MCP instrumentation, so the SDK SHOULD NOT
-relabel events the host application captures through the same client; where the platform can only
-relabel the whole client, the SDK SHALL document that MCP analytics needs a dedicated client.
+MCP events SHALL be identified by their `$mcp_` event name prefix and `$mcp_source`, and SHALL carry `$lib`
+as `posthog-<runtime>-mcp` (such as `posthog-node-mcp`, `posthog-python-mcp`, `posthog-rs-mcp`,
+`posthog-go-mcp`) with `$lib_version` the version of the installed package that ships the instrumentation.
+The SDK SHOULD label MCP events one by one, as an integration label (`capture`, **Events name their own
+library**), so events the host application captures through the same client keep the SDK's own `$lib`. Where
+the platform can only label the whole client, the SDK MAY label a dedicated client `posthog-<runtime>-mcp`
+and SHALL document that MCP analytics needs a dedicated client. A `$lib` in the call's `properties`, and
+`before_send`, win over the label.
 
 #### Scenario: Events name the MCP instrumentation
 - **GIVEN** an MCP server instrumented by the SDK
 - **WHEN** an MCP client calls tool "search_docs"
 - **AND** the SDK is flushed
-- **THEN** the "$mcp_tool_call" event's property "$lib" should end with "-mcp"
+- **THEN** the "$mcp_tool_call" event's property "$mcp_source" should be the string "posthog_mcp_analytics"
+- **AND** the "$mcp_tool_call" event's property "$lib" should end with "-mcp"
 
 ### Requirement: Interface identity
 

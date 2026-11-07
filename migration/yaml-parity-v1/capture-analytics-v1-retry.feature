@@ -411,7 +411,7 @@ Feature: Analytics-v1 retries and mock response YAML parity
     Then at least 3 capture request should have been received
     And the first inter-request delay should be at least 100 milliseconds
 
-  # Source: yaml:029a94a:capture_v1:retry_behavior:max_retries_respected
+  # Source: yaml:486fb42:capture_v1:retry_behavior:max_retries_respected
   Scenario: Three configured retries produce exactly four requests after fifteen seconds
     Given the mock serves these ordered analytics responses:
       | status | headers | body | event_results |
@@ -428,3 +428,107 @@ Feature: Analytics-v1 retries and mock response YAML parity
     And pending captures are flushed
     And 15000 milliseconds elapse without a public SDK call
     Then exactly 4 capture request should have been received
+
+  # Source: yaml:486fb42:capture_v1:retry_behavior:retries_on_404
+  Scenario: HTTP 404 is retried and a 200 is observed
+    Given the mock serves these ordered analytics responses:
+      | status | headers | body | event_results |
+      | 404 | {} | "{\\"error\\":\\"not_found\\",\\"error_description\\":\\"Mock 404\\",\\"error_uri\\":\\"https://posthog.com/docs/api\\"}" | null |
+      | 200 | {} | null | null |
+    And the SDK is initialized with token "phc_test_key" and no additional configuration
+    When capture is called with JSON arguments:
+      """application/json
+      {"distinct_id":"test_user","event":"test_event"}
+      """
+    And pending captures are flushed
+    And 5000 milliseconds elapse without a public SDK call
+    Then at least 2 capture request should have been received
+    And at least one recorded response should have status 200
+
+  # Source: yaml:486fb42:capture_v1:retry_behavior:retries_on_429
+  Scenario: HTTP 429 is retried and a 200 is observed
+    Given the mock serves these ordered analytics responses:
+      | status | headers | body | event_results |
+      | 429 | {} | "{\\"error\\":\\"rate_limited\\",\\"error_description\\":\\"Mock 429\\",\\"error_uri\\":\\"https://posthog.com/docs/api\\"}" | null |
+      | 200 | {} | null | null |
+    And the SDK is initialized with token "phc_test_key" and no additional configuration
+    When capture is called with JSON arguments:
+      """application/json
+      {"distinct_id":"test_user","event":"test_event"}
+      """
+    And pending captures are flushed
+    And 5000 milliseconds elapse without a public SDK call
+    Then at least 2 capture request should have been received
+    And at least one recorded response should have status 200
+
+  # Source: yaml:486fb42:capture_v1:retry_behavior:retries_on_502
+  Scenario: HTTP 502 is retried and a 200 is observed
+    Given the mock serves these ordered analytics responses:
+      | status | headers | body | event_results |
+      | 502 | {} | "{\\"error\\":\\"bad_gateway\\",\\"error_description\\":\\"Mock 502\\",\\"error_uri\\":\\"https://posthog.com/docs/api\\"}" | null |
+      | 200 | {} | null | null |
+    And the SDK is initialized with token "phc_test_key" and no additional configuration
+    When capture is called with JSON arguments:
+      """application/json
+      {"distinct_id":"test_user","event":"test_event"}
+      """
+    And pending captures are flushed
+    And 5000 milliseconds elapse without a public SDK call
+    Then at least 2 capture request should have been received
+    And at least one recorded response should have status 200
+
+  # Source: openspec capture "Capture v1 request headers" (no YAML case). Waits on harness
+  # bindings for "the analytics capture requests should be, in order:" before it can run.
+  Scenario: Events captured during a retry wait go in their own request
+    Given the mock serves these ordered analytics responses:
+      | status | headers | body | event_results |
+      | 503 | {"Retry-After":"5"} | null | null |
+      | 200 | {} | null | null |
+      | 200 | {} | null | null |
+    And the SDK is initialized with token "phc_test_key" and flush threshold 10
+    When capture is called with JSON arguments:
+      """application/json
+      {"distinct_id":"test_user","event":"first_event"}
+      """
+    And pending captures are flushed
+    And 1000 milliseconds elapse without a public SDK call
+    And capture is called with JSON arguments:
+      """application/json
+      {"distinct_id":"test_user","event":"new_event"}
+      """
+    And pending captures are flushed
+    And 8000 milliseconds elapse without a public SDK call
+    Then the analytics capture requests should be, in order:
+      | events | posthog-attempt | posthog-request-id | created_at |
+      | ["first_event"] | 1 | A | A |
+      | ["first_event"] | 2 | A | A |
+      | ["new_event"] | 1 | B | B |
+    And the present event "uuid" lists in requests zero and one should be identical
+
+  # Source: openspec capture "Capture v1 request headers" (no YAML case). Waits on harness
+  # bindings for "the analytics capture requests should be, in order:" before it can run.
+  Scenario: Events captured during a per-event retry wait go in their own request
+    Given the mock serves these ordered analytics responses:
+      | status | headers | body | event_results |
+      | 200 | {"Retry-After":"5"} | null | ["ok","retry"] |
+      | 200 | {} | null | null |
+      | 200 | {} | null | null |
+    And the SDK is initialized with token "phc_test_key" and flush threshold 10
+    When capture is called sequentially 2 times with zero-based top-level index substitution:
+      """application/json
+      {"distinct_id":"test_user","event":"first_event_{index}"}
+      """
+    And pending captures are flushed
+    And 1000 milliseconds elapse without a public SDK call
+    And capture is called with JSON arguments:
+      """application/json
+      {"distinct_id":"test_user","event":"new_event"}
+      """
+    And pending captures are flushed
+    And 8000 milliseconds elapse without a public SDK call
+    Then the analytics capture requests should be, in order:
+      | events | posthog-attempt | posthog-request-id | created_at |
+      | ["first_event_0","first_event_1"] | 1 | A | A |
+      | ["first_event_1"] | 2 | A | A |
+      | ["new_event"] | 1 | B | B |
+    And the second request should retain first-response retry UUIDs and omit its terminal UUIDs

@@ -576,9 +576,8 @@ as `posthog-<runtime>-mcp` (such as `posthog-node-mcp`, `posthog-python-mcp`, `p
 The SDK SHOULD label MCP events one by one, as an integration label (`capture`, **Events name their own
 library**), so events the host application captures through the same client keep the SDK's own `$lib`. Where
 the platform can only label the whole client, the SDK MAY label a dedicated client `posthog-<runtime>-mcp`
-and SHALL document that MCP analytics needs a dedicated client; where the SDK fixes its identity when the
-client first sends (posthog-node 6), it SHALL also document that the instrumentation must be applied before
-the client captures. A `$lib` in the call's `properties`, and `before_send`, win over the label.
+and SHALL document that MCP analytics needs a dedicated client. A `$lib` in the call's `properties`, and
+`before_send`, win over the label.
 
 #### Scenario: Events name the MCP instrumentation
 - **GIVEN** an MCP server instrumented by the SDK

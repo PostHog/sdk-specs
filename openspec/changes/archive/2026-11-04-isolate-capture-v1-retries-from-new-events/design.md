@@ -1,6 +1,6 @@
 ## Context
 
-`add-capture-v1` let a client SDK with a durable disk queue start a new request identity when events captured during a backoff joined the resend. That was written while the client ports were still open. All of them now hold the retried queue entries apart and resend only those, the same as the server SDKs.
+`add-capture-v1` let a client SDK with a durable disk queue start a new request identity when events captured during a backoff joined the resend. That was written while the client ports were still open. All of them now hold the retried queue entries apart and resend only those, the same as the server SDKs, except posthog-android 4.0's synchronous fatal-crash flush.
 
 ## Decisions
 
@@ -10,7 +10,7 @@ The retry carries the events of a batch that failed as a whole, or the `retry` e
 
 ### Retry identity lives in memory
 
-A client SDK keeps the request ID, attempt number and `created_at` next to the queue entries it retries. If one of those entries leaves the queue (capacity eviction, a clear) or the app restarts, the SDK builds its next batch as usual at attempt 1. The cost is only a reset attempt count: capture corrects skew from `PostHog-Request-Timestamp`, not from the request ID or attempt.
+A client SDK keeps the request ID, attempt number and `created_at` next to the queue entries it retries. If one of those entries leaves the queue (capacity eviction, a clear) or the app restarts, the SDK builds its next batch as usual at attempt 1. A synchronous fatal-crash flush may do the same, because delivering the crash before the process exits matters more than keeping one batch per request ID. The cost is only a reset attempt count: capture corrects skew from `PostHog-Request-Timestamp`, not from the request ID or attempt.
 
 ### Server and client SDKs satisfy one scenario
 

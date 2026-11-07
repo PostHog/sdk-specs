@@ -1014,7 +1014,7 @@ A built-in integration or wrapper (MCP instrumentation, AI wrappers, framework m
 
 `before_send` sees the filled values and MAY change or remove them; the SDK sends what the hook returns.
 
-Capture keeps the event's values. When the event's `$lib` is not set, capture sets both properties from `PostHog-Sdk-Info`. When `$lib` equals the header's library and `$lib_version` is not set, capture sets `$lib_version` from the header. Otherwise capture stores both as sent. Capture fills nothing when the header value does not split at its last `/` into a library and a version that are both non-empty after trimming, or when it is longer than 200 characters.
+Capture keeps the event's values. When the event's `$lib` is not set, capture sets both properties from `PostHog-Sdk-Info`. When `$lib` equals the header's library and `$lib_version` is not set, capture sets `$lib_version` from the header. Otherwise capture stores both as sent. Capture fills nothing when the header value does not split at its last `/` into a library and a version that are both non-empty after trimming, or when it is longer than 200 bytes.
 
 Legacy capture: server SDKs stamped `$lib` and `$lib_version` over the caller's values, and some integrations relabeled the client.
 

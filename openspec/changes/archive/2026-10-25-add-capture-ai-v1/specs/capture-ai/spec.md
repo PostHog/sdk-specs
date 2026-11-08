@@ -91,6 +91,8 @@ Legacy capture: the AI route was `/i/v0/ai/batch/`, which rejected a whole batch
 
 PostHog's own AI wrapper libraries and instrumentation that emit `$ai_*` events through the SDK (provider wrappers, the OpenTelemetry AI bridge where it captures events, MCP add-ons) SHALL send them through the client's AI method on every capture v1 SDK, regardless of `enable_full_ai_capture` or any other setting. They SHALL set `process_person_profile: false` as an option when they substitute a trace or session id for a missing user id, and SHALL never write a legacy option property. A wrapper given a client object that lacks the AI method (a stand-in or mock) SHALL log one error when it is constructed and turn its own AI capture off; it SHALL NOT fall back to `capture` and SHALL NOT raise into the host application.
 
+On capture v1 a built-in AI integration SHOULD accept event options per call, named after its per-call properties argument: `posthog_options` next to `posthog_properties` in posthog-python, and `posthogOptions` next to `posthogProperties` in `@posthog/ai`. They are the event's own options, so context and global options fill only the keys they leave unset. The integration SHALL apply its `process_person_profile: false` for a missing user id last, so it wins over a per-call `process_person_profile`.
+
 Legacy capture: wrappers sent through `capture` unless `enable_full_ai_capture` was set.
 
 #### Scenario: A wrapper event rides the AI lane with the flag unset (@server)

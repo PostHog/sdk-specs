@@ -924,7 +924,7 @@ In a wrapper whose events a native SDK delivers (posthog-flutter on iOS, macOS a
 
 A per-call argument such as `disable_geoip` belongs to step 2, so it beats a context or global `$geoip_disable`; the client-level setting belongs to step 3, so a context or global value beats it. A built-in AI or MCP integration SHALL set `process_person_profile: false` at step 2 when it substitutes a trace or session id for a missing user id. Adding groups to an event SHALL NOT turn person processing on.
 
-Legacy capture: posthog-python 7.x merged `super_properties` over the call's properties and posthog-go 1.x merged `DefaultEventProperties` over the call's properties; both reversed in their capture v1 majors. This requirement states the server part of the order that #145 proposes for flag properties.
+Legacy capture: posthog-python 7.x merged `super_properties` over the call's properties and posthog-go 1.x merged `DefaultEventProperties` over the call's properties; both reversed in their capture v1 majors.
 
 #### Scenario: The call wins over context, global and SDK values (@server)
 - **GIVEN** a fresh SDK acceptance test harness

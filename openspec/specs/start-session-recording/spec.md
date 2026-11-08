@@ -47,7 +47,7 @@ The optional control argument is **not uniform across SDKs**:
    - In React Native / iOS / Android, if `resumeCurrent` is `false`, start a fresh replay session when the SDK supports that option by rotating/creating a new session id first.
    - In browser, optional override controls can mark sampling, linked-flag, URL-trigger, or event-trigger gates as satisfied for the next start attempt.
 5. **Re-check replay eligibility.** Starting recording does not usually override server/project controls. Audited SDKs may still refuse to start if replay is disabled by remote config, linked-flag/session gating, or sampling rules, except where the browser override controls explicitly bypass specific local start gates.
-6. **Start replay capture.** When all guards pass, the replay subsystem starts capturing screenshots/wireframes and related replay telemetry for the chosen session.
+6. **Start replay capture.** When all guards pass, the replay subsystem starts capturing DOM events or screenshots and related replay telemetry for the chosen session.
 7. **Do not emit a normal analytics event directly.** This API controls replay capture state; any resulting replay snapshots or `$snapshot`-style traffic comes from the replay subsystem itself.
 
 ## State & lifecycle

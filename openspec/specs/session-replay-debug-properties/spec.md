@@ -605,10 +605,10 @@ and the key is omitted when none is pending.
 
 `$sdk_debug_replay_capture_mode` is **mobile-only** and **optional**. posthog-js has no analog —
 its required and optional lists contain no capture-mode key — so a mobile SDK SHALL classify it
-in the optional bundle, never in the required keys. Its value SHALL be `screenshot` when the
-platform's screenshot-recording mode is on, or when the host SDK name is `posthog-flutter` (the
-Flutter plugin always records screenshots through the native SDK); otherwise `wireframe`. No other
-value is defined. It derives from configuration, not from integration state, so it stays present
+in the optional bundle, never in the required keys. Its value SHALL be `screenshot`, because mobile
+session replay always records masked screenshots. posthog-ios and posthog-android before 4.0
+reported `wireframe` when their screenshot option was off and the host SDK was not
+`posthog-flutter`; 4.0 removed wireframe recording and that option. No other value is defined. It derives from configuration, not from integration state, so it stays present
 on bundle-carrying events after replay is stopped or the integration is uninstalled, and a mobile
 SDK whose platform ships the replay module SHALL include it in the no-integration fallback (see
 "Attach the disabled shape when replay is not configured"). It is not a point-in-time key and
@@ -649,8 +649,7 @@ flutter host"), and `PostHogTests/PostHogSessionReplayEventTriggersTest.swift:23
 reflects pending state before either trigger resolves, then activation as each fires") at
 `88f4b6b56`; the merge order is covered by posthog-ios 4.0 (PostHog/posthog-ios#938)
 `PostHogTests/PostHogSDKTest.swift:1293` ("registered debug properties override the SDK's, and
-caller ones override both"). Planned (mobile): the required/optional split on a custom event, and the `wireframe`
-default. No test on either mobile SDK derives the session start from a caller-supplied UUIDv7
+caller ones override both"). Planned (mobile): the required/optional split on a custom event. No test on either mobile SDK derives the session start from a caller-supplied UUIDv7
 `$session_id` (iOS reads the manager's snapshot at `PostHog/PostHogSDK.swift:633-635`); that
 scenario remains planned.
 
@@ -754,23 +753,10 @@ posthog-ios `88f4b6b56` reads the manager's start snapshot unconditionally).
 - **AND** a second event is captured without `$recording_status`
 - **THEN** the second event's `$recording_status` is the SDK-computed value
 
-#### Scenario: Capture mode reflects the screenshot flag or the Flutter host name
-- **GIVEN** screenshot-recording mode is off
-- **AND** the host SDK name is `posthog-flutter`
+#### Scenario: Capture mode is always screenshot (mobile)
+- **GIVEN** a mobile SDK with the replay module available
 - **WHEN** an eligible SDK event that the window allows is captured
 - **THEN** `$sdk_debug_replay_capture_mode` is `screenshot`
-
-#### Scenario: Capture mode is screenshot when screenshot recording is on
-- **GIVEN** screenshot-recording mode is on
-- **AND** the host SDK name is not `posthog-flutter`
-- **WHEN** an eligible SDK event that the window allows is captured
-- **THEN** `$sdk_debug_replay_capture_mode` is `screenshot`
-
-#### Scenario: Capture mode is wireframe when both screenshot recording and the Flutter host are off
-- **GIVEN** screenshot-recording mode is off
-- **AND** the host SDK name is not `posthog-flutter`
-- **WHEN** an eligible SDK event that the window allows is captured
-- **THEN** `$sdk_debug_replay_capture_mode` is `wireframe`
 
 #### Scenario: Capture mode is never a required key (mobile)
 - **GIVEN** a mobile SDK with the replay module available

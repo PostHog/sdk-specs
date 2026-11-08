@@ -22,7 +22,7 @@ alike. It does not cover LLM analytics (tokens, cost, prompts), which belong to 
 | posthog-js | `@posthog/mcp` |
 | posthog-python | `posthog.mcp` (inside `posthog`) |
 | posthog-go | `posthogmcp` (manual API), `posthogmcpsdk` (go-sdk adapter) |
-| posthog-rs | `posthog_rs::mcp` (feature `mcp`, rmcp adapter) |
+| posthog-rs | `posthog::mcp` (inside `posthog`, feature `mcp`, rmcp adapter) |
 | posthog-ruby | not yet |
 
 ## Public signatures

@@ -293,6 +293,8 @@ A flag-reading API that lets the caller suppress `$feature_flag_called` for that
 
 A flag whose value is the empty string `""` SHALL read as disabled. The SDK SHALL return a result with `enabled: false` and `variant: ""`, and `is-feature-enabled` SHALL return `false` for it, whether or not the caller supplies a default.
 
+Known gap: posthog-js core and react-native still return `enabled: true` from `getFeatureFlagResult` for `""`, because `getEnabledFromValue` reads any string as enabled, while their `isFeatureEnabled` returns `false`. A follow-up should make `getFeatureFlagResult` match.
+
 #### Scenario: Empty variant flag result is disabled (@both)
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"

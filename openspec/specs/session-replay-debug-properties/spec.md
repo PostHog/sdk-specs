@@ -608,8 +608,9 @@ its required and optional lists contain no capture-mode key — so a mobile SDK 
 in the optional bundle, never in the required keys. Its value SHALL be `screenshot`, because mobile
 session replay always records masked screenshots. posthog-ios and posthog-android before 4.0
 reported `wireframe` when their screenshot option was off and the host SDK was not
-`posthog-flutter`; 4.0 removed wireframe recording and that option. No other value is defined. It derives from configuration, not from integration state, so it stays present
-on bundle-carrying events after replay is stopped or the integration is uninstalled, and a mobile
+`posthog-flutter`; 4.0 removed wireframe recording and that option. No other value is defined.
+It derives from configuration, not from integration state, so it stays present on
+bundle-carrying events after replay is stopped or the integration is uninstalled, and a mobile
 SDK whose platform ships the replay module SHALL include it in the no-integration fallback (see
 "Attach the disabled shape when replay is not configured"). It is not a point-in-time key and
 stays in the crash-context snapshot. `$sdk_debug_replay_throttle_delay_ms` (the configured
@@ -636,18 +637,21 @@ writes (`triggerMatching.ts:303`, `:415`, `:529`); the merge (`posthog-core.ts:2
 session-start source `sessionid.ts:25`. posthog-ios `origin/main` `88f4b6b56` — the integration's builder `debugProperties()`
 (`PostHog/Replay/PostHogReplayIntegration.swift:1899-1956`: status `:1918-1920`, hold reason
 `:1921-1923`, capture mode `:1927`, buffer length `:1930`, trigger statuses `:1945-1946`, pending
-conditions `:1948-1953`); `captureMode(config:)` (`:1862-1864`); the session start from the
-session manager's start snapshot (`PostHog/PostHogSDK.swift:633-635`). The required/optional tiers,
+conditions `:1948-1953`); the session start from the session manager's start snapshot
+(`PostHog/PostHogSDK.swift:633-635`). posthog-ios 4.0 (PostHog/posthog-ios#873) `adb99908d`
+hardcodes the value as `PostHogReplayIntegration.captureMode = "screenshot"`
+(`PostHog/Replay/PostHogReplayIntegration.swift:1658`). The required/optional tiers,
 the two removed keys, and the capture-mode classification are the contract mobile SDKs port; no
 mobile code is cited for them.
 
 Covering test: posthog-js `packages/browser/src/__tests__/posthog-core-also.test.ts:102` (the
 required/optional split, including the trigger statuses on every event and
 `$sdk_debug_replay_pending_trigger_conditions` / `$sdk_debug_session_start` only on
-bundle-carrying events). posthog-ios `PostHogTests/PostHogSDKTest.swift:441` ("reports screenshot capture mode for the
-flutter host"), and `PostHogTests/PostHogSessionReplayEventTriggersTest.swift:235` ("trigger status
-reflects pending state before either trigger resolves, then activation as each fires") at
-`88f4b6b56`; the merge order is covered by posthog-ios 4.0 (PostHog/posthog-ios#938)
+bundle-carrying events). posthog-ios `PostHogTests/PostHogSessionReplayEventTriggersTest.swift:235`
+("trigger status reflects pending state before either trigger resolves, then activation as each
+fires") at `88f4b6b56`; the `screenshot` value by posthog-ios 4.0 (PostHog/posthog-ios#873)
+`PostHogTests/PostHogSDKTest.swift:493` ("captures $recording_status on every event and the full
+replay debug bundle on the first eligible SDK event only", `:510`) at `adb99908d`; the merge order is covered by posthog-ios 4.0 (PostHog/posthog-ios#938)
 `PostHogTests/PostHogSDKTest.swift:1293` ("registered debug properties override the SDK's, and
 caller ones override both"). Planned (mobile): the required/optional split on a custom event. No test on either mobile SDK derives the session start from a caller-supplied UUIDv7
 `$session_id` (iOS reads the manager's snapshot at `PostHog/PostHogSDK.swift:633-635`); that

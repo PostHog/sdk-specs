@@ -5,6 +5,7 @@
 - [x] 1.3 Add the scenario to `acceptance/public/get-feature-flag-result.feature`
 - [x] 1.4 Add the **Empty variant is left out of the flags a listener receives** requirement to `on-feature-flags` and its scenario to `acceptance/public/on-feature-flags.feature`
 - [x] 1.5 Add the **Empty variant is not an active feature flag** requirement to `capture` and its scenario to `acceptance/public/capture.feature`
+- [x] 1.6 Add the **Flag result list reads an empty variant as disabled** requirement to `get-feature-flags` and its scenario to `acceptance/public/get-feature-flags.feature`
 
 ## 2. Validation
 

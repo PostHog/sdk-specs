@@ -194,14 +194,18 @@ Common optional wire fields include:
 | `errorTracking` | boolean or object | Error tracking configuration |
 | `capturePerformance` | boolean or object | Performance/network timing configuration |
 | `supportedCompression` | array of strings | Advertised compression formats |
+| `quotaLimited` | array of strings | Billing resources whose quota the project has exhausted; the values the server sends today are `recordings` and `feature_flags` |
+
+`quotaLimited` is absent when no quota is exhausted. The project config response currently lists only `recordings`, and the server sets `sessionRecording` to `false` in the same response, so an SDK does not need a second replay gate from this field. The flags response carries the same field and can list `feature_flags`, `recordings`, or both. An SDK that reads the field SHALL ignore values it does not recognize.
 
 This is not an exhaustive schema and does not require every SDK to implement every product. Nested replay/survey/error-tracking settings retain their product-specific semantics. Conceptual acceptance settings such as `session_replay_enabled` and `feature_flags_available` SHALL NOT be treated as actual JSON wire field names.
 
 #### Scenario: Parse real wire fields and tolerate extensions
-- **GIVEN** the JSON endpoint returns HTTP 200 with `{"hasFeatureFlags":false,"sessionRecording":false,"surveys":false,"futureSetting":{"enabled":true}}`
+- **GIVEN** the JSON endpoint returns HTTP 200 with `{"hasFeatureFlags":false,"sessionRecording":false,"surveys":false,"quotaLimited":["recordings","futureResource"],"futureSetting":{"enabled":true}}`
 - **WHEN** the SDK processes the response
 - **THEN** it recognizes the supported project settings using their wire names
 - **AND** the unknown `futureSetting` field does not prevent applying those settings
+- **AND** the unknown `futureResource` value in `quotaLimited` is ignored
 - **AND** absent optional fields do not make the response invalid
 
 ### Requirement: Project configuration delivery and scope

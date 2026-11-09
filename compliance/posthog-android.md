@@ -61,21 +61,18 @@ client SDKs and not scored: halving a multi-event batch on `413`, dropping a non
 of sending `null`, writing timestamps with exactly three fractional digits, minting a new
 `PostHog-Request-Id` after an app restart, and logging dropped and retried events only in debug mode.
 
-**Open spec questions, not scored.** Two #146 conflicts are raised on the PR
-([comment](https://github.com/PostHog/sdk-specs/pull/146#issuecomment-6743564814),
-[follow-up](https://github.com/PostHog/sdk-specs/pull/146#issuecomment-6743588735)), and android follows
-one side of each:
+**Open spec question, not scored.** One #146 conflict is
+[raised on the PR](https://github.com/PostHog/sdk-specs/pull/146#issuecomment-6743564814).
+`http-client` asks for one option that turns compression off "for the whole client". `capture-ai` says
+the analytics lane's compression "SHALL NOT change AI uploads". Android has `compression` and
+`captureAiCompression`, so `compression = NONE` still gzips `captureAi` requests. That follows
+`capture-ai`. If #146 settles this against android, HTTP Client goes back to 🟡.
 
-- **Compression opt-out.** `http-client` asks for one option that turns compression off "for the whole
-  client". `capture-ai` says the analytics lane's compression "SHALL NOT change AI uploads". Android has
-  `compression` and `captureAiCompression`, so `compression = NONE` still gzips `captureAi` requests.
-  That follows `capture-ai`.
-- **`$lib` for client SDKs.** **Caller-supplied event properties take precedence** (client-only) merges
-  a caller's `$lib` key by key, so it ships with android's own `$lib_version`. **Events name their own
-  library** says the SDK "SHALL NOT add its own `$lib_version` to another library's `$lib`". Android
-  merges key by key (`PostHog.kt:932-933`, `:985-986`). That follows the client rule.
-
-If #146 settles either conflict against android, Capture, Capture AI or HTTP Client goes back to 🟡.
+**`$lib` for client SDKs.** A caller's `$lib` merges key by key over android's pair
+(`PostHog.kt:932-933`, `:985-986`), as **Caller-supplied event properties take precedence** says for
+client SDKs. This is scored on the assumption that #146 scopes the pair-fill rule in **Events name
+their own library** to server SDKs
+([raised on the PR](https://github.com/PostHog/sdk-specs/pull/146#issuecomment-6743588735)).
 
 ## Movement on 2026-10-19
 
@@ -625,13 +622,12 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
     always produce `null`. Both are the allowances step 4 grants, and the 4.0 migration guide tells
     callers to set `options` to an empty map to send none (`docs/migration-3.x-to-4.0.md:479`), as step
     6 requires.
-  - **Open, not scored.** A caller's `$lib` merges key by key over the SDK's pair (`PostHog.kt:932-933`,
-    `:985-986`), so `$lib: "custom-lib"` ships with android's `$lib_version`. This follows the client
-    rule **Caller-supplied event properties take precedence**, which conflicts with **Events name their
-    own library**. The conflict is raised on #146; see
-    [Open spec questions](#posthog-android-40-re-audit-2026-11-05).
+  - **Caller `$lib`.** A caller's `$lib` merges key by key over the SDK's pair (`PostHog.kt:932-933`,
+    `:985-986`), as the client rule **Caller-supplied event properties take precedence** says. Scored
+    on the assumption that #146 scopes the pair-fill rule to server SDKs; see
+    [`$lib` for client SDKs](#posthog-android-40-re-audit-2026-11-05).
 - **Backwards compatibility:** No change needed.
-- **Remediation:** None, unless #146 resolves the `$lib` conflict in favour of the pair-fill rule.
+- **Remediation:** None.
 
 ### n25 — Capture AI (✅ Pass, new applicability)
 - **Spec requires:** [#147](https://github.com/PostHog/sdk-specs/pull/147) extends Applicability to

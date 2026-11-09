@@ -182,9 +182,8 @@ row applies now, and the AI lane conforms. **Capture** and **HTTP Client** stay 
 and `null`-options restore and the same-origin redirect rule on a caller's `httpClient` are allowances
 #146 now grants. **Event Batcher** stays 🟡 on its old `Timer` finding; byte-aware batching passes.
 **Retry Queue** stays ✅. Keeping 404'd events queued with no attempt limit is what #146 allows for a
-durable client queue. Two #146 conflicts are raised on the PR and not scored: the `http-client`
-whole-client compression opt-out against `capture-ai`'s per-lane compression, and client `$lib`
-precedence against **Events name their own library**. Every other row carries forward from 2026-10-19.
+durable client queue. One #146 conflict is raised on the PR and not scored: the `http-client`
+whole-client compression opt-out against `capture-ai`'s per-lane compression. Every other row carries forward from 2026-10-19.
 Details in [posthog-android.md](posthog-android.md#posthog-android-40-re-audit-2026-11-05).
 
 **Row-count note:** **seven of twelve SDKs now carry the full 64-row matrix** — posthog-js,

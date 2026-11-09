@@ -6,7 +6,7 @@ sdk-specs#86 proposed this row together with a `mobile_recordings` resource. Its
 
 ## What Changes
 
-- **Remote-config JSON wire representation**: add the `quotaLimited` row to the wire-field table, and one paragraph stating that the field is absent when no quota is exhausted, that the project config response currently lists only `recordings` while also turning `sessionRecording` off, that the flags response carries the same field with `feature_flags`, and that SDKs ignore values they do not recognize.
+- **Remote-config JSON wire representation**: add the `quotaLimited` row to the wire-field table, and one paragraph stating that the field is absent when no quota is exhausted, that the project config response currently lists only `recordings` while also turning `sessionRecording` off, that the flags response carries the same field and can list `feature_flags`, `recordings`, or both, and that SDKs ignore values they do not recognize.
 
 ## Capabilities
 

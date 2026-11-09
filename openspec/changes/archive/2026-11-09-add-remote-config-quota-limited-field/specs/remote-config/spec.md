@@ -14,9 +14,9 @@ Common optional wire fields include:
 | `errorTracking` | boolean or object | Error tracking configuration |
 | `capturePerformance` | boolean or object | Performance/network timing configuration |
 | `supportedCompression` | array of strings | Advertised compression formats |
-| `quotaLimited` | array of strings | Billing resources whose quota the project has exhausted; currently `recordings` here and `feature_flags` on the flags response |
+| `quotaLimited` | array of strings | Billing resources whose quota the project has exhausted; the values the server sends today are `recordings` and `feature_flags` |
 
-`quotaLimited` is absent when no quota is exhausted. The project config response currently lists only `recordings`, and the server sets `sessionRecording` to `false` in the same response, so an SDK does not need a second replay gate from this field. The flags response carries the same field and reports `feature_flags` when the flags quota is exhausted. An SDK that reads the field SHALL ignore values it does not recognize.
+`quotaLimited` is absent when no quota is exhausted. The project config response currently lists only `recordings`, and the server sets `sessionRecording` to `false` in the same response, so an SDK does not need a second replay gate from this field. The flags response carries the same field and can list `feature_flags`, `recordings`, or both. An SDK that reads the field SHALL ignore values it does not recognize.
 
 This is not an exhaustive schema and does not require every SDK to implement every product. Nested replay/survey/error-tracking settings retain their product-specific semantics. Conceptual acceptance settings such as `session_replay_enabled` and `feature_flags_available` SHALL NOT be treated as actual JSON wire field names.
 

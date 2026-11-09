@@ -174,7 +174,7 @@ The roll-up counts include the fixes from PostHog/posthog-ios#924–#934: Shutdo
 
 **2026-11-05 out-of-cycle refresh — posthog-android 4.0 (re-checked 2026-11-09):** re-audited the
 five rows the capture v1 specs change (Capture, Capture AI, Event Batcher, HTTP Client, Retry Queue) at
-`8b63a135`, the head of the 4.0 integration PR PostHog/posthog-android#871, against the open
+`8b63a135`, the head of the 4.0 integration PR PostHog/posthog-android#871, against
 [#146](https://github.com/PostHog/sdk-specs/pull/146) (capture v1 delivery) at `5c26b9bc`. That text
 includes [#147](https://github.com/PostHog/sdk-specs/pull/147) (capture v1 AI lane), which merged into
 #146's branch and adds posthog-android 4.0 to `capture-ai`'s Applicability. **Capture AI ➖→✅**: the

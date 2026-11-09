@@ -28,8 +28,8 @@ posthog-android 4.0 sends analytics events to capture v1 (`POST /i/v1/analytics/
 The capture v1 specs name android 4.0 directly: [#146](https://github.com/PostHog/sdk-specs/pull/146)
 adds the capture v1 requirements to `capture`, `event-batcher`, `http-client` and `retry-queue`, and
 [#147](https://github.com/PostHog/sdk-specs/pull/147) adds client SDKs on capture v1 that ship an AI
-method, posthog-android 4.0 among them, to `capture-ai`'s Applicability. #147 merged into #146's branch, not into `main`, so its text lands with
-#146. #146 was still open on 2026-11-09, so the rows below are scored against its text at `5c26b9bc`.
+method, posthog-android 4.0 among them, to `capture-ai`'s Applicability. #147 merged into #146's branch. The rows below are scored against
+#146's text at `5c26b9bc`, treated as merged to `main`.
 
 **Scope.** Only the five rows these specs change were re-audited, at `be3ed4b4`, and re-checked at
 `8b63a135` (2026-11-09). Every other row carries forward from 2026-10-19 at `c5e788bd`. 4.0 also changes

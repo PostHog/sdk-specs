@@ -587,6 +587,8 @@ drops its `$exception`.
 
 Every MCP event's properties, `$set` and `$groups` included, SHALL serialize to at most 102,400 bytes
 of compact UTF-8 JSON, without ever dropping the event or a required property of "Tool call event". The
+bound covers the properties the MCP instrumentation builds; values the client adds afterwards from its
+global or context layers (`capture`) are outside it, and capture's own event size limit applies to them. The
 SDK SHALL shrink `$mcp_response` and `$mcp_parameters` first and other optional properties after them.
 To shrink is to truncate string values to a smaller cap of the SDK's choosing, keeping their start, and
 to drop the property only when it still does not fit; the order is normative, the caps are not;

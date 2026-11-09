@@ -1,9 +1,9 @@
 # posthog-ios — SDK Compliance
 
 **Repo:** [PostHog/posthog-ios](https://github.com/PostHog/posthog-ios)
-**Audited commit:** `3460e534a9d07bc8e826205d27d68cafaf1294ff` ([commit](https://github.com/PostHog/posthog-ios/commit/3460e534a9d07bc8e826205d27d68cafaf1294ff)) on the 4.0 release branch `chore/v4-remove-deprecated` ([PostHog/posthog-ios#873](https://github.com/PostHog/posthog-ios/pull/873)) — audited on 2026-11-05, before 4.0.0 is published
-**Audited against sdk-specs commit:** `dd11a6b`
-**Summary:** 39 ✅ · 18 🟡 · 1 ❌ · 11 ➖ (69 rows; previous audit 2026-10-08 at `f5cbe87c` + posthog-ios#924–#934 scored 38/16/4/6 on 64 rows)
+**Audited commit:** `3460e534a9d07bc8e826205d27d68cafaf1294ff` ([commit](https://github.com/PostHog/posthog-ios/commit/3460e534a9d07bc8e826205d27d68cafaf1294ff)) on the 4.0 release branch `chore/v4-remove-deprecated` ([PostHog/posthog-ios#873](https://github.com/PostHog/posthog-ios/pull/873)) — audited on 2026-11-05, before 4.0.0 is published; re-checked on 2026-11-09 at `1f91c5b2` (see [Re-check](#re-check-2026-11-09))
+**Audited against sdk-specs commit:** `dd11a6b`; re-checked against `8306698` and the open [#146](https://github.com/PostHog/sdk-specs/pull/146) at `5c26b9bc`
+**Summary:** 40 ✅ · 17 🟡 · 1 ❌ · 11 ➖ (69 rows; previous audit 2026-10-08 at `f5cbe87c` + posthog-ios#924–#934 scored 38/16/4/6 on 64 rows)
 
 Note on repo layout: `posthog-ios` is a single-package repo, distributed through Swift Package Manager
 only from 4.0. Core SDK logic lives at `PostHog/` (flat files: `PostHogSDK.swift` — the main public
@@ -39,11 +39,14 @@ Net changes vs. the previous audit:
   still wins over an enclosing `postHogNoMask()`, the reverse of the spec's precedence), Get Feature Flags and
   Get Feature Flags And Payloads ❌→🟡 (the specs now record iOS 4.0's `getAllFeatureFlags()` list of
   results, with per-entry payload decoding, as its surface; it is still not the canonical map shape).
-- **New spec requirements unmet (3):** On Feature Flags ✅→🟡 (a `/flags` load in flight across
-  `reset()` still reaches listeners), Surveys ✅→🟡 (popup delay: a close reported before display
-  marks the survey seen and sends `survey dismissed`; `reset()` doesn't cancel a pending delayed display)
-  and HTTP Client ✅→🟡 (`compression = .none` leaves `captureAi` requests gzipped, so there is no
-  whole-client opt-out).
+- **New spec requirements unmet (2):** On Feature Flags ✅→🟡 (a `/flags` load in flight across
+  `reset()` still reaches listeners) and Surveys ✅→🟡 (popup delay: a close reported before display
+  marks the survey seen and sends `survey dismissed`; `reset()` doesn't cancel a pending delayed display;
+  and, from #102, submit and dismiss move the last-seen survey date).
+- **Open spec question, not scored:** HTTP Client stays ✅. `compression = .none` leaves `captureAi`
+  requests gzipped, which follows #146's `capture-ai` ("The analytics lane's compression … SHALL NOT
+  change AI uploads") and conflicts with `http-client`'s whole-client opt-out. The conflict is raised on
+  [#146](https://github.com/PostHog/sdk-specs/pull/146#issuecomment-6743564814).
 - **Note-only changes:** Capture stays 🟡, but empty event names are now dropped; only the `NSNull`
   gap remains. Capture AI stays ➖ because its Applicability is still `server`, but iOS 4.0 now ships
   `captureAi` on `/i/v1/ai/events`; [n27] records its conformance. Shutdown, HTTP Client, Group, Group
@@ -51,6 +54,28 @@ Net changes vs. the previous audit:
   New requirements met without a status change: jittered retry backoff (Retry Queue), identify while opted out (Identify, Consent Gating),
   `$group_set` nesting (Group Identify), caller-property precedence (Capture, Register, Session Replay
   Debug Properties), build-invariant lifecycle properties (Application Lifecycle).
+
+## Re-check (2026-11-09)
+
+Line references stay at `3460e534a`. Re-checked against the 4.0 branch head `1f91c5b2` and sdk-specs
+`8306698`:
+
+- **SDK changes, no status change.** The range adds #1036 (`$lib`/`$lib_version` stay in properties,
+  see [Capture v1](#capture-v1-informational-not-scored)), #1037 (an empty string variant reads as
+  disabled), #1040 (crash and memory reports recorded while opted out are dropped) and #896 (replay
+  scheduled from a run-loop observer; an idle screen no longer rotates the session). Line numbers in
+  `PostHog/PostHogSDK.swift` from line 610 on move −5, and in `PostHog/PostHogApi.swift` after line 388
+  move −2.
+- **Spec changes on `main` since `dd11a6b`:**
+  - Opt In: both new #138 requirements are met ([n15](#n15)); the row stays 🟡 on its old gap.
+  - Surveys: #102 adds a gap ([n29](#n29)); the row stays 🟡.
+  - Session Replay Privacy and Debug Properties: #197 removes wireframe text and fixes the capture mode
+    at `screenshot`, which iOS 4.0 sends; both rows stay 🟡 on their existing gaps.
+  - Remote Config: `quotaLimited` (#198) is read with `as? [String]` and `.contains(...)`
+    (`PostHog/PostHogRemoteConfig.swift`), so unknown values are ignored; stays ✅.
+  - Evaluate Flags (#169) and MCP Analytics (#189, #190, #194) are server-only; stay ➖.
+- **HTTP Client 🟡→✅.** The compression gap scored on 2026-11-05 comes from two conflicting #146
+  rules, not from iOS alone ([n22](#n22)).
 
 ## Capture v1 (informational, not scored)
 
@@ -63,10 +88,13 @@ this records what the audited branch does so the next audit can score it once #1
   `PostHog-Request-Timestamp` headers, and a `{created_at, batch}` body (`PostHog/PostHogApi.swift:198-246`).
 - After `beforeSend`, `captureV1JSON` (`PostHog/PostHogApi.swift:386-414`) hoists `$process_person_profile`,
   `$cookieless_mode`, `$ignore_sent_at` and `$product_tour_id` into `options`, lifts string
-  `$session_id`/`$window_id` to top-level `session_id`/`window_id`, and removes `$lib`/`$lib_version`
-  from `properties` (`:388-389`). Open [PostHog/posthog-ios#1036](https://github.com/PostHog/posthog-ios/pull/1036)
-  (4.0 release blocker) stops removing them, so 4.0.0 will send per-event `$lib`/`$lib_version` as 3.x
-  did; that differs from #146's "Library identity comes from the request header" as drafted.
+  `$session_id`/`$window_id` to top-level `session_id`/`window_id`. At `3460e534a` it also removed
+  `$lib`/`$lib_version` from `properties` (`:388-389`).
+  [PostHog/posthog-ios#1036](https://github.com/PostHog/posthog-ios/pull/1036) (merged as `436fd50ea`,
+  in `1f91c5b2`) keeps them, which matches #146's **Events name their own library** at `5c26b9bc`: "the
+  wire builder SHALL NOT remove them". A caller's `$lib` merges key by key over the SDK's pair, which
+  follows the client precedence rule; #146's pair-fill rule conflicts with that, and the conflict is
+  raised on [#146](https://github.com/PostHog/sdk-specs/pull/146#issuecomment-6743588735).
 - Matches #146: retried statuses (404/408/429/500/502/503/504 and network errors), `Retry-After` as a
   floor clamped to 30 s, byte-aware 5 MiB batches, same-origin 307/308 redirects only, and the client-SDK
   retry policy #146 names iOS 4.0 for: a durable queue with no attempt limit, 1–30 s jittered backoff, and
@@ -127,7 +155,7 @@ this records what the audited branch does so the next audit can score it once #1
 | 50 | Feature Flag Cache | ✅ | was 🟡; malformed → `nil`, bootstrap payloads decoded once — [n20] |
 | 51 | Feature Flag Called Tracker | ✅ | [n21]; config-version-2 attribution needs `/flags?v=4`, which iOS does not request |
 | 52 | Flag Definition Loader | ➖ | unchanged: new keyless-provider and polling-opt-out requirements are server-only |
-| 53 | HTTP Client | 🟡 | was ✅; [n22]; gzip by default, but `compression = .none` doesn't turn off `captureAi` compression, so the opt-out is not whole-client |
+| 53 | HTTP Client | ✅ | [n22]; gzip by default; `compression = .none` doesn't turn off `captureAi` compression, which follows #146's per-lane rule (open spec conflict, not scored) |
 | 54 | Local Feature Flag Evaluator | ➖ | unchanged: no local rule engine |
 | 55 | Persistent Storage | 🟡 | [n23] |
 | 56 | Remote Config | ✅ | |
@@ -135,7 +163,7 @@ this records what the audited branch does so the next audit can score it once #1
 | 58 | Session Manager | ✅ | |
 | 59 | Session Replay Ingestion Controls | ✅ | |
 | 60 | Session Replay Privacy | 🟡 | was ❌; 4.0 removes wireframe mode, the only path that leaked; SwiftUI `postHogMask()` wins over an enclosing `postHogNoMask()` (over-masks, not a leak) — [n24] |
-| 61 | Surveys | 🟡 | was ✅; new popup-delay requirement (#121) — [n29] |
+| 61 | Surveys | 🟡 | was ✅; new popup-delay (#121) and wait-period (#102) requirements — [n29] |
 | 62 | Bootstrap | 🟡 | [n25] |
 | 63 | MCP Analytics | ➖ | Applicability is `server` add-on; no iOS package |
 | 64 | Session Replay Debug Properties | 🟡 | [n26]; (c) fixed and new precedence rule (#155) met; (a), (b) still open |
@@ -221,16 +249,15 @@ this records what the audited branch does so the next audit can score it once #1
     (`PostHog/PostHogApi.swift:198-213`) with `Authorization: Bearer <projectToken>` set after custom
     headers (`:242`), `PostHog-Sdk-Info: <name>/<version>`, `PostHog-Attempt`, `PostHog-Request-Id` and
     `PostHog-Request-Timestamp` (`:243-246`), and a `{created_at, batch}` body (`:224-227`).
-    `captureV1JSON` (`:386-414`) runs after `beforeSend` and removes `$lib`/`$lib_version` from
-    `properties` (`:388-389`), hoists `$cookieless_mode`, `$ignore_sent_at`, `$product_tour_id` and
+    `captureV1JSON` (`:386-414`) runs after `beforeSend`, removes `$lib`/`$lib_version` from
+    `properties` at `3460e534a` (`:388-389`; #1036 keeps them from `1f91c5b2`), hoists `$cookieless_mode`, `$ignore_sent_at`, `$product_tour_id` and
     `$process_person_profile` into `options` when the option is unset (`:391-397`, list at
     `:370-375`), and lifts string `$session_id`/`$window_id` to top-level `session_id`/`window_id`
     (`:405-410`). Enqueued events still carry `$lib`/`$lib_version` (stamped from `sdkInfo`,
     `PostHog/PostHogSDK.swift:800-803`), so the `@client` "Caller property overrides an SDK context
-    property" scenario passes on the enqueued event. Open PostHog/posthog-ios#1036 (4.0 release
-    blocker) stops removing `$lib`/`$lib_version` in `captureV1JSON`, keeping them per event as 3.x
-    did; that contradicts #146's "Library identity comes from the request header" as currently
-    drafted.
+    property" scenario passes on the enqueued event. PostHog/posthog-ios#1036 (merged, `436fd50ea`)
+    stops removing `$lib`/`$lib_version` in `captureV1JSON`, which matches #146's **Events name their
+    own library** at `5c26b9bc`.
 - **Backwards compatibility:** Backward-compatible. Omitting null members only changes
   serialization; `[String: Any]` types stay. Person properties set to `null` would need a deliberate
   scope decision.
@@ -369,6 +396,15 @@ this records what the audited branch does so the next audit can score it once #1
 - **SDK currently:** Unchanged gap. `optIn()`/`optOut()` (`PostHog/PostHogSDK.swift:3559-3655`) persist consent
   under `optOutLock` (unless `persistOptOut` is false) and install/uninstall integrations; `optOut()` takes no
   parameter and no config clears persisted identity or super properties on opt-out.
+  Met (new on `main`, #138): "Opt-in restarts session replay in a new session" and "Opt-in restarts the
+  session replay the app wanted at opt-out". `startSessionRecordingOnOptIn` starts from
+  `config.sessionReplay` at setup (`:356`), so an app that launches opted out records on its first
+  opt-in. `startSessionRecording` sets it (`:3786`), and `stopSessionRecording` clears it only when not
+  opted out (`:3838`), so a stop while opted out doesn't block the restart. `optIn()` calls
+  `sessionManager.startSession()` (`PostHog/PostHogSessionManager.swift:162`) before reinstalling, even
+  when a linked flag then holds replay off (`:3583-3585`), and afterwards stops replay the app had
+  stopped or installs a manually started one (`:3589-3596`). Read from code; the acceptance scenarios
+  were not run.
 - **Backwards compatibility:** Backward-compatible with an optional parameter or config flag defaulting to today's
   behavior.
 - **Remediation:** Add an optional clear-local-data parameter to `optOut()`.
@@ -453,7 +489,7 @@ this records what the audited branch does so the next audit can score it once #1
   attribution rules have nothing to act on (the spec: such an SDK "sees config version 2 flags as legacy
   values").
 
-### n22 — HTTP Client (🟡 Partial; was ✅)
+### n22 — HTTP Client (✅ Pass)
 - **Spec requires:** flags retry policy (transient transport errors incl. DNS/TLS; refused connections not
   retried; 502/504 only; one retry, 300 ms doubling) and (new, #81) gzip by default with a client-wide opt-out,
   raw JSON without `Content-Encoding` when off, and no silent downgrade after a server rejection.
@@ -469,11 +505,16 @@ this records what the audited branch does so the next audit can score it once #1
   which `requestAndPayload` prefers over `compression` (`:148`). So `compression = .none` alone still gzips AI
   requests; the spec requires an option that turns compression off "for the whole client", covering every
   endpoint the SDK would otherwise compress. Setting both properties to `.none` works around it.
-- **Backwards compatibility:** Backward-compatible if `compression = .none` also turns off AI compression unless
-  `captureAiCompression` is set explicitly (for example, make `captureAiCompression` optional and fall back to
-  `compression`).
-- **Remediation:** Make `compression` the whole-client switch, with `captureAiCompression` an optional per-lane
-  override.
+- **Open spec question, not scored:** the AI-lane gap above follows #146's `capture-ai` (text at
+  `5c26b9bc`): "The analytics lane's compression and queue capacity … SHALL NOT change AI uploads, and
+  the reverse". The two rules conflict, and posthog-android 4.0 has the same `captureAiCompression`
+  split. The conflict is raised on [#146](https://github.com/PostHog/sdk-specs/pull/146#issuecomment-6743564814);
+  the row was 🟡 on 2026-11-05 and is ✅ until #146 settles it.
+- **Backwards compatibility:** No change needed unless #146 keeps the whole-client rule. Then: make
+  `compression = .none` also turn off AI compression unless `captureAiCompression` is set explicitly
+  (for example, make `captureAiCompression` optional and fall back to `compression`).
+- **Remediation:** None now. If #146 keeps the whole-client rule, make `compression` the whole-client
+  switch, with `captureAiCompression` an optional per-lane override.
 
 ### n23 — Persistent Storage (🟡 Partial)
 - **Spec requires:** "Storage failures do not crash SDK calls" — no throw **and** a recorded storage warning.
@@ -537,9 +578,9 @@ this records what the audited branch does so the next audit can score it once #1
 - **Spec requires:** (a) `$sdk_debug_session_start` "MUST never describe" a different session than
   the event's own `$session_id`; for a caller-supplied id it comes from the UUIDv7 timestamp and is
   omitted for a non-v7 id (`openspec/specs/session-replay-debug-properties/spec.md:550-561`, scenario
-  "Session keys are omitted for a non-UUIDv7 caller session id (mobile)" at `:701`). (b) An event
+  "Session keys are omitted for a non-UUIDv7 caller session id (mobile)" at `:704` on `8306698`). (b) An event
   timestamped before the current session's start carries the persisted snapshot or none of the keys
-  (scenario "A previous-process crash carries no live debug state", `:1026-1032`).
+  (scenario "A previous-process crash carries no live debug state", `:1016-1022` on `8306698`).
 - **SDK currently:** (a) `replayDebugProperties()` always takes the start from
   `sessionManager.sessionStartTimestampSnapshot` (`PostHog/PostHogSDK.swift:743-745`), even when
   `buildProperties` uses a caller-supplied `$session_id` (`:770-773`); no UUIDv7 derivation or
@@ -571,9 +612,10 @@ this records what the audited branch does so the next audit can score it once #1
   setup (`PostHog/PostHogSDK.swift:314-331`), not lazily (Behavior 3). There is no
   `enableFullAiCapture` flag, which only matters for PostHog AI wrapper libraries, and iOS has none.
 - **Why ➖:** the legend's N/A means the contract does not apply to the platform, and the spec's
-  Applicability still names only server SDKs. Scoring it would need an Applicability change in
-  sdk-specs (for example, to cover client SDKs that ship `capture_ai`). Recorded here so that change
-  can cite iOS's conformance.
+  Applicability on `main` (`8306698`) still names only server SDKs. #147 merged into #146's branch
+  (`6a9ed0f`), not `main`; at #146's `5c26b9bc` Applicability adds "posthog-ios 4.0 and
+  posthog-android 4.0 (`captureAi`)". Score this row once #146 merges; the AI queue starting at setup
+  rather than lazily is the one deviation recorded above.
 - **Backwards compatibility:** N/A.
 - **Remediation:** None required. If the spec extends Applicability to clients, start the AI queue on
   first `captureAi` call.
@@ -610,13 +652,17 @@ this records what the audited branch does so the next audit can score it once #1
   mark it seen or write the last-seen date, and releases the reservation; also release on reset or
   surveys teardown. Host UI layers must report every survey as shown or closed, and "closing a survey
   before it was shown does not mark it seen and emits no interaction event". SHOULD re-check
-  eligibility when the delay elapses.
+  eligibility when the delay elapses. New on `main` (#102): "The survey wait period starts when a survey
+  is shown": the device-wide last-seen survey date is written on show, and "Submit and dismiss SHALL NOT
+  move the date"; `reset` clears it; a resumed in-progress survey is still gated by the wait period.
 - **SDK currently:** Met: `showNextSurvey()` reserves the survey with `setActiveSurvey` before calling
   `renderSurvey` (`PostHog/Surveys/PostHogSurveyIntegration.swift:295-331`), and `canShowNextSurvey()`
   blocks a second survey while it is held (`:1065-1067`). The default delegate clamps the delay
   (`PostHog/Surveys/PostHogSurveysDefaultDelegate.swift:98`), shows immediately at 0, and otherwise
-  schedules one `asyncAfter` (`:106-126`). `survey shown` and the last-seen date are written only in
-  `handleSurveyShown` (`PostHogSurveyIntegration.swift:526-546`). `stop()` clears the active survey
+  schedules one `asyncAfter` (`:106-126`). `survey shown` is sent and the last-seen date written in
+  `handleSurveyShown` (`PostHogSurveyIntegration.swift:526-546`, date at `:533`), inside the
+  generation-checked attempt. `reset()` deletes the date (`PostHog/PostHogStorage.swift`), and resumed
+  in-progress surveys still go through `hasWaitPeriodPassed`. `stop()` clears the active survey
   before `cleanupSurveys()` closes the pending one (`:114-123`), so teardown emits nothing.
   Gaps: (1) `handleSurveyClosed` (`:640-677`) does not check whether the survey was ever shown: a
   close reported before display marks it seen (`:661`) and sends `survey dismissed` (`:664-670`).
@@ -625,11 +671,16 @@ this records what the audited branch does so the next audit can score it once #1
   doesn't cancel a pending delayed display: the default delegate's work item still shows the old
   user's survey after the delay (its callbacks are then ignored by the generation check,
   `:507-522`), and the reservation is held until that survey is closed. (3) No eligibility re-check
-  when the delay elapses (SHOULD).
-- **Backwards compatibility:** Backward-compatible. Only pre-display closes change: they stop sending
-  `survey dismissed` and stop marking the survey seen.
+  when the delay elapses (SHOULD). (4) `setSurveySeen` (`:392-399`) also writes the last-seen date
+  (`:398`), and it runs on close (`:661`) and submit (`:718`), so submit and dismiss move the wait
+  period. Shown on day 0, dismissed on day 2, a 7-day wait period blocks another survey until day 9
+  instead of day 7. posthog-js browser and React Native write the date only on show; posthog-android
+  4.0 has the same gap. Line numbers are the same at `1f91c5b2`.
+- **Backwards compatibility:** Backward-compatible. Pre-display closes stop sending `survey dismissed`
+  and stop marking the survey seen. Dropping the date write from `setSurveySeen` lets the next survey
+  appear up to the time a survey stayed open sooner.
 - **Remediation:** Track a per-attempt "shown" flag set in `handleSurveyShown`; in
   `handleSurveyClosed`, when it is unset, release the reservation without `setSurveySeen` or
   `survey dismissed`. Have `reset()` close the pending survey through the surveys delegate (or
   re-check generation in the work item before showing). Optionally re-run the eligibility filter
-  before displaying.
+  before displaying. Remove `setLastSeenSurveyDate(Date())` from `setSurveySeen`.

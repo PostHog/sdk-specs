@@ -283,7 +283,7 @@ NOT depend on `$exception`, which can be disabled.
 - **AND** the client should receive the same failure it would receive without instrumentation
 
 #### Scenario: The error classifier labels an isError result as an expected failure
-- **GIVEN** an MCP server instrumented by the SDK with an error classifier that returns error type "not_found" and expected true, and a tool "get_record" that returns a result with isError true and the text "record not found"
+- **GIVEN** an MCP server instrumented by the SDK with conversation anchoring disabled, an error classifier that returns error type "not_found" and expected true, and a tool "get_record" that returns a result with isError true and the text "record not found"
 - **WHEN** an MCP client calls tool "get_record"
 - **AND** the SDK is flushed
 - **THEN** the "$mcp_tool_call" event's property "$mcp_is_error" should be the boolean true

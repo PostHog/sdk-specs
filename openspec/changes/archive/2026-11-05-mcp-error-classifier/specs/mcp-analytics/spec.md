@@ -93,10 +93,12 @@ identity, failure capture (apart from the error classifier), privacy, and size b
 A lower-level method MAY also accept a finished call's fields directly, for a server that already holds
 them; it is exempt from producing the same events as automatic instrumentation. It sends
 `$mcp_parameters` and `$mcp_response` as the caller passes them, takes whether a failure is expected
-next to its explicit error type, and follows the rest of this spec for everything else. A `$session_id`
-the caller passes is sent unchanged as the transport session unless a conversation handle applies;
-without either, each call gets a fresh `ses_<UUIDv7>`, as rule 3 of "Session identity" gives a
-stateless request, so a server on a one-client connection SHOULD pass its connection's id.
+next to its explicit error type, and follows the rest of this spec for everything else. A client
+conversation id applies only when the caller passes the request's `_meta` together with the `User-Agent`
+or client name that recognizes its client. A `$session_id` the caller passes is sent unchanged as the
+transport session unless a client conversation id or a conversation handle applies; without any of
+these, each call gets a fresh `ses_<UUIDv7>`, as rule 4 of "Session identity" gives a stateless
+request, so a server on a one-client connection SHOULD pass its connection's id.
 
 #### Scenario: A manually captured call matches the automatic one
 - **GIVEN** an MCP server that dispatches tool "search_docs" itself through the SDK's manual API

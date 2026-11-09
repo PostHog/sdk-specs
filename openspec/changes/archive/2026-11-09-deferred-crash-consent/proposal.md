@@ -28,9 +28,9 @@ None.
 
 ## Impact
 
-- **posthog-ios**: [PR 1040](https://github.com/PostHog/posthog-ios/pull/1040) (draft, head `fb380fe03eb0420a58e48a29c8e9a62dbe6f6275`) implements the marker approach for PLCrashReporter reports. The MetricKit out-of-memory path (`PostHogMemoryExceptionReporter`, [#853](https://github.com/PostHog/posthog-ios/pull/853)) is a stacked follow-up PR, not yet open; until it lands posthog-ios is partial against the requirement.
+- **posthog-ios**: [PR 1040](https://github.com/PostHog/posthog-ios/pull/1040), merged 2026-11-09 as `9e17a6310378da13222863d2a0393b671a10c17a`, implements the marker approach for PLCrashReporter reports and, through the stacked [#1041](https://github.com/PostHog/posthog-ios/pull/1041), for MetricKit out-of-memory terminations (`PostHogMemoryExceptionReporter`, [#853](https://github.com/PostHog/posthog-ios/pull/853)).
 - **posthog-android**: a fix on branch `fix/native-crash-recorded-while-opted-out` (local commit `1f10328b`, no PR yet) persists opt-out intervals and skips tombstone records whose timestamp falls inside one while still advancing the watermark. Android writes no PostHog identity into the OS tombstone, so the identity sentence holds there with no code.
 - **React Native and Flutter on native** inherit the behaviour from the native SDKs; the wrappers have no crash recorder of their own.
 - **posthog-js, Flutter on web, and in-process uncaught handlers** are out of scope: their fatal exceptions go through `capture()`, which `consent-gating` already blocks while opted out.
 - Compliance matrix: `compliance/posthog-ios.md` and `compliance/posthog-android.md` are produced by the weekly audit (branch `posthog-code/weekly-sdk-compliance-matrix`), so they are not edited here. The next audit after the SDK PRs merge picks the new requirement up.
-- The provenance mapping in `tasks.md` points at the unmerged PR 1040 head and the local Android commit; re-point it at the merged SHAs before this spec PR leaves draft.
+- The provenance mapping in `tasks.md` is at the posthog-ios merge commit; the Android column points at the local commit and is re-pointed in a follow-up once the Android PR merges.

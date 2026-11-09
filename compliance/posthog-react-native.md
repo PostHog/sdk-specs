@@ -1,9 +1,9 @@
 # posthog-react-native — SDK Compliance
 
 **Repo:** [PostHog/posthog-react-native](https://github.com/PostHog/posthog-react-native) (archived; code lives in `packages/react-native` + `packages/react-native-plugin` of the `posthog-js` monorepo)
-**Audited commit:** `3ddaa65402896c91dcb7b04cfe433e0b1d2f3313` ([commit](https://github.com/PostHog/posthog-js/commit/3ddaa65402896c91dcb7b04cfe433e0b1d2f3313)) — audited on 2026-10-19
-**Audited against sdk-specs commit:** `c72e367`
-**Summary:** 29 ✅ · 27 🟡 · 3 ❌ · 5 ➖ · 0 ❓ (64 rows; previous audit 2026-08-06 at `e1efa57` scored 31/23/2/2/1 on 59 rows)
+**Audited commit:** `3ddaa65402896c91dcb7b04cfe433e0b1d2f3313` ([commit](https://github.com/PostHog/posthog-js/commit/3ddaa65402896c91dcb7b04cfe433e0b1d2f3313)) — audited on 2026-10-19. **Nine rows re-audited on 2026-11-10 for `@posthog/react-native-plugin` 3.0** at `210bf35d8c19a15003d0643999ae63bcc2102fb6` ([commit](https://github.com/PostHog/posthog-js/commit/210bf35d8c19a15003d0643999ae63bcc2102fb6), head of [PostHog/posthog-js#5194](https://github.com/PostHog/posthog-js/pull/5194)) — see [react-native-plugin 3.0](#react-native-plugin-30-re-audit-2026-11-10)
+**Audited against sdk-specs commit:** `c72e367` (2026-10-19 rows); `752f899` plus [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79`, treated as merged, for the nine plugin 3.0 rows
+**Summary:** 32 ✅ · 25 🟡 · 2 ❌ · 5 ➖ · 0 ❓ (64 rows; 2026-10-19 at `3ddaa654` scored 29/27/3/5/0; previous full audit 2026-08-06 at `e1efa57` scored 31/23/2/2/1 on 59 rows)
 
 **Repo layout (unchanged, re-confirmed):** `PostHog/posthog-react-native` is archived; the SDK lives at
 `packages/react-native/src` (`PostHog extends PostHogCore`, `posthog-rn.ts`, now 3,345 lines — up from
@@ -12,18 +12,73 @@ Because react-native extends the full client-side `PostHogCore` rather than the 
 `packages/node` uses, it is scored as a client SDK: ambient-identity primitives that posthog-node
 scores ➖ N/A are genuine contracts here.
 
-**Why this run:** rotation priority 1 — this was the stalest pointer in the matrix (2026-08-06) and
+**Why the 2026-10-19 run:** rotation priority 1 — this was the stalest pointer in the matrix (2026-08-06) and
 the intended third pick of the 2026-10-12 run. The monorepo moved **802 commits** between
 `e1efa57` and `3ddaa654`.
 
-**Scope of this audit.** All 64 rows were scored. The five contracts missing from the previous
+**Scope of the 2026-10-19 audit.** All 64 rows were scored. The five contracts missing from the previous
 59-row file (Capture AI, Evaluate Flags, Exception Event Metadata, Session Replay Debug Properties,
 MCP Analytics) were audited from scratch. Every previously non-Pass row was re-read against current
 code at this commit; the Pass rows were re-checked against the spec text that has merged since
 2026-08-06 (PRs #103, #108, #110, #114, and the payload-decoding requirement), which is where all
 four new downgrades come from.
 
-## Movement this run
+## react-native-plugin 3.0 re-audit (2026-11-10)
+
+`@posthog/react-native-plugin` 3.0 ([PostHog/posthog-js#5194](https://github.com/PostHog/posthog-js/pull/5194))
+moves the native layer to posthog-ios 4.0 and posthog-android 4.0. Session replay, native crash reports,
+fatal JavaScript crashes reported natively and push opens run in those SDKs, and their events go to capture
+v1. Events captured in JavaScript still go to `/batch` through `posthog-react-native`. The native behavior
+these rows rely on was read at the 4.0 release branches, posthog-ios `e27cbe4cb` and posthog-android
+`aaa23d39`. Source references in this section and in the notes it updates are at posthog-js `210bf35d8`
+unless they say otherwise.
+
+**Scope.** Nine rows were re-audited: the six session replay rows, Opt In, Capture Exception and Exception
+Event Metadata. Every other row carries forward from 2026-10-19 at `3ddaa654`. Spec changes on `main` since
+then also touch rows outside this scope, which the next full audit must re-verify:
+
+- **Capture:** #193 adds "Empty variant is not an active feature flag" and names posthog-js core and
+  react-native as a known gap (a `""` flag is still listed in `$active_feature_flags`). The `$lib` pair rule
+  of #146 doesn't reach JS events, which still go to `/batch`; for native-delivered events see below.
+- **Get Feature Flag Result, Get Feature Flags, On Feature Flags:** #193 reads an empty variant as disabled.
+- **Feature Flag Called Tracker:** #203 renames `$feature_flag_variant` to `$feature_flag_variant_key`.
+- **Surveys:** #102 writes the last-seen survey date on show. Surveys render in JS: the plugin turns native
+  surveys off, also when another package enables posthog-ios's Surveys trait (PostHog/posthog-js#5639,
+  `packages/react-native-plugin/ios/PosthogReactNativePlugin.swift:375-381`), so native survey fixes such as
+  PostHog/posthog-ios#1049 don't reach RN.
+- **Remote Config** (#198, `quotaLimited`) and **Identify** and **Consent Gating** (#167, identify keeps
+  running while opted out).
+
+| Contract | 2026-10-19 | Plugin 3.0 | Why |
+|---|---|---|---|
+| Is Session Replay Active | 🟡 | ✅ | The getter reads native `isSessionReplayActive()`, which in 4.0 reports a running recorder for this session, and JS stops the native recorder whenever its linked-flag, event-trigger or consent gate holds replay off ([n18](#n18)) |
+| Opt In | ✅ | ✅ | Meets #138: JS owns the session id and rotates it before native restarts replay, and the restart follows what the app wanted at opt-out. Meets #199 through the native SDKs: a native crash recorded while opted out is dropped, and one recorded while opted in waits for opt-in ([n32](#n32)) |
+| Session Replay Debug Properties | ❌ | 🟡 | Required and optional tiers, the 30 s window from acceptance, `screenshot` capture mode, the minimal `$feature_flag_called` strip and backdated events conform; the SDK-computed keys overwrite registered and caller values ([n24](#n24)) |
+| Session Replay Ingestion Controls | 🟡 | ✅ | Sampling and minimum-duration buffering run in posthog-ios 4.0 and posthog-android 4.0, which implement both; the JS gates are unchanged ([n25](#n25)) |
+| Session Replay Privacy | 🟡 | ✅ | 4.0 records masked screenshots only, so the posthog-ios wireframe leak this row inherited is gone; RN exposes only a mask marker, so an unmask-precedence gap can't arise ([n26](#n26)) |
+| Start Session Recording | ✅ | ✅ | Unchanged; a start while opted out doesn't change what opt-in restores |
+| Stop Session Recording | 🟡 | 🟡 | posthog-ios 4.0 flushes the replay queue on stop; posthog-android 4.0 still doesn't ([n29](#n29)) |
+| Capture Exception | ✅ | ✅ | JS-captured exceptions are unchanged; native crash reports and natively reported fatal JS crashes go through native capture v1, and Android now stamps a fatal JS crash on the SDK clock ([n33](#n33)) |
+| Exception Event Metadata | 🟡 | 🟡 | The shared `@posthog/core` gaps ([n7](#n7)) are unchanged; #205's job-retry rule has no RN integration to apply to |
+
+**Native events on capture v1.** The plugin configures both native SDKs with the library name
+`posthog-react-native` and the JS SDK's version (`packages/react-native-plugin/ios/PosthogReactNativePlugin.swift:440-443`,
+`packages/react-native-plugin/android/src/main/java/com/posthogreactnativeplugin/PosthogReactNativePluginModule.kt:207-210`),
+as #146 requires of a wrapper whose events a native SDK delivers. #146's "Events name their own library"
+applies to these events, not to JS events on `/batch`. Both native SDKs fill the pair from that configured
+identity. At posthog-ios `e27cbe4cb`, `fillLibraryIdentity` (`PostHog/PostHogSDK.swift:701-711`) reads `sdkInfo()`, built
+from `postHogSdkName` and `postHogVersion` (`PostHog/PostHogContext.swift:149-154`). At posthog-android `aaa23d39`,
+`fillLibraryIdentity` (`posthog/src/main/java/com/posthog/internal/PostHogLibraryIdentity.kt:13-29`) reads
+`getSdkInfo()`, built from `config.sdkName` and `config.sdkVersion` (`PostHogAndroidContext.kt:47-53`). So a native event without `$lib` gets `posthog-react-native` with the JS
+version, a `posthog-react-native` event without a version gets the JS version, and another library's `$lib`
+keeps its own version. This is recorded, not scored: Capture is outside this re-audit. Delivery, headers, retry
+and redirect behavior are the native SDKs' and are scored in their audits.
+
+**Not scored: `$app_language`.** Plugin 3.0 turns off native language detection and sends the language set
+with `posthog.setAppLanguage()` (posthog-react-native 4.86.0+) on native events. The spec for
+`$app_language` ([#172](https://github.com/PostHog/sdk-specs/pull/172)) is still open.
+
+## Movement on 2026-10-19
 
 **Improvements (3):**
 
@@ -74,7 +129,7 @@ on its pre-existing empty-event-name gap.
 | 5 | Bootstrap | 🟡 | [n4] |
 | 6 | Capture | 🟡 | [n5] |
 | 7 | Capture AI | ➖ | |
-| 8 | Capture Exception | ✅ | |
+| 8 | Capture Exception | ✅ | [n33] |
 | 9 | Consent Gating | ✅ | |
 | 10 | Create Person Profile | ✅ | |
 | 11 | Debug | ✅ | |
@@ -101,12 +156,12 @@ on its pre-existing empty-event-name gap.
 | 32 | Identify | 🟡 | [n16] |
 | 33 | Is Feature Enabled | ✅ | |
 | 34 | Is Opt Out | ❌ | [n17] |
-| 35 | Is Session Replay Active | 🟡 | [n18] |
+| 35 | Is Session Replay Active | ✅ | [n18] |
 | 36 | Local Feature Flag Evaluator | ➖ | |
 | 37 | Logs | 🟡 | [n19] |
 | 38 | MCP Analytics | ➖ | |
 | 39 | On Feature Flags | 🟡 | [n20] |
-| 40 | Opt In | ✅ | |
+| 40 | Opt In | ✅ | [n32] |
 | 41 | Persistent Storage | 🟡 | [n21] |
 | 42 | Register | ✅ | |
 | 43 | Reload Feature Flags | ✅ | |
@@ -117,9 +172,9 @@ on its pre-existing empty-event-name gap.
 | 48 | Retry Queue | 🟡 | [n22] |
 | 49 | Screen | 🟡 | [n23] |
 | 50 | Session Manager | ✅ | |
-| 51 | Session Replay Debug Properties | ❌ | [n24] |
-| 52 | Session Replay Ingestion Controls | 🟡 | [n25] |
-| 53 | Session Replay Privacy | 🟡 | [n26] |
+| 51 | Session Replay Debug Properties | 🟡 | [n24] |
+| 52 | Session Replay Ingestion Controls | ✅ | [n25] |
+| 53 | Session Replay Privacy | ✅ | [n26] |
 | 54 | Set Group Properties For Flags | ✅ | |
 | 55 | Set Person Properties | ✅ | |
 | 56 | Set Person Properties For Flags | ✅ | |
@@ -171,8 +226,8 @@ on its pre-existing empty-event-name gap.
 - **Remediation:** Generate the device id from the UUIDv7 generator independently at first use; keep any already-persisted value untouched so existing installs do not re-key.
 
 ### n7 — Exception Event Metadata (🟡 Partial)
-- **Spec requires:** Canonical `$exception_list` with a `mechanism` on every entry; `exception_id`/`parent_id` linkage; nested entries `type: 'chained'` with a `source`; omit optional fields that cannot be determined rather than writing `false`/`""`/`null`; cycle detection and at most 50 entries; a 1,000-member aggregate inspection budget; and (spec line 300) **application property bags MUST NOT override SDK-owned `$exception_list`, `$exception_level`, `$exception_source`, or `$debug_images`**.
-- **SDK currently:** Audited from scratch. `ErrorPropertiesBuilder.convertToExceptionList` (`packages/core/src/error-tracking/error-properties-builder.ts:117-157`) is substantially correct: `exception_id` is the entry index with `0` outermost, `parent_id` links nested entries, nested entries get `type: 'chained'` with `source: 'cause'` or `'member'`, `handled` is **not** copied onto nested entries, and `synthetic` is omitted when the coercer could not determine it. `MAX_EXCEPTIONS = 50` (`:20`) and `MAX_AGGREGATE_MEMBER_INSPECTIONS = 1000` (`:21`) are both enforced with a `seen` set for cycle detection (`:194`, `:212`, `:241`) — the spec's two numeric bounds are implemented exactly. RN's own integrations supply real metadata: `{ type: 'onuncaughtexception', handled: false }` (`packages/react-native/src/error-tracking/index.ts:342`) and `{ type: 'onunhandledrejection', … }` (`:487-488`), and the fatal path passes `$exception_level: 'fatal'` (`posthog-rn.ts:400`). **Three gaps:** (1) no `$exception_source` is emitted anywhere — grep across `packages/core/src/error-tracking` and `packages/react-native/src` returns zero hits for the property; (2) `buildFromUnknown` hardcodes `$exception_level: 'error'` (`error-properties-builder.ts:55`), so the level is a fixed literal on every path except RN's fatal override rather than being derived from the boundary; (3) `captureExceptionInternal` merges as `{ ...this.buildExceptionProperties(error, hint), ...finalAdditional }` (`posthog-rn.ts:2141-2144`), and core's `captureException` does the same (`posthog-core.ts:1376-1381`), so the **caller's generic property bag overrides SDK-owned `$exception_list` and `$exception_level`** — directly contrary to spec line 300. Gaps (1)–(3) are shared with posthog-node and posthog-js through the same `@posthog/core` package.
+- **Spec requires:** Canonical `$exception_list` with a `mechanism` on every entry; `exception_id`/`parent_id` linkage; nested entries `type: 'chained'` with a `source`; omit optional fields that cannot be determined rather than writing `false`/`""`/`null`; cycle detection and at most 50 entries; a 1,000-member aggregate inspection budget; and (spec line 314) **application property bags MUST NOT override SDK-owned `$exception_list`, `$exception_level`, `$exception_source`, or `$debug_images`**.
+- **SDK currently:** Audited from scratch on 2026-10-19; line references re-read at `210bf35d8` for the plugin 3.0 re-audit, with the same findings. `ErrorPropertiesBuilder.convertToExceptionList` (`packages/core/src/error-tracking/error-properties-builder.ts:119-159`) is substantially correct: `exception_id` is the entry index with `0` outermost, `parent_id` links nested entries, nested entries get `type: 'chained'` with `source: 'cause'` or `'member'`, `handled` is **not** copied onto nested entries, and `synthetic` is omitted when the coercer could not determine it. `MAX_EXCEPTIONS = 50` (`:20`) and `MAX_AGGREGATE_MEMBER_INSPECTIONS = 1000` (`:21`) are both enforced with a `seen` set for cycle detection (`:194`, `:212`, `:216`) — the spec's two numeric bounds are implemented exactly. RN's own integrations supply real metadata: `{ type: 'onuncaughtexception', handled: false }` (`packages/react-native/src/error-tracking/index.ts:419`) and `{ type: 'onunhandledrejection', handled: false }` (`:565-566`), and the fatal path passes `$exception_level: 'fatal'` (`posthog-rn.ts:493`). **Three gaps:** (1) no `$exception_source` is emitted anywhere — grep across `packages/core/src/error-tracking` and `packages/react-native/src` returns zero hits for the property; (2) `buildFromUnknown` hardcodes `$exception_level: 'error'` (`error-properties-builder.ts:55`), so the level is a fixed literal on every path except RN's fatal override rather than being derived from the boundary; (3) `captureExceptionInternal` merges as `{ ...exceptionProperties, ...finalAdditional }` (`posthog-rn.ts:2585-2600`), and core's `captureException` does the same (`posthog-core.ts:1431-1438`), so the **caller's generic property bag overrides SDK-owned `$exception_list` and `$exception_level`** — directly contrary to spec line 314. Gaps (1)–(3) are shared with posthog-node and posthog-js through the same `@posthog/core` package. #205's handled-state rule for framework job retries has nothing to apply to in RN, which has no job integration.
 - **Backwards compatibility:** Backward-compatible for (1) and (2) — adding a property and deriving a level from the boundary are additive. **Needs deprecation path** for (3): callers may today rely on passing `$exception_level` through the property bag, and the spec itself asks for documented *typed* overrides instead, so the typed channel has to land before the generic one is ignored.
 - **Remediation:** Emit `$exception_source` from the capture boundary; derive `$exception_level` from the boundary (fatal/error) rather than a literal; add typed `level`/`source`/`mechanism` override parameters, then stop letting the generic property bag win for the reserved keys. One fix in `@posthog/core` covers react-native, browser, and node.
 
@@ -240,11 +295,11 @@ on its pre-existing empty-event-name gap.
 - **Backwards compatibility:** Backward-compatible — adding an `isOptOut(): boolean` method that returns the existing getter is purely additive; the `optedOut` property can stay indefinitely.
 - **Remediation:** Add `isOptOut(): boolean { return this.optedOut }` to `PostHogCore` (or `PostHogCoreStateless` behind the client classes), and document `optedOut` as the property alias.
 
-### n18 — Is Session Replay Active (🟡 Partial)
-- **Spec requires:** A getter reporting whether replay is actively recording *this* session, reflecting the SDK's own ingestion-control decision.
-- **SDK currently:** Unchanged at this commit. `isSessionReplayActive()` awaits `_initPromise`, returns `false` when disabled or when the native plugin is absent, then delegates entirely to `OptionalReactNativePlugin.isEnabled()`, catching to `false` — correctly fail-closed. **Gap:** it never cross-checks the JS-computed ingestion-controls decision (`_sessionReplayRecordingActive`, the linked-flag/event-trigger gate in `_evaluateAndStartSessionReplayInternal`). If native's `isEnabled()` means "the integration is installed and running" rather than "this session is being recorded", the getter can report `true` while the JS gate has held recording back.
-- **Backwards compatibility:** Backward-compatible — ANDing in a flag the SDK already maintains is internal.
-- **Remediation:** Return `nativeEnabled && this._sessionReplayRecordingActive`, or document precisely which of the two meanings the getter carries.
+### n18 — Is Session Replay Active (✅ Pass; was 🟡)
+- **Spec requires:** A getter reporting whether replay is actively recording *this* session, reflecting the SDK's own ingestion-control decision; an `active` `$recording_status` implies the getter is true, and `disabled` implies false (`session-replay-debug-properties`, "Reconciliation with `is-session-replay-active`").
+- **SDK currently (plugin 3.0, `210bf35d8`):** `isSessionReplayActive()` (`packages/react-native/src/posthog-rn.ts:2393-2415`) returns `false` when disabled, without the plugin, or when another project's client owns the native session, and otherwise returns the plugin's `isEnabled()`. That now calls `PostHogSDK.shared.isSessionReplayActive()` on iOS (`packages/react-native-plugin/ios/PosthogReactNativePlugin.swift:519-525`) and `PostHog.isSessionReplayActive()` on Android (`PosthogReactNativePluginModule.kt:252-258`), which in posthog-ios 4.0 requires a running recorder and a session (posthog-ios `e27cbe4cb` `PostHogSDK.swift:3977-3989`) and in posthog-android 4.0 is `sessionReplayHandler?.isActive() == true && isSessionActive()` (posthog-android `aaa23d39`, `PostHog.kt:3220-3226`). The 2026-10-19 gap was that the getter never consulted the JS gate. The JS gate now drives the native recorder directly: `_evaluateAndStartSessionReplayInternal` stops it while opted out or after the app stopped replay (`posthog-rn.ts:3620-3650`) and starts it only when the linked-flag and event-trigger gates pass, so a running native recorder means the JS gate passed. `$recording_status` reads the same native state (`:943-947`).
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.
 
 ### n19 — Logs (🟡 Partial)
 - **Spec requires:** An OTLP logs pipeline to `/i/v1/logs` with canonical `AnyValue` encoding (int64 as a string), severity mapping, rate capping, and a global `flush()` that includes the logs queue.
@@ -276,23 +331,25 @@ on its pre-existing empty-event-name gap.
 - **Backwards compatibility:** Backward-compatible — adding the guard only changes behaviour for opted-out callers whose events are already dropped.
 - **Remediation:** Check `isDisabled`/`optedOut` at the top of `screen()` and return before `registerForSession`.
 
-### n24 — Session Replay Debug Properties (❌ Fail)
-- **Spec requires:** `client`. Attach `$recording_status`, `$sdk_debug_replay_event_trigger_status`, `$sdk_debug_replay_linked_flag_trigger_status`, and `$sdk_debug_replay_internal_buffer_length` to **every** captured event except `$snapshot`; attach the optional `$sdk_debug_*` bundle to SDK events at most once per 30 s; strip all of them from the minimal `$feature_flag_called` envelope; and attach `$recording_status: disabled` when replay is not configured. `posthog-js` is the reference implementation and mobile/hybrid SDKs are the primary conformance targets.
-- **SDK currently:** Audited from scratch. **Nothing is implemented.** Grep for `recording_status` and `sdk_debug` across `packages/react-native/src` and `packages/core/src` returns zero matches — the keys exist only in `packages/browser`. React Native owns a real replay integration (`_evaluateAndStartSessionReplayInternal`, the linked-flag and event-trigger gates, the native plugin bridge) and therefore computes almost all of the state these keys report, but it never attaches any of it to captured events. The "no replay integration ⇒ `$recording_status: disabled`" carve-out does not apply, because RN *has* a replay integration.
-- **Backwards compatibility:** Backward-compatible — these are additive diagnostic properties on events the SDK already sends; nothing existing changes shape.
-- **Remediation:** Port the required-key split from `packages/browser/src/posthog-core.ts`'s `REQUIRED_REPLAY_PROPERTIES` into the client enrichment path, sourcing the four cross-platform keys from the state RN already holds (`_sessionReplayRecordingActive`, the event-trigger and linked-flag gate results, and the native plugin's buffer length); exclude `$snapshot`; and confirm `minimizeFlagCalledEventProperties` strips them (it already rebuilds from an allowlist, so this comes for free).
+### n24 — Session Replay Debug Properties (🟡 Partial; was ❌)
+- **Spec requires:** `client`. Required keys (`$recording_status`, the two trigger statuses, `$sdk_debug_replay_internal_buffer_length`) on every non-`$snapshot` event; the optional bundle only on eligible SDK events, at most once per 30 s from acceptance; the queue-depth key on every event; the minimal `$feature_flag_called` envelope stripped; `$sdk_debug_replay_capture_mode` always `screenshot` on mobile (#197); and, per `openspec/specs/session-replay-debug-properties/spec.md:619-623` on `main`, "`$recording_status` and the `$sdk_debug_*` keys are properties the SDK sets itself, so they follow capture's **Caller-supplied event properties take precedence**: a registered (super) property of the same name overrides the SDK-computed value, a caller-supplied event property overrides both".
+- **SDK currently (`210bf35d8`):** implemented since the 2026-10-19 audit (in `posthog-react-native`, not the plugin).
+  - **Met.** `_sessionReplayDebugProperties()` (`packages/react-native/src/posthog-rn.ts:901-971`) builds every key on each capture from state only, takes `$recording_status`, the hold reason and the buffer length from the native map when known, computes the trigger statuses and pending conditions in JS, reports `$sdk_debug_pending_queue_size`, and sets `$sdk_debug_replay_capture_mode` to `screenshot` whenever the native replay module is present. A build failure keeps the queue depth and attaches only `$sdk_debug_error_capturing_properties` (`:962-968`). `processBeforeEnqueue` (`:3714-3765`) claims the optional bundle for `$`-prefixed events other than `$feature_flag_called` and `$snapshot` before `before_send` (`:3769-3784`), starts the 30 s window only when the event is accepted (`:3787-3795`), strips the debug keys from a minimal `$feature_flag_called` (`:883-892`) and from an event backdated before the session start (`:3833-3840`), and strips the JS snapshot from a fatal exception handed to native, which builds its own (`:3735-3742`).
+  - **Gap: SDK values win over registered and caller values.** `_stampReplayDebugProperties` (`:883-896`) spreads the SDK-computed map after the event's properties, and that map writes every owned key, `undefined` when absent. A registered or caller-supplied `$recording_status` or `$sdk_debug_*` value is therefore replaced. The code comment says so: "The replay debug keys are SDK-owned, so they land after the caller's properties".
+- **Backwards compatibility:** Backward-compatible — letting registered and caller values win only changes events whose caller set these keys.
+- **Remediation:** Fill the debug keys only where the event's properties leave them unset, as the client precedence rule does for other SDK-set values.
 
-### n25 — Session Replay Ingestion Controls (🟡 Partial)
+### n25 — Session Replay Ingestion Controls (✅ Pass; was 🟡)
 - **Spec requires:** Linked-flag, event-trigger, sample-rate, and minimum-duration gating of replay ingestion, with restrictive (AND) combination on mobile.
-- **SDK currently:** Re-read at this commit. The JS gate is substantial and largely correct: linked-flag evaluation covers all three shapes (boolean, `{flag, variant}`, multivariate "any variant"), event-trigger gating hooks in **after** `super.processBeforeEnqueue()` (i.e. after before-send, correctly per spec), activation is persisted keyed to the current session id and re-armed on rotation via the `getSessionId()` override, and AND-only combination is explicit in both a code comment and `test/session-replay-event-triggers.spec.ts`. URL triggers are correctly absent on mobile. **Two gaps, unchanged:** (1) no minimum-recording-duration buffering gate exists in the JS layer (zero grep hits); the spec does not exempt mobile from it, though the underlying native SDK may implement it; (2) the sample-rate *decision* — deterministic, session-id-keyed persistence of the sampled-in/out outcome — is not in JS at all: RN merges and validates a numeric rate and hands the raw number to native, delegating the decision to native code outside this repository.
-- **Backwards compatibility:** Backward-compatible — both are additive gates on a path that currently starts recording unconditionally once the other gates pass.
-- **Remediation:** Implement the session-keyed sample decision in JS so it is deterministic and observable across the bridge, or document native as the owner and verify it in the posthog-ios/posthog-android audits; add the minimum-duration buffer gate or record an explicit spec carve-out request for hybrid SDKs.
+- **SDK currently (plugin 3.0, `210bf35d8`):** the JS gates are unchanged: linked flag (all three shapes), event triggers after `before_send`, AND combination, persisted activation per session (`packages/react-native/src/posthog-rn.ts:3600-3615`). The two 2026-10-19 gaps were left to the native SDKs, and plugin 3.0's native SDKs implement both. RN validates the sample rate and passes it to native (`:3270-3305`; `packages/react-native-plugin/ios/PosthogReactNativePlugin.swift:409`, `PosthogReactNativePluginModule.kt:178`). posthog-ios 4.0 samples on the session id, with the local rate winning over the remote one, and buffers until the minimum duration is met (posthog-ios `e27cbe4cb` `PostHog/Replay/PostHogReplayIntegration.swift:463-470`, `:641-649`); posthog-android 4.0 keeps the session-keyed sampling decision (`shouldRecordSession`, posthog-android `aaa23d39` `PostHog.kt:3228`) and reports `below_minimum_duration` holds (`PostHogReplayIntegration.kt:3007`). posthog-android's own 🟡 on this row (event triggers matched on the pre-hook name) doesn't reach RN, whose triggers are matched in JS after `before_send`.
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.
 
-### n26 — Session Replay Privacy (🟡 Partial)
-- **Spec requires:** Mask text inputs, images, and sandboxed/secure views by default; honour `ph-no-capture` containers including their children.
-- **SDK currently:** **Resolved from ❓ Unknown this run.** The previous audit left this Unknown because masking logic lives in the native SDKs, which were not available to it. The evidence needed is now in hand: this run has `posthog-android` cloned, and `compliance/posthog-ios.md` carries a confirmed finding (ios n24, ❌: the default wireframe mode still records the children of a plain `ph-no-capture` container unmasked). React Native's own layer is correct and privacy-safe: `posthog-rn.ts` passes `maskAllTextInputs`, `maskAllImages`, and `maskAllSandboxedViews` all defaulting to `true`, and `packages/react-native-plugin`'s iOS and Android modules do nothing but copy those booleans onto the native replay config. RN contributes no masking logic of its own and introduces no additional gap. The row is 🟡 rather than ✅ because an RN app on iOS inherits ios n24's confirmed container-children defect through this pass-through, and 🟡 rather than ❌ because every control RN owns is set to the safe value and the Android path is not known to share the defect.
-- **Backwards compatibility:** Backward-compatible from react-native's side — nothing in `packages/react-native` needs to change.
-- **Remediation:** No action in this repository. Track the fix under posthog-ios n24; re-score this row to ✅ once that lands, and confirm the Android path at posthog-android's next audit.
+### n26 — Session Replay Privacy (✅ Pass; was 🟡)
+- **Spec requires:** Mask text inputs, images, and sandboxed/secure views by default; honour `ph-no-capture` containers including their children; explicit unmask markers take precedence over explicit mask markers where an SDK offers both.
+- **SDK currently (plugin 3.0, `210bf35d8`):** RN passes `maskAllTextInputs`, `maskAllImages` and `maskAllSandboxedViews`, all defaulting to `true`, and the plugin copies them onto the native config (`packages/react-native-plugin/ios/PosthogReactNativePlugin.swift:389-396`, `PosthogReactNativePluginModule.kt:166-177`). `PostHogMaskView` sets `accessibilityLabel="ph-no-capture"` (`packages/react-native/src/PostHogMaskView.tsx:42`). The 2026-10-19 🟡 came from posthog-ios's default wireframe mode recording the children of a `ph-no-capture` container. posthog-ios 4.0 and posthog-android 4.0 record masked screenshots only, so that path is gone. Both mask a `ph-no-capture` view and everything inside it: posthog-ios passes `maskChildren || view.isNoCapture()` down the walk (posthog-ios `e27cbe4cb` `PostHog/Replay/PostHogReplayIntegration.swift:917`, `:1077`), and posthog-android uses `insideNoCapture` (posthog-android `aaa23d39` `PostHogReplayIntegration.kt:1603-1606`, `:2875-2878`). An unmask marker winning or losing against a mask marker can't arise here, because RN has no unmask marker.
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.
 
 ### n27 — Setup (🟡 Partial)
 - **Spec requires:** `openspec/specs/setup/spec.md:163` and `:179` — the configuration option carrying the project token SHALL be named `projectToken` (platform-cased). An SDK still naming it `apiKey` SHALL **add `projectToken` and keep `apiKey` as a deprecated alias in the same release**, so the rename needs no major version; where a surface accepts both at once, `projectToken` SHALL win. The spec names React Native's `PostHogProvider` `apiKey` prop explicitly as one of two client SDKs that have not adopted it.
@@ -308,9 +365,9 @@ on its pre-existing empty-event-name gap.
 
 ### n29 — Stop Session Recording (🟡 Partial)
 - **Spec requires:** Stop recording and finalize/flush any buffered replay data rather than discarding it.
-- **SDK currently:** Unchanged at this commit. `stopSessionRecording()` → `_stopSessionRecording()` checks `isDisabled` and plugin/method presence, then awaits `OptionalReactNativePlugin.stopRecording()`. No JS-side flush or finalize call exists anywhere in the stop path. Because the plugin bridges straight into the same native `stopRecording()`/`stop()` that posthog-ios n25 already flagged for not flushing the replay queue, RN very likely propagates that gap and adds no compensating flush of its own.
+- **SDK currently (plugin 3.0, `210bf35d8`):** `stopSessionRecording()` (`packages/react-native/src/posthog-rn.ts:2319-2332`) records that the app no longer wants replay (only while opted in) and calls the plugin's `stopRecording()` (`:2338-2372`), which calls `PostHogSDK.shared.stopSessionRecording()` on iOS (`packages/react-native-plugin/ios/PosthogReactNativePlugin.swift:615-622`) and `PostHog.stopSessionReplay()` on Android (`PosthogReactNativePluginModule.kt:391-399`). posthog-ios 4.0 flushes the replay queue after stopping (`replayQueue?.flush()`, posthog-ios `e27cbe4cb` `PostHogSDK.swift:3900-3918`). posthog-android 4.0 still doesn't: `stopSessionReplay()` only calls the handler's `stop()` (posthog-android `aaa23d39` `PostHog.kt:3298-3313`), and `stopRecording` clears capture state and sets the integration inactive with no replay-queue flush (`PostHogReplayIntegration.kt:2967-2987`). RN adds no flush of its own, so Android apps inherit the gap.
 - **Backwards compatibility:** Backward-compatible — flushing before stopping is additive.
-- **Remediation:** Fix the flush in the native SDKs (tracked under posthog-ios n25); optionally have RN await a bridged flush before resolving `stopSessionRecording()`.
+- **Remediation:** Flush the replay queue in posthog-android's `stopSessionReplay()`; optionally have RN await a bridged flush before resolving `stopSessionRecording()`.
 
 ### n30 — Surveys (🟡 Partial)
 - **Spec requires:** Load definitions from remote config; exclude web-only-conditioned surveys on non-web SDKs; enforce eligibility (active status, device type, seen/repeat, wait period, linked/targeting flags); a single active prompt; emit `survey shown`/`sent`/`dismissed` (and `abandoned` where supported); do not display to an opted-out user.
@@ -329,3 +386,18 @@ posthog-node audit recorded Traces as ❌ with "no OTLP `/i/v1/traces` pipeline 
 monorepo". That was a false negative — the pipeline merged on 2026-09-10, four weeks before that
 audit, and node is the one package that wires it. See the matching entry in
 [README.md](README.md) and [posthog-node.md](posthog-node.md#n2).
+
+### n32 — Opt In (✅ Pass)
+- **Spec requires:** (`openspec/specs/opt-in/spec.md` on `main`) **#138** (`:143-251`): a mobile client SDK, React Native included, that stops replay while opted out SHALL start a new session before replay restarts on opt-in; "Where a wrapper owns the session id rather than the native SDK, the wrapper SHALL perform the rotation"; the restart follows whether the app wanted replay at opt-out (configured, or started with `startSessionRecording()` and not stopped since), not whether it was recording; a start or stop made while opted out doesn't change that; an app that launches opted out with replay enabled records on its first opt-in. **#199** (`:253-299`, and `optOut` step 5): React Native "through the native SDK" SHALL decide whether to send a crash reconstructed on a later launch from the consent state at crash time. A report recorded while opted out is never sent; a report recorded while opted in, found by an opted-out launch, stays in place and is delivered once the user opts in. Data accepted while opted in stays deliverable after opt-out.
+- **SDK currently (`210bf35d8`):**
+  - **Replay restart (#138).** RN owns the session id, and posthog-ios's own rotation is "a no-op under React Native, which owns the session id" (posthog-ios `e27cbe4cb` `PostHogSDK.swift:3651-3655`). `optIn()` (`packages/react-native/src/posthog-rn.ts:1474-1500`) rotates the session in JS and moves native onto it (`_rotateReplaySession`, `:2225-2233`) before native opts in, whenever the app wanted replay, then re-evaluates replay against the gates. Intent is `_sessionReplayWanted`: set from `enableSessionReplay` at setup (`:487`), set by `startSessionRecording()` (`:2134-2139`) and cleared by `stopSessionRecording()` (`:2319-2325`) only while opted in. `optOut()` (`:1519-1557`) stops replay and keeps that intent. An app that launches opted out has `_sessionReplayWanted` from its configuration, and its first `optIn()` takes the same path.
+  - **Deferred crash reports (#199).** JS owns consent and hands it to native: setup passes `optOut` with `persistOptOut = false` (`packages/react-native-plugin/ios/PosthogReactNativePlugin.swift:422-425`, `PosthogReactNativePluginModule.kt:128-133`), and `optOut()`/`optIn()` call the native `optOut()`/`optIn()` (`_propagateNativeOptOut`, `posthog-rn.ts:1562-1576`; `PosthogReactNativePlugin.swift:590-598`, `PosthogReactNativePluginModule.kt:330-338`). Native comes up opted out on an opted-out launch when native crash capture, push or fatal JS capture is on (`posthog-rn.ts:3587-3588`). posthog-ios 4.0 uninstalls its integrations on `optOut()` (`PostHogSDK.swift:3701-3722`); the crash integration then marks the crash context (`markOptedOut()`, which also replaces the saved identity and properties, `PostHog/ErrorTracking/PostHogErrorTrackingAutoCaptureIntegration.swift:119-127`, `PostHogExceptionStepsBuffer.swift:158-161`), and the next install drops a marked report (`:267-270`). Pending reports are processed only on install, which runs only while opted in, so a consented report waits for opt-in. posthog-android 4.0 records opt-out intervals at an opted-out setup and on `optOut()` (`PostHogAndroid.kt:151-159`; `PostHogNativeCrashIntegration.kt:170-174`), closes them on install, and drops a native crash whose exit time falls in one (`:396-401`); its scan runs only from install, so a consented crash waits for opt-in. Fatal JS crashes handed to native are captured in-process and gated at capture time: JS skips native capture while opted out (`_isFatalJsCaptureNativeEnabled`, `posthog-rn.ts:3102-3107`), and posthog-ios rejects the call while opted out (`PosthogReactNativePlugin.swift:655-663`). Opt-out clears neither queue: core `optOut()` only persists the flag and the JS queue stays (`packages/core/src/posthog-core-stateless.ts:508-512`), and the native queues are kept (`posthog-rn.ts:1541-1545`).
+  - Read from code; the acceptance scenarios were not run.
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.
+
+### n33 — Capture Exception (✅ Pass)
+- **Spec requires:** `$exception` events with a canonical `$exception_list`, sent through the normal capture pipeline.
+- **SDK currently (plugin 3.0, `210bf35d8`):** exceptions captured in JS are unchanged and go to `/batch`. Native crash reports and fatal JS crashes the plugin hands to native (`_captureFatalAndChooseOwner`, `packages/react-native/src/posthog-rn.ts:3802-3820`; the JS debug snapshot is stripped first, `:3735-3742`) are captured by posthog-ios 4.0 and posthog-android 4.0 and sent through capture v1, labelled `posthog-react-native` (see "Native events on capture v1" above). On Android the fatal JS crash's timestamp, read from the device clock in JS, is moved onto the native SDK's clock before capture (`toSdkClock`, `packages/react-native-plugin/android/src/main/java/com/posthogreactnativeplugin/PosthogReactNativePluginModule.kt:460-466`, `:852-856`; PostHog/posthog-js#5605), so the server's clock-skew correction doesn't shift it. posthog-ios 4.0 omits `NSNull`-valued event properties instead of sending JSON `null` (PostHog/posthog-ios#1047), so a `null` property on a native-captured exception on iOS is left out. Whether a crash reconstructed on a later launch is sent follows the consent rule scored under Opt In ([n32](#n32)).
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.

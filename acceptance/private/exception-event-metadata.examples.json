@@ -180,5 +180,25 @@
         }
       ]
     }
+  },
+  "active_otel_span": {
+    "event": "$exception",
+    "properties": {
+      "$exception_level": "error",
+      "$trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+      "$span_id": "00f067aa0ba902b7",
+      "$exception_list": [
+        {
+          "type": "CheckoutError",
+          "value": "Checkout failed",
+          "mechanism": {
+            "type": "generic",
+            "handled": true,
+            "synthetic": false,
+            "exception_id": 0
+          }
+        }
+      ]
+    }
   }
 }

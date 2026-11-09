@@ -45,11 +45,9 @@ Net changes vs. the previous audit:
   and, from #102, submit and dismiss move the last-seen survey date).
 - **Newly applicable (1):** Capture AI ➖→🟡. #146 adds iOS 4.0 to its Applicability. The AI lane
   conforms; like Capture, `NSNull` properties are sent as JSON `null` ([n27]).
-- **Spec conflicts inside #146, not scored:** HTTP Client stays ✅. `compression = .none` leaves
+- **Spec conflict inside #146, not scored:** HTTP Client stays ✅. `compression = .none` leaves
   `captureAi` requests gzipped, which follows `capture-ai` ("The analytics lane's compression … SHALL NOT
-  change AI uploads") and conflicts with `http-client`'s whole-client opt-out. Capture stays 🟡 only for
-  `NSNull`: a caller's `$lib` merges key by key over the SDK's pair, which follows the client precedence
-  rule and conflicts with "Events name their own library". Both conflicts are raised on
+  change AI uploads") and conflicts with `http-client`'s whole-client opt-out. The conflict is raised on
   [#146](https://github.com/PostHog/sdk-specs/pull/146#issuecomment-6743564814).
 - **Note-only changes:** Capture stays 🟡, but empty event names are now dropped and the capture v1
   wire conforms; only the `NSNull` gap remains. Shutdown, HTTP Client, Group, Group
@@ -263,8 +261,9 @@ Retry Queue. Line references in this section are at `1f91c5b2`.
     a client allowance) and fail-open token; see [Capture v1](#capture-v1). A caller's `$lib` merges key
     by key over the SDK's pair (enqueued events carry `$lib` from `sdkInfo`,
     `PostHog/PostHogSDK.swift:800-803`), so the `@client` "Caller property overrides an SDK context
-    property" scenario passes; #146's pair-fill rule conflicts with that, and the conflict is raised on
-    [#146](https://github.com/PostHog/sdk-specs/pull/146#issuecomment-6743588735), not scored.
+    property" scenario passes. Scored on the assumption that #146 scopes the pair-fill rule in "Events
+    name their own library" to server SDKs
+    ([raised on the PR](https://github.com/PostHog/sdk-specs/pull/146#issuecomment-6743588735)).
 - **Backwards compatibility:** Backward-compatible. Omitting null members only changes
   serialization; `[String: Any]` types stay. Person properties set to `null` would need a deliberate
   scope decision.

@@ -177,9 +177,9 @@ date). Capture v1 rows (Capture, Before Send Hook, Event Batcher, HTTP Client, R
 against [#146](https://github.com/PostHog/sdk-specs/pull/146) at `5c26b9bc`, treated as merged, and
 conform; Capture stays 🟡 only for `NSNull`. **Capture AI ➖→🟡**: #146 adds iOS 4.0 to its
 Applicability; the AI lane conforms, but `NSNull` properties are sent as JSON `null`. Opt In meets the
-new #138 replay-restart requirements. Two conflicts inside #146 (whole-client vs per-lane compression,
-and client `$lib` precedence) are
-[raised on the PR](https://github.com/PostHog/sdk-specs/pull/146#issuecomment-6743564814) and not scored.
+new #138 replay-restart requirements. One conflict inside #146 (whole-client vs per-lane compression)
+is [raised on the PR](https://github.com/PostHog/sdk-specs/pull/146#issuecomment-6743564814) and not
+scored.
 Details in [posthog-ios.md](posthog-ios.md).
 
 **2026-10-08 out-of-cycle refresh — posthog-ios:** re-audited all 64 rows at `f5cbe87c` against

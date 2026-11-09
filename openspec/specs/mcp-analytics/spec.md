@@ -105,6 +105,7 @@ means set whenever the SDK can determine the value. Events: "call" is `$mcp_tool
 | `$mcp_intent` | call, report | non-empty string, at most 2,048 characters | known |
 | `$mcp_intent_source` | call, report | `"context_parameter"`, `"inferred"`, or `"client_metadata"` | with `$mcp_intent` |
 | `$mcp_conversation_id` | call, report, `$exception`, `$mcp_input_required`, `$mcp_unknown_tool` | lowercase UUIDv7 | known, except on a call with a client conversation id |
+| `$mcp_session_source` | all | `"client_metadata"`, `"conversation"`, `"transport"`, or `"generated"` | should, from automatic instrumentation |
 | `$mcp_error_type` | failed call | string, low cardinality, at most 256 characters | failed calls |
 | `$mcp_error_message` | failed call | string, at most 2,048 characters | failed calls |
 | `$mcp_error_status` | failed call | JSON number, an HTTP status code | may |
@@ -125,9 +126,7 @@ means set whenever the SDK can determine the value. Events: "call" is `$mcp_tool
 
 Length limits count characters, keep the start of the string, include any truncation marker, and apply
 before the byte bound of "Event size bounds".
-
 ## Requirements
-
 ### Requirement: Observer-only instrumentation
 
 An SDK SHALL let a server be instrumented with one call taking the MCP server and a configured PostHog
@@ -286,6 +285,15 @@ input's characters (ASCII, so bytes, UTF-16 units, and code points agree), seeds
 the two lanes as 8 lowercase hex digits each. Derivation is deterministic so replicas, restarts, and
 SDKs in different languages agree.
 
+Automatic instrumentation SHOULD set `$mcp_session_source` on every event to what produced its
+`$session_id`: `"client_metadata"` for a client conversation id (rule 1), `"conversation"` for a
+conversation handle (rule 2), `"transport"` for a transport session id or a replayed PostHog session
+token (rule 3), and `"generated"` for an id the SDK generated itself, whether for a one-client
+connection (rule 3) or a single request (rule 4). An event the SDK sends outside a request, such as a
+server's custom event, takes the source of the session it carries. The manual API MAY set it. A server
+reads fragmentation from it directly: calls whose source is `"generated"` on a stateless HTTP server
+are grouped by nothing.
+
 A client conversation id is a value an MCP client puts in a `tools/call` request's `_meta` to name the
 conversation the call belongs to. This table lists every key the SDK reads. A request comes from a
 recognized client when it matches a row's recognition rule, and the SDK SHALL read a row's key only
@@ -361,6 +369,7 @@ is not a token.
 - **WHEN** the SDK is flushed
 - **THEN** the "$mcp_tool_call" event's "$session_id" should be "ses_2f5d35b7108d17c807766f2f769a1e8c"
 - **AND** it should have no "$mcp_conversation_id"
+- **AND** its "$mcp_session_source" should be "client_metadata"
 
 #### Scenario: A client conversation id wins over a conversation handle
 - **GIVEN** an MCP server instrumented by the SDK with conversation anchoring enabled, on a transport that carries no session
@@ -403,6 +412,7 @@ is not a token.
 - **THEN** the result's last content block should be a text block of the form `{"conversation_id":"<uuidv7>"}`
 - **WHEN** the SDK is flushed
 - **THEN** the "$mcp_tool_call" event's "$session_id" should not be "ses_0fdf126b8e2c1f9689ca12f3dd3383e6" or "ses_2f5d35b7108d17c807766f2f769a1e8c"
+- **AND** its "$mcp_session_source" should be "conversation"
 
 #### Scenario: A handle-free client's call gets no conversation_id block without its id
 - **GIVEN** an MCP server instrumented by the SDK with conversation anchoring enabled, on a transport that carries no session

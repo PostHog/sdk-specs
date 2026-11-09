@@ -2,8 +2,8 @@
 
 **Repo:** [PostHog/posthog-ios](https://github.com/PostHog/posthog-ios)
 **Audited commit:** `3460e534a9d07bc8e826205d27d68cafaf1294ff` ([commit](https://github.com/PostHog/posthog-ios/commit/3460e534a9d07bc8e826205d27d68cafaf1294ff)) on the 4.0 release branch `chore/v4-remove-deprecated` ([PostHog/posthog-ios#873](https://github.com/PostHog/posthog-ios/pull/873)) — audited on 2026-11-05, before 4.0.0 is published; re-checked on 2026-11-09 at `1f91c5b2` (see [Re-check](#re-check-2026-11-09))
-**Audited against sdk-specs commit:** `dd11a6b`; re-checked against `8306698` and the open [#146](https://github.com/PostHog/sdk-specs/pull/146) at `5c26b9bc`
-**Summary:** 40 ✅ · 17 🟡 · 1 ❌ · 11 ➖ (69 rows; previous audit 2026-10-08 at `f5cbe87c` + posthog-ios#924–#934 scored 38/16/4/6 on 64 rows)
+**Audited against sdk-specs commit:** `dd11a6b`; re-checked against `8306698` plus [#146](https://github.com/PostHog/sdk-specs/pull/146) at `5c26b9bc` (capture v1, including #147's AI lane), treated as merged to `main`
+**Summary:** 40 ✅ · 18 🟡 · 1 ❌ · 10 ➖ (69 rows; previous audit 2026-10-08 at `f5cbe87c` + posthog-ios#924–#934 scored 38/16/4/6 on 64 rows)
 
 Note on repo layout: `posthog-ios` is a single-package repo, distributed through Swift Package Manager
 only from 4.0. Core SDK logic lives at `PostHog/` (flat files: `PostHogSDK.swift` — the main public
@@ -43,13 +43,16 @@ Net changes vs. the previous audit:
   `reset()` still reaches listeners) and Surveys ✅→🟡 (popup delay: a close reported before display
   marks the survey seen and sends `survey dismissed`; `reset()` doesn't cancel a pending delayed display;
   and, from #102, submit and dismiss move the last-seen survey date).
-- **Open spec question, not scored:** HTTP Client stays ✅. `compression = .none` leaves `captureAi`
-  requests gzipped, which follows #146's `capture-ai` ("The analytics lane's compression … SHALL NOT
-  change AI uploads") and conflicts with `http-client`'s whole-client opt-out. The conflict is raised on
+- **Newly applicable (1):** Capture AI ➖→🟡. #146 adds iOS 4.0 to its Applicability. The AI lane
+  conforms; like Capture, `NSNull` properties are sent as JSON `null` ([n27]).
+- **Spec conflicts inside #146, not scored:** HTTP Client stays ✅. `compression = .none` leaves
+  `captureAi` requests gzipped, which follows `capture-ai` ("The analytics lane's compression … SHALL NOT
+  change AI uploads") and conflicts with `http-client`'s whole-client opt-out. Capture stays 🟡 only for
+  `NSNull`: a caller's `$lib` merges key by key over the SDK's pair, which follows the client precedence
+  rule and conflicts with "Events name their own library". Both conflicts are raised on
   [#146](https://github.com/PostHog/sdk-specs/pull/146#issuecomment-6743564814).
-- **Note-only changes:** Capture stays 🟡, but empty event names are now dropped; only the `NSNull`
-  gap remains. Capture AI stays ➖ because its Applicability is still `server`, but iOS 4.0 now ships
-  `captureAi` on `/i/v1/ai/events`; [n27] records its conformance. Shutdown, HTTP Client, Group, Group
+- **Note-only changes:** Capture stays 🟡, but empty event names are now dropped and the capture v1
+  wire conforms; only the `NSNull` gap remains. Shutdown, HTTP Client, Group, Group
   Identify, Stop Session Recording and Feature Flag Called Tracker no longer depend on pending PRs.
   New requirements met without a status change: jittered retry backoff (Retry Queue), identify while opted out (Identify, Consent Gating),
   `$group_set` nesting (Group Identify), caller-property precedence (Capture, Register, Session Replay
@@ -61,7 +64,7 @@ Line references stay at `3460e534a`. Re-checked against the 4.0 branch head `1f9
 `8306698`:
 
 - **SDK changes, no status change.** The range adds #1036 (`$lib`/`$lib_version` stay in properties,
-  see [Capture v1](#capture-v1-informational-not-scored)), #1037 (an empty string variant reads as
+  see [Capture v1](#capture-v1)), #1037 (an empty string variant reads as
   disabled), #1040 (crash and memory reports recorded while opted out are dropped) and #896 (replay
   scheduled from a run-loop observer; an idle screen no longer rotates the session). Line numbers in
   `PostHog/PostHogSDK.swift` from line 610 on move −5, and in `PostHog/PostHogApi.swift` after line 388
@@ -74,31 +77,42 @@ Line references stay at `3460e534a`. Re-checked against the 4.0 branch head `1f9
   - Remote Config: `quotaLimited` (#198) is read with `as? [String]` and `.contains(...)`
     (`PostHog/PostHogRemoteConfig.swift`), so unknown values are ignored; stays ✅.
   - Evaluate Flags (#169) and MCP Analytics (#189, #190, #194) are server-only; stay ➖.
-- **HTTP Client 🟡→✅.** The compression gap scored on 2026-11-05 comes from two conflicting #146
-  rules, not from iOS alone ([n22](#n22)).
+- **#146 treated as merged.** Capture, Before Send Hook, Event Batcher, HTTP Client and Retry Queue are
+  scored against its capture v1 text, and Capture AI applies ([n27](#n27)). Evidence for the capture v1
+  rows is at `1f91c5b2`.
 
-## Capture v1 (informational, not scored)
+## Capture v1
 
-4.0 sends analytics events through capture v1. The capture v1 contract is still in open
-[PostHog/sdk-specs#146](https://github.com/PostHog/sdk-specs/pull/146), so no row is scored against it;
-this records what the audited branch does so the next audit can score it once #146 merges:
+4.0 sends analytics events through capture v1. These rows are scored against
+[#146](https://github.com/PostHog/sdk-specs/pull/146) at `5c26b9bc`, treated as merged: Capture
+([n4](#n4)), Capture AI ([n27](#n27)), Before Send Hook, Event Batcher, HTTP Client ([n22](#n22)) and
+Retry Queue. Line references in this section are at `1f91c5b2`.
 
-- `POST /i/v1/analytics/events` with `Authorization: Bearer <projectToken>` (set after custom
-  `requestHeaders`), `PostHog-Sdk-Info`, `PostHog-Attempt`, `PostHog-Request-Id` and
-  `PostHog-Request-Timestamp` headers, and a `{created_at, batch}` body (`PostHog/PostHogApi.swift:198-246`).
-- After `beforeSend`, `captureV1JSON` (`PostHog/PostHogApi.swift:386-414`) hoists `$process_person_profile`,
-  `$cookieless_mode`, `$ignore_sent_at` and `$product_tour_id` into `options`, lifts string
-  `$session_id`/`$window_id` to top-level `session_id`/`window_id`. At `3460e534a` it also removed
-  `$lib`/`$lib_version` from `properties` (`:388-389`).
-  [PostHog/posthog-ios#1036](https://github.com/PostHog/posthog-ios/pull/1036) (merged as `436fd50ea`,
-  in `1f91c5b2`) keeps them, which matches #146's **Events name their own library** at `5c26b9bc`: "the
-  wire builder SHALL NOT remove them". A caller's `$lib` merges key by key over the SDK's pair, which
-  follows the client precedence rule; #146's pair-fill rule conflicts with that, and the conflict is
-  raised on [#146](https://github.com/PostHog/sdk-specs/pull/146#issuecomment-6743588735).
-- Matches #146: retried statuses (404/408/429/500/502/503/504 and network errors), `Retry-After` as a
-  floor clamped to 30 s, byte-aware 5 MiB batches, same-origin 307/308 redirects only, and the client-SDK
-  retry policy #146 names iOS 4.0 for: a durable queue with no attempt limit, 1–30 s jittered backoff, and
-  halving a multi-event batch on 413 (a single-event 413 is terminal).
+- **Wire.** `POST /i/v1/analytics/events` with a `{created_at, batch}` body and no `api_key`, `sent_at`
+  or `offset` (`PostHog/PostHogApi.swift:212`, `:224-227`). Headers on every attempt: `Authorization:
+  Bearer` set after custom headers, `PostHog-Sdk-Info: posthog-ios/<version>` (also the `User-Agent`),
+  `PostHog-Attempt`, `PostHog-Request-Id` and a fresh `PostHog-Request-Timestamp` (`:241-246`); custom
+  headers can't override them (`:139-142`). `created_at` and the request id are kept across retries of
+  the same uuid set (`:286-297`).
+- **Event shape.** After `beforeSend`, `captureV1JSON` (`:386-412`) hoists `$process_person_profile`,
+  `$cookieless_mode`, `$ignore_sent_at` and `$product_tour_id` into `options` when the option is absent
+  or null, lifts string `$session_id`/`$window_id` to the root (other types dropped with a log naming
+  the type, `:425-449`), and keeps `$lib`/`$lib_version` in `properties`
+  ([PostHog/posthog-ios#1036](https://github.com/PostHog/posthog-ios/pull/1036)), as **Events name their
+  own library** requires.
+- **Per-event results.** Only `retry` uuids are resent; `drop`, `duplicates_dropped`, unknown results
+  and absent uuids are not; a 2xx without a readable `results` map is terminal (`:314-366`). The
+  aggregate drop line is debug-only, which #146 allows a client SDK.
+- **Delivery.** Retried statuses are exactly 404/408/429/500/502/503/504, network errors and 2xx
+  `retry` entries; 1–30 s backoff with jitter in [0.75, 1.25); `Retry-After` as a floor after jitter,
+  capped at 30 s, also on a 2xx retry; no attempt limit on the durable queue; retries resend only the
+  failed request's events (#180, `PostHog/PostHogQueue.swift:498-507`); byte-aware 5 MiB batches, with a
+  multi-event 413 halving the batch and a single-event 413 terminal; same-origin 307/308 redirects only,
+  at most 5 (`PostHogApi.swift:880-909`). Callers supply a `URLSessionConfiguration`, not a session, so
+  the SDK's redirect rule covers every capture request.
+- **Hook.** After `beforeSend` the SDK only re-imposes the uuid (`PostHog/PostHogSDK.swift:2650`), the
+  first allowance in #146's layer order. `PostHogEvent.options` is non-optional, so the absent-options
+  allowance never arises.
 - `captureAi` sends AI events on their own lane to `POST /i/v1/ai/events` (see [n27]).
 
 | # | Contract | Status | Note |
@@ -107,8 +121,8 @@ this records what the audited branch does so the next audit can score it once #1
 | 2 | Traces | ❌ | [n2] |
 | 3 | Tracing Headers | ✅ | new server span-context bridge requirements (#129) are `@server` only |
 | 4 | Alias | 🟡 | [n3] |
-| 5 | Capture | 🟡 | [n4]; empty event names now dropped (also after `beforeSend`); `NSNull` still sent as JSON `null` |
-| 6 | Capture AI | ➖ | Applicability still `server`; iOS 4.0 ships `captureAi` on `/i/v1/ai/events` and meets Behavior 1, 2, 4 and Error handling, with its AI queue started at setup rather than lazily — [n27] |
+| 5 | Capture | 🟡 | [n4]; capture v1 wire conforms (#146); empty event names now dropped (also after `beforeSend`); `NSNull` still sent as JSON `null` |
+| 6 | Capture AI | 🟡 | was ➖; #146 adds iOS 4.0 to Applicability; the AI lane conforms, but `NSNull` properties are sent as JSON `null` — [n27] |
 | 7 | Capture Exception | 🟡 | [n5]; `NSNull` custom properties still sent as JSON `null` |
 | 8 | Create Person Profile | ➖ | unchanged — spec Applicability still says only the posthog-js family exposes it; no `createPersonProfile` in iOS |
 | 9 | Debug | ✅ | |
@@ -147,10 +161,10 @@ this records what the audited branch does so the next audit can score it once #1
 | 42 | Unregister | ✅ | |
 | 43 | Application Lifecycle | ✅ | build-invariant rule met (`$app_build_xcode`/`$app_build_sdk` on install/update only); `version`/`build` dropped in 4.0. `$lib`/`$lib_version` stay on every enqueued event; on the wire see "Capture v1" above |
 | 44 | Autocapture | ✅ | |
-| 45 | Before Send Hook | ✅ | |
+| 45 | Before Send Hook | ✅ | after the hook only the uuid is re-imposed (#146 allowance); `options` is non-optional, so the absent-options allowance doesn't arise; a throwing hook logs the event and exception name only, in debug mode |
 | 46 | Consent Gating | ✅ | identify updates local state while opted out and only skips the event, matching #167 |
 | 47 | Device ID Generator | ✅ | |
-| 48 | Event Batcher | ✅ | capture v1 adds byte-aware check-before-append batching at 5 MiB (`PostHog/PostHogQueue.swift:544-548`) |
+| 48 | Event Batcher | ✅ | byte-aware check-before-append batching at 5 MiB (`PostHog/PostHogQueue.swift:544-548`); no analytics per-event cap; a multi-event 413 halves the batch (client allowance) |
 | 49 | Exception Event Metadata | 🟡 | [n19]; caller properties can still override `$exception_level`/`$exception_source`; trace context (#123) is server-only |
 | 50 | Feature Flag Cache | ✅ | was 🟡; malformed → `nil`, bootstrap payloads decoded once — [n20] |
 | 51 | Feature Flag Called Tracker | ✅ | [n21]; config-version-2 attribution needs `/flags?v=4`, which iOS does not request |
@@ -159,7 +173,7 @@ this records what the audited branch does so the next audit can score it once #1
 | 54 | Local Feature Flag Evaluator | ➖ | unchanged: no local rule engine |
 | 55 | Persistent Storage | 🟡 | [n23] |
 | 56 | Remote Config | ✅ | |
-| 57 | Retry Queue | ✅ | new jitter requirement met: factor `[0.75, 1.25)`, capped at 30 s, `Retry-After` floor applied after jitter (`PostHog/PostHogQueue.swift:14-43`, `:247-256`) |
+| 57 | Retry Queue | ✅ | capture v1 status set; jitter factor `[0.75, 1.25)`, capped at 30 s, `Retry-After` floor applied after jitter, also on 2xx retries (`PostHog/PostHogQueue.swift:14-43`, `:247-256`); no attempt limit (client allowance); retries exclude new events (#180) |
 | 58 | Session Manager | ✅ | |
 | 59 | Session Replay Ingestion Controls | ✅ | |
 | 60 | Session Replay Privacy | 🟡 | was ❌; 4.0 removes wireframe mode, the only path that leaked; SwiftUI `postHogMask()` wins over an enclosing `postHogNoMask()` (over-masks, not a leak) — [n24] |
@@ -244,20 +258,13 @@ this records what the audited branch does so the next audit can score it once #1
     limiter, so #127 does not apply. #119 and #131 are server-only (`config.disableGeoIp` still stamps
     `$geoip_disable`, `:830-832`). UTC millisecond timestamps, `before_send` before enqueue, and the
     ObjC-hook-exception drop are unchanged.
-  - **Capture v1 wire (informational, not scored — the capture v1 contract is still in open
-    PostHog/sdk-specs#146):** 4.0 sends analytics events to `POST /i/v1/analytics/events`
-    (`PostHog/PostHogApi.swift:198-213`) with `Authorization: Bearer <projectToken>` set after custom
-    headers (`:242`), `PostHog-Sdk-Info: <name>/<version>`, `PostHog-Attempt`, `PostHog-Request-Id` and
-    `PostHog-Request-Timestamp` (`:243-246`), and a `{created_at, batch}` body (`:224-227`).
-    `captureV1JSON` (`:386-414`) runs after `beforeSend`, removes `$lib`/`$lib_version` from
-    `properties` at `3460e534a` (`:388-389`; #1036 keeps them from `1f91c5b2`), hoists `$cookieless_mode`, `$ignore_sent_at`, `$product_tour_id` and
-    `$process_person_profile` into `options` when the option is unset (`:391-397`, list at
-    `:370-375`), and lifts string `$session_id`/`$window_id` to top-level `session_id`/`window_id`
-    (`:405-410`). Enqueued events still carry `$lib`/`$lib_version` (stamped from `sdkInfo`,
+  - **Met (#146, capture v1):** wire, headers, per-event results, options hoisting, `$lib`/`$lib_version`
+    kept, session/window id lifting, blank distinct id fallback, timestamps (three fractional digits,
+    a client allowance) and fail-open token; see [Capture v1](#capture-v1). A caller's `$lib` merges key
+    by key over the SDK's pair (enqueued events carry `$lib` from `sdkInfo`,
     `PostHog/PostHogSDK.swift:800-803`), so the `@client` "Caller property overrides an SDK context
-    property" scenario passes on the enqueued event. PostHog/posthog-ios#1036 (merged, `436fd50ea`)
-    stops removing `$lib`/`$lib_version` in `captureV1JSON`, which matches #146's **Events name their
-    own library** at `5c26b9bc`.
+    property" scenario passes; #146's pair-fill rule conflicts with that, and the conflict is raised on
+    [#146](https://github.com/PostHog/sdk-specs/pull/146#issuecomment-6743588735), not scored.
 - **Backwards compatibility:** Backward-compatible. Omitting null members only changes
   serialization; `[String: Any]` types stay. Person properties set to `null` would need a deliberate
   scope decision.
@@ -505,11 +512,14 @@ this records what the audited branch does so the next audit can score it once #1
   which `requestAndPayload` prefers over `compression` (`:148`). So `compression = .none` alone still gzips AI
   requests; the spec requires an option that turns compression off "for the whole client", covering every
   endpoint the SDK would otherwise compress. Setting both properties to `.none` works around it.
-- **Open spec question, not scored:** the AI-lane gap above follows #146's `capture-ai` (text at
-  `5c26b9bc`): "The analytics lane's compression and queue capacity … SHALL NOT change AI uploads, and
-  the reverse". The two rules conflict, and posthog-android 4.0 has the same `captureAiCompression`
-  split. The conflict is raised on [#146](https://github.com/PostHog/sdk-specs/pull/146#issuecomment-6743564814);
-  the row was 🟡 on 2026-11-05 and is ✅ until #146 settles it.
+- **Met (#146, capture v1 transport):** capture v1 URLs, Bearer-only token and the full header set on
+  every attempt; exactly `Content-Encoding: gzip`, with a raw fallback only on a local gzip error; no
+  legacy encodings; same-origin 307/308 redirects only, at most 5; see [Capture v1](#capture-v1).
+- **Spec conflict, not scored:** the AI-lane compression above follows #146's `capture-ai`: "The
+  analytics lane's compression and queue capacity … SHALL NOT change AI uploads, and the reverse". That
+  conflicts with this spec's whole-client opt-out, and posthog-android 4.0 has the same
+  `captureAiCompression` split. The conflict is raised on
+  [#146](https://github.com/PostHog/sdk-specs/pull/146#issuecomment-6743564814).
 - **Backwards compatibility:** No change needed unless #146 keeps the whole-client rule. Then: make
   `compression = .none` also turn off AI compression unless `captureAiCompression` is set explicitly
   (for example, make `captureAiCompression` optional and fall back to `compression`).
@@ -594,31 +604,33 @@ this records what the audited branch does so the next audit can score it once #1
   start from its UUIDv7 timestamp, or omit the key when it isn't v7. (b) Skip the required keys and
   the bundle when `timestamp` is earlier than the current session start.
 
-### n27 — Capture AI (➖ N/A)
-- **Spec requires:** Applicability is `server` ("currently implemented by posthog-python and
-  posthog-node"), with `@server` scenarios. Behavior: 1 same admission pipeline as `capture`; 2 a
-  client-generated UUID returned to the caller; 3 an isolated queue with its own caps and retry that
-  starts lazily; 4 a stable envelope across retries. Error handling: never throw; drop oversized
-  events logging only name and size.
-- **SDK currently:** iOS 4.0 adds `captureAi(_:distinctId:properties:userProperties:userPropertiesSetOnce:groups:timestamp:options:) -> String?`
-  (`PostHog/PostHogSDK.swift:1631-1655`), mirroring `capture`'s parameters and routed through
-  `captureInternal(..., aiLane: true)`, so `beforeSend`, enrichment and opt-out apply (Behavior 1)
-  and the event UUID is returned (2). AI events go to `/i/v1/ai/events`
-  (`PostHog/PostHogApi.swift:206-213`) from their own disk queue with separate count, byte, timeout
-  and compression settings (`PostHog/QueueEndpoint+Factories.swift:60-90`;
-  `PostHog/PostHogConfig.swift:493-518`). The queue is stored per event and resent unchanged (4). An
-  event over `captureAiMaxEventBytes` is dropped with a log of its name and size only
-  (`PostHog/PostHogQueue.swift:417-418`). One deviation: the AI queue is created and started at
-  setup (`PostHog/PostHogSDK.swift:314-331`), not lazily (Behavior 3). There is no
-  `enableFullAiCapture` flag, which only matters for PostHog AI wrapper libraries, and iOS has none.
-- **Why ➖:** the legend's N/A means the contract does not apply to the platform, and the spec's
-  Applicability on `main` (`8306698`) still names only server SDKs. #147 merged into #146's branch
-  (`6a9ed0f`), not `main`; at #146's `5c26b9bc` Applicability adds "posthog-ios 4.0 and
-  posthog-android 4.0 (`captureAi`)". Score this row once #146 merges; the AI queue starting at setup
-  rather than lazily is the one deviation recorded above.
-- **Backwards compatibility:** N/A.
-- **Remediation:** None required. If the spec extends Applicability to clients, start the AI queue on
-  first `captureAi` call.
+### n27 — Capture AI (🟡 Partial; was ➖)
+- **Spec requires:** [#146](https://github.com/PostHog/sdk-specs/pull/146) at `5c26b9bc` (with #147's
+  text) adds "posthog-ios 4.0 and posthog-android 4.0 (`captureAi`)" to Applicability. The AI method
+  uses capture's event-building order and "SHALL follow capture's 'Capture drops null-valued object
+  properties' requirement"; AI events ride their own lane to `/i/v1/ai/events` with their own queue,
+  retry state and lane-scoped options; "client SDKs start their durable queue at launch" (Behavior 3);
+  the whole serialized event is capped at 8 MiB + 64 KiB, a configured cap above that is clamped or
+  refused, and batches are byte-aware at 5 MiB.
+- **SDK currently (`1f91c5b2`):**
+  - **Met:** `captureAi` takes the same parameters as the fullest `capture` overload and returns the
+    uuid; a non-`$ai_` name is sent with a debug log (`PostHog/PostHogSDK.swift:2062-2066`), and
+    `capture` never reroutes `$ai_*` events. The lane has its own queue, retry state and request identity
+    (keyed by path, `PostHog/PostHogApi.swift:75`). The AI queue starts at setup (`PostHogSDK.swift:314-332`),
+    as Behavior 3 asks of client SDKs. `flush()` and `close()` signal both lanes. Options:
+    `captureAiCompression` (gzip), `captureAiMaxQueueSize` (100), `captureAiTimeout` (60 s idle) and
+    `captureAiMaxEventBytes` (`PostHog/PostHogConfig.swift:483-516`), plus a fixed 50 MiB disk cap. A cap
+    above the ceiling is clamped with a log (`PostHog/QueueEndpoint+Factories.swift:64-68`); an event over
+    it is dropped with a name-and-size log (`PostHog/PostHogQueue.swift:416-419`). Batches use the 5 MiB
+    window.
+  - **Gap:** `captureAi` uses the same `sanitizeDictionary` and `captureV1JSON` path as `capture`
+    (`PostHogSDK.swift:1628-1655`, `:1930`), so `NSNull` properties are sent as JSON `null`, the same
+    root cause as [n4](#n4).
+  - **Not applicable:** the full-AI-capture flag, built-in AI integrations and the OpenTelemetry bridge;
+    iOS ships none of them.
+  - **Not scored:** per-lane compression is the #146 conflict recorded in [n22](#n22).
+- **Backwards compatibility:** Backward-compatible; omitting null members only changes serialization.
+- **Remediation:** The same encode-step `NSNull` strip as [n4](#n4).
 
 ### n28 — On Feature Flags (🟡 Partial; was ✅)
 - **Spec requires:** new since the last audit (#94, #161): a failed non-quota load invokes listeners with

@@ -17,178 +17,201 @@ detail — evidence, code references, and remediation for every non-Pass cell �
 
 In-scope SDKs (referenced across `openspec/specs/`): posthog-js, posthog-python, posthog-node,
 posthog-android, posthog-ios, posthog-flutter, posthog-react-native, posthog-php, posthog-ruby,
-posthog-go, posthog-java, posthog-dotnet. **68 contracts** are now tracked per SDK: the 68
+posthog-go, posthog-java, posthog-dotnet. **69 contracts** are now tracked per SDK: the 69
 capabilities listed in the root `README.md` table.
 
-**The contract surface grew by four this cycle, all server-scope.** **Emails**
-([#159](https://github.com/PostHog/sdk-specs/pull/159)) and the three AI-evaluation capabilities
-**AI Datasets**, **AI Scorers** and **Offline Evaluations**
-([#137](https://github.com/PostHog/sdk-specs/pull/137), with per-item models added by
-[#149](https://github.com/PostHog/sdk-specs/pull/149)) merged between 2026-10-20 and 2026-10-30. Their
-applicability differs in a way that matters for scoring: **Emails says "Server SDKs only"
-unconditionally**, so an unimplemented Emails row on a server SDK is ❌, while the three AI capabilities
-scope themselves to "server SDKs **that implement**" them, so an unimplemented row is ➖. Client SDKs
-take ➖ on all four.
+**The contract surface grew by one this cycle: Experiment Exposure**
+([#162](https://github.com/PostHog/sdk-specs/pull/162)), an `internal behavior` capability whose
+applicability is `both` but is conditioned on the SDK reading `/flags?v=4` records — an SDK that does
+not read them "sees config version 2 flags as legacy values and sends no direct exposure", which
+makes abstaining conformant rather than a gap.
 
-**Row-count status.** The three SDKs audited this run (posthog-python, posthog-node, posthog-java) are
-at the full 68 rows, and posthog-java's long-standing 59-row shortfall is closed. **The other nine
-SDKs are at 64 or 63 and need the four new rows backfilled** — a mechanical addition for the six client
-SDKs (four ➖ each) and a real scoring question only for posthog-php, posthog-ruby, posthog-go and
-posthog-dotnet, where the Emails row is a genuine ❌/✅ call. posthog-php and posthog-ruby additionally
-still need the MCP Analytics row (➖ for both).
+**Row-count status.** The six SDKs audited in the last two runs — posthog-python, posthog-node,
+posthog-java, posthog-php, posthog-ruby, posthog-go — are at the full 69 rows. **The other six are at
+64 and need backfilling**: the four server-scope contracts from the previous cycle (Emails, AI
+Datasets, AI Scorers, Offline Evaluations) plus Experiment Exposure, and MCP Analytics where it is
+not yet present. For the five client SDKs that is five mechanical ➖ rows each; posthog-dotnet is the
+one remaining SDK where the Emails row is a genuine ❌/✅ call.
 
-**Two scope questions for a human, raised by this cycle's specs.** (1) **posthog-rs** is now named in
-the `mcp-analytics` applicability table with a concrete surface (`posthog_rs::mcp`, feature `mcp`,
-rmcp adapter), added by [#150](https://github.com/PostHog/sdk-specs/pull/150). By the rule "include
-only SDKs the specs actually reference" it has become in-scope and should enter the matrix pending
-initial audit; this run did not add it unilaterally. (2) **posthog-kmp** and **posthog-unity** are
-mentioned in `session-replay-privacy` ([#160](https://github.com/PostHog/sdk-specs/pull/160)) — kmp as
-delegating to posthog-android, unity as "a named follow-up" that does not implement the requirement
-yet. These are single-spec remarks rather than enumerated surfaces, so they are weaker candidates than
-posthog-rs. See "Scope decisions needed" below.
+**Two scope questions for a human, both about the `mcp-analytics` applicability table.** It records
+posthog-ruby as "not yet" while the gem ships a 3,798-line `lib/posthog/mcp/` package, and it lists
+two Go adapter packages where posthog-go now ships three. A third, older question — whether
+**posthog-rs** should enter the matrix as a 13th SDK — is still open. See "Scope decisions needed"
+below.
 
-**No SDK is pending its first audit.** Every run since the backlog drained has been a re-audit
-run, and selection is driven by the four-rule priority order at the top of this file.
-## This run (2026-11-02)
+**No SDK is pending its first audit.**
 
-**Three SDKs audited: posthog-java, posthog-node, posthog-python** — the full three-slot cap, and the
-whole server cohort that the cycle's spec delta lands on.
+## This run (2026-11-09)
 
-**sdk-specs advanced from `898b669` to `be25182`: 20 commits touching `openspec/specs/`, including
-four new capabilities.** The changes that drove this run's selection and findings:
+**Three SDKs audited: posthog-php, posthog-ruby, posthog-go** — the full three-slot cap, the two
+stalest pointers in the matrix plus the server SDK this cycle's `mcp-analytics` work lands on.
 
-- **Four new server-scope capabilities** — Emails
-  ([#159](https://github.com/PostHog/sdk-specs/pull/159)), AI Datasets, AI Scorers and Offline
-  Evaluations ([#137](https://github.com/PostHog/sdk-specs/pull/137),
-  [#149](https://github.com/PostHog/sdk-specs/pull/149)). Every one of them names posthog-python
-  and/or posthog-node as its reference surface, which is rule 1 pointing squarely at this cohort.
-- **Retry Queue** ([#132](https://github.com/PostHog/sdk-specs/pull/132)) — ingestion retry backoff
-  SHOULD be jittered, scaling the computed delay rather than replacing the schedule, with
-  `Retry-After` still a floor applied after jitter.
-- **Shutdown** ([#135](https://github.com/PostHog/sdk-specs/pull/135)) — a shutdown timeout bounds the
-  *whole* teardown drain, not each delivery within it; once the budget is gone the SDK stops, starts no
-  further flush, returns normally, and reports once.
-- **Evaluate Flags / Get Feature Flag Result**
-  ([#111](https://github.com/PostHog/sdk-specs/pull/111), building on
-  [#109](https://github.com/PostHog/sdk-specs/pull/109)) — snapshot enablement and value accessors
-  SHALL take a per-read `sendFeatureFlagEvents`; payload accessors, key enumeration and in-memory
-  filters SHALL NOT. An omitted option uses the client-level default where the SDK has one.
-- **HTTP Client** ([#81](https://github.com/PostHog/sdk-specs/pull/81)) — request body compression and
-  its opt-out. Server SDKs may default to no compression and may express the control as a boolean or
-  an enum, so this is a light requirement on this cohort; the hard rule is that a server rejection
-  must never silently downgrade to an uncompressed resend.
-- **MCP Analytics** ([#150](https://github.com/PostHog/sdk-specs/pull/150),
-  [#157](https://github.com/PostHog/sdk-specs/pull/157)) — #150 reconciles three redaction rules and
-  **explicitly records that the SDKs, not the spec, must change on one of them**: object keys get the
-  same passes as string values. #157 adds the common-prefix margin rule for long keys.
-- Also: **Flag Definition Loader** ([#88](https://github.com/PostHog/sdk-specs/pull/88)) optional
-  polling opt-out (a MAY, so it creates no gap); **Capture Exception**
-  ([#124](https://github.com/PostHog/sdk-specs/pull/124)) fatal-path serializer parity (applies only
-  where an SDK has a separate fatal serializer); and several client-scoped changes
-  ([#143](https://github.com/PostHog/sdk-specs/pull/143) capture precedence,
-  [#127](https://github.com/PostHog/sdk-specs/pull/127) rate-limiter clock bound,
-  [#121](https://github.com/PostHog/sdk-specs/pull/121) survey popup delay,
-  [#155](https://github.com/PostHog/sdk-specs/pull/155) replay debug precedence,
-  [#160](https://github.com/PostHog/sdk-specs/pull/160) Android FLAG_SECURE) that this run's cohort is
-  not exposed to.
+**sdk-specs advanced from `be25182` to `e08cbc0`: 19 commits touching `openspec/specs/`, including a
+new capability.** The changes that drove this run's selection and findings:
 
-**Selection.** Rules 1, 2 and 4 all point the same way:
+- **Experiment Exposure** ([#162](https://github.com/PostHog/sdk-specs/pull/162)) — a **69th
+  contract**. For a flag with config version 2, a read that lands on an experiment split emits
+  `$experiment_exposure` directly, deduped independently of `$feature_flag_called`. Its applicability
+  is `both` but conditioned: "every client or server SDK that reads `/flags?v=4` records. An SDK that
+  does not read them sees config version 2 flags as legacy values and sends no direct exposure."
+- **Feature Flag Called Tracker** ([#162](https://github.com/PostHog/sdk-specs/pull/162), +240 lines)
+  — config version 2 attribution (`$feature_flag_config_version`, `$feature_flag_reason_code`
+  replacing `$feature_flag_reason`, the `rule_id`/`rule_type` pair and `$feature_flag_variant`) and a
+  matching dedupe key.
+- **Evaluate Flags** ([#162](https://github.com/PostHog/sdk-specs/pull/162),
+  [#169](https://github.com/PostHog/sdk-specs/pull/169)) — snapshots must retain the evaluation
+  details exposure needs, and the definition-load warning must exclude `evaluation_runtime: "client"`
+  flags.
+- **Exception Event Metadata** ([#123](https://github.com/PostHog/sdk-specs/pull/123)) — a server SDK
+  SHALL add `$trace_id`/`$span_id` from the ambient OpenTelemetry span, without taking OTel as a
+  required dependency and without ever dropping the event if the read fails.
+- **Tracing Headers** ([#129](https://github.com/PostHog/sdk-specs/pull/129)) — a server span-context
+  bridge: existing request spans and child spans receive `posthogDistinctId`/`sessionId`, existing
+  span attributes win, nothing is evicted, and detached work past the request scope gets nothing.
+- **Emails** ([#163](https://github.com/PostHog/sdk-specs/pull/163)) — the send body is flattened to
+  `{"template_id", "to", "message_data", "distinct_id"}`, replacing the nested
+  `template.id`/`identifiers.distinct_id` shape the capability shipped with.
+- **MCP Analytics** ([#175](https://github.com/PostHog/sdk-specs/pull/175),
+  [#176](https://github.com/PostHog/sdk-specs/pull/176),
+  [#189](https://github.com/PostHog/sdk-specs/pull/189),
+  [#190](https://github.com/PostHog/sdk-specs/pull/190),
+  [#194](https://github.com/PostHog/sdk-specs/pull/194)) — client conversation ids read from a tool
+  call's `_meta` for ChatGPT, Codex and VS Code, ranked above the SDK's own conversation handle; and
+  a reversal: #194 drops #190's pattern-based personal-data pass over tool payloads, so an SDK relays
+  arguments, results and error text after the **credential passes only**.
+- Also: **Identify** ([#167](https://github.com/PostHog/sdk-specs/pull/167)) keep identify running
+  while opted out, and several client-scoped changes
+  ([#170](https://github.com/PostHog/sdk-specs/pull/170),
+  [#171](https://github.com/PostHog/sdk-specs/pull/171),
+  [#161](https://github.com/PostHog/sdk-specs/pull/161),
+  [#102](https://github.com/PostHog/sdk-specs/pull/102),
+  [#138](https://github.com/PostHog/sdk-specs/pull/138)) this run's cohort is not exposed to.
 
-- **Rule 1 (spec-affected).** All four new capabilities are server-scope and none of the client SDKs
-  can score anything but ➖ on them. Of the six server SDKs, posthog-python and posthog-node are the
-  named reference surfaces and posthog-java is the only one whose Emails row could plausibly have
-  changed without anyone noticing.
-- **Rule 2 (changed since last audit).** All three drifted: posthog-java `8659a7b4`→`8309f837`
-  (+2,099/−345 lines in `posthog-server/src/main` alone), posthog-node `4f590b36`→`8c832754`,
-  posthog-python `509c8525`→`dca22075` (+19,800 lines in `posthog/`, excluding tests).
-- **Rule 4 (staleness backstop).** posthog-java's pointer was **12 weeks** old, the only one outside
-  the ~4-week window by more than a few days, and it was the last SDK short of the full contract list.
-  posthog-node and posthog-python were both three weeks old — inside the window, but chosen on rules 1
-  and 2 rather than staleness.
+**Selection.** Rules 1, 2 and 4 again converge:
 
-**What this run deliberately did not do.** It did not re-derive all 68 rows for any of the three SDKs.
-Each per-SDK file states its own scope in the header and marks which rows carry forward unverified
-from the previous audit. posthog-java's forward-carried set is the largest and is the first thing to
-spend its next slot on.
+- **Rule 4 (staleness backstop).** posthog-php and posthog-ruby were the two oldest pointers at
+  **6 weeks**, the only two outside the ~4-week window, and the two with the largest backfill — they
+  were the top of last run's queue for exactly this reason.
+- **Rule 1 (spec-affected).** posthog-go is the only remaining SDK in the matrix named in the
+  `mcp-analytics` applicability table, and five of this cycle's commits are `mcp-analytics`. All
+  three are server SDKs, which is where the Emails, Exception Event Metadata and Tracing Headers
+  deltas land.
+- **Rule 2 (changed since last audit).** All three drifted hard: posthog-php `5451f4e0`→`9c059270`
+  (+3,409/−428 lines in `lib/`), posthog-ruby `185060ab`→`c08fd1b9` (+1,695/−366 in `lib/`),
+  posthog-go `08549f42`→`2f949f18` (+11,341 lines across non-test `.go` files).
 
-### The matrix has no Unknown cells for the first time
+**What this run deliberately did not do.** It did not re-derive all 69 rows from scratch for any of
+the three. Each file's scope this run was: every row touched by the 19-commit spec delta, every row
+already recorded as 🟡/❌, and the six rows new to the matrix. Rows outside that set carry forward
+from the previous audit and are marked as such in each file's header.
 
-posthog-node's **Traces ❓→✅** was the last one, and it was queued specifically for this run.
-`packages/core/src/traces/` (8,190 lines) was read against all of `openspec/specs/traces/spec.md`:
-the `startSpan`/`withSpan`/`getActiveSpan` surface, the thirteen configuration knobs with their
-positive-integer fallbacks, the off-until-configured gate, the OTLP transport with bearer auth and
-gzip, and the error-handling policy. It passes each of them, and in places implements the spec's
-reasoning rather than just its outcome — the retry budget is charged per *backoff window* rather than
-per attempt, a caller-driven flush is explicitly exempted from charging, and the batch size ramps back
-up by one per healthy send after a 413 shrink. See [posthog-node.md#n2](posthog-node.md).
+### Emails went from one implementation to four
 
-This closes a two-run correction: the row was ❌ on 2026-10-12 (a false negative — the grep missed a
-pipeline that had merged four weeks earlier), ❓ on 2026-10-19, and is now scored.
+The headline result. **Emails was a ❌ on posthog-java three weeks ago on the reasoning that the
+capability applies to server SDKs unconditionally. All three SDKs audited this run ship it, and all
+three pass** — `lib/Emails.php` (773 lines), `lib/posthog/emails.rb` (518 new lines), `emails.go`
+(660 new lines), each with its own error type module alongside.
 
-### posthog-java: the first SDK with feature-flag negative knowledge
+They pass on the details that are easiest to get wrong, and they agree with each other:
 
-Seven server SDKs have now been checked against the `evaluate-flags` requirement that an SDK remember
-a key was absent from both its local definitions and a clean remote fallback. Six — php, ruby, go,
-dotnet, python, node — lack it entirely. **posthog-java has it, and has it properly.**
-`PostHogFeatureFlags.kt` carries a capacity-bounded `knownMissingFlagKeys` store, a
-`missingFlagKeysGeneration` counter invalidated on every successful definitions refresh, and an
-`inFlightMissingFlagProbes` map so concurrent callers for the same key wait on one probe instead of
-each issuing a `/flags` request. A response is matched against the generation it was issued under, so
-a refresh landing mid-probe cannot install stale negative knowledge.
+- All three send [#163](https://github.com/PostHog/sdk-specs/pull/163)'s **flattened** body with the
+  template ID lowercased and `distinct_id` present only when the caller passed one — none carries the
+  superseded nested shape.
+- All three resolve the **app host** from the five Cloud ingestion hosts and refuse a custom host
+  with no `app_host`, so a proxy never receives the secret key.
+- All three build the **idempotency key** once per call, outside the attempt loop, defaulting to a
+  UUID v4 — the thing a naive implementation gets wrong by regenerating per attempt.
+- posthog-ruby reproduces the spec's **error-name table** line for line, including both 409, both 422
+  and both 429 branches (`lib/posthog/email_error.rb:42-53`).
 
-That matters beyond one row: **the remediation written on six other SDK pages now has a first-party
-reference implementation** instead of a description. See [posthog-java.md#n27](posthog-java.md).
+All three also ship the **code-content form** (`template_key` with `subject`/`html`/`text`) and
+`capture_engagement`, which the spec currently lists under "Not covered … which the send API does not
+accept yet". That is extra surface rather than a deviation, and
+[#191](https://github.com/PostHog/sdk-specs/pull/191) is the open proposal to specify it — but three
+independent SDKs shipping an unspecified form of the same call is worth knowing about.
 
-posthog-java's Evaluate Flags row is still 🟡, on a narrower and newer gap: its snapshot accessors
-`isEnabled(key)` and `getFlag(key)` take no per-read `sendFeatureFlagEvents`, which #111 now requires.
-posthog-node already satisfies that requirement; posthog-python does not.
+### The OpenTelemetry bridge landed in all three, with Go ahead on the hard scenario
 
-### posthog-python passes all four new contracts
+[#129](https://github.com/PostHog/sdk-specs/pull/129)'s five span-enrichment requirements and
+[#123](https://github.com/PostHog/sdk-specs/pull/123)'s two trace-context requirements both arrived
+this cycle, and all three SDKs implemented them — independently, within weeks, with the same shape:
+an optional span processor that writes `posthogDistinctId`/`sessionId` at span start, yields to
+attributes the span already has, skips non-recording spans, and swallows every error.
 
-It is the only SDK that does, and that is close to tautological — it is the named reference surface
-for all four — but each was checked against the spec rather than assumed, and the checks found the
-implementation genuinely faithful on the details that are easiest to get wrong: the complete
-response → error-name table for Emails including both 409, both 422 and both 429 branches; the
-per-operation page limits and caps across datasets, revisions, items and item versions; the
-offset-versus-cursor split in scorers; and #149's per-item `model_version`, validated locally,
-carried in the item's immutable encoded JSON, and rejected before any I/O when two results declare
-conflicting models for one item UUID. See [n21]–[n24] in
-[posthog-python.md](posthog-python.md).
+**posthog-go is the only one that gets the detached-work scenario right.** "Work that starts a new
+span after its inherited request scope has ended SHALL NOT receive that ended scope's IDs" is the one
+requirement a plain context lookup fails, because a Go context value outlives the handler;
+`otel/context_span_processor.go:63-65,106-109` carries an `active` flag that the middleware clears
+with `defer`, so an inherited context stops enriching the moment the request returns.
 
-Its other movement this run is a quiet improvement that closes half of an existing note: tracing-header
-extraction is no longer Django-only. `posthog/integrations/` now carries `flask.py`, `asgi.py` and
-`drf.py` sharing a new `_tracing_headers.py`.
+**posthog-go is also the only one where the trace-context requirement is not reachable by default.**
+Its derivation is correct, but it fires only through `posthogotel.EnqueueWithContext` in the separate
+`otel/` module; an application capturing exceptions through the core client gets nothing. PHP
+(`class_exists`) and Ruby (`defined?`) soft-import, so their default capture path carries the IDs.
+Go cannot do that, which makes this a design question rather than a bug — recorded inside
+[posthog-go.md#n6](posthog-go.md) rather than scored as its own row.
 
-### posthog-java's exception envelope is the worst row added this run
+### None of the three server SDKs reads `/flags?v=4`
 
-**Exception Event Metadata ❌ on first scoring**, and it fails four `exception-event-metadata` rules at
-once: `mechanism.synthetic` is the literal `false` on every entry (the spec says "A producer MUST NOT
-default unknown synthetic state to `false`"); `mechanism.source` is never emitted, with the parent edge
-smuggled into `type` as `"suppressed"`; `exception_id` is omitted entirely on single-entry lists where
-the spec unconditionally requires `0`; and `handled` is resolved once and copied onto every cause.
+posthog-php requests `/flags/?v=2` (`lib/Client.php:272`), posthog-ruby `/flags/?v=2`
+(`lib/posthog/feature_flags.rb:1857`), posthog-go `flags/?v=2` (`flags.go:228`). Across all three,
+`grep -rnE 'config_version|experiment_split|experiment_exposure|rule_id|variant_key'` returns **zero**
+non-test matches.
 
-This is **shared-core code** (`ThrowableCoercer.kt` in the `posthog` module), so it is the same defect
-posthog-android carries and one fix closes both rows. posthog-java does do one thing posthog-android
-does not: it sets `$exception_source` from the concrete runtime hook. See
-[posthog-java.md#n29](posthog-java.md).
+So **Experiment Exposure scores ➖ on all three** — the spec's applicability sentence explicitly
+sanctions abstaining — and the config version 2 attribution requirements added to
+`feature-flag-called-tracker` never trigger, so they create no ❌ either. What they do create is a
+ceiling: none of these SDKs can produce correct experiment analytics for a config version 2 flag, and
+the fix is one change (read `v=4`, carry the record's metadata through) that unlocks three rows at
+once on each SDK. Whether a server SDK staying on `v=2` indefinitely should keep reading as ➖ is a
+scope question for a human — see "Scope decisions needed" below.
 
-### The jitter requirement is unmet across the whole cohort
+**One requirement in this family they all already meet:** [#169](https://github.com/PostHog/sdk-specs/pull/169)'s
+exclusion of `evaluation_runtime: "client"` flags from the definition-load warning is implemented in
+all three (`lib/Client.php:1910`, `lib/posthog/feature_flags.rb:1807`, `featureflags.go:323`), which
+is unusual for a requirement that merged five days before the audit.
 
-[#132](https://github.com/PostHog/sdk-specs/pull/132) is SHOULD-tier, and **all three SDKs audited this
-run fail it**, each for a slightly different reason worth recording separately:
+### posthog-ruby ships MCP analytics; the spec says it does not
 
-- **posthog-python** has a correct exponential progression with `Retry-After` as a floor and a shared
-  ceiling — and no randomness anywhere on the path.
-- **posthog-node** *ships* a correct jitter helper (`packages/core/src/utils/backoff.ts`, with the
-  `Retry-After` floor applied after jitter), but uses it **only** in the logs and traces OTLP queues.
-  The analytics-events ingestion queue still waits a **fixed 3,000 ms** per attempt through
-  `retriable()` — no exponential progression, no jitter, no `Retry-After` handling at all. This is
-  shared `@posthog/core` code, so posthog-react-native and posthog-browser inherit it.
-- **posthog-java** uses a linear 5 s → 60 s progression with no randomness and no visible `Retry-After`
-  handling.
+`openspec/specs/mcp-analytics/spec.md:26` records posthog-ruby as **"not yet"**. The gem contains
+`lib/posthog/mcp/`: **3,798 lines across 22 files** — instrumentation, a Rack middleware, a server
+extension, session derivation and a PostHog session token, sanitization, truncation, intent and
+identity resolution, a before-send hook and a feedback tool — and it grew again this cycle. The
+2026-09-28 audit treated the whole subtree as out of scope on the strength of that table.
 
-posthog-node is the cheapest fix of the three and the highest-leverage: the helper it needs is already
-in the same package.
+This run scores it at **🟡**, because the contract plainly describes what the package does. It emits
+nine `$mcp_*` event types and the great majority of the property reference. Three gaps:
+`$mcp_interface` — a *required* property — is never emitted; the client-conversation-id rung
+[#175](https://github.com/PostHog/sdk-specs/pull/175)/[#176](https://github.com/PostHog/sdk-specs/pull/176)
+added above handle resolution is absent; and `$mcp_input_required` (a SHOULD) is not emitted. See
+[posthog-ruby.md#n21](posthog-ruby.md).
+
+**The applicability table is the thing that needs updating**, and it is stale in a second place:
+posthog-go now ships a **third** MCP adapter package, `posthogmcpgo` (1,137 lines, new this cycle),
+where the table lists only `posthogmcp` and `posthogmcpsdk`.
+
+### The jitter requirement is still unmet across the cohort
+
+[#132](https://github.com/PostHog/sdk-specs/pull/132) is SHOULD-tier. Last run found posthog-python,
+posthog-node and posthog-java all failing it. **This run adds posthog-php and posthog-go**, and the
+Go case is the most pointed in the matrix:
+
+- **posthog-php** has a plain 100/200/400 ms doubling schedule with no randomness anywhere
+  (`lib/HttpClient.php:104,176`) — while its own brand-new `Emails` client *does* jitter, drawing a
+  factor from `[0.8, 1.2]` (`lib/Emails.php:553`). Two retry paths in one package, one compliant.
+- **posthog-go** already has the machinery: `NewBackoff(base, factor, jitter, cap)` applies a bounded
+  random deviation when `jitter != 0` (`backoff.go:19-47`). Every ingestion and flag call site passes
+  **`jitter: 0`** (`backoff.go:36`, `flags.go:220`). The only caller that jitters is, again, the new
+  `Emails` client at `0.2` (`emails.go:306`). The fix is one constant per call site.
+- **posthog-ruby is the exception and the reference.** `BackoffPolicy#add_jitter`
+  (`lib/posthog/backoff_policy.rb:41-47`) applies a randomization factor around the computed
+  interval, and `Transport#retry_with_backoff` uses it on the real ingestion path
+  (`lib/posthog/transport.rb:125-151`). Its Retry Queue row stays 🟡 for an unrelated reason.
+
+Seven of the twelve SDKs have now been checked against this requirement and six fail it. A
+`SHOULD`-tier availability measure that six first-party SDKs independently skipped is worth a second
+look at the requirement's discoverability, not just at the SDKs.
+
 
 ## Roll-up
 
@@ -201,9 +224,9 @@ in the same package.
 | posthog-node | 11/68 fully compliant (16%; 32 contracts N/A on a server SDK) | 11 | 21 | 4 | 32 | 0 | 2026-11-02 · `8c832754` (posthog-js monorepo; targeted re-audit — see file header) | 25 | [posthog-node.md](posthog-node.md) |
 | posthog-flutter | 21/64 fully compliant (33%; **64 rows, needs +4 new contracts**) | 21 | 29 | 6 | 8 | 0 | 2026-10-19 · `1032c102` | 35 | [posthog-flutter.md](posthog-flutter.md) |
 | posthog-react-native | 29/64 fully compliant (45%; **64 rows, needs +4 new contracts**) | 29 | 27 | 3 | 5 | 0 | 2026-10-19 · `3ddaa654` (posthog-js monorepo) | 30 | [posthog-react-native.md](posthog-react-native.md) |
-| posthog-php | 11/63 fully compliant (17%; 33 contracts N/A on a server SDK; **needs +5: MCP Analytics and the four new contracts**) | 11 | 11 | 8 | 33 | 0 | 2026-09-28 · `5451f4e0` | 19 | [posthog-php.md](posthog-php.md) |
-| posthog-ruby | 9/63 fully compliant (14%; 33 contracts N/A on a server SDK; **needs +5: MCP Analytics and the four new contracts**) | 9 | 13 | 8 | 33 | 0 | 2026-09-28 · `185060ab` | 21 | [posthog-ruby.md](posthog-ruby.md) |
-| posthog-go | 8/64 fully compliant (13%; 33 contracts N/A on a server SDK; **64 rows, needs +4 new contracts**) | 8 | 14 | 9 | 33 | 0 | 2026-10-05 · `08549f42` | 23 | [posthog-go.md](posthog-go.md) |
+| posthog-php | 11/69 fully compliant (16%; 38 contracts N/A on a server SDK) | 11 | 12 | 8 | 38 | 0 | 2026-11-09 · `9c059270` (targeted re-audit — see file header) | 20 | [posthog-php.md](posthog-php.md) |
+| posthog-ruby | 10/69 fully compliant (14%; 37 contracts N/A on a server SDK) | 10 | 14 | 8 | 37 | 0 | 2026-11-09 · `c08fd1b9` (targeted re-audit — see file header) | 22 | [posthog-ruby.md](posthog-ruby.md) |
+| posthog-go | 9/69 fully compliant (13%; 37 contracts N/A on a server SDK) | 9 | 14 | 9 | 37 | 0 | 2026-11-09 · `2f949f18` (targeted re-audit — see file header) | 23 | [posthog-go.md](posthog-go.md) |
 | posthog-java | 12/68 fully compliant (18%; 33 contracts N/A on a server SDK) | 12 | 14 | 9 | 33 | 0 | 2026-11-02 · `8309f837` (posthog-android monorepo; row completion + targeted re-audit — see file header) | 23 | [posthog-java.md](posthog-java.md) |
 | posthog-dotnet | 5/64 fully compliant (8%; 30 contracts N/A on a server SDK; **64 rows, needs +4 new contracts**) | 5 | 19 | 10 | 30 | 0 | 2026-10-05 · `ae4d019c` | 29 | [posthog-dotnet.md](posthog-dotnet.md) |
 
@@ -336,6 +359,8 @@ there close rows on two pages at once.
 | posthog-java | Traces | Backward-compatible | No `/i/v1/traces` pipeline. Its `otel/` package enriches the application's own OpenTelemetry spans and is a different capability; the previous ➖ rested on "no SDK implements this yet", which python and node have since made false — [posthog-java.md#n26](posthog-java.md) |
 | posthog-java | Logs | Backward-compatible | No `/i/v1/logs` OTLP pipeline in `posthog-server` — [posthog-java.md#n19](posthog-java.md) |
 | posthog-java | Set/Reset Person/Group Properties For Flags (×4) | Backward-compatible | No persistent property-override store despite `@both`-tagged acceptance scenarios — [posthog-java.md#n20](posthog-java.md) |
+
+**Re-confirmed this run, unchanged at the new HEAD:** every posthog-php, posthog-ruby and posthog-go ❌ above was re-checked at `9c059270`, `c08fd1b9` and `2f949f18` respectively. None was found fixed, and no new ❌ was added — the three rows new to these files that could have been ❌ (Emails on each) all came in ✅.
 | posthog-dotnet | Get Feature Flag Payload | Backward-compatible | No standalone `GetFeatureFlagPayloadAsync(key, distinctId)`; only reachable via a full flag/snapshot object — [posthog-dotnet.md#n15](posthog-dotnet.md) |
 | posthog-dotnet | Is Feature Enabled | Backward-compatible | No `defaultValue` overload on `IsFeatureEnabledAsync`/`FeatureFlagEvaluations.IsEnabled`; every miss collapses to hardcoded `false` — [posthog-dotnet.md#n20](posthog-dotnet.md) |
 | posthog-dotnet | Logs | Backward-compatible | Entirely unimplemented — [posthog-dotnet.md#n22](posthog-dotnet.md) |
@@ -420,6 +445,10 @@ there close rows on two pages at once.
 | posthog-dotnet | Identify | Breaking or Backward-compatible (implementation-dependent) | Missing/empty `distinctId` silently succeeds today; spec text calls for either a raise (breaking) or drop-with-log (backward-compatible) — [posthog-dotnet.md#n19](posthog-dotnet.md) |
 | posthog-go | MCP Analytics | Backward-compatible | **New this run** — strong first implementation, but the `$exception` side-car omits `$exception_source: "mcp.tool_call"` and hardcodes `mechanism.synthetic: true` on a path only reached for a thrown error, inverting the spec's rule; no `client_metadata` intent source (the manual API rejects the value) — [posthog-go.md#n17](posthog-go.md) |
 | posthog-go | Evaluate Flags | Backward-compatible | **New this run** — no negative-knowledge retention (a deleted key re-probes `/flags` forever) and no JSON validation on `GetFlagPayload` — [posthog-go.md#n5](posthog-go.md) |
+| posthog-php | Retry Queue | Backward-compatible | **New this run, downgraded from ✅** — ingestion retries are a plain 100/200/400 ms doubling schedule with no jitter, while the SDK's own new `Emails` client jitters on `[0.8, 1.2]` — [posthog-php.md#n18](posthog-php.md) |
+| posthog-ruby | MCP Analytics | Backward-compatible | **New this run** — a 3,798-line `lib/posthog/mcp/` package the spec's applicability table still records as "not yet"; the required `$mcp_interface` is never emitted, and the client-conversation-id rung added by #175/#176 is absent — [posthog-ruby.md#n21](posthog-ruby.md) |
+| posthog-go | Retry Queue | Backward-compatible | **Added this run** — a third gap on an existing 🟡: `NewBackoff` supports jitter and every ingestion and flag call site passes `jitter: 0` (`backoff.go:36`, `flags.go:220`); only `Emails` jitters — [posthog-go.md#n19](posthog-go.md) |
+| posthog-go | MCP Analytics | Backward-compatible | **Added this run** — the required `$mcp_interface` is never emitted and the client-conversation-id rung from #175/#176 is absent, on top of the three `$exception` side-car gaps already recorded — [posthog-go.md#n17](posthog-go.md) |
 | posthog-go | Local Feature Flag Evaluator | Backward-compatible | **Downgraded from ✅ this run on new spec text** — experiment holdouts entirely unimplemented (`grep holdout`: zero matches); every other new matching requirement is met — [posthog-go.md#n15](posthog-go.md) |
 | posthog-dotnet | Evaluate Flags | Backward-compatible | **New this run** — good control flow, but no negative-knowledge retention, and an unguarded `JsonDocument.Parse` makes a malformed payload throw during flag construction, discarding the whole remote response — [posthog-dotnet.md#n7](posthog-dotnet.md) |
 | posthog-dotnet | Capture AI | Backward-compatible | **New this run** — `PostHog.AI` ships real `$ai_*` support but routes it through ordinary `Capture(...)` to `batch`; no `CaptureAi` surface and no isolated AI route with the larger payload allowance — [posthog-dotnet.md#n4](posthog-dotnet.md) |
@@ -646,19 +675,26 @@ flutter and react-native embed native SDKs for replay, the cheapest path for bot
 android already computes across the bridge rather than reimplement it.
 ## Unknown (❓) cells needing human review
 
-**None. For the first time since the matrix was created, every cell has a definite status.**
+**None. Every cell in the matrix has a definite status, for the second run running.**
 
-posthog-node's Traces row was the last one and it resolved to ✅ this run after a full read of
-`packages/core/src/traces/` against `openspec/specs/traces/spec.md` — see
-[posthog-node.md#n2](posthog-node.md) and "The matrix has no Unknown cells for the first time" above.
-That closes a two-run correction: ❌ (false negative) on 2026-10-12, ❓ on 2026-10-19, ✅ now.
+**No new Unknown was introduced this run**, and no existing one was created by the six rows added per
+SDK. Every one of the eighteen rows scored from scratch — six each on posthog-php, posthog-ruby and
+posthog-go — resolved against directly cited code, and the three that could plausibly have gone ❓
+did not:
 
-**No new Unknown was introduced this run.** Every one of the thirteen rows scored from scratch —
-four each on posthog-python and posthog-node, nine on posthog-java — resolved against directly cited
-code. Where this run could not establish something cheaply, it said so inside the relevant note
-rather than opening a cell: posthog-java's group-key rendering under
-[#89](https://github.com/PostHog/sdk-specs/pull/89) is recorded as unconfirmed inside
-[posthog-java.md#n18](posthog-java.md) rather than as a separate ❓.
+- **Emails** on all three resolved to ✅ against a read of the implementation rather than an
+  inventory of method names.
+- **Experiment Exposure** on all three resolved to ➖ on an explicit sentence in the spec's own
+  applicability section, not on an absence of evidence.
+- **MCP Analytics** on posthog-ruby resolved to 🟡 despite the spec's applicability table saying the
+  package does not exist. That is the one row this run would understand a maintainer reversing, and
+  it is raised as a scope question rather than left as ❓ — the evidence is not missing, the
+  applicability is contested. See "Scope decisions needed" item 5.
+
+Where this run could not establish something cheaply it said so inside the relevant note:
+posthog-php's "no eviction at the span attribute limit" rests on OTel PHP's runtime behavior rather
+than an explicit check in PostHog's code, and is recorded that way in
+[posthog-php.md#n17](posthog-php.md).
 
 ## Scope decisions needed (human)
 
@@ -689,6 +725,21 @@ did not act on any of them unilaterally.
    the conditional makes them inapplicable to a no-timeout surface, or server SDKs must grow a timeout
    parameter. See [posthog-python.md#n11](posthog-python.md).
 
+5. **The `mcp-analytics` applicability table is out of date in two places, and one of them changed a
+   row's status.** It records posthog-ruby as "not yet" while `lib/posthog/mcp/` is a 3,798-line
+   package that grew again this cycle; this run scored that package anyway and gave posthog-ruby a
+   🟡 MCP Analytics row, which is a judgement call a maintainer may want to reverse to ➖ until the
+   table is updated. Separately it lists `posthogmcp` and `posthogmcpsdk` for Go, where posthog-go
+   now ships a third adapter, `posthogmcpgo` (1,137 lines, new this cycle). Neither is an SDK defect.
+6. **Does a server SDK that stays on `/flags?v=2` keep scoring ➖ on Experiment Exposure
+   indefinitely?** posthog-php, posthog-ruby and posthog-go all request `v=2`, and
+   `openspec/specs/experiment-exposure/spec.md`'s applicability sentence says an SDK that does not
+   read `v=4` records "sends no direct exposure" — so abstaining is conformant and all three score
+   ➖. That is the conservative reading and this run took it. But it means three server SDKs cannot
+   produce correct experiment analytics for a config version 2 flag and the matrix shows no gap for
+   it. If `v=4` adoption is expected, the applicability sentence is the place to say so, and these
+   rows become ❌ rather than ➖.
+
 ## Pending initial audit
 
 None of the twelve current in-scope SDKs. **posthog-rs would be the first entry here** if the scope
@@ -696,47 +747,39 @@ decision above goes that way.
 
 ## Queued for next run
 
-This run used all 3 slots (**posthog-java**, **posthog-node**, **posthog-python**). That leaves
-**9 SDKs queued**, and for the first time the queue is dominated by a **row backfill** rather than by
-staleness: nine of the twelve files need the four new server-scope contracts added.
+This run used all 3 slots (**posthog-php**, **posthog-ruby**, **posthog-go**). That leaves **9 SDKs
+queued**. The row backfill is now concentrated in the six SDKs that have not been audited in the last
+two cycles.
 
 | SDK | Last-audited SHA | Last audited | Rows | Weeks since | Backfill needed |
 |---|---|---|---|---|---|
-| posthog-php | `5451f4e0` | 2026-09-28 | 63 | 5 | +5 (MCP Analytics + the four new) |
-| posthog-ruby | `185060ab` | 2026-09-28 | 63 | 5 | +5 (MCP Analytics + the four new) |
-| posthog-go | `08549f42` | 2026-10-05 | 64 | 4 | +4 |
-| posthog-dotnet | `ae4d019c` | 2026-10-05 | 64 | 4 | +4 |
-| posthog-js | `6538babc` | 2026-10-05 | 64 | 4 | +4 (all ➖) |
-| posthog-ios | `f5cbe87c` | 2026-10-08 | 64 | 3.5 | +4 (all ➖) |
-| posthog-android | `c5e788bd` | 2026-10-19 | 64 | 2 | +4 (all ➖) |
-| posthog-flutter | `1032c102` | 2026-10-19 | 64 | 2 | +4 (all ➖) |
-| posthog-react-native | `3ddaa654` | 2026-10-19 | 64 | 2 | +4 (all ➖) |
+| posthog-dotnet | `ae4d019c` | 2026-10-05 | 64 | 5 | +5 (Emails is a real ❌/✅ call) |
+| posthog-js | `6538babc` | 2026-10-05 | 64 | 5 | +5 (MCP Analytics is a real call; `@posthog/mcp` is in the applicability table) |
+| posthog-ios | `f5cbe87c` | 2026-10-08 | 64 | 4.5 | +5 (all ➖) |
+| posthog-android | `c5e788bd` | 2026-10-19 | 64 | 3 | +5 (all ➖) |
+| posthog-flutter | `1032c102` | 2026-10-19 | 64 | 3 | +5 (all ➖) |
+| posthog-react-native | `3ddaa654` | 2026-10-19 | 64 | 3 | +5 (all ➖) |
+| posthog-java | `8309f837` | 2026-11-02 | 68 | 1 | +1 (Experiment Exposure) |
+| posthog-node | `8c832754` | 2026-11-02 | 68 | 1 | +1 (Experiment Exposure) |
+| posthog-python | `dca22075` | 2026-11-02 | 68 | 1 | +1 (Experiment Exposure) |
 
 Prioritized for upcoming runs:
 
-1. **posthog-php and posthog-ruby** — now the two stalest pointers (5 weeks, just past the ~4-week
-   window) and the two with the largest backfill. Both are also the SDKs whose Emails row is a real
-   scoring question rather than a mechanical ➖, and both carry the Exception Event Metadata defect
-   family that this run characterized from a third angle on posthog-java. Two slots.
-2. **posthog-go and posthog-dotnet** — 4 weeks, at the edge of the window, each needing the same
-   four-row backfill with one genuine Emails call. Either makes a sensible third slot. posthog-go has
-   the additional pull of being named in the `mcp-analytics` table alongside the SDKs that #150 says
-   must change their object-key redaction, which this run confirmed is still unfixed on posthog-python
-   and is likely unfixed there too.
-3. **A half-slot backfill sweep over the five client SDKs** (posthog-js, posthog-ios,
-   posthog-android, posthog-flutter, posthog-react-native). All four new contracts are server-scope,
-   so these twenty rows are ➖ with a one-line justification each. This is cheap and gets the whole
-   matrix onto one denominator; fold it into whichever run has spare capacity rather than spending a
-   slot. **Do not** let it displace a real audit.
-4. **posthog-java's forward-carried rows.** This run completed its row count and re-derived the rows
-   the drift and spec delta land on, but a large share of its 68 rows still rest on 2026-08-10
-   evidence against a module that has moved +2,099 lines since. Its next slot should be a full
-   re-derivation rather than another targeted pass.
-5. **posthog-rs**, if the scope decision adds it — it would enter as pending initial audit and should
-   take a full slot, not a corner of one.
+1. **posthog-dotnet and posthog-js** — the two stalest pointers at 5 weeks, and the two remaining
+   SDKs whose backfill contains a real scoring question rather than five mechanical ➖ rows:
+   posthog-dotnet's Emails row (the capability applies to server SDKs unconditionally, and three
+   SDKs just showed that shipping it is tractable) and posthog-js's MCP Analytics row (`@posthog/mcp`
+   is the first entry in the applicability table and has never been scored). Two slots.
+2. **posthog-ios** — third at 4.5 weeks, and the only one of the client SDKs with an out-of-cycle
+   refresh in its history rather than a clean audit. One slot, or hold it for whichever client SDK
+   the next cycle's spec delta lands on.
+3. **The three client SDKs audited 2026-10-19** (android, flutter, react-native) are still inside the
+   ~4-week window and need only the five ➖ rows. A **half-slot sweep** can add those rows to all six
+   64-row files mechanically, without spending an audit slot, and is the cheapest way to get the
+   whole matrix onto 69 rows.
+4. **posthog-java, posthog-node and posthog-python** need one row each (Experiment Exposure) and are
+   otherwise a week old. Fold them into the same sweep.
 
-**Rotation health.** Pointer ages after this run: php/ruby 5 weeks, go/dotnet/js 4, ios 3.5,
-android/flutter/react-native 2, and java/node/python 0. **php and ruby are the only two outside the
-~4-week window**, both by about a week, and both are first in the queue. The rotation is healthy; the
-backlog that replaced the old staleness problem is row completion, which is cheaper per row and does
-not require re-reading an SDK.
+**A note on the sweep.** Four of the five rows it would add are ➖ on a client SDK by the specs' own
+applicability lines, and Experiment Exposure is the exception: it is `both`-scoped, so a client SDK
+that reads `/flags?v=4` has a real row there. posthog-js in particular should be scored, not swept.

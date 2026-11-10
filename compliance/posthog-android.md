@@ -163,7 +163,7 @@ complete implementation of that contract outside the browser.
 | 14 | Event Batcher | 🟡 | [n6] |
 | 15 | Exception Event Metadata | 🟡 | [n7] |
 | 16 | Exception Steps | ✅ |  |
-| 17 | Feature Flag Cache | ✅ |  |
+| 17 | Feature Flag Cache | ✅ | [n33] |
 | 18 | Feature Flag Called Tracker | 🟡 | [n8] |
 | 19 | Flag Definition Loader | ➖ |  |
 | 20 | Flush | ✅ |  |
@@ -183,14 +183,14 @@ complete implementation of that contract outside the browser.
 | 34 | Is Opt Out | ✅ |  |
 | 35 | Is Session Replay Active | ✅ |  |
 | 36 | Local Feature Flag Evaluator | ➖ |  |
-| 37 | Logs | ✅ |  |
+| 37 | Logs | ✅ | [n35] |
 | 38 | MCP Analytics | ➖ |  |
 | 39 | On Feature Flags | 🟡 | [n13] |
 | 40 | Opt In | 🟡 | [n14] |
 | 41 | Persistent Storage | 🟡 | [n15] |
 | 42 | Register | 🟡 | [n16] |
-| 43 | Reload Feature Flags | ✅ |  |
-| 44 | Remote Config | ✅ |  |
+| 43 | Reload Feature Flags | ✅ | [n34] |
+| 44 | Remote Config | ✅ | [n32] |
 | 45 | Reset | ✅ |  |
 | 46 | Reset Group Properties For Flags | ✅ |  |
 | 47 | Reset Person Properties For Flags | ✅ |  |
@@ -247,17 +247,16 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
 <a id="n3"></a>
 
 ### n3 — Before Send Hook (✅ Pass)
-- **Spec requires:** multiple registered hooks run in a chain, each receiving the **previous**
-  hook's output; if a hook throws, the SDK records a warning, stops the chain, and drops the event
-  rather than sending the original or last-good value (`before-send-hook/spec.md:89`).
-- **SDK currently:** Multi-hook support is real (`PostHogBeforeSend.kt:8-16`,
-  `PostHogConfig.kt:484-516` stores hooks in a lock-guarded `MutableList`). Neither of the two bugs the
-  previous audit recorded holds at `c5e788bd`: `buildEvent` (`posthog/src/main/java/com/posthog/PostHogStateless.kt:322-335`)
-  calls `beforeSend.run(eventChecked)` and assigns the result back to `eventChecked`, so each hook
-  sees the previous hook's mutation; a `null` result drops the event; and `catch (e: Throwable)` logs
-  and returns `null`, which stops the chain and drops the event exactly as the spec requires. The previous
-  audit's advice to fall back to the last-good value would have broken that rule, which exists so a
-  failed privacy filter cannot leak data. **Re-scored ✅ this run.**
+- **Spec requires:** hooks run in order, each getting the previous hook's output. `null` drops the event. A
+  throwing hook logs a warning, stops the chain and drops the event rather than sending the original or
+  last-good value (`before-send-hook/spec.md:89`).
+- **SDK currently (4.0, `aaa23d39`):** conforms. `runBeforeSend`
+  (`posthog/src/main/java/com/posthog/PostHogStateless.kt:371-408`) passes each hook a copy of the previous
+  result (`copyForHooks`, `:411-416`), and returns `null` on a `null` result or a throw, logging only the
+  exception type (`:393-396`). Hooks sit in a lock-guarded list (`PostHogConfig.kt:565-600`). 4.0 adds
+  `PostHogEvent.options` (`PostHogEvent.kt:54`); a hook that returns a new event with `null` options keeps
+  the pre-hook options (`:387-391`), and the SDK re-imposes its uuid (`:400-405`), the two allowances
+  capture's step 4 grants ([n24](#n24)).
 - **Backwards compatibility:** No change needed.
 - **Remediation:** None.
 
@@ -350,27 +349,30 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
 <a id="n8"></a>
 
 ### n8 — Feature Flag Called Tracker (🟡 Partial)
-- **Spec requires:** dedup semantics for `$feature_flag_called` (per spec.md/acceptance for this
-  specific contract — duplicate values suppressed, value changes re-tracked, cleared on
-  reset/close).
-- **SDK currently:** Core dedup-tracker contract passes: dedup key is per-flag-key with a value
-  list (`PostHog.kt:1710-1717`, `featureFlagsCalled: MutableMap<String, MutableList<Any?>>` at line
-  122); duplicate values suppressed, value changes re-tracked; tracker clears on `reset()`
-  (`PostHog.kt:1896`) and `close()` (`PostHog.kt:513`) as required. No bounded/LRU eviction exists
-  (unbounded growth), which the spec marks optional ("where needed"), not mandatory — minor gap,
-  not a failure. Note: re-examining this cycle, the previously-cited `MINIMAL_FEATURE_FLAG_CALLED_PROPERTIES`
-  allowlist gap (`PostHogStateless.kt:693-711`, missing UTM/`$referring_domain`/`gclid`/`fbclid`
-  session-attribution and static platform/OS identity properties) is confirmed accurate as a
-  factual code observation, but on closer reading `feature-flag-called-tracker.feature` contains no
-  scenarios about property minimization/allowlists — that spec is purely about dedup-key
-  semantics, so this allowlist gap is scored here for continuity with the prior audit's framing,
-  while noting it may be more accurately an unscoped/undocumented-elsewhere observability gap
-  (the SDK has no UTM/gclid/fbclid/`$referring_domain` capture mechanism at all, repo-wide).
-- **Backwards compatibility:** Backward-compatible — expanding the allowlist or adding
-  attribution-property capture is purely additive.
-- **Remediation:** Port the missing allowlist categories if minimal-event mode should retain
-  session-attribution/platform-identity properties; separately consider whether UTM/click-id
-  capture belongs in this SDK's scope at all.
+- **Spec requires:**
+  - **Dedupe.** A repeated read of the same value is suppressed, a changed value is tracked again, and the
+    tracker clears on reset and close (`feature-flag-called-tracker/spec.md:61-62`, `:89-196`).
+  - **Minimal event mode.** When gated on, the allowlist SHALL cover the static platform identity
+    properties the SDK attaches to every event and the session-attribution properties registered as super
+    properties (`:205-215`). The `@client` scenario at `:280-298` registers `$referring_domain` and
+    `utm_source` and expects both to survive.
+  - **Config version 2** attribution and dedupe (#162, `:348-536`) and #203's `$feature_flag_variant_key`
+    apply only to config version 2 records the SDK reads.
+- **SDK currently (4.0, `aaa23d39`):**
+  - **Dedupe conforms.** `sendFeatureFlagCalled` (`posthog/src/main/java/com/posthog/PostHog.kt:2700-2760`)
+    keys by flag with a list of seen values (`:211`, `:2715-2722`) and clears on `reset()` (`:2919`) and
+    `close()` (`:783`).
+  - **Allowlist gap.** `MINIMAL_FEATURE_FLAG_CALLED_PROPERTIES` (`PostHogStateless.kt:929-951`) leaves out
+    `$os_name`/`$os_version`, which android adds to every event
+    (`posthog-android/src/main/java/com/posthog/android/internal/PostHogAndroidContext.kt:80-81`), and
+    `$referring_domain` and the UTM and click-id keys, so the `:280-298` scenario fails.
+  - **Config version 2 doesn't apply.** Android requests `/flags/?v=2` (`internal/PostHogApi.kt:598`) and
+    `FeatureFlagMetadata` has no config version, rule or variant-key fields, so it sends neither the new
+    attribution nor `$experiment_exposure`. `experiment-exposure/spec.md:11` treats such flags as legacy.
+  - **Not scored (SHOULD).** The tracker isn't cleared after a flags reload, and the map is unbounded.
+- **Backwards compatibility:** Backward-compatible. Minimized events gain a few static or attribution keys.
+- **Remediation:** Add `$os_name`, `$os_version`, `$referring_domain`, `utm_source`, `utm_medium`,
+  `utm_campaign`, `utm_content`, `utm_term`, `gad_source`, `mc_cid`, `gclid` and `fbclid` to the allowlist.
 
 <a id="n9"></a>
 
@@ -908,3 +910,65 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
   `PostHogLifecycleObserverIntegration.kt:72-73`).
 - **Backwards compatibility:** No change needed.
 - **Remediation:** None. Optionally drop un-prefixed `version`/`build`.
+
+<a id="n32"></a>
+
+### n32 — Remote Config (✅ Pass)
+- **Spec requires:** `GET {assetBase}/array/{projectKey}/config` with the token and no identity; US/EU Cloud
+  map to their `-assets` hosts and a custom host keeps its base path; unknown fields and `quotaLimited`
+  values are ignored (#198); a failed fetch keeps the cached config (`remote-config/spec.md:100-220`).
+- **SDK currently (4.0, `aaa23d39`):** conforms. `remoteConfig()`
+  (`posthog/src/main/java/com/posthog/internal/PostHogApi.kt:679-720`) sends that request.
+  `loadRemoteConfig` (`internal/PostHogRemoteConfig.kt:315-443`) skips a load while one is in flight
+  (`:336`), loads flags only when `hasFeatureFlags` and `preloadFeatureFlags` are both true (`:364-410`),
+  and keeps the cached slices on failure (`:429-438`). 4.0 always loads `/config` at setup (`PostHog.kt:556`;
+  the `remoteConfig` option is removed, `MIGRATION.md:76`), and `notifyIntegrationsRemoteConfig`
+  (`PostHog.kt:571-591`) drops a reply that arrives after `close()` or belongs to an earlier setup
+  (PostHog/posthog-android#953, #961). `quotaLimited` is parsed; only `mobile_recordings` turns replay off
+  (`PostHogRemoteConfig.kt:350`), and other values are ignored.
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.
+
+<a id="n33"></a>
+
+### n33 — Feature Flag Cache (✅ Pass)
+- **Spec requires:** cache values and payloads, serve reads with no network request, clear on reset. A
+  malformed, empty or whitespace-only cached payload is logged and reads as absent, never as the raw string
+  (#170, `feature-flag-cache/spec.md:98-162`).
+- **SDK currently (4.0, `aaa23d39`):** conforms. `decodePayload`
+  (`posthog/src/main/java/com/posthog/internal/PostHogRemoteConfig.kt:1280-1294`) parses strict JSON and
+  returns `null` on failure. Payloads loaded from storage are re-decoded from the cached flag details
+  (`:1251-1271`), so a raw string left by 3.x is dropped. A failed load leaves the cache alone, a success
+  persists it (`:1024-1059`), and `clear()` empties it on reset (`:1772-1806`).
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.
+
+<a id="n34"></a>
+
+### n34 — Reload Feature Flags (✅ Pass)
+- **Spec requires:** reload with the current distinct id, groups and properties for flags, and keep the
+  cached flags on failure. The android variant is `reloadFeatureFlags(onFeatureFlags: PostHogFeatureFlagsCallback? = null)`,
+  whose callback gets `PostHogFeatureFlagsLoaded` (`reload-feature-flags/spec.md:31`); a reported failure
+  comes with the last known flags (`:153-155`).
+- **SDK currently (4.0, `aaa23d39`):** conforms. `reloadFeatureFlags`
+  (`posthog/src/main/java/com/posthog/PostHog.kt:2599-2609`) matches the variant. `executeFeatureFlags`
+  (`internal/PostHogRemoteConfig.kt:856-1117`) sends the current context (`:914-921`) and queues a reload
+  that arrives while one is in flight (`:880-906`). On failure `errorsLoading` stays `true` and the cache is
+  untouched; the callback gets `PostHogFeatureFlagsLoaded(getFeatureFlags(), errorsLoading)` (`:286-300`).
+- **Backwards compatibility:** 4.0 changed the callback type (`MIGRATION.md:185-225`).
+- **Remediation:** None.
+
+<a id="n35"></a>
+
+### n35 — Logs (✅ Pass)
+- **Spec requires:** gzip by default, and raw JSON with no `Content-Encoding` when the app turns compression
+  off through the `http-client` option (#81, `logs/spec.md:234-255`).
+- **SDK currently (4.0, `aaa23d39`):** conforms. `sendLogs`
+  (`posthog/src/main/java/com/posthog/internal/PostHogApi.kt:429-449`) posts on the base client, whose
+  `GzipRequestInterceptor` (`:85`, `internal/GzipRequestInterceptor.kt:55-60`) compresses only when
+  `config.compression` is `GZIP`. `captureLog` runs `beforeSend` before the rate cap
+  (`PostHog.kt:1834-1845`). The logs queue retries 408, 429 and 5xx (`internal/EndpointSpec.kt:270`) and
+  uses `Retry-After` as a floor capped at 30 s (`PostHogQueue.kt:604-621`). The other requirements carry
+  over from 2026-10-19; the shared queue was reworked in 4.0 and was spot-checked, not re-derived.
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.

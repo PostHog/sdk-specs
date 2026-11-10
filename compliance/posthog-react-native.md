@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-react-native](https://github.com/PostHog/posthog-react-native) (archived; code lives in `packages/react-native` + `packages/react-native-plugin` of the `posthog-js` monorepo)
 **Audited commit:** `3ddaa65402896c91dcb7b04cfe433e0b1d2f3313` ([commit](https://github.com/PostHog/posthog-js/commit/3ddaa65402896c91dcb7b04cfe433e0b1d2f3313)) — audited on 2026-10-19. **Nine rows re-audited on 2026-11-10 for `@posthog/react-native-plugin` 3.0** at `210bf35d8c19a15003d0643999ae63bcc2102fb6` ([commit](https://github.com/PostHog/posthog-js/commit/210bf35d8c19a15003d0643999ae63bcc2102fb6), head of [PostHog/posthog-js#5194](https://github.com/PostHog/posthog-js/pull/5194)) — see [react-native-plugin 3.0](#react-native-plugin-30-re-audit-2026-11-10)
 **Audited against sdk-specs commit:** `c72e367` (2026-10-19 rows); `752f899` plus [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79`, treated as merged, for the nine plugin 3.0 rows
-**Summary:** 31 ✅ · 26 🟡 · 2 ❌ · 5 ➖ · 0 ❓ (64 rows; 2026-10-19 at `3ddaa654` scored 29/27/3/5/0; previous full audit 2026-08-06 at `e1efa57` scored 31/23/2/2/1 on 59 rows)
+**Summary:** 30 ✅ · 27 🟡 · 2 ❌ · 5 ➖ · 0 ❓ (64 rows; 2026-10-19 at `3ddaa654` scored 29/27/3/5/0; previous full audit 2026-08-06 at `e1efa57` scored 31/23/2/2/1 on 59 rows)
 
 **Repo layout (unchanged, re-confirmed):** `PostHog/posthog-react-native` is archived; the SDK lives at
 `packages/react-native/src` (`PostHog extends PostHogCore`, `posthog-rn.ts`, now 3,345 lines — up from
@@ -58,7 +58,7 @@ then also touch rows outside this scope, which the next full audit must re-verif
 | Session Replay Privacy | 🟡 | ✅ | 4.0 records masked screenshots only, so the posthog-ios wireframe leak this row inherited is gone; RN exposes only a mask marker, so an unmask-precedence gap can't arise ([n26](#n26)) |
 | Start Session Recording | ✅ | ✅ | Unchanged; a start while opted out doesn't change what opt-in restores |
 | Stop Session Recording | 🟡 | 🟡 | posthog-ios 4.0 flushes the replay queue on stop; posthog-android 4.0 still doesn't ([n29](#n29)) |
-| Capture Exception | ✅ | ✅ | JS-captured exceptions are unchanged; native crash reports and natively reported fatal JS crashes go through native capture v1, and Android now stamps a fatal JS crash on the SDK clock ([n33](#n33)) |
+| Capture Exception | ✅ | 🟡 | Native crash reports and natively reported fatal JS crashes go through native capture v1, and Android now stamps a fatal JS crash on the SDK clock. Gap, missed on 2026-10-19: JS-captured exceptions keep null-valued custom properties ([n33](#n33)) |
 | Exception Event Metadata | 🟡 | 🟡 | The shared `@posthog/core` gaps ([n7](#n7)) are unchanged; #205's job-retry rule has no RN integration to apply to |
 
 **Native events on capture v1.** The plugin configures both native SDKs with the library name
@@ -129,7 +129,7 @@ on its pre-existing empty-event-name gap.
 | 5 | Bootstrap | 🟡 | [n4] |
 | 6 | Capture | 🟡 | [n5] |
 | 7 | Capture AI | ➖ | |
-| 8 | Capture Exception | ✅ | [n33] |
+| 8 | Capture Exception | 🟡 | [n33] |
 | 9 | Consent Gating | ✅ | |
 | 10 | Create Person Profile | ✅ | |
 | 11 | Debug | ✅ | |
@@ -396,8 +396,8 @@ audit, and node is the one package that wires it. See the matching entry in
 - **Backwards compatibility:** No change needed.
 - **Remediation:** None.
 
-### n33 — Capture Exception (✅ Pass)
-- **Spec requires:** `$exception` events with a canonical `$exception_list`, sent through the normal capture pipeline.
-- **SDK currently (plugin 3.0, `210bf35d8`):** exceptions captured in JS are unchanged and go to `/batch`. Native crash reports and fatal JS crashes the plugin hands to native (`_captureFatalAndChooseOwner`, `packages/react-native/src/posthog-rn.ts:3802-3820`; the JS debug snapshot is stripped first, `:3735-3742`) are captured by posthog-ios 4.0 and posthog-android 4.0 and sent through capture v1, labelled `posthog-react-native` (see "Native events on capture v1" above). On Android the fatal JS crash's timestamp, read from the device clock in JS, is moved onto the native SDK's clock before capture (`toSdkClock`, `packages/react-native-plugin/android/src/main/java/com/posthogreactnativeplugin/PosthogReactNativePluginModule.kt:460-466`, `:852-856`; PostHog/posthog-js#5605), so the server's clock-skew correction doesn't shift it. posthog-ios 4.0 omits `NSNull`-valued event properties instead of sending JSON `null` (PostHog/posthog-ios#1047), so a `null` property on a native-captured exception on iOS is left out. Whether a crash reconstructed on a later launch is sent follows the consent rule scored under Opt In ([n32](#n32)).
-- **Backwards compatibility:** No change needed.
-- **Remediation:** None.
+### n33 — Capture Exception (🟡 Partial; was ✅)
+- **Spec requires:** `$exception` events with a canonical `$exception_list`, sent through the normal capture pipeline; null-valued custom object properties dropped, including nested ones, with null array elements kept in place.
+- **SDK currently (plugin 3.0, `210bf35d8`):** exceptions captured in JS are unchanged and go to `/batch`. Native crash reports and fatal JS crashes the plugin hands to native (`_captureFatalAndChooseOwner`, `packages/react-native/src/posthog-rn.ts:3802-3820`; the JS debug snapshot is stripped first, `:3735-3742`) are captured by posthog-ios 4.0 and posthog-android 4.0 and sent through capture v1, labelled `posthog-react-native` (see "Native events on capture v1" above). On Android the fatal JS crash's timestamp, read from the device clock in JS, is moved onto the native SDK's clock before capture (`toSdkClock`, `packages/react-native-plugin/android/src/main/java/com/posthogreactnativeplugin/PosthogReactNativePluginModule.kt:460-466`, `:852-856`; PostHog/posthog-js#5605), so the server's clock-skew correction doesn't shift it. posthog-ios 4.0 omits `NSNull`-valued event properties instead of sending JSON `null` (PostHog/posthog-ios#1047), so a `null` property on a native-captured exception on iOS is left out. Whether a crash reconstructed on a later launch is sent follows the consent rule scored under Opt In ([n32](#n32)). **Gap, missed on 2026-10-19:** JS-captured exceptions keep null-valued custom properties. `captureExceptionInternal` passes the caller's properties to ordinary capture (`packages/react-native/src/posthog-rn.ts:2585-2601`), and nothing on the way to `/batch` drops nulls: `normalizeMessage` (`packages/core/src/posthog-core-stateless.ts:1355-1377`) doesn't, and `sendBatch` serializes with `safeJsonStringify` (`:1615`), whose replacer returns `null` unchanged (`packages/core/src/utils/string-utils.ts:27-65`). So `{"test":null,"nested":{"drop":null}}` is sent as is, against "Exception capture drops null-valued custom object properties". posthog-ios 4.0's `NSNull` cleanup only covers native-captured exceptions. The serializer is the same at `3ddaa654`, so this isn't a regression.
+- **Backwards compatibility:** Backward-compatible — an omitted property and a `null` one read the same in PostHog.
+- **Remediation:** Drop null-valued object members, recursively and keeping null array elements, in `@posthog/core` before serializing; that also covers Capture's matching requirement.

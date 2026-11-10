@@ -28,6 +28,43 @@ Feature: Emails
     And the request body should equal JSON {"template_key":"password-reset","subject":"Reset your password","html":"<p>Hi</p>","capture_engagement":true,"to":"user@example.com","distinct_id":"user_123"}
     And the send result should have ID "msg_1" and replayed false
 
+  # Requirement: Send message category
+
+  Scenario Outline: A code-form send carries its message category as given
+    Given the SDK is initialized with token "test-token", host "https://us.i.posthog.com" and secret key "phs_test"
+    And the mock server will accept the next email send with message ID "msg_1"
+    When the caller sends to "user@example.com" with template key "monthly-news", subject "This month", HTML "<p>News {{ unsubscribe_url }}</p>" and message category <category>
+    Then the mock server should receive 1 email send request
+    And the request body field "category" should equal JSON <sent>
+
+    Examples:
+      | category                                                                                         | sent                                                                                             |
+      | {"key":"newsletter","type":"marketing","name":"Newsletter","description":"Monthly product news"} | {"key":"newsletter","type":"marketing","name":"Newsletter","description":"Monthly product news"} |
+      | {"key":"receipts","type":"transactional","name":"Receipts"}                                      | {"key":"receipts","type":"transactional","name":"Receipts"}                                      |
+      | {"key":"newsletter","type":"marketing","name":"Newsletter","description":""}                     | {"key":"newsletter","type":"marketing","name":"Newsletter","description":""}                     |
+
+  Scenario: The built-in transactional value is sent as a string
+    Given the SDK is initialized with token "test-token", host "https://us.i.posthog.com" and secret key "phs_test"
+    And the mock server will accept the next email send with message ID "msg_1"
+    When the caller sends to "user@example.com" with template key "password-reset", subject "Reset your password", HTML "<p>Hi</p>" and the built-in transactional value as message category
+    Then the mock server should receive 1 email send request
+    And the request body field "category" should equal JSON "transactional"
+
+  Scenario Outline: A refused category send keeps PostHog's code and is not retried
+    Given the SDK is initialized with token "test-token", host "https://us.i.posthog.com" and secret key "phs_test"
+    And the mock server will fail the next email send with status <status> and code "<code>"
+    And the mock server will accept the next email send with message ID "msg_1"
+    When the caller sends to "user@example.com" with template key "monthly-news", subject "This month", HTML "<html>" and message category {"key":"newsletter","type":"marketing","name":"Newsletter"}
+    Then the mock server should receive 1 email send request
+    And the send should fail with error code "<code>", name "validation_error" and status <status>
+
+    Examples:
+      | status | code                      | html                              |
+      | 400    | category_mismatch         | <p>News {{ unsubscribe_url }}</p> |
+      | 400    | too_many_categories       | <p>News {{ unsubscribe_url }}</p> |
+      | 400    | unsubscribe_link_required | <p>News</p>                       |
+      | 422    | recipient_opted_out       | <p>News {{ unsubscribe_url }}</p> |
+
   # Requirement: Custom host refusal
 
   Scenario: A custom host without an app host never receives the secret key
@@ -90,7 +127,7 @@ Feature: Emails
 
   # Requirements: Error fields, Error names
 
-  Scenario Outline: Errors keep PostHog's code and carry a category name
+  Scenario Outline: Errors keep PostHog's code and carry an error name
     Given the SDK is initialized with token "test-token", host "https://us.i.posthog.com" and secret key "phs_test"
     And the mock server will fail the next email send with status <status> and code "<code>"
     When the caller sends to "user@example.com" with template ID "0190f6d2-7c1e-7b3a-9f5e-1c2d3e4f5a6b" and a per-send retry limit of 0

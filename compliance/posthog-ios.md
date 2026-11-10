@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-ios](https://github.com/PostHog/posthog-ios)
 **Audited commit:** `e27cbe4cb0bf5958fe79a061783af2dfb1b17ab4` ([commit](https://github.com/PostHog/posthog-ios/commit/e27cbe4cb0bf5958fe79a061783af2dfb1b17ab4)) on the 4.0 release branch `chore/v4-remove-deprecated` ([PostHog/posthog-ios#873](https://github.com/PostHog/posthog-ios/pull/873)), before 4.0.0 is published — first audited on 2026-11-05 at `3460e534a`, re-checked on 2026-11-10 (see [Re-check](#re-check-2026-11-10))
 **Audited against sdk-specs commit:** `752f899` plus [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79` (capture v1, including #147's AI lane), treated as merged to `main`; first audited against `dd11a6b`
-**Summary:** 44 ✅ · 14 🟡 · 1 ❌ · 10 ➖ (69 rows; previous audit 2026-10-08 at `f5cbe87c` + posthog-ios#924–#934 scored 38/16/4/6 on 64 rows)
+**Summary:** 45 ✅ · 13 🟡 · 1 ❌ · 10 ➖ (69 rows; previous audit 2026-10-08 at `f5cbe87c` + posthog-ios#924–#934 scored 38/16/4/6 on 64 rows)
 
 Note on repo layout: `posthog-ios` is a single-package repo, distributed through Swift Package Manager
 only from 4.0. Core SDK logic lives at `PostHog/` (flat files: `PostHogSDK.swift` — the main public
@@ -42,8 +42,6 @@ Net changes vs. the previous audit:
   Flags and Get Feature Flags And Payloads ❌→🟡 (the specs now record iOS 4.0's `getAllFeatureFlags()`
   list of results, with per-entry payload decoding, as its surface; it is still not the canonical map
   shape).
-- **New spec requirement unmet (1):** Surveys ✅→🟡. The popup-delay requirement (#121) SHOULD re-check
-  eligibility when the delay elapses; iOS shows the reserved survey without one ([n29](#n29)).
 - **Newly applicable (1):** Capture AI ➖→✅. #146 adds iOS 4.0 to its Applicability, and the AI lane
   conforms ([n27](#n27)).
 - **Note-only changes:** Shutdown, HTTP Client, Group, Group Identify, Stop Session Recording and
@@ -65,9 +63,10 @@ Every line reference on this page is at `e27cbe4cb`.
   🟡→✅ ([PostHog/posthog-ios#1047](https://github.com/PostHog/posthog-ios/pull/1047) omits `NSNull`
   properties; [n4](#n4), [n5](#n5), [n27](#n27)); On Feature Flags 🟡→✅
   ([PostHog/posthog-ios#1048](https://github.com/PostHog/posthog-ios/pull/1048) drops loads in flight
-  across `reset()`; [n28](#n28)). Surveys stays 🟡 on the SHOULD only:
-  [PostHog/posthog-ios#1049](https://github.com/PostHog/posthog-ios/pull/1049) fixed pre-display
-  closes, the pending display on `reset()` and the wait-period date ([n29](#n29)).
+  across `reset()`; [n28](#n28)). Surveys stays ✅:
+  [PostHog/posthog-ios#1049](https://github.com/PostHog/posthog-ios/pull/1049) meets every SHALL of the
+  popup-delay requirement (#121) and #102's wait period; the one unmet SHOULD (re-check eligibility
+  when the delay elapses) is recorded but not scored ([n29](#n29)).
 - **#146 since `5c26b9bc`:** `http-client` now leaves "a delivery lane that has its own compression
   setting (`capture-ai`)" out of the whole-client opt-out, so `captureAiCompression` conforms and HTTP
   Client is scored ✅ on its merits ([n22](#n22)). "Events name their own library" now applies to
@@ -195,7 +194,7 @@ Retry Queue.
 | 58 | Session Manager | ✅ | |
 | 59 | Session Replay Ingestion Controls | ✅ | |
 | 60 | Session Replay Privacy | 🟡 | was ❌; 4.0 removes wireframe mode, the only path that leaked; SwiftUI `postHogMask()` wins over an enclosing `postHogNoMask()` (over-masks, not a leak) — [n24] |
-| 61 | Surveys | 🟡 | was ✅; popup-delay (#121) and wait-period (#102) SHALLs met since #1049; no eligibility re-check when the delay elapses (SHOULD) — [n29] |
+| 61 | Surveys | ✅ | popup-delay (#121) and wait-period (#102) SHALLs met since #1049; the SHOULD eligibility re-check when the delay elapses is not met and not scored — [n29] |
 | 62 | Bootstrap | 🟡 | [n25] |
 | 63 | MCP Analytics | ➖ | Applicability is `server` add-on; no iOS package |
 | 64 | Session Replay Debug Properties | 🟡 | [n26]; (c) fixed and new precedence rule (#155) met; (a), (b) still open |
@@ -704,7 +703,7 @@ Retry Queue.
   keeps only `true` booleans and non-empty strings in `flags` and `variants`
   (`PostHog/Models/PostHogFeatureFlagsLoaded.swift:42-56`), so a `""` flag is left out.
 
-### n29 — Surveys (🟡 Partial; was ✅)
+### n29 — Surveys (✅ Pass)
 - **Spec requires:** new requirement "Survey popup delay" (`openspec/specs/surveys/spec.md:321-417`,
   sdk-specs #121). Wait `appearance.surveyPopupDelaySeconds` (negative clamps to 0) before display;
   reserve the survey before the wait so repeats don't restart it or show a second survey. A survey
@@ -733,11 +732,11 @@ Retry Queue.
   or calls `cleanupSurveys()` on a custom delegate (`PostHogSurveyIntegration.swift:897-916`). `stop()`
   clears the active survey before `cleanupSurveys()` closes the pending one (`:117-126`), so teardown
   emits nothing. Resumed in-progress surveys still go through `hasWaitPeriodPassed` (`:151`, `:454`).
-  Gap (SHOULD): when the delay elapses, the default delegate's work item shows the reserved survey
+  Not scored (SHOULD): when the delay elapses, the default delegate's work item shows the reserved survey
   without re-checking eligibility (`PostHogSurveysDefaultDelegate.swift:115-130`), so, for example, an
   `identify` during the wait that turns the targeting flag off doesn't stop it.
 - **Backwards compatibility:** Backward-compatible; a re-check would only skip surveys that are no
   longer eligible.
-- **Remediation:** Before the work item shows the survey, ask the integration to re-run its eligibility
+- **Remediation (optional, SHOULD):** Before the work item shows the survey, ask the integration to re-run its eligibility
   filter for that survey; when it fails, release the reservation (report the survey closed, which is
   now a no-op for an unshown survey) instead of displaying it.

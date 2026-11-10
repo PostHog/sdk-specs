@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-flutter](https://github.com/PostHog/posthog-flutter)
 **Audited commit:** `82123e6d8815c89a9f603b4f23e72d72494eee2b` ([commit](https://github.com/PostHog/posthog-flutter/commit/82123e6d8815c89a9f603b4f23e72d72494eee2b)), the head of the posthog_flutter 6.0 release PR [PostHog/posthog-flutter#637](https://github.com/PostHog/posthog-flutter/pull/637) — audited on 2026-11-10, before 6.0.0 is published
 **Audited against sdk-specs commit:** `752f899` plus [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79` (capture v1, including #147's AI lane), treated as merged to `main`
-**Summary:** 27 ✅ · 26 🟡 · 4 ❌ · 12 ➖ · 0 ❓ (69 rows; previous audit 2026-10-19 at `1032c102` (5.x) scored 21/29/6/8/0 on 64 rows)
+**Summary:** 25 ✅ · 28 🟡 · 4 ❌ · 12 ➖ · 0 ❓ (69 rows; previous audit 2026-10-19 at `1032c102` (5.x) scored 21/29/6/8/0 on 64 rows)
 
 **Why this run:** posthog_flutter 6.0 ([PostHog/posthog-flutter#637](https://github.com/PostHog/posthog-flutter/pull/637))
 adopts posthog-ios 4.0 and posthog-android 4.0 (`Package.swift` pins `"4.0.0" ..< "5.0.0"`,
@@ -41,13 +41,8 @@ Where the paths disagree the row is 🟡 and the note says which platform fails.
 
 ## Movement this run
 
-**Improved (9):**
+**Improved (7):**
 - **Get Feature Flag 🟡→✅** ([n13](#n13)): `getFeatureFlag(key, {sendFeatureFlagEvent})` on every path.
-- **Get Feature Flag Payload 🟡→✅** ([n14](#n14)) and **Get Feature Flag Result 🟡→✅** ([n15](#n15)):
-  `getFeatureFlagPayload()` is removed, and payloads are read through `getFeatureFlagResult(key,
-  sendFeatureFlagEvent: false)`, which the spec permits. posthog-ios 4.0 returns no payload for
-  malformed JSON, so the iOS/macOS half of the old gap is gone. An empty variant reads as disabled
-  on every path (#193).
 - **Is Feature Enabled 🟡→✅** ([n20](#n20)): `isFeatureEnabled(key, {sendFeatureFlagEvent, defaultValue})`.
 - **HTTP Client 🟡→✅** ([n19](#n19)): the Dart core no longer retries a refused `/flags` connection, backs
   off exponentially, and its capture v1 transport conforms. Separate `compression` and
@@ -64,7 +59,10 @@ Where the paths disagree the row is 🟡 and the note says which platform fails.
 **Downgraded on new spec text (1):** **Identify ✅→🟡** ([n40](#n40)): the Dart core ignores `identify()`
 while opted out, but #167 made opt-out "not a guard" for identify.
 
-**Same status, new or changed findings:** Capture ([n41](#n41): every path fills `$lib`/`$lib_version`
+**Same status, new or changed findings:** Get Feature Flag Payload and Get Feature Flag Result
+([n14](#n14), [n15](#n15): `getFeatureFlagPayload()` is removed and payloads are read through
+`getFeatureFlagResult(key, sendFeatureFlagEvent: false)`, which the spec permits; posthog-ios 4.0
+returns no payload for malformed JSON, so only web still returns the raw string), Capture ([n41](#n41): every path fills `$lib`/`$lib_version`
 as a pair after the caller's properties, and leaves an empty variant out of `$active_feature_flags`),
 Before Send Hook ([n3](#n3): the throwing-hook log line now has to name the event and omit the exception
 message), Surveys ([n35](#n35): posthog-android still moves the last-seen survey date on submit and
@@ -106,8 +104,8 @@ Emails ➖ (all server-only).
 | 21 | Get Anonymous ID | ❌ | [n12] |
 | 22 | Get Distinct ID | ✅ | |
 | 23 | Get Feature Flag | ✅ | [n13] |
-| 24 | Get Feature Flag Payload | ✅ | [n14] |
-| 25 | Get Feature Flag Result | ✅ | [n15] |
+| 24 | Get Feature Flag Payload | 🟡 | [n14] |
+| 25 | Get Feature Flag Result | 🟡 | [n15] |
 | 26 | Get Feature Flags | 🟡 | [n16] |
 | 27 | Get Feature Flags And Payloads | 🟡 | [n17] |
 | 28 | Get Session ID | ✅ | |
@@ -240,17 +238,17 @@ Notes [n2](#n2), [n4](#n4), [n5](#n5), [n7](#n7), [n10](#n10)–[n12](#n12), [n2
 - **Backwards compatibility:** No change needed.
 - **Remediation:** None.
 
-### n14 — Get Feature Flag Payload (✅ Pass)
+### n14 — Get Feature Flag Payload (🟡 Partial)
 - **Spec requires:** a cache-only payload read with no `$feature_flag_called`; malformed JSON is no payload. "A client SDK MAY omit a dedicated payload getter when its flag result getter … returns the payload and accepts a per-call `sendFeatureFlagEvent` option. posthog-ios 4.0, posthog-android 4.0 and posthog_flutter 6.0 do this." (`openspec/specs/get-feature-flag-payload/spec.md:236`)
-- **SDK currently (`82123e6`):** `getFeatureFlagPayload()` is removed; the read is `getFeatureFlagResult(key, sendFeatureFlagEvent: false)?.payload` ([n15](#n15)). The malformed-payload rule holds on Windows/Linux (`lib/src/core/feature_flags.dart`, `parsePayload`), on iOS/macOS through posthog-ios 4.0 (`compliance/posthog-ios.md` n7, ✅) and on Android through posthog-android 4.0.
-- **Backwards compatibility:** No change needed.
-- **Remediation:** None.
+- **SDK currently (`82123e6`):** `getFeatureFlagPayload()` is removed; the read is `getFeatureFlagResult(key, sendFeatureFlagEvent: false)?.payload` ([n15](#n15)). The malformed-payload rule holds on Windows/Linux (`lib/src/core/feature_flags.dart`, `parsePayload`), on iOS/macOS through posthog-ios 4.0 (`compliance/posthog-ios.md` n7, ✅) and on Android through posthog-android 4.0. **Gap on web:** the result comes from posthog-js, which returns a malformed payload as its raw string ([n15](#n15)).
+- **Backwards compatibility:** Backward-compatible — only invalid payloads change.
+- **Remediation:** Same as [n15](#n15).
 
-### n15 — Get Feature Flag Result (✅ Pass)
+### n15 — Get Feature Flag Result (🟡 Partial)
 - **Spec requires:** a structured result (`key`, `enabled`, `variant`, `payload`), `null` for an unknown flag, malformed payloads as no payload, and a per-call `sendFeatureFlagEvent`; (#193) a flag whose value is `""` reads as disabled, `enabled: false` with `variant: ""`.
-- **SDK currently (`82123e6`):** `getFeatureFlagResult(key, {sendFeatureFlagEvent})` (`lib/src/posthog.dart:1079-1084`) follows `PostHogConfig.sendFeatureFlagEvent` when the option is omitted. Payloads are no payload for malformed, empty or whitespace JSON on iOS/macOS (posthog-ios 4.0, `compliance/posthog-ios.md` n8, ✅), Android and Windows/Linux. An empty variant gives `enabled: false, variant: ""` on Windows/Linux (`lib/src/core/posthog_core.dart:1135-1139`), iOS/macOS (`PostHogRemoteConfig.swift:1184-1192` at `e27cbe4cb`), Android (`PostHogRemoteConfig.kt:1344-1348` at `aaa23d39`) and web, where posthog-js's browser `getFeatureFlagResult` sets `enabled: !!flagValue` and Flutter passes the result through (`lib/src/utils/channel_serialization.dart:176-188`).
-- **Backwards compatibility:** No change needed.
-- **Remediation:** None.
+- **SDK currently (`82123e6`):** `getFeatureFlagResult(key, {sendFeatureFlagEvent})` (`lib/src/posthog.dart:1079-1084`) follows `PostHogConfig.sendFeatureFlagEvent` when the option is omitted. Payloads are no payload for malformed, empty or whitespace JSON on iOS/macOS (posthog-ios 4.0, `compliance/posthog-ios.md` n8, ✅), Android and Windows/Linux. An empty variant gives `enabled: false, variant: ""` on Windows/Linux (`lib/src/core/posthog_core.dart:1135-1139`), iOS/macOS (`PostHogRemoteConfig.swift:1184-1192` at `e27cbe4cb`), Android (`PostHogRemoteConfig.kt:1344-1348` at `aaa23d39`) and web, where posthog-js's browser `getFeatureFlagResult` sets `enabled: !!flagValue` and Flutter passes the result through (`lib/src/utils/channel_serialization.dart:176-188`). **Gap on web:** that pass-through (`lib/src/posthog_flutter_web_handler.dart:143-150`) also copies `payload` unchanged, and posthog-js's `parsePayload` returns a malformed payload as its raw string, with no log (`packages/browser-common/src/feature-flags.ts:1531`, `packages/core/src/featureFlagUtils.ts:110-120` at posthog-js `5e31f126d`; `packages/browser-common/tests/feature-flags-behavior.spec.ts:665-684` expects it).
+- **Backwards compatibility:** Backward-compatible — only invalid payloads change.
+- **Remediation:** Fix `parsePayload` in posthog-js, or return no payload on web when posthog-js hands back a string that isn't valid JSON.
 
 ### n16 — Get Feature Flags (🟡 Partial)
 - **Spec requires:** a bulk getter returning every known flag as a key → value map. The spec records "**iOS (4.0+), Android (4.0+), flutter (6.0+):** `getAllFeatureFlags()` returns a list of flag result objects (key, enabled, variant, payload), or `null` when flags are unavailable, instead of a key-to-value map" (`openspec/specs/get-feature-flags/spec.md:59`).
@@ -260,9 +258,9 @@ Notes [n2](#n2), [n4](#n4), [n5](#n5), [n7](#n7), [n10](#n10)–[n12](#n12), [n2
 
 ### n17 — Get Feature Flags And Payloads (🟡 Partial)
 - **Spec requires:** a combined getter returning flags and their decoded payloads.
-- **SDK currently (`82123e6`):** `getAllFeatureFlags()` ([n16](#n16)) returns each flag's decoded payload with its value, which the spec records as the flutter 6.0 surface; it is not the canonical combined shape, and on web an empty variant is listed as enabled ([n16](#n16)).
+- **SDK currently (`82123e6`):** `getAllFeatureFlags()` ([n16](#n16)) returns each flag's decoded payload with its value, which the spec records as the flutter 6.0 surface; it is not the canonical combined shape, and on web an empty variant is listed as enabled ([n16](#n16)) and a malformed payload is the raw string (`packages/browser-common/src/feature-flags.ts:880` at posthog-js `5e31f126d`, [n15](#n15)).
 - **Backwards compatibility:** Backward-compatible.
-- **Remediation:** Same as [n16](#n16).
+- **Remediation:** Same as [n16](#n16) and [n15](#n15).
 
 ### n18 — Group (🟡 Partial)
 - **Spec requires:** `group(type, key, properties)` MUST reject a blank `type` or `key`, leaving group state unchanged and logging a warning.

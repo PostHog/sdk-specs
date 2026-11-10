@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-android](https://github.com/PostHog/posthog-android)
 **Audited commit:** `c5e788bd603d3bdda77ac4d213538b9db637299a` ([commit](https://github.com/PostHog/posthog-android/commit/c5e788bd603d3bdda77ac4d213538b9db637299a)) — audited on 2026-10-19. **31 rows re-audited against posthog-android 4.0** at `aaa23d39af4424978bd2439028282e47417490b8` ([commit](https://github.com/PostHog/posthog-android/commit/aaa23d39af4424978bd2439028282e47417490b8), head of the 4.0 integration PR [PostHog/posthog-android#871](https://github.com/PostHog/posthog-android/pull/871)) on 2026-11-10 — see [posthog-android 4.0](#posthog-android-40-re-audit-2026-11-05)
 **Audited against sdk-specs commit:** `c72e367` (2026-10-19 rows); `752f899` plus the capture v1 text of [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79`, which includes [#147](https://github.com/PostHog/sdk-specs/pull/147) (merged into #146's branch as `6a9ed0f`), for the 31 4.0 rows; Capture also against #146's identity-call guide rule from `15501ca`
-**Summary:** 42 ✅ · 16 🟡 · 1 ❌ · 5 ➖ · 0 ❓ (64 rows; 2026-10-19 at `c5e788bd` scored 37/16/5/6/0; previous full audit 2026-08-10 at `8659a7b4` scored 31/16/9/3/0 on 59 rows)
+**Summary:** 42 ✅ · 16 🟡 · 1 ❌ · 10 ➖ · 0 ❓ (69 rows; 2026-10-19 at `c5e788bd` scored 37/16/5/6/0; previous full audit 2026-08-10 at `8659a7b4` scored 31/16/9/3/0 on 59 rows)
 
 **Why the 2026-10-19 run:** rotation priority 3 — the pointer was ten weeks old, and android carries the
 mobile reference for Session Replay Debug Properties. It was also the cheapest third slot available:
@@ -35,7 +35,10 @@ specs merged since 2026-10-19 change those rows (#81, #102, #109, #111, #115, #1
 
 **Scope.** 31 rows are scored at `aaa23d39` against `main` at `752f899` plus #146's text at `d387ab79`,
 treated as merged to `main`: the five capture v1 rows, the 25 rows those other changes touch, and Alias, whose code changed in
-PostHog/posthog-android#819. The other 33 rows carry forward from 2026-10-19 at `c5e788bd`, scored against `c72e367`. The spec changes
+PostHog/posthog-android#819. The other 33 rows carry forward from 2026-10-19 at `c5e788bd`, scored against `c72e367`.
+The five contracts `main` added since then (Experiment Exposure, AI Datasets, AI Scorers, Offline
+Evaluations and Emails) are new rows, all ➖: android 4.0 requests `/flags?v=2`, and the other four
+are server-only. The spec changes
 merged since then that this page doesn't score bind server SDKs, posthog-js, another platform, or
 contracts that are ➖ here (#205, #178, #185, #116, #129, #94, #88, #130, #85, #169, #171, and the MCP
 analytics, AI evaluation and emails changes). One carried-forward row is stale: **Stop Session
@@ -76,7 +79,7 @@ replay, so the next full audit must re-verify it.
 | Start Session Recording | ❌ | ✅ | Replay isn't installed while opted out, so a start stays inactive ([n20](#n20)) |
 | Surveys | 🟡 | 🟡 | Web-only exclusion and popup delay conform; submit and dismiss move the last-seen date (#102), and an unknown question type blocks later surveys ([n22](#n22)) |
 
-android moves from 37/16/5/6 on 2026-10-19 to **42/16/1/5** (58%→66%).
+android moves from 37/16/5/6 on 2026-10-19 to **42/16/1/10** on 69 rows (58%→61%).
 
 **Behavior the spec permits for client SDKs, recorded so it isn't mistaken for a gap:** a `404` (or
 any retryable status) keeps the events on disk with no attempt limit, so a proxy that doesn't serve
@@ -145,70 +148,75 @@ complete implementation of that contract outside the browser.
 
 | # | Contract | Status | Note |
 |---|----------|--------|------|
-| 1 | Alias | ✅ | [n1] |
-| 2 | Application Lifecycle | ✅ | [n31] |
-| 3 | Autocapture | ✅ | [n2] |
-| 4 | Before Send Hook | ✅ | [n3] |
-| 5 | Bootstrap | 🟡 | [n4] |
-| 6 | Capture | 🟡 | [n24] |
-| 7 | Capture AI | ✅ | [n25] |
-| 8 | Capture Exception | ✅ | [n40] |
-| 9 | Consent Gating | ✅ | [n5] |
-| 10 | Create Person Profile | ➖ |  |
-| 11 | Debug | ✅ |  |
-| 12 | Device ID Generator | ✅ |  |
-| 13 | Evaluate Flags | ➖ |  |
-| 14 | Event Batcher | 🟡 | [n6] |
-| 15 | Exception Event Metadata | 🟡 | [n7] |
-| 16 | Exception Steps | ✅ |  |
-| 17 | Feature Flag Cache | ✅ | [n33] |
-| 18 | Feature Flag Called Tracker | 🟡 | [n8] |
-| 19 | Flag Definition Loader | ➖ |  |
-| 20 | Flush | ✅ |  |
-| 21 | Get Anonymous ID | ✅ |  |
-| 22 | Get Distinct ID | ✅ |  |
-| 23 | Get Feature Flag | ✅ | [n39] |
-| 24 | Get Feature Flag Payload | ✅ | [n38] |
-| 25 | Get Feature Flag Result | ✅ | [n36] |
-| 26 | Get Feature Flags | 🟡 | [n9] |
-| 27 | Get Feature Flags And Payloads | 🟡 | [n10] |
-| 28 | Get Session ID | ✅ |  |
-| 29 | Group | 🟡 | [n11] |
-| 30 | Group Identify | 🟡 | [n12] |
-| 31 | HTTP Client | ✅ | [n26] |
-| 32 | Identify | 🟡 | [n28] |
-| 33 | Is Feature Enabled | ✅ | [n37] |
-| 34 | Is Opt Out | ✅ |  |
-| 35 | Is Session Replay Active | ✅ |  |
-| 36 | Local Feature Flag Evaluator | ➖ |  |
-| 37 | Logs | ✅ | [n35] |
-| 38 | MCP Analytics | ➖ |  |
-| 39 | On Feature Flags | ✅ | [n13] |
-| 40 | Opt In | 🟡 | [n14] |
-| 41 | Persistent Storage | 🟡 | [n15] |
-| 42 | Register | 🟡 | [n16] |
-| 43 | Reload Feature Flags | ✅ | [n34] |
-| 44 | Remote Config | ✅ | [n32] |
-| 45 | Reset | ✅ |  |
-| 46 | Reset Group Properties For Flags | ✅ |  |
-| 47 | Reset Person Properties For Flags | ✅ |  |
-| 48 | Retry Queue | ✅ | [n27] |
-| 49 | Screen | ✅ |  |
-| 50 | Session Manager | ✅ |  |
-| 51 | Session Replay Debug Properties | ✅ | [n17] |
-| 52 | Session Replay Ingestion Controls | 🟡 | [n18] |
-| 53 | Session Replay Privacy | ✅ | [n19] |
-| 54 | Set Group Properties For Flags | ✅ |  |
-| 55 | Set Person Properties | ✅ |  |
-| 56 | Set Person Properties For Flags | ✅ |  |
-| 57 | Setup | ✅ | [n29] |
-| 58 | Shutdown | ✅ | [n30] |
-| 59 | Start Session Recording | ✅ | [n20] |
-| 60 | Stop Session Recording | 🟡 | [n21] |
-| 61 | Surveys | 🟡 | [n22] |
-| 62 | Traces | ❌ | [n23] |
-| 63 | Tracing Headers | ✅ |  |
-| 64 | Unregister | ✅ |  |
+| 1 | AI Datasets | ➖ | **new row**: server SDKs only (personal API key); no android surface |
+| 2 | AI Scorers | ➖ | **new row**: server SDKs only (personal API key); no android surface |
+| 3 | Alias | ✅ | [n1] |
+| 4 | Application Lifecycle | ✅ | [n31] |
+| 5 | Autocapture | ✅ | [n2] |
+| 6 | Before Send Hook | ✅ | [n3] |
+| 7 | Bootstrap | 🟡 | [n4] |
+| 8 | Capture | 🟡 | [n24] |
+| 9 | Capture AI | ✅ | [n25] |
+| 10 | Capture Exception | ✅ | [n40] |
+| 11 | Consent Gating | ✅ | [n5] |
+| 12 | Create Person Profile | ➖ |  |
+| 13 | Debug | ✅ |  |
+| 14 | Device ID Generator | ✅ |  |
+| 15 | Emails | ➖ | **new row**: server SDKs only; needs a secret key that must never reach a client |
+| 16 | Evaluate Flags | ➖ |  |
+| 17 | Event Batcher | 🟡 | [n6] |
+| 18 | Exception Event Metadata | 🟡 | [n7] |
+| 19 | Exception Steps | ✅ |  |
+| 20 | Experiment Exposure | ➖ | **new row**: applies to SDKs that read `/flags?v=4` records; android 4.0 requests `v=2` (`posthog/src/main/java/com/posthog/internal/PostHogApi.kt:598`), so config-version-2 flags read as legacy values |
+| 21 | Feature Flag Cache | ✅ | [n33] |
+| 22 | Feature Flag Called Tracker | 🟡 | [n8] |
+| 23 | Flag Definition Loader | ➖ |  |
+| 24 | Flush | ✅ |  |
+| 25 | Get Anonymous ID | ✅ |  |
+| 26 | Get Distinct ID | ✅ |  |
+| 27 | Get Feature Flag | ✅ | [n39] |
+| 28 | Get Feature Flag Payload | ✅ | [n38] |
+| 29 | Get Feature Flag Result | ✅ | [n36] |
+| 30 | Get Feature Flags | 🟡 | [n9] |
+| 31 | Get Feature Flags And Payloads | 🟡 | [n10] |
+| 32 | Get Session ID | ✅ |  |
+| 33 | Group | 🟡 | [n11] |
+| 34 | Group Identify | 🟡 | [n12] |
+| 35 | HTTP Client | ✅ | [n26] |
+| 36 | Identify | 🟡 | [n28] |
+| 37 | Is Feature Enabled | ✅ | [n37] |
+| 38 | Is Opt Out | ✅ |  |
+| 39 | Is Session Replay Active | ✅ |  |
+| 40 | Local Feature Flag Evaluator | ➖ |  |
+| 41 | Logs | ✅ | [n35] |
+| 42 | MCP Analytics | ➖ |  |
+| 43 | Offline Evaluations | ➖ | **new row**: server SDKs only; no android surface |
+| 44 | On Feature Flags | ✅ | [n13] |
+| 45 | Opt In | 🟡 | [n14] |
+| 46 | Persistent Storage | 🟡 | [n15] |
+| 47 | Register | 🟡 | [n16] |
+| 48 | Reload Feature Flags | ✅ | [n34] |
+| 49 | Remote Config | ✅ | [n32] |
+| 50 | Reset | ✅ |  |
+| 51 | Reset Group Properties For Flags | ✅ |  |
+| 52 | Reset Person Properties For Flags | ✅ |  |
+| 53 | Retry Queue | ✅ | [n27] |
+| 54 | Screen | ✅ |  |
+| 55 | Session Manager | ✅ |  |
+| 56 | Session Replay Debug Properties | ✅ | [n17] |
+| 57 | Session Replay Ingestion Controls | 🟡 | [n18] |
+| 58 | Session Replay Privacy | ✅ | [n19] |
+| 59 | Set Group Properties For Flags | ✅ |  |
+| 60 | Set Person Properties | ✅ |  |
+| 61 | Set Person Properties For Flags | ✅ |  |
+| 62 | Setup | ✅ | [n29] |
+| 63 | Shutdown | ✅ | [n30] |
+| 64 | Start Session Recording | ✅ | [n20] |
+| 65 | Stop Session Recording | 🟡 | [n21] |
+| 66 | Surveys | 🟡 | [n22] |
+| 67 | Traces | ❌ | [n23] |
+| 68 | Tracing Headers | ✅ |  |
+| 69 | Unregister | ✅ |  |
 
 ## Notes
 

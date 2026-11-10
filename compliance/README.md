@@ -145,7 +145,7 @@ the single most widely-shared non-compliance in the matrix.
 |---|---|---|---|---|---|---|---|---|---|
 | posthog-js | 26/64 fully compliant (41%) | 26 | 21 | 12 | 5 | 0 | 2026-10-05 · `6538babc` (targeted re-audit; most of the 59 pre-existing rows carried from 2026-08-10, see file header) | 33 | [posthog-js.md](posthog-js.md) |
 | posthog-python | 13/64 fully compliant (20%; 30 contracts N/A on a server SDK) | 13 | 16 | 5 | 30 | 0 | 2026-10-12 · `509c8525` | 21 | [posthog-python.md](posthog-python.md) |
-| posthog-android | 42/64 fully compliant (66%) | 42 | 16 | 1 | 5 | 0 | 2026-11-10 · `aaa23d39` (4.0: 31 rows); other rows 2026-10-19 · `c5e788bd` — see file header | 17 | [posthog-android.md](posthog-android.md) |
+| posthog-android | 42/69 fully compliant (61%) | 42 | 16 | 1 | 10 | 0 | 2026-11-10 · `aaa23d39` (4.0: 31 rows); other rows 2026-10-19 · `c5e788bd` — see file header | 17 | [posthog-android.md](posthog-android.md) |
 | posthog-ios | 38/64 fully compliant (59%) | 38 | 16 | 4 | 6 | 0 | 2026-10-08 · `f5cbe87c` + PostHog/posthog-ios#924–#934 (out-of-cycle refresh, see below) | 20 | [posthog-ios.md](posthog-ios.md) |
 | posthog-node | 9/64 fully compliant (14%; 29 contracts N/A on a server SDK) | 9 | 21 | 4 | 29 | 1 | 2026-10-12 · `4f590b36` (posthog-js monorepo; Traces row corrected 2026-10-19) | 25 (+1 ❓) | [posthog-node.md](posthog-node.md) |
 | posthog-flutter | 21/64 fully compliant (33%) | 21 | 29 | 6 | 8 | 0 | 2026-10-19 · `1032c102` | 35 | [posthog-flutter.md](posthog-flutter.md) |
@@ -177,7 +177,9 @@ rows at `aaa23d39`, the head of the 4.0 integration PR PostHog/posthog-android#8
 `752f899` plus [#146](https://github.com/PostHog/sdk-specs/pull/146) (capture v1 delivery) at `d387ab79`,
 which includes [#147](https://github.com/PostHog/sdk-specs/pull/147) (capture v1 AI lane). The 31 are the
 five capture v1 rows, the 25 rows that 4.0 code or spec text merged since 2026-10-19 changes, and
-Alias, whose code changed in PostHog/posthog-android#819. android moves from 37/16/5/6 to **42/16/1/5**:
+Alias, whose code changed in PostHog/posthog-android#819. android moves from 37/16/5/6 to **42/16/1/10**, on 69 rows:
+- **Five new rows, all ➖:** Experiment Exposure (android requests `/flags?v=2`), AI Datasets, AI Scorers,
+  Offline Evaluations and Emails (server-only).
 - **Alias ❌→✅:** `$create_alias` carries `distinct_id` in its properties (PostHog/posthog-android#819).
 - **Capture AI ➖→✅:** #147 adds android 4.0 to Applicability, and the AI lane conforms.
 - **Start Session Recording ❌→✅:** replay isn't installed while opted out, so a start stays inactive.

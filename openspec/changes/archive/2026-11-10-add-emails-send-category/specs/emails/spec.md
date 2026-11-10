@@ -24,13 +24,40 @@ The code form SHALL hold `template_key`, `subject`, `to`, `capture_engagement`, 
 - **WHEN** the caller sends a code-form email with an empty reply-to list
 - **THEN** the body has no `reply_to`
 
+### Requirement: Send code form
+
+The code form SHALL take a required template key and subject, with `html`, `text` or both, and SHALL take an optional sender address, an optional reply-to of one address or a list of addresses, an optional capture-engagement flag that defaults to true, and an optional message category, as **Send message category** says. The template key names the email so PostHog can group its metrics, logs and status under it; it is not a template stored in PostHog. PostHog sends the content as given and does not store it.
+
+The shared send inputs — the recipient, the distinct ID, the idempotency key and the per-send retry limit — apply to both forms.
+
+One call SHALL carry exactly one form. The SDK SHALL refuse, before any request, a call that names neither form, a call that names both, and a call that sets a field belonging to the other form, such as template data on a code send or a subject on a template send. Capture engagement and the message category belong to the code form only: a template made in PostHog follows the project's engagement setting and sends in its own category. An SDK whose types already keep a field off the template form refuses it through its types.
+
+#### Scenario: Capture engagement defaults to true
+- **WHEN** the caller sends a code-form email without a capture-engagement value
+- **THEN** the body holds `"capture_engagement": true`
+
+#### Scenario: A call that names both forms sends nothing
+- **WHEN** the caller sends an email with both a template ID and a template key
+- **THEN** the SDK reports an argument error
+- **AND** no request is made
+
+#### Scenario: A template send refuses a code-form field
+- **WHEN** the caller sends an email with a template ID and a subject
+- **THEN** the SDK reports an argument error
+- **AND** no request is made
+
+#### Scenario: A template send refuses a message category
+- **WHEN** the caller sends an email with a template ID and a message category
+- **THEN** the SDK refuses the call, through its types or with an argument error
+- **AND** no request is made
+
 ### Requirement: Argument checks
 
 Before any request, the SDK SHALL check that `to` is one nonempty string, a distinct ID is a nonempty string, an idempotency key is 1 to 255 visible ASCII characters, and a retry limit is a nonnegative integer.
 
 For the template form it SHALL check that the template ID is a UUID and template data is a mapping. For the code form it SHALL check that the template key is 1 to 400 characters of letters, digits, hyphens and underscores, that a subject is present, that at least one of `html` and `text` is present and each given one is a string, and that a capture-engagement value is a boolean.
 
-For a message category it SHALL check what the SDK's types cannot enforce: that the category is the built-in transactional value or a category object, that its type is `marketing` or `transactional`, that its key and name are strings, and that a description, when given, is a string. The SDK MAY also refuse an empty or blank key or name, and a field that a category object doesn't have. PostHog owns the key's format and every length, so the SDK SHALL NOT check them.
+For a message category it SHALL check what the SDK's types cannot enforce: that the category is the built-in transactional value or a category object, that its type is `marketing` or `transactional`, that its key and name are strings, and that a description, when given, is a string. The SDK MAY also refuse an empty or blank key or name, the one length check it may make, and a field that a category object doesn't have. PostHog owns the key's format and every other length, so the SDK SHALL NOT check them.
 
 A failed check SHALL send no request.
 
@@ -65,11 +92,11 @@ An error SHALL carry a `name`, a coarse class for callers that branch on the kin
 
 ### Requirement: Send message category
 
-The code form SHALL take an optional message category: either the built-in transactional value, which the SDK SHALL expose as a named value in its idiom, such as a constant, an enum variant or a function, or a category object with a required key, a required type of `marketing` or `transactional`, a required name, and an optional description. The message category belongs to the code form only, so the one-form rule of **Send code form** refuses it on a template send, through the SDK's types or before any request. A template made in PostHog sends in its own category.
+The code form SHALL take an optional message category: either the built-in transactional value, which the SDK SHALL expose as a named value in its idiom, such as a constant, an enum variant or a function, or a category object with a required key, a required type of `marketing` or `transactional`, a required name, and an optional description. The message category belongs to the code form only, as **Send code form** says.
 
 In the body, `category` SHALL be the string `"transactional"` for the built-in transactional value, or an object with `key`, `type` and `name`, and with `description` unless the caller left it out. An empty description SHALL be sent as `""`. A category or a description counts as left out when the caller didn't pass it, or passed the unset value of an SDK that marks unset options that way, such as null, nil or None. The SDK SHALL NOT send a default category.
 
-PostHog upserts a category object by its key: an unknown key creates the category, a changed name or description updates it, a left-out description keeps the stored one, `""` clears it, and a key that exists with another type is refused. Without a category, or with the built-in transactional value, the email is transactional with no category. A marketing email honors the recipient's opt-outs, and its HTML, or its text when it has no HTML, needs an `{{ unsubscribe_url }}` placeholder.
+When the template key matches a template stored in PostHog, the email sends in that template's category: `category` SHALL be left out or match it, with the same key and type, or the built-in transactional value for a template without a category, and PostHog refuses anything else with `category_mismatch` and creates or updates no category. Otherwise PostHog upserts a category object by its key: an unknown key creates the category, a changed name or description updates it, a left-out description keeps the stored one, `""` clears it, and a key that exists with another type is refused. Without a category, or with the built-in transactional value, that email is transactional with no category. A marketing email honors the recipient's opt-outs, and its HTML, or its text when it has no HTML, needs an `{{ unsubscribe_url }}` placeholder.
 
 PostHog can refuse a send in a message category with `category_mismatch`, `too_many_categories`, `unsubscribe_link_required` or `copies_not_allowed` (`400`), or `recipient_opted_out` (`422`). **Error fields**, **Error names** and **Retryable responses** apply to them as to any other code. An SDK that types PostHog's error codes as a closed set, such as an enum or a union, SHALL include these five. `copies_not_allowed` answers a marketing send with copies, which the code form doesn't take yet.
 

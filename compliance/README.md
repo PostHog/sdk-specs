@@ -145,7 +145,7 @@ the single most widely-shared non-compliance in the matrix.
 |---|---|---|---|---|---|---|---|---|---|
 | posthog-js | 26/64 fully compliant (41%) | 26 | 21 | 12 | 5 | 0 | 2026-10-05 · `6538babc` (targeted re-audit; most of the 59 pre-existing rows carried from 2026-08-10, see file header) | 33 | [posthog-js.md](posthog-js.md) |
 | posthog-python | 13/64 fully compliant (20%; 30 contracts N/A on a server SDK) | 13 | 16 | 5 | 30 | 0 | 2026-10-12 · `509c8525` | 21 | [posthog-python.md](posthog-python.md) |
-| posthog-android | 42/64 fully compliant (66%) | 42 | 15 | 2 | 5 | 0 | 2026-11-10 · `aaa23d39` (4.0: 30 rows); other rows 2026-10-19 · `c5e788bd` — see file header | 17 | [posthog-android.md](posthog-android.md) |
+| posthog-android | 43/64 fully compliant (67%) | 43 | 15 | 1 | 5 | 0 | 2026-11-10 · `aaa23d39` (4.0: 31 rows); other rows 2026-10-19 · `c5e788bd` — see file header | 16 | [posthog-android.md](posthog-android.md) |
 | posthog-ios | 38/64 fully compliant (59%) | 38 | 16 | 4 | 6 | 0 | 2026-10-08 · `f5cbe87c` + PostHog/posthog-ios#924–#934 (out-of-cycle refresh, see below) | 20 | [posthog-ios.md](posthog-ios.md) |
 | posthog-node | 9/64 fully compliant (14%; 29 contracts N/A on a server SDK) | 9 | 21 | 4 | 29 | 1 | 2026-10-12 · `4f590b36` (posthog-js monorepo; Traces row corrected 2026-10-19) | 25 (+1 ❓) | [posthog-node.md](posthog-node.md) |
 | posthog-flutter | 21/64 fully compliant (33%) | 21 | 29 | 6 | 8 | 0 | 2026-10-19 · `1032c102` | 35 | [posthog-flutter.md](posthog-flutter.md) |
@@ -172,12 +172,13 @@ MCP Analytics ➖, Session Replay Debug Properties 🟡. Details in [posthog-ios
 The roll-up counts include the fixes from PostHog/posthog-ios#924–#934: Shutdown ❌→✅ and five 🟡→✅
 (Group, Group Identify, Stop Session Recording, Feature Flag Called Tracker, HTTP Client); see the "posthog-ios PRs included" table in the per-SDK file.
 
-**2026-11-05 out-of-cycle refresh — posthog-android 4.0 (re-checked 2026-11-10):** re-audited 30
+**2026-11-05 out-of-cycle refresh — posthog-android 4.0 (re-checked 2026-11-10):** re-audited 31
 rows at `aaa23d39`, the head of the 4.0 integration PR PostHog/posthog-android#871, against `main` at
 `752f899` plus [#146](https://github.com/PostHog/sdk-specs/pull/146) (capture v1 delivery) at `d387ab79`,
-which includes [#147](https://github.com/PostHog/sdk-specs/pull/147) (capture v1 AI lane). The 30 are the
-five capture v1 rows and the 25 rows that 4.0 code or spec text merged since 2026-10-19 changes. android
-moves from 37/16/5/6 to **42/15/2/5**:
+which includes [#147](https://github.com/PostHog/sdk-specs/pull/147) (capture v1 AI lane). The 31 are the
+five capture v1 rows, the 25 rows that 4.0 code or spec text merged since 2026-10-19 changes, and
+Alias, whose code changed in PostHog/posthog-android#819. android moves from 37/16/5/6 to **43/15/1/5**:
+- **Alias ❌→✅:** `$create_alias` carries `distinct_id` in its properties (PostHog/posthog-android#819).
 - **Capture AI ➖→✅:** #147 adds android 4.0 to Applicability, and the AI lane conforms.
 - **Start Session Recording ❌→✅:** replay isn't installed while opted out, so a start stays inactive.
 - **Consent Gating 🟡→✅:** `optOut()` stops replay and integrations.
@@ -262,7 +263,6 @@ stalest pointer and its only 59-row file.
 | posthog-js | Traces | Backward-compatible | No OTLP span/traces implementation anywhere — [posthog-js.md#n34](posthog-js.md) |
 | posthog-python | Logs | Backward-compatible | No `/i/v1/logs` OTLP pipeline — [posthog-python.md#n1](posthog-python.md) |
 | posthog-python | Set/Reset Person/Group Properties For Flags (×4) | Backward-compatible | No persistent property-override cache, despite `@both`-tagged acceptance scenarios — [posthog-python.md#n10](posthog-python.md) |
-| posthog-android | Alias | Backward-compatible | No `distinct_id` alongside `alias` in the `$create_alias` payload; re-confirmed 2026-10-19 at `PostHogStateless.kt:373-385` — [posthog-android.md#n1](posthog-android.md#n1) |
 | posthog-android | Traces | Backward-compatible | No OTLP traces/spans implementation — [posthog-android.md#n23](posthog-android.md#n23) |
 | posthog-ios | Get Feature Flags | Backward-compatible | No public flat key→value bulk flag getter — [posthog-ios.md#n9](posthog-ios.md) |
 | posthog-ios | Get Feature Flags And Payloads | Backward-compatible | No combined flags+payloads getter under any name — [posthog-ios.md#n10](posthog-ios.md) |
@@ -385,7 +385,7 @@ stalest pointer and its only 59-row file.
 | posthog-js | Exception Event Metadata | Backward-compatible | **New this run** — the most complete producer envelope audited (full `exception_id`/`parent_id` linkage, canonical sources, correct nested-`handled` omission, spec-exact caps), missing only `$exception_source` and a capture category on the two global handlers, which fall back to `generic` — [posthog-js.md#n35](posthog-js.md) |
 | posthog-js | Session Replay Debug Properties | Backward-compatible | **New this run** — re-scored against `d078270` after #96; tiering, the `$`-prefix gate, and the 30 s throttle conform, but after `stopSessionRecording()` on a loaded recorder events keep `active`/`buffering` instead of `$recording_status: disabled` — [posthog-js.md#n36](posthog-js.md) |
 
-Full contract-by-contract detail (33 posthog-js, 21 posthog-python, 17 posthog-android, 20
+Full contract-by-contract detail (33 posthog-js, 21 posthog-python, 16 posthog-android, 20
 posthog-ios, 26 posthog-node, 34 posthog-flutter, 31 posthog-react-native, 19 posthog-php, 21
 posthog-ruby, 23 posthog-go, 19 posthog-java, and 29 posthog-dotnet non-Pass/non-N/A cells) is in
 the respective per-SDK files.

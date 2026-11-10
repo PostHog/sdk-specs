@@ -1,9 +1,9 @@
 # posthog-android — SDK Compliance
 
 **Repo:** [PostHog/posthog-android](https://github.com/PostHog/posthog-android)
-**Audited commit:** `c5e788bd603d3bdda77ac4d213538b9db637299a` ([commit](https://github.com/PostHog/posthog-android/commit/c5e788bd603d3bdda77ac4d213538b9db637299a)) — audited on 2026-10-19. **30 rows re-audited against posthog-android 4.0** at `aaa23d39af4424978bd2439028282e47417490b8` ([commit](https://github.com/PostHog/posthog-android/commit/aaa23d39af4424978bd2439028282e47417490b8), head of the 4.0 integration PR [PostHog/posthog-android#871](https://github.com/PostHog/posthog-android/pull/871)) on 2026-11-10 — see [posthog-android 4.0](#posthog-android-40-re-audit-2026-11-05)
-**Audited against sdk-specs commit:** `c72e367` (2026-10-19 rows); `752f899` plus the capture v1 text of [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79`, which includes [#147](https://github.com/PostHog/sdk-specs/pull/147) (merged into #146's branch as `6a9ed0f`), for the 30 4.0 rows
-**Summary:** 42 ✅ · 15 🟡 · 2 ❌ · 5 ➖ · 0 ❓ (64 rows; 2026-10-19 at `c5e788bd` scored 37/16/5/6/0; previous full audit 2026-08-10 at `8659a7b4` scored 31/16/9/3/0 on 59 rows)
+**Audited commit:** `c5e788bd603d3bdda77ac4d213538b9db637299a` ([commit](https://github.com/PostHog/posthog-android/commit/c5e788bd603d3bdda77ac4d213538b9db637299a)) — audited on 2026-10-19. **31 rows re-audited against posthog-android 4.0** at `aaa23d39af4424978bd2439028282e47417490b8` ([commit](https://github.com/PostHog/posthog-android/commit/aaa23d39af4424978bd2439028282e47417490b8), head of the 4.0 integration PR [PostHog/posthog-android#871](https://github.com/PostHog/posthog-android/pull/871)) on 2026-11-10 — see [posthog-android 4.0](#posthog-android-40-re-audit-2026-11-05)
+**Audited against sdk-specs commit:** `c72e367` (2026-10-19 rows); `752f899` plus the capture v1 text of [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79`, which includes [#147](https://github.com/PostHog/sdk-specs/pull/147) (merged into #146's branch as `6a9ed0f`), for the 31 4.0 rows
+**Summary:** 43 ✅ · 15 🟡 · 1 ❌ · 5 ➖ · 0 ❓ (64 rows; 2026-10-19 at `c5e788bd` scored 37/16/5/6/0; previous full audit 2026-08-10 at `8659a7b4` scored 31/16/9/3/0 on 59 rows)
 
 **Why the 2026-10-19 run:** rotation priority 3 — the pointer was ten weeks old, and android carries the
 mobile reference for Session Replay Debug Properties. It was also the cheapest third slot available:
@@ -33,9 +33,9 @@ branch. 4.0 also changes consent handling, remote config, the flag API, session 
 specs merged since 2026-10-19 change those rows (#81, #102, #109, #111, #115, #121, #123, #124, #135, #138,
 #155, #160, #161, #162, #167, #170, #193, #197, #198, #199, #203).
 
-**Scope.** 30 rows are scored at `aaa23d39` against `main` at `752f899` plus #146's text at `d387ab79`,
-treated as merged to `main`: the five capture v1 rows and the 25 rows those other changes touch. The
-other 34 rows carry forward from 2026-10-19 at `c5e788bd`, scored against `c72e367`. The spec changes
+**Scope.** 31 rows are scored at `aaa23d39` against `main` at `752f899` plus #146's text at `d387ab79`,
+treated as merged to `main`: the five capture v1 rows, the 25 rows those other changes touch, and Alias, whose code changed in
+PostHog/posthog-android#819. The other 33 rows carry forward from 2026-10-19 at `c5e788bd`, scored against `c72e367`. The spec changes
 merged since then that this page doesn't score bind server SDKs, posthog-js, another platform, or
 contracts that are ➖ here (#205, #178, #185, #116, #129, #94, #88, #130, #85, #169, #171, and the MCP
 analytics, AI evaluation and emails changes). One carried-forward row is stale: **Stop Session
@@ -44,6 +44,7 @@ replay, so the next full audit must re-verify it.
 
 | Contract | 2026-10-19 | 4.0 | Why |
 |---|---|---|---|
+| Alias | ❌ | ✅ | `$create_alias` carries the source id as `properties.distinct_id` too (PostHog/posthog-android#819) ([n1](#n1)) |
 | Application Lifecycle | ✅ | ✅ | Installed, Updated, Opened and Backgrounded carry the required properties; un-prefixed `version`/`build` break only a SHOULD NOT ([n31](#n31)) |
 | Before Send Hook | ✅ | ✅ | Chain, drop and fail-closed unchanged; `options` and the uuid survive a hook as capture allows ([n3](#n3)) |
 | Capture | ✅ | ✅ | Capture v1 wire, headers, per-event results, options, the `$lib`/`$lib_version` pair fill, session id lifting, timestamps and fail-open token all conform; the post-hook uuid and `null`-options restore are the two allowances #146 grants ([n24](#n24)) |
@@ -75,7 +76,7 @@ replay, so the next full audit must re-verify it.
 | Start Session Recording | ❌ | ✅ | Replay isn't installed while opted out, so a start stays inactive ([n20](#n20)) |
 | Surveys | 🟡 | 🟡 | Web-only exclusion and popup delay conform; submit and dismiss move the last-seen date (#102), and an unknown question type blocks later surveys ([n22](#n22)) |
 
-android moves from 37/16/5/6 on 2026-10-19 to **42/15/2/5** (58%→66%).
+android moves from 37/16/5/6 on 2026-10-19 to **43/15/1/5** (58%→67%).
 
 **Behavior the spec permits for client SDKs, recorded so it isn't mistaken for a gap:** a `404` (or
 any retryable status) keeps the events on disk with no attempt limit, so a proxy that doesn't serve
@@ -144,7 +145,7 @@ complete implementation of that contract outside the browser.
 
 | # | Contract | Status | Note |
 |---|----------|--------|------|
-| 1 | Alias | ❌ | [n1] |
+| 1 | Alias | ✅ | [n1] |
 | 2 | Application Lifecycle | ✅ | [n31] |
 | 3 | Autocapture | ✅ | [n2] |
 | 4 | Before Send Hook | ✅ | [n3] |
@@ -215,25 +216,25 @@ Note numbers were reassigned this run when the matrix was re-sorted alphabetical
 forward from the 2026-08-10 audit keep their original analysis, re-checked for existence at
 `c5e788bd`; notes [n2](#n2), [n7](#n7), and [n17](#n17) are new or rewritten this run. A reference
 to "posthog-android nX" in a document written before 2026-10-19 refers to the old numbering.
-Notes [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14](#n14), [n17](#n17), [n19](#n19),
+Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14](#n14), [n17](#n17), [n19](#n19),
 [n20](#n20), [n22](#n22) and [n24](#n24)-[n40](#n40) are scored at `aaa23d39`.
 
 <a id="n1"></a>
 
-### n1 — Alias (❌ Fail)
-- **Spec requires:** `acceptance/public/alias.feature:12-21` (tagged `@both`, applies to client
-  SDKs) requires the enqueued `$create_alias` event's properties to include both `alias` and
-  `distinct_id`.
-- **SDK currently:** `alias(alias: String)` (`posthog/src/main/java/com/posthog/PostHog.kt:1164-1178`)
-  builds `props["alias"] = alias` and calls `capture(PostHogEventName.CREATE_ALIAS.event,
-  properties = props)` but never sets `props["distinct_id"]`. Confirmed by direct read of the
-  current method body this cycle. `buildProperties()` also does not inject `distinct_id` for
-  `$create_alias` events. Re-scored from 🟡 Partial (prior audit) to ❌ Fail this cycle: the
-  required property is entirely absent, not partially present, and the acceptance scenario is
-  tagged `@both` (applies to client), not just server — there is no ambiguity carve-out.
-- **Backwards compatibility:** Backward-compatible — adding `props["distinct_id"] = distinctId` at
-  `PostHog.kt:~1176` is purely additive to the event payload.
-- **Remediation:** Set `distinct_id` alongside `alias` in the `$create_alias` properties map.
+### n1 — Alias (✅ Pass, re-audited at 4.0)
+- **Spec requires:** `acceptance/public/alias.feature` (`@client` scenario) requires the enqueued
+  `$create_alias` event to carry the current distinct id as its `distinct_id` and both `alias` and
+  `distinct_id` in its properties. `alias/spec.md` drops the call when `personProfiles` is `never` and
+  turns person processing on otherwise.
+- **SDK currently (4.0, `aaa23d39`):** conforms. `alias(alias, options)`
+  (`posthog/src/main/java/com/posthog/PostHog.kt:2112-2141`) returns when the SDK is disabled or
+  `personProfiles` is `NEVER` (`requirePersonProcessing`, `:2479-2491`, which also turns person
+  processing on), resolves the current distinct id once, sets `props["alias"]` and
+  `props["distinct_id"]` to it, and passes the same id to `capture` as the event's `distinct_id`, so
+  the two can't diverge. PostHog/posthog-android#819 (merged 2026-10-22, in `aaa23d39`) added the
+  property. At `c5e788bd` it was missing, which is why this row was ❌ on 2026-10-19.
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.
 
 <a id="n2"></a>
 

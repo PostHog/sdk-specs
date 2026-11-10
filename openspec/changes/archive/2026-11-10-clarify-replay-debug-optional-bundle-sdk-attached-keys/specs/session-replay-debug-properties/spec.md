@@ -19,9 +19,7 @@ with `$`, **excluding** `$feature_flag_called`, `$snapshot`, and, on the browser
 The SDK SHALL NOT attach any key of the optional bundle to a custom event (a name not starting
 with `$`). This constrains only what the SDK attaches itself: it does not require the SDK to
 remove a same-named key that reaches the event by another route, whether supplied by the caller in
-the capture properties, registered as a super property, or set deliberately by `beforeSend`. When
-the SDK does write a key itself, its value wins over a same-named caller or registered value (see
-"SDK-computed `$recording_status` and `$sdk_debug_*` values SHALL take precedence" below).
+the capture properties, registered as a super property, or set deliberately by `beforeSend`.
 Eligibility SHALL be decided on the event name as passed to capture, before `beforeSend` runs: an
 eligible event that `beforeSend` renames to a custom name still carries the bundle it was built
 with, and a custom event that `beforeSend` renames to a `$`-prefixed name does not gain it. The

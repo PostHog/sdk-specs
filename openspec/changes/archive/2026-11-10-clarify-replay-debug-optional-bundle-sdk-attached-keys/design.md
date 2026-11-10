@@ -13,15 +13,14 @@ debug-named key that the caller, `register`, or `before_send` placed on the even
 one scenario that fails if they strip caller keys.
 
 **Non-goals:** changing which events are eligible, the 30-second window, the acceptance rules for
-starting the window, or the precedence of SDK-written values.
+starting the window, or the merge order between SDK-written, registered, and caller values, which
+capture's **Caller-supplied event properties take precedence** already defines.
 
 ## Decisions
 
 - State the rule as "the SDK SHALL NOT attach", scoped to the SDK's own writes, and say explicitly
   that it does not require removal of keys from other routes. The permissive form matches what the
   reference does without adding a new SHALL about registered keys.
-- Keep the existing precedence sentence as the only statement about collisions when the SDK does
-  write a key; the new text cross-references it rather than restating it.
 - Note that posthog-js's `hidden` persistence exposure for its own session-persisted replay state is
   a storage rule, already cited in the key catalogue, so a reader does not mistake it for the gate.
 - The new scenario uses `$sdk_debug_session_start` because it is in the optional bundle on every
@@ -30,7 +29,8 @@ starting the window, or the precedence of SDK-written values.
 ## Risks / Trade-offs
 
 - A caller can put a stale or wrong value under a debug key on a custom event → accepted; the key is
-  the caller's and the existing precedence rule still overwrites it whenever the SDK writes it.
+  the caller's, and capture's merge order already lets a caller value override an SDK-written key on
+  any event.
 - No SDK has a test for the new scenario yet → recorded as planned on every SDK, not as conformance.
 
 ## Migration Plan

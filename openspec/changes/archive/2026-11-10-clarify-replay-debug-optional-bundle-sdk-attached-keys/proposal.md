@@ -13,7 +13,6 @@ of step with the reference.
 - Reword the custom-event sentence so it constrains what the SDK attaches itself and states that it
   does not require removing a same-named key that arrived through capture properties, `register`, or
   `beforeSend`.
-- Point back to the existing precedence rule: when the SDK does write a key, its value still wins.
 - Add one scenario for a caller-supplied optional-bundle key on a custom event, with the posthog-js
   and posthog-android lines that ground it.
 

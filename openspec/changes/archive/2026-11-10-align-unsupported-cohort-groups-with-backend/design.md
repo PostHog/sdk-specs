@@ -28,4 +28,4 @@ The alternative was to change the Rust backend to continue after an unsupported 
 
 ## Migration Plan
 
-Publish this spec correction and link it from PostHog/posthog-go#440. Revert Go's sibling-composition follow-up without rewriting history. No normal supported definitions, dependencies, CI selectors, or public signatures change. SDKs must only change code if they currently suppress a reached unsupported-group failure with later siblings.
+Publish this spec correction and link it from PostHog/posthog-go#440. Revert Go's sibling-composition follow-up without rewriting history. No normal supported definitions, dependencies, CI selectors, or public signatures change. SDKs must change code if they suppress a reached unsupported-group failure with later siblings or continue visiting siblings after a result is already decisive. Python at `1f185fd20a2b57d16486170f50cf436e01a54506` has the latter behavior and needs a separate SDK follow-up; no Python code is changed here.

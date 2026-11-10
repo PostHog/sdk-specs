@@ -1,26 +1,30 @@
 # posthog-node — SDK Compliance
 
 **Repo:** [PostHog/posthog-js](https://github.com/PostHog/posthog-js) (`packages/node` + `packages/core` — the standalone `posthog-node` repo is archived and its code now lives in this monorepo)
-**Audited commit:** `4f590b367e415fccf85a5f7a895e0f1f454ad25a` ([commit](https://github.com/PostHog/posthog-js/commit/4f590b367e415fccf85a5f7a895e0f1f454ad25a)) — audited on 2026-10-12
-**Audited against sdk-specs commit:** `513d94c`
-**Summary:** 9 ✅ · 21 🟡 · 4 ❌ · 29 ➖ · 1 ❓ (64 rows)
+**Audited commit:** `8c832754` ([tree](https://github.com/PostHog/posthog-js/commits/main)) — audited on 2026-11-02
+**Audited against sdk-specs commit:** `be25182`
+**Summary:** 11 ✅ · 21 🟡 · 4 ❌ · 32 ➖ · 0 ❓ (68 rows)
 
-**2026-10-19 correction (not a re-audit):** the Traces row moved ❌→❓. The 2026-10-12 audit recorded
-"no OTLP `/i/v1/traces` pipeline anywhere in the monorepo"; the pipeline had in fact merged on
-2026-09-10 and posthog-node is the package that wires it. See [n2](#n2). Every other row on this
-page is unchanged and still reflects the 2026-10-12 audit at `4f590b36`.
+**Previous audit:** 2026-10-12 at `4f590b36` (64 rows, 9 ✅ · 21 🟡 · 4 ❌ · 29 ➖ · 1 ❓), with a
+2026-10-19 correction that moved Traces ❌→❓.
 
-**Previous audit:** 2026-08-17 at `fbdb6c7b` (62 rows, 10 ✅ · 16 🟡 · 8 ❌ · 28 ➖ · 0 ❓). This run adds the two
-missing contracts (**Session Replay Debug Properties**, **MCP Analytics**) and re-verifies the rows the
-sdk-specs delta since `0ea0aba` lands on. Three rows move ❌→🟡 and one ✅→🟡; note ids are stable across
-audits.
+**Scope of this run — targeted re-audit.** Two things drove it: the spec surface gained **four new
+server-scope contracts** (Emails, AI Datasets, AI Scorers, Offline Evaluations), and the matrix's
+**only ❓ cell** — Traces — was explicitly queued to be scored here. This run re-derived the four new
+rows, scored Traces in full against `openspec/specs/traces/spec.md`, and re-checked the rows the
+sdk-specs delta (`513d94c` → `be25182`) lands on: HTTP Client (#81 compression), Retry Queue (#132
+jitter), Shutdown (#135 timeout-bounded drain), Evaluate Flags (#111 snapshot event control) and the
+flag-getter option naming (#109). Rows outside those sets carry forward from 2026-10-12.
 
-**A note on repo layout:** The `PostHog/posthog-node` repository itself has been archived/redirected — its code was moved into the `posthog-js` monorepo and now lives at `packages/node` (Node-specific integration: the `PostHog` client class, Express/NestJS middleware, error-tracking stack-trace enrichment, feature-flag polling, the new `captureAi`/`ai-capture` route) and `packages/core` (the shared `@posthog/core` library also used by `packages/browser` and `packages/react-native`: the capture/batch/flush/retry engine in `posthog-core-stateless.ts`, the richer ambient-identity `posthog-core.ts` base class used only by client SDKs, logs, error-tracking primitives). This audit clones `posthog-js` (commit above) and inspects `packages/node/src` + `packages/core/src` only — `packages/browser`, `packages/react-native`, and `packages/ai` are out of scope except where they are the *only* place a Node-facing option (e.g. `enableFullAiCapture`) is actually consumed. `packages/node`'s `PostHogBackendClient` still extends the stateless `PostHogCoreStateless`, **not** the richer client-only `PostHogCore`, so most client-only ambient-identity/session/replay primitives (`group()`, `reset()`, `getAnonymousId()`, `onFeatureFlags()`, session replay, bootstrap, etc.) simply don't exist on the Node class at all, making most N/A calls unusually clean-cut. The repo still supports both a legacy "v0" batch-capture pipeline (`POST /batch/`, default) and a newer "v1" pipeline (`POST /i/v1/analytics/events`, opt-in only via `POSTHOG_CAPTURE_MODE=v1` env var, `packages/node/src/capture-v1/config.ts`) — both share one queue/flush/retry engine in `posthog-core-stateless.ts` but differ in transport (`packages/node/src/capture-v1/*`), which matters for several findings below. Since the last audit (2026-08-06, `e1efa572`), the monorepo has added a dedicated AI-event capture route (`packages/node/src/ai-capture/`), a richer flag-evaluation snapshot API (`packages/node/src/feature-flag-evaluations.ts`), and no Traces/OTel-native-spans support in `packages/node` (still only in the separate `packages/ai` package's OTel bridge to `/i/v0/ai/otel`, not `/i/v1/traces`).
+**Headline: the matrix has no Unknown cells for the first time.** Traces resolves to ✅ — see [n2],
+which replaces the Unknown note with the evaluation it was waiting for.
+
+**A note on repo layout:** The `PostHog/posthog-node` repository itself has been archived/redirected — its code was moved into the `posthog-js` monorepo and now lives at `packages/node` (Node-specific integration: the `PostHog` client class, Express/NestJS middleware, error-tracking stack-trace enrichment, feature-flag polling, the `captureAi`/`ai-capture` route, and the new `emails/` surface) and `packages/core` (the shared `@posthog/core` library also used by `packages/browser` and `packages/react-native`: the capture/batch/flush/retry engine in `posthog-core-stateless.ts`, the richer ambient-identity `posthog-core.ts` base class used only by client SDKs, and the `logs/`, `traces/` and `metrics/` OTLP pipelines). This audit inspects `packages/node/src` + `packages/core/src` only. `packages/node`'s `PostHogBackendClient` still extends the stateless `PostHogCoreStateless`, **not** the richer client-only `PostHogCore`, so most client-only ambient-identity/session/replay primitives simply don't exist on the Node class at all, making most N/A calls unusually clean-cut.
 
 | # | Contract | Status | Note |
 |---|----------|--------|------|
 | 1 | Logs | 🟡 | [n1] |
-| 2 | Traces | ❓ | [n2] |
+| 2 | Traces | ✅ | |
 | 3 | Tracing Headers | 🟡 | [n3] |
 | 4 | Alias | 🟡 | [n4] |
 | 5 | Capture | 🟡 | [n5] |
@@ -83,6 +87,10 @@ audits.
 | 62 | Bootstrap | ➖ | client-side cold-start flag/identity hydration from server-rendered values; `setupBootstrap()` exists only on `PostHogCore`, called only by `posthog-react-native`, zero node references; acceptance is `@client`-only |
 | 63 | Session Replay Debug Properties | ➖ | `client` applicability; the spec states server SDKs observe no session timeline and attach none of these keys; `packages/node` has no replay subsystem and `PostHogBackendClient` extends the stateless base, not the replay-aware `PostHogCore` |
 | 64 | MCP Analytics | 🟡 | [n26] |
+| 65 | Emails | ✅ | [n27] |
+| 66 | AI Datasets | ➖ | the spec's applicability is conditional — "Server SDKs **that implement** AI dataset management", with posthog-python's `posthog.ai.evaluations` as the only named reference surface. `packages/node` ships no dataset management (`grep -ril datasets packages/node/src` → nothing), so the contract does not bite. Re-scope to ❌ if the spec is ever widened to require it of every server SDK |
+| 67 | AI Scorers | ➖ | same conditional applicability — "Server SDKs implementing AI scorer management"; no scorer surface in `packages/node` |
+| 68 | Offline Evaluations | ➖ | same conditional applicability — "Server SDKs implementing offline evaluation uploads"; no experiment/upload surface in `packages/node`. Note this is the capability that also defines the shared app-API client for the two rows above, so all three would land together |
 
 ## Notes
 
@@ -92,12 +100,44 @@ audits.
 - **Backwards compatibility:** Backward-compatible — instantiating `PostHogLogs` and exposing it via a new lazy getter/method on `PostHogBackendClient`, mirroring the existing `metrics` getter pattern, is purely additive.
 - **Remediation:** Add a `captureLog()` method or `logger`/`logs` getter to `packages/node/src/client.ts` that constructs `PostHogLogs` against the already-present `_sendLogsBatch` transport, the same way `metrics` is wired up today.
 
-### n2 — Traces (❓ Unknown) — *corrected 2026-10-19; the previous ❌ was a false negative*
-- **Spec requires:** A `startSpan`/`withSpan` API producing OTLP spans shipped to `POST {host}/i/v1/traces`, explicitly distinct from LLM-analytics-as-events, requiring no OpenTelemetry runtime dependency.
-- **Correction.** The 2026-10-12 audit recorded this row as ❌ on the finding that an "exhaustive grep for `startSpan`/`withSpan`/`i/v1/traces`/`traceparent`/`getActiveSpan`" across the monorepo "returns zero matches anywhere". **That was wrong.** The 2026-10-19 posthog-react-native audit, reading the same monorepo, found the implementation: `packages/core/src/traces/` (`span.ts`, `otlp.ts`, `traceparent.ts`, `ids.ts`, `config.ts`, `context.ts`, `sanitize.ts`, `live-spans`), exported as `PostHogTraces` from `packages/core/src/index.ts:91`, with the transport `_sendTracesBatch` posting to the `traces` path on `PostHogCoreStateless` (`posthog-core-stateless.ts:1866-1874`). It is wired up in **posthog-node specifically**: `packages/node/src/client.ts:21` imports `PostHogTraces`, `:155` holds it, and `:698-703` constructs it lazily. It landed in [posthog-js#4579](https://github.com/PostHog/posthog-js/pull/4579) on **2026-09-10**, four weeks *before* the audit that recorded it as absent, with follow-up fixes in #4908 and #5018. posthog-node is the only package in the monorepo that wires it.
-- **SDK currently:** Not scored. The implementation demonstrably exists, so ❌ is not defensible; but it has **not** been evaluated against the traces spec's configuration knobs, defaults, W3C `traceparent`/`tracestate` interop, payload bounds, or retry classification, so ✅ or 🟡 would be a guess. The row is ❓ pending that evaluation. This is the only Unknown cell in the matrix.
-- **Backwards compatibility:** Unknown — the evidence needed is a read of `packages/core/src/traces/` against `openspec/specs/traces/spec.md`, which this run did not have the budget for.
-- **Remediation:** Score this row at posthog-node's next audit, which should be prioritized for it. The posthog-python Traces audit (2026-10-12, the matrix's first ✅ on this contract) is the reference for what a full evaluation of this capability covers. Note that the related finding in [posthog-react-native.md#n31](posthog-react-native.md#n31) — react-native has the shared engine and transport but never constructs `PostHogTraces` — stands independently and is unaffected.
+### n2 — Traces (withdrawn — row is now ✅)
+Withdrawn 2026-11-02. This cell was ❌ on 2026-10-12 (a false negative — the implementation existed
+and the grep missed it), corrected to ❓ on 2026-10-19, and is now scored. It was the matrix's only
+Unknown cell.
+
+**What was evaluated.** `packages/core/src/traces/` (8,190 lines across `index.ts`, `span.ts`,
+`otlp.ts`, `traceparent.ts`, `ids.ts`, `config.ts`, `context.ts`, `sanitize.ts`, `live-spans`),
+wired into posthog-node at `packages/node/src/client.ts:776-791`, against
+`openspec/specs/traces/spec.md` — the public span API, configuration knobs, gating, transport,
+compression, queue and flush, and the error-handling/retry policy. It passes each of them:
+
+- **Public span API.** `startSpan(name, options)` and the overloaded `withSpan` (`index.ts:217`,
+  `:296-298`) plus `getActiveSpan()` (`:331`). The handle carries `setAttribute`, `setAttributes`,
+  `addEvent`, `setStatus`, `recordException`, `updateName`, `traceparent()`, `tracestate()` and
+  `end(endTime?)` (`span.ts:180-294`), with every mutator gated behind a `_mutable(...)` check so
+  operations after `end()` no-op — the spec's idempotence requirement.
+- **Configuration knobs.** All thirteen the spec names are present and resolved in `config.ts:120-140`.
+  The spec's "an unusable knob value falls back" scenario is implemented literally: every numeric knob
+  goes through `positiveInteger(value, DEFAULT)`, and `resolveBeforeSpanSend` (`:87-98`) filters
+  non-function entries and logs how many it dropped rather than invoking or disabling them.
+- **Off until configured.** `client.ts:776-779` returns `undefined` when `options.traces` is absent and
+  `startSpan` falls back to `inertSpan(...)` (`:826`), so an unconfigured client returns a no-op handle
+  and exports nothing.
+- **Transport and compression.** `_sendTracesBatch` → `_sendOtlpBatch({path: 'traces', auth: 'bearer'})`
+  (`posthog-core-stateless.ts:1878`, `:1767-1827`) posts to `${host}/i/v1/traces` with
+  `Authorization: Bearer`, gzips unless `disableCompression` is set and declares `Content-Encoding:
+  gzip` when it does, and measures the **uncompressed** payload against the endpoint's limit before
+  spending a request or a gzip pass on a batch that cannot be accepted.
+- **Error handling and retries.** `index.ts:899-996` implements the policy clause by clause: 2xx
+  removes the exact batch, resets the failure count and ramps `_maxExportBatchSize` back up by one
+  toward the configured max after a 413 shrink (`:921-923`); `too-large` halves the batch and drops a
+  single-span batch that the endpoint still refuses (`:928-950`); `retry-later` draws jitter
+  (`drawJitter()`, `utils/backoff.ts`) and installs a `RetryAfterWindow`; and the retry budget is
+  charged per backoff window rather than per attempt (`_headBatchChargeableAt`, `:901`) with a
+  caller-driven flush explicitly exempted — which is the spec's "honoring the endpoint costs a request
+  rather than the batch" rule.
+
+**Backwards compatibility:** n/a — Pass.
 
 ### n3 — Tracing Headers (🟡 Partial)
 - **Spec requires:** `both` applicability. Request-scoped middleware extracting `X-POSTHOG-DISTINCT-ID`/`X-POSTHOG-SESSION-ID` case-insensitively; sanitize (trim/strip control chars/cap length); explicit call-site values take precedence over context; personless-capture fallback unless the caller explicitly supplied `$process_person_profile`; flag-evaluation APIs no-op/return-empty when no identity is resolvable; per-request isolation; headers never used for auth.
@@ -146,6 +186,20 @@ audits.
 - **Backwards compatibility:** Backward-compatible — a bounded missing-key set keyed to the definitions generation plus a per-key in-flight promise map is additive and changes no public surface.
 - **Remediation:** Add the store next to the existing definitions poller so a successful refresh clears it, consult it before the remote probe, and dedupe concurrent probes for the same key through a promise map. posthog-node is the sixth server SDK checked against this requirement and the sixth to lack it (php, ruby, go, dotnet, python, node).
 
+**Re-verified 2026-11-02 at `8c832754` — the new #111 requirement is met; the pre-existing gap stands.**
+sdk-specs [#111](https://github.com/PostHog/sdk-specs/pull/111) added "Snapshot feature flag event
+control", and posthog-node already satisfies it: `isEnabled(key, {defaultValue, sendFeatureFlagEvents})`
+and `getFlag(key, {sendFeatureFlagEvents})` (`packages/node/src/feature-flag-evaluations.ts:143`,
+`:167`) take the per-read option and pass it to `_recordAccess`, which resolves it against the
+client-level default through `this._host.resolveSendFeatureFlagEvents(...)` (`:301-306`) — exactly the
+decision order the requirement specifies. The payload accessor (`:184`) correctly takes no option. The
+row stays 🟡 **only** for the missing negative knowledge: `grep -rniE "missingKey|negativeKnowledge|
+inFlight" packages/node/src packages/core/src` (non-test) still finds no missing-key store, no
+definitions generation counter and no in-flight probe map — the only `inFlight` hits are the unrelated
+pending-request set in `packages/node/src/emails/emails.ts`. **posthog-java now implements this**
+(see [posthog-java.md#n27](posthog-java.md)), so it is no longer a uniform server-SDK gap and there is
+a first-party reference for the fix.
+
 ### n11 — Group Identify (🟡 Partial)
 - **Spec requires:** `both` applicability. Validate that `groupType`/`groupKey` are present and non-empty; drop the call with zero enqueued events and a validation warning otherwise (acceptance scenario "Group identify requires type and key," tagged `@both`).
 - **SDK currently:** `groupIdentify()`/`groupIdentifyImmediate()` (`client.ts:2278-2340`) correctly build the `$groupidentify` event with `$group_type`/`$group_key`/`$group_set`, matching the happy-path scenario, including the documented synthetic-distinct-id fallback (`` `$${groupType}_${groupKey}` ``) when `distinctId` is omitted. Fresh read of both methods confirms **there is still no validation** of `groupType`/`groupKey` presence/emptiness — a call with a missing or empty `groupKey` still builds and enqueues a `$groupidentify` event with `$group_key: undefined`, contradicting the acceptance scenario's "no event should be enqueued" requirement. Unchanged from the previous audit.
@@ -184,6 +238,20 @@ audits.
 - **SDK currently:** The timeout-resolves-not-rejects correction is **already fully satisfied** and was the reason the spec text itself was corrected (per posthog-js#4506) — no code change was needed here. `PostHogCoreStateless._shutdown` races `doShutdown()` against a timeout via `raceWithTimeout` (`packages/core/src/utils/index.ts:97-121`); the timeout branch calls the `onTimeout` callback (which never throws) and then always `resolve()`s, so `Promise.race` settles as a resolution — `shutdown()`'s returned promise resolves on timeout, never rejects. `posthog-core-stateless.ts` logs `this._logger.critical('Timeout while shutting down PostHog. Some events may not have been sent.', {...})` inside that same `onTimeout` callback — `critical` always writes to `console.error` unconditionally, satisfying "logging a critical diagnostic." Genuine unrecoverable errors (non-fetch exceptions in `doShutdown()`'s catch block) are still rethrown, correctly preserving "reject is still permitted for other unrecoverable flush failures." The rest of the contract holds: flush-then-close ordering, idempotency via a `shutdownPromise` guard with a warning log on concurrent re-entry, permanent worker-stop (flush timer cleared, feature-flag poller stopped via `stopPoller()`), the feature-flag-called dedupe tracker explicitly cleared in a `finally` block (`client.ts`, `this.distinctIdHasSentFlagCalls = {}`), and delivery failures during final flush absorbed via `logFlushError()` rather than crashing. **Unchanged gap:** post-shutdown `capture()` calls are still **not** rejected or no-op'd — fresh reads of `wrap()`, `enqueue()`, and `sendImmediate()` in `posthog-core-stateless.ts` confirm no `_isShutdown`/`isShutdown`/`closed` guard exists anywhere in core or node; only `disabled`/`optedOut`/queue-size checks are present. A `capture()` call issued after `shutdown()` resolves silently re-populates the persisted queue and can even re-arm the flush timer that shutdown just cleared, directly contradicting the acceptance scenario "Shutdown flushes queued events and disables future work," which requires that no event be enqueued after shutdown.
 - **Backwards compatibility:** Backward-compatible — adding an `_isShutdown` guard checked in `wrap()`/`enqueue()` (mirroring the existing `disabled` check) that silently no-ops future `capture()` calls after shutdown completes is additive; post-shutdown capture calls are already undocumented/unsupported usage.
 - **Remediation:** Add a shutdown-state check to `enqueue()`/`sendImmediate()`, alongside the existing `disabled`/`optedOut` checks, that silently drops calls made after `shutdown()` has completed.
+
+**Re-verified 2026-11-02 at `8c832754` — new spec text, verdict unchanged.** sdk-specs
+[#135](https://github.com/PostHog/sdk-specs/pull/135) requires that a shutdown timeout bound the whole
+teardown drain, that the SDK stop rather than start another flush once the budget is gone, that it
+return normally, and that the stop be reported once. `_shutdown(shutdownTimeoutMs = 30000)`
+(`packages/core/src/posthog-core-stateless.ts:2018-2073`) does all four: `raceWithTimeout` bounds the
+whole `doShutdown()` drain, the timeout callback sets `hasTimedOut` which breaks the re-flush loop
+before another `flush()` starts, the race resolves rather than rejects, and the single
+`logger.critical('Timeout while shutting down PostHog…')` is the one report. The requirement's
+SHOULD-tier clause — check the remaining budget before each further delivery attempt *within* a flush,
+including a retry — is **not** met: `flush()` is not budget-aware, and `retriable()`
+(`packages/core/src/utils/index.ts:88-109`) waits a fixed `retryDelay` with no deadline check. The row
+stays 🟡 on the pre-existing finding (no post-shutdown capture guard) with this as a second, SHOULD-tier
+observation.
 
 ### n18 — Before Send Hook (✅ Pass)
 - Spec requires `both` applicability: a `beforeSend(event) -> event | null` hook run after event assembly and before enqueue; supports multi-hook chaining, stopping on a drop; hook exceptions must not crash the caller. Node exceeds the baseline: `_beforeSend?: BeforeSendFn | BeforeSendFn[]` (`packages/core/src/posthog-core.ts`) accepts either a single function or an array. `_runBeforeSend()` on `PostHogCore` threads `result = fn(result)` through each hook in order, stops immediately on a falsy/null return, and wraps each hook call in its own try/catch that logs the error and falls back to the last good `result`. Note: this class (`PostHogCore`, used by browser/react-native) is architecturally distinct from the Node-client-specific `_runBeforeSend` referenced in n5, which lacks the same per-hook try/catch — see n5 for that separate deviation in the Node capture path specifically. The `before-send-hook` capability itself, as exercised through the shared core event-assembly path, is fully spec-conformant and tested (`before-send-hook.feature`, `@both`, 3 scenarios).
@@ -235,8 +303,42 @@ audits.
 - **Backwards compatibility:** Backward-compatible to add `Retry-After` support to v0 (additive). The v1 queue-loss issue needs the same careful, non-silent fix described under n9.
 - **Remediation:** Add `Retry-After` honoring to the v0 retry path in `packages/core/src/utils/index.ts`'s `retriable()`; fix the v1 event-loss issue per n9's remediation.
 
+**New gap 2026-11-02 — the ingestion retry path is neither exponential nor jittered.** sdk-specs
+[#132](https://github.com/PostHog/sdk-specs/pull/132) added "Ingestion retry backoff is jittered"
+(SHOULD-tier). The monorepo **has** a correct jitter implementation — `packages/core/src/utils/backoff.ts`
+exposes `backoffDelayMs(baseMs, failures, jitter, maxMs)` and `drawJitter()`, with the `Retry-After`
+floor applied after jitter — but `grep -rn "backoffDelayMs|drawJitter" packages/core/src` shows it is
+used **only** by `logs/index.ts` and `traces/index.ts`. The analytics-events ingestion queue still goes
+through `retriable()` (`packages/core/src/utils/index.ts:88-109`), which waits a **fixed**
+`props.retryDelay` — 3,000 ms by default (`posthog-core-stateless.ts:448`) — on every attempt: no
+exponential progression, no jitter, and no `Retry-After` handling at all. Backward-compatible: routing
+the ingestion retry through the `backoff.ts` helper the same module already ships is additive and
+strictly reduces synchronized retry bursts. This defect is shared with posthog-react-native and
+posthog-browser through `@posthog/core`.
+
 ### n26 — MCP Analytics (🟡 Partial, new row)
 - **Spec requires:** The MCP analytics spec's applicability table lists `@posthog/mcp` under **posthog-js**. In practice `packages/mcp/package.json` declares `posthog-node` as both a workspace dependency and a `^5.0.0` peer dependency — the add-on's host SDK, whose `capture` carries the `$mcp_*` events, is posthog-node, not the browser package. This row is scored here on that basis and cross-referenced from [posthog-js.md](posthog-js.md#n37); **the applicability table and the package's actual host client disagree, and which SDK owns this row is a spec question for a human maintainer**, not something this audit resolves. The requirements themselves: one `$mcp_tool_call` per call reaching a final outcome, always carrying `$mcp_tool_name`, `$mcp_is_error`, `$mcp_duration_ms`, `$mcp_source`, `$session_id` and a request-start `timestamp`; no `$mcp_tool_call` for an `input_required` round, a task handle, or a call naming an unregistered tool (a rule that "applies to every SDK" regardless of capability tags); `$mcp_input_required` and `$mcp_unknown_tool` SHOULD be emitted; events bounded at 102,400 bytes with a normative shrink order; `$lib` of the form `posthog-<runtime>-mcp`.
 - **SDK currently:** `packages/mcp` is the richest MCP implementation in this matrix and the one posthog-js's audit already examined in detail at `6538babc`; re-reading it at this run's commit confirmed both gaps are unchanged — `grep -rn 'mcp_unknown_tool\|mcp_input_required' packages/mcp/src` returns **zero** matches, and the suite still asserts the misreporting behavior directly in `packages/mcp/src/__tests__/error-capture.test.ts:162` ("captures errors for unknown tool names") — so rather than restate the rest of the evidence this note defers to [posthog-js.md](posthog-js.md#n37) for it. In summary: the required `$mcp_tool_call` properties, session derivation, injected arguments, server build, feedback tool and size bound are all present; **neither `$mcp_unknown_tool` nor `$mcp_input_required` is emitted**, and an unknown tool is not merely unreported but *misreported* as a failed `$mcp_tool_call` on both instrumentation paths, inflating the server's own tool error rate with names it never registered.
 - **Backwards compatibility:** Backward-compatible — adding the two event names and suppressing the misreported `$mcp_tool_call` are additive and corrective; no existing property changes meaning.
 - **Remediation:** Emit `$mcp_unknown_tool` with the requested name instead of a failed `$mcp_tool_call` when the server has no such tool, emit `$mcp_input_required` per round, and declare the matching `@mcp_unknown_tool_capable`/`@mcp_input_required_capable` acceptance tags. Separately, raise the ownership question above with the spec owners so this row is tracked against exactly one SDK.
+
+### n27 — Emails (✅ Pass, new row)
+- **Spec requires:** Server SDKs only. `emails.send` / `emails.get`; the `secretKey`, `appHost`,
+  `emailRequestTimeoutMs` (15 s) and `emailRequestMaxRetries` (2) client options; the two HTTP paths;
+  one idempotency key reused across every attempt of a call; and the normative response → error-name
+  table.
+- **SDK currently:** `packages/node/src/emails/` (`emails.ts` 459 lines, `errors.ts`, `types.ts`) is
+  one of the spec's two named reference surfaces, and the details line up. `SEND_PATH` and
+  `STATUS_PATH` (`emails.ts:21-22`) are the spec's exact paths; the status read lower-cases the message
+  ID before substitution (`:140`). `connect()` (`:151-177`) resolves the app host from `host`/`appHost`
+  and refuses a non-Cloud custom host with a distinct error rather than leaking the secret key to a
+  proxy — the spec's "Custom host refusal" requirement. Auth is `Authorization: Bearer <secretKey>`
+  with an `Idempotency-Key` header on sends (`:115-117`, `:180-182`). `errors.ts:60-88` reproduces the
+  error-name table row for row, including both 409 branches, both 422 branches, both 429 branches, and
+  the local `invalid_*` → `validation_error` rule (`:69`). The client options resolve through
+  `positiveNumberOr(..., DEFAULT_EMAIL_REQUEST_TIMEOUT_MS)` and
+  `nonNegativeIntegerOr(..., DEFAULT_EMAIL_REQUEST_MAX_RETRIES)` (`client.ts:727-728`), and a per-send
+  `maxRetries` overrides the client default. `shutdown()` awaits the in-flight set (`emails.ts:103-104`),
+  satisfying the Shutdown requirement, and a disabled or shut-down client raises `client_disabled` /
+  `client_closed` rather than sending.
+- **Backwards compatibility:** n/a — Pass.

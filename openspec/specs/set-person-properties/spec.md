@@ -151,9 +151,10 @@ A client SDK that skips duplicate person-property updates with a cached hash (fr
 - **AND** the mock PostHog server is reset
 - **GIVEN** the SDK is initialized with token "test-token"
 - **AND** the current distinct id is "user-123"
-- **WHEN** set person properties is called with property "plan" set to "pro" and capture option "process_person_profile" set to false
+- **WHEN** set person properties is called with property "plan" set to "pro"
+- **AND** set person properties is called with property "plan" set to "pro" and capture option "process_person_profile" set to false
 - **AND** set person properties is called with property "plan" set to "pro"
-- **THEN** 2 events named "$set" should be enqueued
+- **THEN** 3 events named "$set" should be enqueued
 
 #### Scenario: A personless update clears the stored hash
 - **GIVEN** a fresh SDK acceptance test harness

@@ -256,7 +256,7 @@ In a wrapper whose events a native SDK delivers (posthog-flutter on iOS, macOS a
 
 A per-call argument such as `disable_geoip` belongs to step 2, so it beats a context or global `$geoip_disable`; the client-level setting belongs to step 3, so a context or global value beats it. A built-in AI or MCP integration SHALL set `process_person_profile: false` at step 2 when it substitutes a trace or session id for a missing user id. Adding groups to an event SHALL NOT turn person processing on.
 
-Legacy capture: posthog-python 7.x merged `super_properties` over the call's properties and posthog-go 1.x merged `DefaultEventProperties` over the call's properties; both reversed in their capture v1 majors. This requirement states the server part of the order that #145 proposes for flag properties.
+Legacy capture: posthog-python 7.x merged `super_properties` over the call's properties and posthog-go 1.x merged `DefaultEventProperties` over the call's properties; both reversed in their capture v1 majors.
 
 #### Scenario: The call wins over context, global and SDK values (@server)
 - **GIVEN** a fresh SDK acceptance test harness
@@ -334,13 +334,15 @@ Legacy capture: posthog-python 7.x merged `super_properties` over the call's pro
 
 ### Requirement: Events name their own library
 
-An SDK that delivers events through capture v1 SHALL send `$lib` and `$lib_version` in `properties`, and the wire builder SHALL NOT remove them. `$lib` names the library that produced the event and `$lib_version` its version; `PostHog-Sdk-Info` names the SDK that sent the request. For the SDK's own fill and for capture's fallback, `$lib` and `$lib_version` count as set only when they are non-empty strings.
+Every SDK that delivers events through capture v1 SHALL send `$lib` and `$lib_version` in `properties`, and the wire builder SHALL NOT remove them. `$lib` names the library that produced the event and `$lib_version` its version; `PostHog-Sdk-Info` names the SDK that sent the request. For a server SDK's own fill and for capture's fallback, `$lib` and `$lib_version` count as set only when they are non-empty strings.
 
-The SDK SHALL fill the pair from its own identity as the last fill-only layer (step 3 of **Server SDKs build every event in one layer order**), before `before_send`:
+A server SDK SHALL fill the pair from its own identity as the last fill-only layer (step 3 of **Server SDKs build every event in one layer order**), before `before_send`:
 
 - When `$lib` is not set, the SDK SHALL set both `$lib` and `$lib_version`, replacing a `$lib_version` set without `$lib`, and a `$lib` that is `null`, empty or not a string.
 - When `$lib` is the SDK's own library name and `$lib_version` is not set, the SDK SHALL set `$lib_version`.
 - Otherwise the SDK SHALL leave both as they are. It SHALL NOT add its own `$lib_version` to another library's `$lib`.
+
+A client SDK SHALL instead merge `$lib` and `$lib_version` key by key like any other property, as **Caller-supplied event properties take precedence** describes.
 
 A built-in integration or wrapper (MCP instrumentation, AI wrappers, framework middleware) MAY label the events it captures with its own `$lib` and `$lib_version`. It SHALL set both, as the first fill-only layer of step 3, so a `$lib` in the call's `properties` wins over its label. Built-in integrations SHALL NOT change the client's `PostHog-Sdk-Info` value, except an MCP integration that labels a dedicated client (`mcp-analytics`, Library identity).
 

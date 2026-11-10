@@ -330,7 +330,7 @@ standalone `$identify` event, for any MCP revision or session mode. It would car
 `$anon_distinct_id`, so ingestion would merge no person, and every event already carries the identity.
 
 #### Scenario: An anonymous call does not create a person
-- **GIVEN** an MCP server instrumented by the SDK with no identify option
+- **GIVEN** an MCP server instrumented by the SDK on capture v1 with no identify option
 - **WHEN** an MCP client calls tool "search_docs"
 - **AND** the SDK is flushed
 - **THEN** the "$mcp_tool_call" event's distinct_id should equal its "$session_id"

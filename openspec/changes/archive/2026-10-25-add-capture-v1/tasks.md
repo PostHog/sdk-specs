@@ -8,9 +8,9 @@
 
 - [x] 2.1 Draft the `capture` delta: wire contract, request headers, per-event results, per-event options, server layer order, library identity, session and window ids, identity fallbacks, timestamps, per-event serialization, fail-open; modify the client precedence requirement's server note.
 - [x] 2.2 Draft the `retry-queue` delta: status classification, attempt budget, waits, `Retry-After`, no HTTP-library retries; narrative notes for `429` and `413`.
-- [x] 2.3 Draft the `http-client` delta: bearer token, header set, encodings, same-origin 307/308 redirects.
+- [x] 2.3 Draft the `http-client` delta: bearer token, header set, encodings, same-origin 307/308 redirects; a compression opt-out that leaves a lane with its own setting alone.
 - [x] 2.4 Draft the `event-batcher` delta: byte-aware check-before-append, no analytics per-event cap below capture's, `413` terminal.
-- [x] 2.5 Draft the `mcp-analytics` delta: **Library identity** for clients shared with the application and dedicated MCP clients.
+- [x] 2.5 Draft the `mcp-analytics` delta: **Library identity** for clients shared with the application and dedicated MCP clients; **Person identity** and **Event options** on capture v1; the scope of **Event size bounds**.
 
 ## 3. Validation and archive
 

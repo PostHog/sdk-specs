@@ -13,8 +13,12 @@ Four server SDKs are moving event delivery to capture v1 in their next majors: p
 - Modify `before-send-hook` so the log line for a throwing hook names the event and the exception type, never the message or event content.
 - Add the capture v1 status and retry rules to `retry-queue` (404/408/429/500/502/503/504 and network errors retried; 402/413 terminal; four attempts with 100 ms doubling waits and jitter; `Retry-After` as a clamped floor; no HTTP-library retries; events whose last attempt got no HTTP response may go back to the queue), and mark "shrink on 413" as legacy behavior.
 - Add the capture v1 transport rules to `http-client`: bearer token, the required header set, same-origin 307/308 redirects only, the accepted `Content-Encoding` values.
+- Modify `http-client`'s **Request body compression and opt-out** so a client's compression opt-out leaves alone a delivery lane that has its own compression setting, such as the AI lane.
 - Add byte-aware batching for capture v1 to `event-batcher`: check before append against a target of at most 5 MiB, an oversize event ships alone, order is kept, no per-event analytics cap below capture's, 413 is terminal.
 - Modify `mcp-analytics`'s **Library identity**: MCP events are identified by `$mcp_` events and `$mcp_source` and carry a `posthog-<runtime>-mcp` `$lib`, set one event at a time as an integration label so the application's own events keep the SDK's `$lib`. A whole-client label is allowed when the SDK documents a dedicated client.
+- Modify `mcp-analytics`'s **Person identity** so an anonymous call turns person processing off with the `process_person_profile: false` event option on capture v1, and with the legacy property on legacy capture.
+- Add **Event options** to `mcp-analytics`: hosts set event options on MCP events per request and per call, under a name apart from the MCP configuration, merged under the anonymous default.
+- Modify `mcp-analytics`'s **Event size bounds** so the bound covers only the properties the MCP instrumentation builds.
 
 ## Capabilities
 
@@ -27,9 +31,9 @@ _None._
 - `capture`: capture v1 wire contract, per-event options, server event-building order, identity and validation rules, per-event results; the server note in **Caller-supplied event properties take precedence**; the per-call value in **Client-level GeoIP control with per-call override**.
 - `before-send-hook`: the log line for a throwing hook.
 - `retry-queue`: status classification, attempt budget, backoff and `Retry-After` on capture v1; 429 and 413 handling.
-- `http-client`: capture v1 request headers, authentication, redirects and encodings.
+- `http-client`: capture v1 request headers, authentication, redirects and encodings; the scope of the compression opt-out in **Request body compression and opt-out**.
 - `event-batcher`: byte-aware batching and the end of 413 batch shrinking on capture v1.
-- `mcp-analytics`: **Library identity**: MCP events are identified by `$mcp_` events and `$mcp_source`, and label themselves `posthog-<runtime>-mcp` one event at a time.
+- `mcp-analytics`: **Library identity**: MCP events are identified by `$mcp_` events and `$mcp_source`, and label themselves `posthog-<runtime>-mcp` one event at a time; **Person identity** on capture v1; new **Event options**; the scope of **Event size bounds**.
 
 ## Impact
 

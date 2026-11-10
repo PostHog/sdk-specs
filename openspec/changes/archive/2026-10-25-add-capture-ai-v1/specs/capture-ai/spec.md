@@ -251,7 +251,7 @@ SDK's AI wrapper libraries capture. When true, the wrappers skip string truncati
 `capture_ai` directly.
 
 #### Scenario: wrapper media is redacted by default and passed through when enabled (@server)
-- **GIVEN** an AI wrapper capturing a payload containing base64 media
+- **GIVEN** an AI wrapper on a capture v1 SDK capturing a payload containing base64 media
 - **WHEN** the client has the flag unset
 - **THEN** the captured content should replace the media with a type-aware placeholder
 - **AND** the event should be sent through the AI method

@@ -164,7 +164,7 @@ PR [#79](https://github.com/PostHog/sdk-specs/pull/79) text on fresh evidence, a
 
 **2026-11-10 out-of-cycle refresh — posthog-flutter 6.0:** re-audited all 64 rows at `82123e6`,
 the head of the 6.0 release PR ([PostHog/posthog-flutter#637](https://github.com/PostHog/posthog-flutter/pull/637)),
-against sdk-specs `752f899` plus [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79`,
+against sdk-specs `752f899` plus [#146](https://github.com/PostHog/sdk-specs/pull/146) at `23c2478`,
 treated as merged, and added five ➖ rows (Experiment Exposure, AI Datasets, AI Scorers, Offline
 Evaluations, Emails). 6.0 adopts posthog-ios 4.x and posthog-android 4.x; mobile rows were checked at
 the heads of their 4.0 branches (posthog-ios `e27cbe4cb`, posthog-android `aaa23d39`). Improved: Get
@@ -176,7 +176,8 @@ records for flutter 6.0). Capture AI ➖→🟡 (#146 names posthog-flutter 6.0;
 lanes conform apart from capture's desktop session-id gap). Downgraded on new spec text: Identify ✅→🟡
 (the Dart core ignores `identify()` while opted out, against #167) and Capture ✅→🟡 (the Dart core
 replaces an empty or non-string caller `$session_id` instead of lifting or dropping it, against
-#146). Get Feature Flag Payload and Get Feature Flag Result stay 🟡: payloads are
+#146, and the migration guide doesn't yet show the call option that keeps identity calls under a
+registered personless option, until posthog-flutter#718). Get Feature Flag Payload and Get Feature Flag Result stay 🟡: payloads are
 read through the result getter and posthog-ios 4.0 returns no payload for malformed JSON, but on web
 posthog-js still returns the raw string. Every path except web fills `$lib`/`$lib_version` as a pair
 after the caller's properties. Surveys stays 🟡: posthog-android still moves the last-seen survey date on
@@ -346,7 +347,7 @@ stalest pointer and its only 59-row file.
 | posthog-flutter | Get Feature Flag Payload / Result | Backward-compatible | **6.0** — payloads are read through `getFeatureFlagResult`, and posthog-ios 4.0 returns no payload for malformed JSON; on web posthog-js still returns the raw string — [posthog-flutter.md#n15](posthog-flutter.md#n15) |
 | posthog-flutter | Session Replay Debug Properties | Backward-compatible | **6.0** — mobile events are built by posthog-ios/posthog-android 4.x and carry their bundles (posthog-ios 🟡); desktop sends `$recording_status: disabled`, but the Dart core also puts `$sdk_debug_session_start` and `$sdk_debug_current_session_duration` on every event, custom events included, and no SDK may send the duration — [posthog-flutter.md#n28](posthog-flutter.md#n28) |
 | posthog-flutter | Retry Queue | Needs deprecation path (inherited) | **Resolved from ❓** — desktop and mobile keep failed batches queued, but Flutter Web uses posthog-js's `RetryQueue`, which drops a 429; clears with posthog-js n28 — [posthog-flutter.md#n38](posthog-flutter.md#n38) |
-| posthog-flutter | Capture / Capture AI | Backward-compatible | **6.0, against #146** — the Windows/Linux Dart core replaces an empty or non-string caller `$session_id` with its own session id, so it is never lifted or dropped with a warning; native paths keep the caller's value — [posthog-flutter.md#n41](posthog-flutter.md#n41) |
+| posthog-flutter | Capture / Capture AI | Backward-compatible | **6.0, against #146** — the Windows/Linux Dart core replaces an empty or non-string caller `$session_id` with its own session id, so it is never lifted or dropped with a warning; native paths keep the caller's value. The migration guide doesn't yet show the `process_person_profile: true` call option on identity calls (posthog-flutter#718) — [posthog-flutter.md#n41](posthog-flutter.md#n41) |
 | posthog-flutter | Identify | Backward-compatible | **Downgraded on new spec text (6.0)** — the Windows/Linux Dart core returns early from `identify()` while opted out, so the distinct id and flags don't follow until opt-in; #167 says opt-out is not a guard — [posthog-flutter.md#n40](posthog-flutter.md#n40) |
 | posthog-flutter | Surveys | Backward-compatible | **6.0** — posthog-android still moves the last-seen survey date on submit and dismiss (#102); posthog-ios now writes it on show — [posthog-flutter.md#n35](posthog-flutter.md#n35) |
 | posthog-react-native | Bootstrap | Backward-compatible | Flag-merge spread order is inverted — previously-persisted flags win over a fresh bootstrap value, the opposite of the spec's required precedence — [posthog-react-native.md#n4](posthog-react-native.md) |

@@ -26,7 +26,7 @@ The code form SHALL hold `template_key`, `subject`, `to`, `capture_engagement`, 
 
 ### Requirement: Send code form
 
-The code form SHALL take a required template key and subject, with `html`, `text` or both, and SHALL take an optional sender address, an optional reply-to of one address or a list of addresses, an optional capture-engagement flag that defaults to true, and an optional message category, as **Send message category** says. The template key names the email so PostHog can group its metrics, logs and status under it; it is not a template stored in PostHog. PostHog sends the content as given and does not store it. A key that matches a template stored in PostHog sends in that template's message category, as **Send message category** says.
+The code form SHALL take a required template key and subject, with `html`, `text` or both, and SHALL take an optional sender address, an optional reply-to of one address or a list of addresses, an optional capture-engagement flag that defaults to true, and an optional message category, as **Send message category** says. The template key names the email so PostHog can group its metrics, logs and status under it; it need not name a template stored in PostHog. PostHog sends the content as given and does not store it. A key that matches a template stored in PostHog sends in that template's message category, as **Send message category** says.
 
 The shared send inputs — the recipient, the distinct ID, the idempotency key and the per-send retry limit — apply to both forms.
 

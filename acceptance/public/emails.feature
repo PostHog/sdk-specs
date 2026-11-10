@@ -54,16 +54,16 @@ Feature: Emails
     Given the SDK is initialized with token "test-token", host "https://us.i.posthog.com" and secret key "phs_test"
     And the mock server will fail the next email send with status <status> and code "<code>"
     And the mock server will accept the next email send with message ID "msg_1"
-    When the caller sends to "user@example.com" with template key "monthly-news", subject "This month", HTML "<p>News {{ unsubscribe_url }}</p>" and message category {"key":"newsletter","type":"marketing","name":"Newsletter"}
+    When the caller sends to "user@example.com" with template key "monthly-news", subject "This month", HTML "<html>" and message category {"key":"newsletter","type":"marketing","name":"Newsletter"}
     Then the mock server should receive 1 email send request
     And the send should fail with error code "<code>", name "validation_error" and status <status>
 
     Examples:
-      | status | code                      |
-      | 400    | category_mismatch         |
-      | 400    | too_many_categories       |
-      | 400    | unsubscribe_link_required |
-      | 422    | recipient_opted_out       |
+      | status | code                      | html                              |
+      | 400    | category_mismatch         | <p>News {{ unsubscribe_url }}</p> |
+      | 400    | too_many_categories       | <p>News {{ unsubscribe_url }}</p> |
+      | 400    | unsubscribe_link_required | <p>News</p>                       |
+      | 422    | recipient_opted_out       | <p>News {{ unsubscribe_url }}</p> |
 
   # Requirement: Custom host refusal
 

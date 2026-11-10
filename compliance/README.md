@@ -22,6 +22,14 @@ capabilities listed in the root `README.md` table, including **MCP Analytics**, 
 PR [#87](https://github.com/PostHog/sdk-specs/pull/87), and **Bootstrap**, added to the table by PR
 [#97](https://github.com/PostHog/sdk-specs/pull/97).
 
+**Update (2026-11-10):** the root `README.md` table now lists **69 contracts**. Five were added after
+this run: **AI Datasets**, **AI Scorers** and **Offline Evaluations** (PR
+[#137](https://github.com/PostHog/sdk-specs/pull/137)), **Emails** (PR
+[#159](https://github.com/PostHog/sdk-specs/pull/159)) and **Experiment Exposure** (PR
+[#162](https://github.com/PostHog/sdk-specs/pull/162)). Only posthog-ios carries them so far (all ➖),
+so its row is out of 69; every other SDK is out of 64 or fewer until its next audit adds the five
+rows. On the shared 64-row basis posthog-ios is 43/64 (67%), since all five of its new rows are ➖.
+
 Five contracts are newer than most per-SDK files. **Capture AI**, **Evaluate Flags**, and **Exception
 Event Metadata** merged between 2026-08-10 and 2026-08-13; **Session Replay Debug Properties** on
 2026-09-28 (PR [#72](https://github.com/PostHog/sdk-specs/pull/72)); and **MCP Analytics** on 2026-10-05
@@ -225,7 +233,7 @@ and posthog-dotnet is computed against the contracts actually applicable to a se
 (posthog-python: 13 Pass / 34 applicable = 38%; posthog-node: 9 Pass / 35 applicable = 26%;
 posthog-php: 11 Pass / 30 applicable = 37%; posthog-ruby: 9 Pass / 30 applicable = 30%;
 posthog-go: 8 Pass / 31 applicable = 26%; posthog-java: 12 Pass / 31 applicable = 39%;
-posthog-dotnet: 5 Pass / 34 applicable = 15%); shown above as raw Pass/(59, 63 or 64) for
+posthog-dotnet: 5 Pass / 34 applicable = 15%); shown above as raw Pass/(59, 63, 64 or 69) for
 comparability with client SDKs, which see N/A far less often. posthog-js's 26/64 is likewise 26 Pass
 / 59 applicable = 44%, since Capture AI and Evaluate Flags are ➖ on a browser SDK. **posthog-node
 note:** the standalone `PostHog/posthog-node` repo has been archived/redirected — its code now lives

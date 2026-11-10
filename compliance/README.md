@@ -146,7 +146,7 @@ the single most widely-shared non-compliance in the matrix.
 | posthog-js | 26/64 fully compliant (41%) | 26 | 21 | 12 | 5 | 0 | 2026-10-05 · `6538babc` (targeted re-audit; most of the 59 pre-existing rows carried from 2026-08-10, see file header) | 33 | [posthog-js.md](posthog-js.md) |
 | posthog-python | 13/64 fully compliant (20%; 30 contracts N/A on a server SDK) | 13 | 16 | 5 | 30 | 0 | 2026-10-12 · `509c8525` | 21 | [posthog-python.md](posthog-python.md) |
 | posthog-android | 37/64 fully compliant (58%) | 37 | 16 | 5 | 6 | 0 | 2026-10-19 · `c5e788bd` (targeted re-audit — see file header) | 21 | [posthog-android.md](posthog-android.md) |
-| posthog-ios | 40/69 fully compliant (58%) | 40 | 18 | 1 | 10 | 0 | 2026-11-09 · `1f91c5b2` (4.0 release branch, before 4.0.0 is published; capture v1 rows against #146 as merged; see below) | 19 | [posthog-ios.md](posthog-ios.md) |
+| posthog-ios | 44/69 fully compliant (64%) | 44 | 14 | 1 | 10 | 0 | 2026-11-10 · `e27cbe4cb` (4.0 release branch, before 4.0.0 is published; capture v1 rows against #146 at `d387ab79` as merged; see below) | 15 | [posthog-ios.md](posthog-ios.md) |
 | posthog-node | 9/64 fully compliant (14%; 29 contracts N/A on a server SDK) | 9 | 21 | 4 | 29 | 1 | 2026-10-12 · `4f590b36` (posthog-js monorepo; Traces row corrected 2026-10-19) | 25 (+1 ❓) | [posthog-node.md](posthog-node.md) |
 | posthog-flutter | 21/64 fully compliant (33%) | 21 | 29 | 6 | 8 | 0 | 2026-10-19 · `1032c102` | 35 | [posthog-flutter.md](posthog-flutter.md) |
 | posthog-react-native | 29/64 fully compliant (45%) | 29 | 27 | 3 | 5 | 0 | 2026-10-19 · `3ddaa654` (posthog-js monorepo) | 30 | [posthog-react-native.md](posthog-react-native.md) |
@@ -162,24 +162,24 @@ correction was re-verified this run against the merged
 PR [#79](https://github.com/PostHog/sdk-specs/pull/79) text on fresh evidence, and the ✅ stands; see
 [posthog-js.md#n31](posthog-js.md#n31).
 
-**2026-11-05 out-of-cycle refresh — posthog-ios 4.0:** re-audited all 64 rows at `3460e534a`, the
-4.0 release branch ([PostHog/posthog-ios#873](https://github.com/PostHog/posthog-ios/pull/873)), against
-sdk-specs `dd11a6b`, and added five ➖ rows (Experiment Exposure, AI Datasets, AI Scorers, Offline
-Evaluations, Emails). PostHog/posthog-ios#924–#934 are merged on that branch, so the file no longer
-counts pending PRs. Improved: Get Feature Flag Payload, Get Feature Flag Result, Feature Flag Cache and
-Is Feature Enabled 🟡→✅ (payload read through `getFeatureFlagResult`, malformed payload → `nil`,
-`isFeatureEnabled(_:defaultValue:)`); Session Replay Privacy ❌→🟡 (screenshot-only replay ends the
-leak; SwiftUI's explicit mask still wins over `postHogNoMask()`); Get Feature
-Flags and Get Feature Flags And Payloads ❌→🟡 (spec now records `getAllFeatureFlags()` as the iOS 4.0
-surface). Downgraded on new spec text: On Feature Flags ✅→🟡 (a load in flight across `reset()` reaches
-listeners) and Surveys ✅→🟡 (popup delay; and, from #102, submit and dismiss move the last-seen survey
-date). Capture v1 rows (Capture, Before Send Hook, Event Batcher, HTTP Client, Retry Queue) are scored
-against [#146](https://github.com/PostHog/sdk-specs/pull/146) at `5c26b9bc`, treated as merged, and
-conform; Capture stays 🟡 only for `NSNull`. **Capture AI ➖→🟡**: #146 adds iOS 4.0 to its
-Applicability; the AI lane conforms, but `NSNull` properties are sent as JSON `null`. Opt In meets the
-new #138 replay-restart requirements. One conflict inside #146 (whole-client vs per-lane compression)
-is [raised on the PR](https://github.com/PostHog/sdk-specs/pull/146#issuecomment-6743564814) and not
-scored.
+**2026-11-05 out-of-cycle refresh — posthog-ios 4.0, re-checked 2026-11-10:** re-audited all 64 rows
+on the 4.0 release branch ([PostHog/posthog-ios#873](https://github.com/PostHog/posthog-ios/pull/873)),
+now at `e27cbe4cb`, against sdk-specs `752f899`, and added five ➖ rows (Experiment Exposure, AI
+Datasets, AI Scorers, Offline Evaluations, Emails). PostHog/posthog-ios#924–#934 are merged on that
+branch, so the file no longer counts pending PRs. Improved: Get Feature Flag Payload, Get Feature Flag
+Result, Feature Flag Cache and Is Feature Enabled 🟡→✅ (payload read through `getFeatureFlagResult`,
+malformed payload → `nil`, `isFeatureEnabled(_:defaultValue:)`); Capture and Capture Exception 🟡→✅
+(`NSNull` properties omitted, PostHog/posthog-ios#1047); Session Replay Privacy ❌→🟡 (screenshot-only
+replay ends the leak; SwiftUI's explicit mask still wins over `postHogNoMask()`); Get Feature Flags and
+Get Feature Flags And Payloads ❌→🟡 (spec now records `getAllFeatureFlags()` as the iOS 4.0 surface).
+Downgraded on new spec text: Surveys ✅→🟡, only for the popup-delay SHOULD to re-check eligibility when
+the delay elapses. On Feature Flags stays ✅ on the new reset and empty-variant requirements
+(PostHog/posthog-ios#1048). Capture v1 rows (Capture, Before Send Hook, Event Batcher, HTTP Client,
+Retry Queue) are scored against [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79`,
+treated as merged, and conform, including the per-lane AI compression and the client `$lib` pair fill
+(PostHog/posthog-ios#1050). **Capture AI ➖→✅**: #146 adds iOS 4.0 to its Applicability and the AI
+lane conforms. Opt In meets the #138 replay-restart and #199 deferred-crash-consent requirements and
+stays 🟡 on its old gap.
 Details in [posthog-ios.md](posthog-ios.md).
 
 **2026-10-08 out-of-cycle refresh — posthog-ios:** re-audited all 64 rows at `f5cbe87c` against
@@ -336,10 +336,7 @@ stalest pointer and its only 59-row file.
 | posthog-android | Exception Event Metadata | Needs deprecation path | **New this run** — linkage, 50-cap and cycle detection are all correct, but `synthetic` is a hardcoded `false` (the spec's explicit "MUST NOT represent unknown with false"), causes inherit `handled`, no `mechanism.source`/`$exception_source`, and `$exception_level` is a *documented* caller override — [posthog-android.md#n7](posthog-android.md#n7) |
 | posthog-android | Session Replay Privacy | Needs deprecation path | `ph-no-capture` ignored outside screenshot mode; default capture mode can leak tagged views — [posthog-android.md#n19](posthog-android.md#n19) |
 | posthog-android | Surveys | Needs deprecation path | Web-only `url`/`selector`-targeted surveys aren't excluded on Android as the spec requires — [posthog-android.md#n22](posthog-android.md#n22) |
-| posthog-ios | Capture | Backward-compatible | **Downgraded from ✅ on new spec text** — `NSNull`-valued properties are serialized as JSON `null` instead of dropped (empty event names are dropped since 4.0) — [posthog-ios.md#n4](posthog-ios.md) |
-| posthog-ios | On Feature Flags | Backward-compatible | **Downgraded from ✅ on new spec text** — a `/flags` load in flight when `reset()` runs still writes the previous identity's flags and reaches listeners; no load generation check — [posthog-ios.md#n28](posthog-ios.md) |
-| posthog-ios | Capture AI | Backward-compatible | **Newly applicable** — #146 adds iOS 4.0; the AI lane conforms, but `NSNull` properties are sent as JSON `null` (same root cause as Capture) — [posthog-ios.md#n27](posthog-ios.md) |
-| posthog-ios | Surveys | Backward-compatible | **Downgraded from ✅ on new spec text** — popup delay: a close reported before display marks the survey seen and sends `survey dismissed`, and `reset()` doesn't cancel a pending delayed display; submit and dismiss also move the last-seen survey date, which #102 forbids — [posthog-ios.md#n29](posthog-ios.md) |
+| posthog-ios | Surveys | Backward-compatible | **Downgraded from ✅ on new spec text** — the popup-delay SHALLs and #102's wait period are met (PostHog/posthog-ios#1049), but the survey is shown when the delay elapses without the SHOULD eligibility re-check — [posthog-ios.md#n29](posthog-ios.md) |
 | posthog-ios | Session Replay Privacy | Backward-compatible | **Upgraded from ❌** — 4.0's screenshot-only replay removes the leaking wireframe path; SwiftUI's `postHogMask()` still wins over an enclosing `postHogNoMask()`, the reverse of the spec's precedence (over-masks, no leak) — [posthog-ios.md#n24](posthog-ios.md) |
 | posthog-ios | Get Feature Flags / Get Feature Flags And Payloads | Backward-compatible | **Upgraded from ❌** — the specs now record iOS 4.0's `getAllFeatureFlags()` result list (payloads decoded per entry) as its surface; still not the canonical map shape — [posthog-ios.md#n9](posthog-ios.md) |
 | posthog-ios | Session Replay Debug Properties | Backward-compatible | **New row** — tiers, 30 s window and crash-context snapshot conform; gaps on caller-supplied `$session_id` and backdated events (the `active`-after-timeout gap is fixed in 4.0) — [posthog-ios.md#n26](posthog-ios.md) |
@@ -390,7 +387,7 @@ stalest pointer and its only 59-row file.
 | posthog-js | Exception Event Metadata | Backward-compatible | **New this run** — the most complete producer envelope audited (full `exception_id`/`parent_id` linkage, canonical sources, correct nested-`handled` omission, spec-exact caps), missing only `$exception_source` and a capture category on the two global handlers, which fall back to `generic` — [posthog-js.md#n35](posthog-js.md) |
 | posthog-js | Session Replay Debug Properties | Backward-compatible | **New this run** — re-scored against `d078270` after #96; tiering, the `$`-prefix gate, and the 30 s throttle conform, but after `stopSessionRecording()` on a loaded recorder events keep `active`/`buffering` instead of `$recording_status: disabled` — [posthog-js.md#n36](posthog-js.md) |
 
-Full contract-by-contract detail (33 posthog-js, 21 posthog-python, 23 posthog-android, 19
+Full contract-by-contract detail (33 posthog-js, 21 posthog-python, 23 posthog-android, 15
 posthog-ios, 26 posthog-node, 34 posthog-flutter, 31 posthog-react-native, 19 posthog-php, 21
 posthog-ruby, 23 posthog-go, 19 posthog-java, and 29 posthog-dotnet non-Pass/non-N/A cells) is in
 the respective per-SDK files.

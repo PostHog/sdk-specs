@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-flutter](https://github.com/PostHog/posthog-flutter)
 **Audited commit:** `82123e6d8815c89a9f603b4f23e72d72494eee2b` ([commit](https://github.com/PostHog/posthog-flutter/commit/82123e6d8815c89a9f603b4f23e72d72494eee2b)), the head of the posthog_flutter 6.0 release PR [PostHog/posthog-flutter#637](https://github.com/PostHog/posthog-flutter/pull/637) — audited on 2026-11-10, before 6.0.0 is published
 **Audited against sdk-specs commit:** `752f899` plus [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79` (capture v1, including #147's AI lane), treated as merged to `main`
-**Summary:** 25 ✅ · 28 🟡 · 4 ❌ · 12 ➖ · 0 ❓ (69 rows; previous audit 2026-10-19 at `1032c102` (5.x) scored 21/29/6/8/0 on 64 rows)
+**Summary:** 23 ✅ · 30 🟡 · 4 ❌ · 12 ➖ · 0 ❓ (69 rows; previous audit 2026-10-19 at `1032c102` (5.x) scored 21/29/6/8/0 on 64 rows)
 
 **Why this run:** posthog_flutter 6.0 ([PostHog/posthog-flutter#637](https://github.com/PostHog/posthog-flutter/pull/637))
 adopts posthog-ios 4.0 and posthog-android 4.0 (`Package.swift` pins `"4.0.0" ..< "5.0.0"`,
@@ -41,7 +41,7 @@ Where the paths disagree the row is 🟡 and the note says which platform fails.
 
 ## Movement this run
 
-**Improved (7):**
+**Improved (6):**
 - **Get Feature Flag 🟡→✅** ([n13](#n13)): `getFeatureFlag(key, {sendFeatureFlagEvent})` on every path.
 - **Is Feature Enabled 🟡→✅** ([n20](#n20)): `isFeatureEnabled(key, {sendFeatureFlagEvent, defaultValue})`.
 - **HTTP Client 🟡→✅** ([n19](#n19)): the Dart core no longer retries a refused `/flags` connection, backs
@@ -53,19 +53,22 @@ Where the paths disagree the row is 🟡 and the note says which platform fails.
 - **Get Feature Flags ❌→🟡** ([n16](#n16)) and **Get Feature Flags And Payloads ❌→🟡** ([n17](#n17)):
   `getAllFeatureFlags()` returns a list of flag results, the surface the spec records for flutter 6.0;
   it is still not the canonical map shape.
-- **Capture AI ➖→✅** ([n39](#n39)): #146 names posthog-flutter 6.0, and both the native and the Dart
-  AI lanes conform.
 
-**Downgraded on new spec text (1):** **Identify ✅→🟡** ([n40](#n40)): the Dart core ignores `identify()`
-while opted out, but #167 made opt-out "not a guard" for identify.
+**Newly in scope (1):** **Capture AI ➖→🟡** ([n39](#n39)): #146 names posthog-flutter 6.0. The native
+and Dart AI lanes conform, but on Windows/Linux AI events share capture's session-id gap ([n41](#n41)).
+
+**Downgraded on new spec text (2):** **Identify ✅→🟡** ([n40](#n40)): the Dart core ignores `identify()`
+while opted out, but #167 made opt-out "not a guard" for identify. **Capture ✅→🟡** ([n41](#n41)):
+under #146, the Dart core replaces an empty or non-string caller `$session_id` with its own instead of
+lifting or dropping it. Every path fills `$lib`/`$lib_version` as a pair after the caller's
+properties, and leaves an empty variant out of `$active_feature_flags`.
 
 **Same status, new or changed findings:** Get Feature Flag Payload and Get Feature Flag Result
 ([n14](#n14), [n15](#n15): `getFeatureFlagPayload()` is removed and payloads are read through
 `getFeatureFlagResult(key, sendFeatureFlagEvent: false)`, which the spec permits; posthog-ios 4.0
-returns no payload for malformed JSON, so only web still returns the raw string), Capture ([n41](#n41): every path fills `$lib`/`$lib_version`
-as a pair after the caller's properties, and leaves an empty variant out of `$active_feature_flags`),
-Before Send Hook ([n3](#n3): the throwing-hook log line now has to name the event and omit the exception
-message), Surveys ([n35](#n35): posthog-android still moves the last-seen survey date on submit and
+returns no payload for malformed JSON, so only web still returns the raw string), Before Send Hook
+([n3](#n3): the throwing-hook log line now has to name the event and omit the exception message),
+Surveys ([n35](#n35): posthog-android still moves the last-seen survey date on submit and
 dismiss, against #102; posthog-ios now writes it on show), Opt In ([n23](#n23): #138's replay restart
 and #199's deferred crash consent are met through the native SDKs), Get Feature Flags ([n16](#n16):
 on web, posthog-js reads an empty variant as enabled in the list), Session Replay Debug Properties
@@ -86,8 +89,8 @@ Emails ➖ (all server-only).
 | 3 | Autocapture | 🟡 | [n2] |
 | 4 | Before Send Hook | 🟡 | [n3] |
 | 5 | Bootstrap | 🟡 | [n4] |
-| 6 | Capture | ✅ | [n41] |
-| 7 | Capture AI | ✅ | [n39] |
+| 6 | Capture | 🟡 | [n41] |
+| 7 | Capture AI | 🟡 | [n39] |
 | 8 | Capture Exception | ✅ | [n5] |
 | 9 | Consent Gating | 🟡 | [n6] |
 | 10 | Create Person Profile | ➖ | |
@@ -389,11 +392,11 @@ Notes [n2](#n2), [n4](#n4), [n5](#n5), [n7](#n7), [n10](#n10)–[n12](#n12), [n2
 - **Backwards compatibility:** Inherits posthog-js n28's verdict (Needs deprecation path).
 - **Remediation:** None in this repo; clears with posthog-js n28.
 
-### n39 — Capture AI (✅ Pass; was ➖)
+### n39 — Capture AI (🟡 Partial; was ➖)
 - **Spec requires:** #146 (with #147) extends Applicability to "posthog-flutter 6.0 (`captureAi`: native on iOS, macOS and Android, its own Dart lane on Windows and Linux)". AI events ride their own lane to `/i/v1/ai/events` with lane-scoped compression, queue capacity and timeout; the whole event is capped at 8 MiB + 64 KiB (a larger configured cap is clamped or refused); batches are byte-aware at 5 MiB; client SDKs start their durable queue at launch; null-valued properties are dropped as in capture.
-- **SDK currently (`82123e6`):** `captureAi()` (`lib/src/posthog.dart:313-348`) returns the event's uuid. On iOS, macOS and Android it goes through the native `captureAi` (posthog-ios 4.0 and posthog-android 4.0 AI lanes); Flutter drops null-valued properties before the channel (`PropertyNormalizer`, `lib/src/posthog_flutter_io.dart:595-620`), and posthog-ios 4.0 now omits them as well (PostHog/posthog-ios#1047). Windows/Linux have a separate lane (`lib/src/core/posthog_core_stateless.dart:197-218`): `captureAiMaxQueueSize` (default 100), `captureAiTimeout` (default 60 s), `captureAiCompression` (default gzip, separate from the whole-client `compression`, which #146 allows), `captureAiMaxEventBytes` clamped to 8 MiB + 64 KiB with a warning, and a 50 MiB disk cap (`lib/src/core/capture_v1.dart:12-27`). An oversized event is dropped with a name-and-size log (`posthog_core_stateless.dart:593-600`). Queues left from an earlier run are flushed at setup (`:220-232`). Web is outside Applicability; `captureAi` there logs and returns `null` (`lib/posthog_flutter_web.dart:324-336`).
-- **Backwards compatibility:** No change needed.
-- **Remediation:** None.
+- **SDK currently (`82123e6`):** `captureAi()` (`lib/src/posthog.dart:313-348`) returns the event's uuid. On iOS, macOS and Android it goes through the native `captureAi` (posthog-ios 4.0 and posthog-android 4.0 AI lanes); Flutter drops null-valued properties before the channel (`PropertyNormalizer`, `lib/src/posthog_flutter_io.dart:595-620`), and posthog-ios 4.0 now omits them as well (PostHog/posthog-ios#1047). Windows/Linux have a separate lane (`lib/src/core/posthog_core_stateless.dart:197-218`): `captureAiMaxQueueSize` (default 100), `captureAiTimeout` (default 60 s), `captureAiCompression` (default gzip, separate from the whole-client `compression`, which #146 allows), `captureAiMaxEventBytes` clamped to 8 MiB + 64 KiB with a warning, and a 50 MiB disk cap (`lib/src/core/capture_v1.dart:12-27`). An oversized event is dropped with a name-and-size log (`posthog_core_stateless.dart:593-600`). Queues left from an earlier run are flushed at setup (`:220-232`). Web is outside Applicability; `captureAi` there logs and returns `null` (`lib/posthog_flutter_web.dart:324-336`). **Gap on Windows/Linux:** `captureAi` builds the event through the same `prepareEvent` as `capture` (`lib/src/posthog_flutter_desktop.dart:315`), so an empty or non-string caller `$session_id` is replaced, as in [n41](#n41); capture AI inherits capture's enrichment and wire rules.
+- **Backwards compatibility:** Same as [n41](#n41).
+- **Remediation:** Same as [n41](#n41).
 
 ### n40 — Identify (🟡 Partial; was ✅)
 - **Spec requires:** (#167) "Opt-out is **not** a guard: an opted-out SDK still runs the rest of this flow. It updates local identity state (distinct id, anonymous id, `isIdentified`), updates person properties for flags, and reloads feature flags when the distinct id changes" (`openspec/specs/identify/spec.md:107`; scenarios "Identify while opted out …" at `:211-235`).
@@ -401,8 +404,8 @@ Notes [n2](#n2), [n4](#n4), [n5](#n5), [n7](#n7), [n10](#n10)–[n12](#n12), [n2
 - **Backwards compatibility:** Backward-compatible — the opted-out user's identity starts tracking what the app set.
 - **Remediation:** Run identify's identity, flag-property and reload steps while opted out and skip only the event.
 
-### n41 — Capture (✅ Pass)
+### n41 — Capture (🟡 Partial; was ✅)
 - **Spec requires:** main's capture requirements plus #146's capture v1 contract for every SDK on capture v1: the wire shape and headers, per-event results, legacy option hoisting, `$lib`/`$lib_version` kept in properties and filled by the SDK as a pair after every other layer and before `beforeSend` (set both when `$lib` is unset, only the version when `$lib` is the SDK's own name, never the SDK's version on another library's `$lib`), session/window id lifting, blank distinct-id fallback, empty event names dropped, timestamps, and failing open on a blank or `phx_` token; and (#193) a flag whose value is `""` stays out of `$active_feature_flags` while `$feature/<key>` keeps `""`.
-- **SDK currently (`82123e6`):** iOS, macOS and Android send through posthog-ios 4.0 and posthog-android 4.0 capture v1; Flutter strips null-valued properties before the channel, and posthog-ios now omits them too. The plugins configure the native SDKs with `posthog-flutter` and its version (`darwin/.../PosthogFlutterPlugin.swift:546-547`, `android/.../PosthogFlutterPlugin.kt:908-909`), so the native fill treats `posthog-flutter` as the SDK's own name: posthog-ios fills the pair after the caller's properties (`fillLibraryIdentity`, `PostHogSDK.swift:701-710`, called at `:919-922` at `e27cbe4cb`) and posthog-android as the last step of `buildProperties` (`PostHog.kt:1013`, `internal/PostHogLibraryIdentity.kt:13-29` at `aaa23d39`), in the build `buildEventForWrapper` uses, so the Dart `beforeSend` sees the filled pair. Windows/Linux: `getCommonEventProperties` no longer sets `$lib` (`lib/src/core/posthog_core_stateless.dart:258`), and `_enrichProperties` fills the pair after the context, SDK, registered and caller layers (`_fillLibraryIdentity`, `lib/src/core/posthog_core.dart:206`, `:210-224`), before the desktop wrapper runs `beforeSend` (`lib/src/posthog_flutter_desktop.dart:765-814`). `captureV1Event` hoists the legacy option properties, keeps `$lib`/`$lib_version`, and lifts string `$session_id`/`$window_id` (other types dropped with a log naming the JSON type) (`lib/src/core/capture_v1.dart:59-115`); per-event results resend only `retry`, count `drop` by a sanitized `details` tag, and treat a 2xx without readable results as terminal (`:163-200`, `lib/src/core/posthog_core_stateless.dart:922-942`); `created_at` and the request id are kept across retries of the same uuids (`:862-876`). The desktop wrapper drops an empty event name and falls back to the prepared distinct id when a callback blanks it (`lib/src/posthog_flutter_desktop.dart:837-887`). `setup()` skips a blank or `phx_` token (`lib/src/utils/project_token.dart:5-17`). An empty variant stays out of `$active_feature_flags` on Windows/Linux (`lib/src/core/posthog_core.dart:139-145`), iOS/macOS (`PostHogSDK.swift:609-623` at `e27cbe4cb`) and Android (`PostHog.kt:916-928` at `aaa23d39`). Web uses posthog-js and is not on capture v1.
-- **Backwards compatibility:** No change needed.
-- **Remediation:** None.
+- **SDK currently (`82123e6`):** iOS, macOS and Android send through posthog-ios 4.0 and posthog-android 4.0 capture v1; Flutter strips null-valued properties before the channel, and posthog-ios now omits them too. The plugins configure the native SDKs with `posthog-flutter` and its version (`darwin/.../PosthogFlutterPlugin.swift:546-547`, `android/.../PosthogFlutterPlugin.kt:908-909`), so the native fill treats `posthog-flutter` as the SDK's own name: posthog-ios fills the pair after the caller's properties (`fillLibraryIdentity`, `PostHogSDK.swift:701-710`, called at `:919-922` at `e27cbe4cb`) and posthog-android as the last step of `buildProperties` (`PostHog.kt:1013`, `internal/PostHogLibraryIdentity.kt:13-29` at `aaa23d39`), in the build `buildEventForWrapper` uses, so the Dart `beforeSend` sees the filled pair. Windows/Linux: `getCommonEventProperties` no longer sets `$lib` (`lib/src/core/posthog_core_stateless.dart:258`), and `_enrichProperties` fills the pair after the context, SDK, registered and caller layers (`_fillLibraryIdentity`, `lib/src/core/posthog_core.dart:206`, `:210-224`), before the desktop wrapper runs `beforeSend` (`lib/src/posthog_flutter_desktop.dart:765-814`). `captureV1Event` hoists the legacy option properties, keeps `$lib`/`$lib_version`, and lifts string `$session_id`/`$window_id` (other types dropped with a log naming the JSON type) (`lib/src/core/capture_v1.dart:59-115`); per-event results resend only `retry`, count `drop` by a sanitized `details` tag, and treat a 2xx without readable results as terminal (`:163-200`, `lib/src/core/posthog_core_stateless.dart:922-942`); `created_at` and the request id are kept across retries of the same uuids (`:862-876`). The desktop wrapper drops an empty event name and falls back to the prepared distinct id when a callback blanks it (`lib/src/posthog_flutter_desktop.dart:837-887`). `setup()` skips a blank or `phx_` token (`lib/src/utils/project_token.dart:5-17`). An empty variant stays out of `$active_feature_flags` on Windows/Linux (`lib/src/core/posthog_core.dart:139-145`), iOS/macOS (`PostHogSDK.swift:609-623` at `e27cbe4cb`) and Android (`PostHog.kt:916-928` at `aaa23d39`). Web uses posthog-js and is not on capture v1. **Gap on Windows/Linux:** `_enrichProperties` merges the caller's properties and then replaces an empty or non-string `$session_id` with the managed session id (`lib/src/core/posthog_core.dart:183-206`; `test/core/desktop_parity_regressions_test.dart:74-81` expects it for `''` and `42`), so `captureV1Event` never sees the caller's value. #146 lifts `''` as the top-level `session_id` and drops `42` with a warning (**Session and window ids are lifted only as strings**, `openspec/specs/capture/spec.md:1073-1075` at `d387ab79`), and **Caller-supplied event properties take precedence** has no session-id exception. posthog-ios and posthog-android keep the caller's value (`PostHogSDK.swift:903-922` at `e27cbe4cb`, `PostHog.kt:984-1013` at `aaa23d39`).
+- **Backwards compatibility:** Backward-compatible — only an empty or non-string caller `$session_id` changes.
+- **Remediation:** Drop the replacement in `_enrichProperties` and let `captureV1Event` lift or drop the value, or settle a client fallback in #146.

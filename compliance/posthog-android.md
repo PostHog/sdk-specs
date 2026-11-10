@@ -169,23 +169,23 @@ complete implementation of that contract outside the browser.
 | 20 | Flush | ✅ |  |
 | 21 | Get Anonymous ID | ✅ |  |
 | 22 | Get Distinct ID | ✅ |  |
-| 23 | Get Feature Flag | ✅ |  |
-| 24 | Get Feature Flag Payload | ✅ |  |
-| 25 | Get Feature Flag Result | ✅ |  |
-| 26 | Get Feature Flags | ❌ | [n9] |
-| 27 | Get Feature Flags And Payloads | ❌ | [n10] |
+| 23 | Get Feature Flag | ✅ | [n39] |
+| 24 | Get Feature Flag Payload | ✅ | [n38] |
+| 25 | Get Feature Flag Result | ✅ | [n36] |
+| 26 | Get Feature Flags | 🟡 | [n9] |
+| 27 | Get Feature Flags And Payloads | 🟡 | [n10] |
 | 28 | Get Session ID | ✅ |  |
 | 29 | Group | 🟡 | [n11] |
 | 30 | Group Identify | 🟡 | [n12] |
 | 31 | HTTP Client | ✅ | [n26] |
 | 32 | Identify | 🟡 | [n28] |
-| 33 | Is Feature Enabled | ✅ |  |
+| 33 | Is Feature Enabled | ✅ | [n37] |
 | 34 | Is Opt Out | ✅ |  |
 | 35 | Is Session Replay Active | ✅ |  |
 | 36 | Local Feature Flag Evaluator | ➖ |  |
 | 37 | Logs | ✅ | [n35] |
 | 38 | MCP Analytics | ➖ |  |
-| 39 | On Feature Flags | 🟡 | [n13] |
+| 39 | On Feature Flags | ✅ | [n13] |
 | 40 | Opt In | 🟡 | [n14] |
 | 41 | Persistent Storage | 🟡 | [n15] |
 | 42 | Register | 🟡 | [n16] |
@@ -376,43 +376,36 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
 
 <a id="n9"></a>
 
-### n9 — Get Feature Flags (❌ Fail)
-- **Spec requires:** a public bulk getter returning a flat key→value map (`Record<string,
-  boolean|string>`), cache-only (no network I/O), no `$feature_flag_called` side effect.
-- **SDK currently:** Full read of `PostHogInterface.kt`'s public surface confirms the only public
-  bulk getter is `getAllFeatureFlags(): List<FeatureFlagResult>?` (`PostHogInterface.kt:164`, impl
-  `PostHog.kt:1772-1781`) — a list of `{key, enabled, variant, payload}` objects, not a flat map.
-  A same-named method exists only internally (`internal/PostHogFeatureFlagsInterface.kt:16`, impl
-  `internal/PostHogRemoteConfig.kt:1149-1160`, correctly cache-only) but is not exposed publicly.
-  Re-scored from 🟡 Partial to ❌ Fail this cycle: there is no partial/degraded implementation to
-  point to — the contracted public API simply does not exist.
-- **Backwards compatibility:** Backward-compatible — expose the existing internal
-  `PostHogRemoteConfig.getFeatureFlags()` map via a new public
-  `PostHogInterface.getFeatureFlags(): Map<String, Any>?`; purely additive alongside
-  `getAllFeatureFlags()`.
-- **Remediation:** Add the new public method; keep `getAllFeatureFlags()` unchanged for
-  compatibility.
+### n9 — Get Feature Flags (🟡 Partial; was ❌)
+- **Spec requires:** the android 4.0 variant is `getAllFeatureFlags()`: a list of flag results, or `null`
+  when flags are unavailable; each entry matches `getFeatureFlagResult` for that key, so `""` reads as
+  disabled (#193); no `$feature_flag_called` (`get-feature-flags/spec.md:59`, `:165-184`). **Canonical
+  get-feature-flags behavior** (`:117-163`) returns the cached flags.
+- **SDK currently (4.0, `aaa23d39`):**
+  - **Conforms.** `getAllFeatureFlags()` (`posthog/src/main/java/com/posthog/PostHogInterface.kt:283`,
+    `PostHog.kt:2776-2785`) builds each entry with `getFeatureFlagResult`, so `""` is listed with
+    `enabled = false`, and sends no event.
+  - **Gap.** It reads the key set from `PostHogRemoteConfig.getFeatureFlags()`
+    (`internal/PostHogRemoteConfig.kt:1391-1402`), which never calls `loadFeatureFlagsFromCacheIfNeeded()`,
+    unlike `getFeatureFlagResult` (`:1338`). After a restart, until the first load finishes or a
+    single-flag read hydrates the disk cache, it returns `null` while `getFeatureFlagResult(key)` returns the
+    cached value.
+- **Backwards compatibility:** Backward-compatible. A caller that saw `null` gets the cached list.
+- **Remediation:** Call `loadFeatureFlagsFromCacheIfNeeded()` in `getFeatureFlags()`.
 
 <a id="n10"></a>
 
-### n10 — Get Feature Flags And Payloads (❌ Fail)
-- **Spec requires:** a bulk getter returning a `{flags, payloads}` pair of maps, with empty maps
-  (not `null`) when no flags are known.
-- **SDK currently:** Repo-wide grep for `getFeatureFlagsAndPayloads` returns zero matches anywhere
-  — no such method, public or internal. `getAllFeatureFlags()` bundles payload per-flag inside
-  each `FeatureFlagResult` but callers must manually rebuild two maps. Confirmed
-  `PostHogRemoteConfig.kt:76` (`featureFlags: Map<String, Any>? = null`) and
-  `PostHog.kt:1772-1781` return `null`, not empty maps, on cold/empty cache. Additional defect
-  found this cycle: the internal `PostHogRemoteConfig.getFeatureFlags()`
-  (`PostHogRemoteConfig.kt:1149-1160`) never calls `loadFeatureFlagsFromCacheIfNeeded()` (unlike
-  sibling accessors at lines 1254/1266/1273/1281), so it can spuriously return `null` on cold start
-  even with a valid disk cache. Re-scored from 🟡 Partial to ❌ Fail — no partial implementation
-  exists.
-- **Backwards compatibility:** Backward-compatible — add a new method deriving
-  `{flags: Map, payloads: Map}` from the same underlying `remoteConfig` data, returning empty maps
-  on cold cache; keep `getAllFeatureFlags()` unchanged.
-- **Remediation:** Add the new public method returning empty (not null) maps when no flags are
-  known; fix the internal getter's missing lazy-cache-load call as a side benefit.
+### n10 — Get Feature Flags And Payloads (🟡 Partial; was ❌)
+- **Spec requires:** android 4.0 returns per-flag results that carry the payload from `getAllFeatureFlags()`
+  instead of a paired API (`get-feature-flags-and-payloads/spec.md:55`). Values and payloads come from the
+  cache (`:113-146`), and each payload decodes on its own, so a malformed one never drops the flag or its
+  siblings (`:148-209`).
+- **SDK currently (4.0, `aaa23d39`):** each entry of `getAllFeatureFlags()` (`posthog/src/main/java/com/posthog/PostHog.kt:2776-2785`)
+  comes from `getFeatureFlagResult`, with its payload from `decodePayload`
+  (`internal/PostHogRemoteConfig.kt:1280-1294`); a malformed payload is `null` on that entry only. **Gap:**
+  the same cold-start `null` as [n9](#n9).
+- **Backwards compatibility:** Backward-compatible.
+- **Remediation:** Same as [n9](#n9).
 
 <a id="n11"></a>
 
@@ -444,22 +437,21 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
 
 <a id="n13"></a>
 
-### n13 — On Feature Flags (🟡 Partial)
-- **Spec requires:** a listener mechanism supporting multiple independent subscribers, with
-  late-registered listeners immediately invoked with current values if flags are already loaded.
-- **SDK currently:** `PostHogConfig.onFeatureFlags: PostHogOnFeatureFlags? = null`
-  (`PostHogConfig.kt:155`) remains a single mutable `var`, not a registry — no add/remove
-  semantics, no `addOnFeatureFlagsListener` API anywhere in `PostHogInterface.kt`. Confirmed this
-  cycle there IS a bootstrap-driven immediate-fire path (`PostHog.kt:328-344` fires
-  `config.onFeatureFlags` synchronously at `setup()` if bootstrap flags are present), but this only
-  covers the callback set before/during `setup()`, not true late registration at arbitrary
-  runtime — reassigning `config.onFeatureFlags` post-setup has no immediate-fire side effect.
-- **Backwards compatibility:** Needs deprecation path — a true multi-listener registry with
-  add/remove and fire-on-late-registration changes the current last-write-wins single-slot
-  contract.
-- **Remediation:** Add `addOnFeatureFlagsListener`/`removeOnFeatureFlagsListener` APIs alongside
-  the existing `config.onFeatureFlags` field (retained for compatibility), firing synchronously on
-  registration if flags are already loaded.
+### n13 — On Feature Flags (✅ Pass; was 🟡)
+- **Spec requires:** the android 4.0 variant is `onFeatureFlags(callback)` on the instance and the static
+  facade, returning a subscription and callable before `setup()` (#161, `on-feature-flags/spec.md:40-43`).
+  Late listeners get the current values, unsubscribe works, a failed load still delivers the last known
+  flags (`:116-176`), a registration outlives `close()`/`setup()` (`:178-196`), loads discarded by
+  `reset()`/`close()` reach no listener (`:198-228`), and an empty variant is left out (#193, `:230-251`).
+- **SDK currently (4.0, `aaa23d39`):** conforms. `onFeatureFlags`
+  (`posthog/src/main/java/com/posthog/PostHog.kt:2611-2631`, static `:3490-3491`) adds the listener to a
+  list that `close()` leaves alone, replays `lastFeatureFlagsLoaded` to a late listener (`:2616-2625`), and
+  returns a handle whose unsubscribe is safe to call twice. Each load captures `featureFlagsGeneration`;
+  `reset()` and `close()` bump it and clear the replay, so a stale load is neither delivered nor replayed
+  (`:255-267`, `:287-289`, `:307`). `PostHogFeatureFlagsLoaded` keeps only `true` and non-empty strings
+  (`PostHogFeatureFlagsLoaded.kt:38-41`). `PostHogConfig.onFeatureFlags` is removed (`MIGRATION.md:185`).
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.
 
 <a id="n14"></a>
 
@@ -970,5 +962,58 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
   (`PostHog.kt:1834-1845`). The logs queue retries 408, 429 and 5xx (`internal/EndpointSpec.kt:270`) and
   uses `Retry-After` as a floor capped at 30 s (`PostHogQueue.kt:604-621`). The other requirements carry
   over from 2026-10-19; the shared queue was reworked in 4.0 and was spot-checked, not re-derived.
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.
+
+<a id="n36"></a>
+
+### n36 — Get Feature Flag Result (✅ Pass)
+- **Spec requires:** a key/enabled/variant/payload result and nothing for an unknown flag
+  (`get-feature-flag-result/spec.md:151-196`); a payload parse failure keeps the flag (`:198-227`); the
+  per-call `sendFeatureFlagEvent` falls back to the client default (`:262-290`); `""` reads as disabled
+  (#193, `:292-314`).
+- **SDK currently (4.0, `aaa23d39`):** conforms. `PostHogRemoteConfig.getFeatureFlagResult`
+  (`posthog/src/main/java/com/posthog/internal/PostHogRemoteConfig.kt:1331-1353`) returns `null` for an
+  unknown key and `enabled = value.isNotEmpty()` for a string, so `""` is disabled with `variant = ""`.
+  `decodePayload` (`:1280-1294`) turns a malformed payload into `null` without touching the flag.
+  `PostHog.getFeatureFlagResult` (`PostHog.kt:2787-2799`) falls back to `PostHogConfig.sendFeatureFlagEvent`.
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.
+
+<a id="n37"></a>
+
+### n37 — Is Feature Enabled (✅ Pass)
+- **Spec requires:** the caller's `defaultValue` when the flag has no value, a known value (including
+  `false`) wins, a variant reads as `true`, `""` reads as `false` (#193), and per-call suppression works
+  (`is-feature-enabled/spec.md:135-201`).
+- **SDK currently (4.0, `aaa23d39`):** conforms. `isFeatureEnabled`
+  (`posthog/src/main/java/com/posthog/PostHog.kt:2682-2698`) computes `getFeatureFlag(key, sendFeatureFlagEvent) ?: defaultValue`
+  and treats a string as enabled only when it isn't empty.
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.
+
+<a id="n38"></a>
+
+### n38 — Get Feature Flag Payload (✅ Pass)
+- **Spec requires:** android 4.0 may drop the getter and read payloads through
+  `getFeatureFlagResult(key, sendFeatureFlagEvent = false)?.payload` (#170,
+  `get-feature-flag-payload/spec.md:55`, `:234-251`). A malformed payload reads as absent, valid JSON keeps
+  its type, and nothing is decoded twice (`:161-232`).
+- **SDK currently (4.0, `aaa23d39`):** conforms. There is no payload getter (`MIGRATION.md:124-132`). A silent
+  result read sends no event (`posthog/src/main/java/com/posthog/PostHog.kt:2708-2713`). `decodePayload`
+  (`internal/PostHogRemoteConfig.kt:1280-1294`) decodes `/flags` strings once (`:1273-1277`) and returns
+  `null` for a malformed, empty or whitespace-only payload; bootstrap payloads are used as given.
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.
+
+<a id="n39"></a>
+
+### n39 — Get Feature Flag (✅ Pass)
+- **Spec requires:** the cached boolean or variant, `$feature_flag_called` by default, and per-call
+  suppression; the android variant is `getFeatureFlag(key, sendFeatureFlagEvent = null)`, with 4.0 removing
+  `defaultValue` (`get-feature-flag/spec.md:70`, `:139-179`).
+- **SDK currently (4.0, `aaa23d39`):** conforms. `getFeatureFlag`
+  (`posthog/src/main/java/com/posthog/PostHog.kt:2766-2774`) returns `variant ?: enabled` from the flag
+  result (`FeatureFlagResult.kt:28-29`) and sends `$feature_flag_called` unless suppressed (`:2700-2760`).
 - **Backwards compatibility:** No change needed.
 - **Remediation:** None.

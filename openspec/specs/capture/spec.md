@@ -397,6 +397,8 @@ On client SDKs, an event's properties SHALL be merged in this order, each layer 
 2. Registered (super) properties.
 3. The properties the caller passes on the event.
 
+`$lib` and `$lib_version` are the one exception: the SDK fills its own pair after these layers and before `before_send`, as **Events name their own library** describes.
+
 `before_send` (Behavior step 6) then runs over the assembled message and can change any of them.
 
 A registered or caller value for a key the SDK sets itself changes that event only. It SHALL NOT change the SDK's own state: a later event without that key carries the SDK's value again, and a caller `process_person_profile` option (on legacy capture, the `$process_person_profile` property) does not turn person processing on or off for the SDK.
@@ -1002,15 +1004,13 @@ Legacy capture: posthog-python 7.x merged `super_properties` over the call's pro
 
 ### Requirement: Events name their own library
 
-Every SDK that delivers events through capture v1 SHALL send `$lib` and `$lib_version` in `properties`, and the wire builder SHALL NOT remove them. `$lib` names the library that produced the event and `$lib_version` its version; `PostHog-Sdk-Info` names the SDK that sent the request. For a server SDK's own fill and for capture's fallback, `$lib` and `$lib_version` count as set only when they are non-empty strings.
+Every SDK that delivers events through capture v1 SHALL send `$lib` and `$lib_version` in `properties`, and the wire builder SHALL NOT remove them. `$lib` names the library that produced the event and `$lib_version` its version; `PostHog-Sdk-Info` names the SDK that sent the request. For the SDK's own fill and for capture's fallback, `$lib` and `$lib_version` count as set only when they are non-empty strings.
 
-A server SDK SHALL fill the pair from its own identity as the last fill-only layer (step 3 of **Server SDKs build every event in one layer order**), before `before_send`:
+Every SDK SHALL fill the pair from its own identity after every other layer and before `before_send`: a server SDK as the last fill-only layer (step 3 of **Server SDKs build every event in one layer order**), a client SDK after the layers of **Caller-supplied event properties take precedence**. The fill:
 
 - When `$lib` is not set, the SDK SHALL set both `$lib` and `$lib_version`, replacing a `$lib_version` set without `$lib`, and a `$lib` that is `null`, empty or not a string.
 - When `$lib` is the SDK's own library name and `$lib_version` is not set, the SDK SHALL set `$lib_version`.
 - Otherwise the SDK SHALL leave both as they are. It SHALL NOT add its own `$lib_version` to another library's `$lib`.
-
-A client SDK SHALL instead merge `$lib` and `$lib_version` key by key like any other property, as **Caller-supplied event properties take precedence** describes.
 
 A built-in integration or wrapper (MCP instrumentation, AI wrappers, framework middleware) MAY label the events it captures with its own `$lib` and `$lib_version`. It SHALL set both, as the first fill-only layer of step 3, so a `$lib` in the call's `properties` wins over its label. Built-in integrations SHALL NOT change the client's `PostHog-Sdk-Info` value, except an MCP integration that labels a dedicated client (`mcp-analytics`, **Library identity**).
 
@@ -1054,6 +1054,21 @@ Legacy capture: server SDKs stamped `$lib` and `$lib_version` over the caller's 
   | $lib_version | 9.9.9 |
 - **AND** pending captures are flushed
 - **THEN** the first received event properties "$lib" and "$lib_version" should match "<library>/<version>" for the SDK under test
+
+#### Scenario: Another library's $lib does not get the SDK's version (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **WHEN** capture is called with event "Signed Up" and properties:
+  | property | value      |
+  | $lib     | custom-lib |
+- **THEN** one event named "Signed Up" should be enqueued
+- **AND** the enqueued event properties should include:
+  | property | value      |
+  | $lib     | custom-lib |
+- **AND** the enqueued "Signed Up" event should omit "$lib_version"
 
 ### Requirement: Session and window ids are lifted only as strings
 

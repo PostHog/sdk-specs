@@ -1,8 +1,8 @@
 # posthog-android — SDK Compliance
 
 **Repo:** [PostHog/posthog-android](https://github.com/PostHog/posthog-android)
-**Audited commit:** `c5e788bd603d3bdda77ac4d213538b9db637299a` ([commit](https://github.com/PostHog/posthog-android/commit/c5e788bd603d3bdda77ac4d213538b9db637299a)) — audited on 2026-10-19. **Five rows (Capture, Capture AI, Event Batcher, HTTP Client, Retry Queue) re-audited against posthog-android 4.0** on 2026-11-05 at `be3ed4b4` and re-checked on 2026-11-09 at `8b63a1352d325e716b0e44d3f13b2bbcbfe1ea31` ([commit](https://github.com/PostHog/posthog-android/commit/8b63a1352d325e716b0e44d3f13b2bbcbfe1ea31), head of the 4.0 integration PR [PostHog/posthog-android#871](https://github.com/PostHog/posthog-android/pull/871)) — see [posthog-android 4.0](#posthog-android-40-re-audit-2026-11-05)
-**Audited against sdk-specs commit:** `c72e367` (2026-10-19 rows); `8306698` plus the capture v1 text of [#146](https://github.com/PostHog/sdk-specs/pull/146) at `5c26b9bc`, which includes [#147](https://github.com/PostHog/sdk-specs/pull/147) (merged into #146's branch as `6a9ed0f`), for the five 4.0 rows
+**Audited commit:** `c5e788bd603d3bdda77ac4d213538b9db637299a` ([commit](https://github.com/PostHog/posthog-android/commit/c5e788bd603d3bdda77ac4d213538b9db637299a)) — audited on 2026-10-19. **Five rows (Capture, Capture AI, Event Batcher, HTTP Client, Retry Queue) re-audited against posthog-android 4.0** at `aaa23d39af4424978bd2439028282e47417490b8` ([commit](https://github.com/PostHog/posthog-android/commit/aaa23d39af4424978bd2439028282e47417490b8), head of the 4.0 integration PR [PostHog/posthog-android#871](https://github.com/PostHog/posthog-android/pull/871)) on 2026-11-10 — see [posthog-android 4.0](#posthog-android-40-re-audit-2026-11-05)
+**Audited against sdk-specs commit:** `c72e367` (2026-10-19 rows); `752f899` plus the capture v1 text of [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79`, which includes [#147](https://github.com/PostHog/sdk-specs/pull/147) (merged into #146's branch as `6a9ed0f`), for the five 4.0 rows
 **Summary:** 38 ✅ · 16 🟡 · 5 ❌ · 5 ➖ · 0 ❓ (64 rows; 2026-10-19 at `c5e788bd` scored 37/16/5/6/0; previous full audit 2026-08-10 at `8659a7b4` scored 31/16/9/3/0 on 59 rows)
 
 **Why the 2026-10-19 run:** rotation priority 3 — the pointer was ten weeks old, and android carries the
@@ -28,28 +28,56 @@ posthog-android 4.0 sends analytics events to capture v1 (`POST /i/v1/analytics/
 The capture v1 specs name android 4.0 directly: [#146](https://github.com/PostHog/sdk-specs/pull/146)
 adds the capture v1 requirements to `capture`, `event-batcher`, `http-client` and `retry-queue`, and
 [#147](https://github.com/PostHog/sdk-specs/pull/147) adds client SDKs on capture v1 that ship an AI
-method, posthog-android 4.0 among them, to `capture-ai`'s Applicability. #147 merged into #146's branch. The rows below are scored against
-#146's text at `5c26b9bc`, treated as merged to `main`.
+method, posthog-android 4.0 among them, to `capture-ai`'s Applicability. #147 merged into #146's
+branch. The rows below are scored at `aaa23d39` against `main` at `752f899` plus #146's text at
+`d387ab79`, treated as merged to `main`.
 
-**Scope.** Only the five rows these specs change were re-audited, at `be3ed4b4`, and re-checked at
-`8b63a135` (2026-11-09). Every other row carries forward from 2026-10-19 at `c5e788bd`. 4.0 also changes
-rows outside this scope that the next full audit must re-verify: Session Replay Privacy ([n19](#n19):
-4.0 removes wireframe recording, so finding (1) no longer applies) and Session Replay Debug Properties
-([n17](#n17): 4.0 hardcodes the `screenshot` capture mode and adds a 30 s bundle interval), Surveys
-([n22](#n22): `setSurveySeen` also rewrites the last-seen survey date on submit and dismiss, which the
-wait-period requirement from #102 forbids), Opt In (4.0 rotates the session before restarting replay, as
-#138 requires), Get Feature Flag Payload (`getFeatureFlagPayload()` removed; a malformed
-payload is now `null`), Get Feature Flag Result, On Feature Flags ([n13](#n13), runtime
-`onFeatureFlags()` registration), Setup (`apiKey` removed; a `phx_` key or blank token disables the
-SDK with a warning), Before Send Hook (`PostHogEvent.options`), and Remote Config (the `remoteConfig`
-option removed).
+**Scope.** Only the five rows these specs change were re-audited. Every other row carries forward from
+2026-10-19 at `c5e788bd`, scored against `c72e367`. 4.0 code and spec text merged since then change
+these rows, which the next full audit must re-verify:
+
+- **Opt In** ([n14](#n14)): 4.0 rotates the session before restarting replay, as #138 requires. #199
+  adds **Deferred crash reports honour consent at crash time**, and 4.0 now drops native crashes
+  recorded while opted out (PostHog/posthog-android#952). #167 keeps `identify` running while opted
+  out (also **Identify**). **Consent Gating** ([n5](#n5)) points at the #199 rule.
+- **Remote Config:** 4.0 removes the `remoteConfig` option and ignores replies that arrive after
+  `close()` or from a closed setup (PostHog/posthog-android#953, #961). #198 adds `quotaLimited` to the
+  wire-field table.
+- **Flag reads.** #193 reads an empty variant (`""`) as disabled in **Get Feature Flag Result**, **Get
+  Feature Flags** ([n9](#n9)), **On Feature Flags** ([n13](#n13)) and **Is Feature Enabled**.
+  `getFeatureFlagResult` in 4.0 already returns `enabled = false` for `""`. #170 records the removal of
+  `getFeatureFlagPayload()` (**Get Feature Flag Payload**: a malformed payload is now `null`; also
+  **Get Feature Flag**, **Get Feature Flags And Payloads** ([n10](#n10)) and **Feature Flag Cache**).
+  #161 records runtime `onFeatureFlags()` registration, and #111 and #109 change **Get Feature Flag
+  Result**. **Reload Feature Flags**' callback now receives `PostHogFeatureFlagsLoaded`.
+- **Feature Flag Called Tracker** ([n8](#n8)): #162 adds config version 2 attribution and SDK-sent
+  `$experiment_exposure`, and #203 renames its `$feature_flag_variant` to `$feature_flag_variant_key`.
+  4.0 sends neither, so the rename changes no android code.
+- **Session Replay Privacy** ([n19](#n19)): 4.0 removes wireframe recording (#197), so finding (1) no
+  longer applies. #160 adds fully masked `FLAG_SECURE` windows, and #197 also changes **Start Session
+  Recording** ([n20](#n20)).
+- **Session Replay Debug Properties** ([n17](#n17)): 4.0 hardcodes the `screenshot` capture mode and
+  adds a 30 s bundle interval. #155 and #197 change the spec.
+- **Surveys** ([n22](#n22)): `setSurveySeen` also rewrites the last-seen survey date on submit and
+  dismiss, which the wait-period requirement from #102 forbids. #121 adds the popup delay.
+- **Setup:** `apiKey` removed; a `phx_` key or blank token disables the SDK with a warning.
+- **Before Send Hook** ([n3](#n3)): `PostHogEvent.options`.
+- **Exception rows:** #123 requires trace context on exception events (**Exception Event Metadata**,
+  [n7](#n7)), and #124 keeps the stack trace in fatal exception payloads (**Capture Exception**).
+- **Logs:** #81 adds the compression opt-out to `logs`.
+- **Shutdown:** #135. **Application Lifecycle:** #115.
+
+The other spec changes merged since 2026-10-19 bind server SDKs, posthog-js, another platform, or
+contracts that are ➖ here (#205, #178, #185, #116, #129, #94, #88, #130, #85, #169, #171, and the MCP
+analytics, AI evaluation and emails changes). The ones that touch the five rows (#81, #119, #125, #127,
+#131, #132, #143, #193's `$active_feature_flags` rule) are scored below.
 
 | Contract | 2026-10-19 | 4.0 | Why |
 |---|---|---|---|
-| Capture | ✅ | ✅ | Capture v1 wire, headers, per-event results, options, `$lib` kept in properties, session id lifting, timestamps and fail-open token all conform; the post-hook uuid and `null`-options restore are the two allowances #146 now grants ([n24](#n24)) |
-| Capture AI | ➖ | ✅ | Applies now (#147). The AI lane conforms in full ([n25](#n25)) |
+| Capture | ✅ | ✅ | Capture v1 wire, headers, per-event results, options, the `$lib`/`$lib_version` pair fill, session id lifting, timestamps and fail-open token all conform; the post-hook uuid and `null`-options restore are the two allowances #146 grants ([n24](#n24)) |
+| Capture AI | ➖ | ✅ | Applies now (#147). The AI lane conforms in full, including its own compression setting ([n25](#n25)) |
 | Event Batcher | 🟡 | 🟡 | Capture v1 byte-aware 5 MiB batching and client-permitted 413 halving conform; the periodic flush still runs on `java.util.Timer`, not the injectable clock ([n6](#n6)) |
-| HTTP Client | ✅ | ✅ | Capture v1 transport conforms; applying the same-origin redirect rule to a caller-supplied `httpClient` is one of the two choices #146 allows ([n26](#n26)) |
+| HTTP Client | ✅ | ✅ | Capture v1 transport conforms; `compression` turns off analytics compression and leaves `captureAiCompression` alone, as #146 allows; applying the same-origin redirect rule to a caller-supplied `httpClient` is one of the two choices #146 allows ([n26](#n26)) |
 | Retry Queue | ✅ | ✅ | Capture v1 status set, 1 s→30 s jittered backoff, `Retry-After` floor, per-event `retry` resends, no OkHttp retries ([n27](#n27)) |
 
 **Behavior the spec permits for client SDKs, recorded so it isn't mistaken for a gap:** a `404` (or
@@ -60,19 +88,6 @@ reports no event as exhausted"); the SDK prints one warning even with `debug` of
 client SDKs and not scored: halving a multi-event batch on `413`, dropping a non-finite property instead
 of sending `null`, writing timestamps with exactly three fractional digits, minting a new
 `PostHog-Request-Id` after an app restart, and logging dropped and retried events only in debug mode.
-
-**Open spec question, not scored.** One #146 conflict is
-[raised on the PR](https://github.com/PostHog/sdk-specs/pull/146#issuecomment-6743564814).
-`http-client` asks for one option that turns compression off "for the whole client". `capture-ai` says
-the analytics lane's compression "SHALL NOT change AI uploads". Android has `compression` and
-`captureAiCompression`, so `compression = NONE` still gzips `captureAi` requests. That follows
-`capture-ai`. If #146 settles this against android, HTTP Client goes back to 🟡.
-
-**`$lib` for client SDKs.** A caller's `$lib` merges key by key over android's pair
-(`PostHog.kt:932-933`, `:985-986`), as **Caller-supplied event properties take precedence** says for
-client SDKs. This is scored on the assumption that #146 scopes the pair-fill rule in **Events name
-their own library** to server SDKs
-([raised on the PR](https://github.com/PostHog/sdk-specs/pull/146#issuecomment-6743588735)).
 
 ## Movement on 2026-10-19
 
@@ -204,6 +219,8 @@ forward from the 2026-08-10 audit keep their original analysis, re-checked for e
 `c5e788bd`; notes [n2](#n2), [n7](#n7), and [n17](#n17) are new or rewritten this run. A reference
 to "posthog-android nX" in a document written before 2026-10-19 refers to the old numbering.
 
+<a id="n1"></a>
+
 ### n1 — Alias (❌ Fail)
 - **Spec requires:** `acceptance/public/alias.feature:12-21` (tagged `@both`, applies to client
   SDKs) requires the enqueued `$create_alias` event's properties to include both `alias` and
@@ -219,11 +236,15 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
   `PostHog.kt:~1176` is purely additive to the event payload.
 - **Remediation:** Set `distinct_id` alongside `alias` in the `$create_alias` properties map.
 
+<a id="n2"></a>
+
 ### n2 — Autocapture (✅ Pass)
 - **Spec requires:** Walk element ancestry on a UI interaction, build a sanitized `$elements` array, emit `$autocapture` with an `$event_type` and screen context; respect no-capture markers; never capture sensitive control values.
 - **SDK currently:** **Improved from ❌ Fail — `$autocapture` now genuinely exists.** The previous audit found no generic UI-interaction autocapture at all. `PostHogElementInteractionIntegration` (`posthog-android/src/main/java/com/posthog/android/internal/PostHogElementInteractionIntegration.kt:186`) now captures `$autocapture` for actionable View and Compose taps, carries `$touch_x`/`$touch_y`, and additionally detects and emits `$rageclick` (`:178-182`). A no-capture marker is honoured per subtree via the `com.posthog.android.R.id.posthog_autocapture_no_capture` tag (`internal/InteractionTarget.kt:179`), documented at `PostHogAndroidConfig.kt:77-82`. The payload matches the contract: `$event_type` is `touch` (`internal/InteractionTarget.kt:55`), as `autocapture/spec.md` requires for mobile taps; `$elements` and `$elements_chain` are built from an allowlist of tag name, class, id and `nth-child`/`nth-of-type` only, with the explicit rule "Never add labels, values or arbitrary attributes" (`InteractionTarget.kt:14-60`); and `EditText`, `AbsSeekBar` and `NumberPicker` are not captured as targets (`:146`), so control values never leave the device. The feature is **off by default** — `captureElementInteractions` defaults to `false` (`PostHogAndroidConfig.kt:77`) — but `autocapture/spec.md` says option names and defaults vary by platform and its behaviour applies when autocapture is enabled, so default-off is not a gap. **Re-scored ✅ this run.**
 - **Backwards compatibility:** No change needed.
 - **Remediation:** None.
+
+<a id="n3"></a>
 
 ### n3 — Before Send Hook (✅ Pass)
 - **Spec requires:** multiple registered hooks run in a chain, each receiving the **previous**
@@ -239,6 +260,8 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
   failed privacy filter cannot leak data. **Re-scored ✅ this run.**
 - **Backwards compatibility:** No change needed.
 - **Remediation:** None.
+
+<a id="n4"></a>
 
 ### n4 — Bootstrap (🟡 Partial)
 - **Spec requires:** (optional — "MAY") a client SDK that owns a session id MAY accept a
@@ -258,6 +281,8 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
 - **Remediation:** Add optional `sessionID` bootstrap support if product wants full parity with
   SDKs that implement this optional capability.
 
+<a id="n5"></a>
+
 ### n5 — Consent Gating (🟡 Partial) — *downgraded from ✅ Pass this cycle*
 - **Spec requires:** opt-out state gates capture across all product surfaces the spec's
   "Interactions" section lists, explicitly including session replay (which "may be stopped,
@@ -274,6 +299,8 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
 - **Backwards compatibility:** Backward-compatible — the same fix as n13/n14 (add `isOptedOut()`
   guards) closes this gap; optionally also make `optOut()` call `stopSessionReplay()`.
 - **Remediation:** Extend opt-out gating to the session-replay start/stop surface.
+
+<a id="n6"></a>
 
 ### n6 — Event Batcher (🟡 Partial)
 - **Spec requires:** periodic flush driven by the SDK's injectable clock abstraction (so tests can
@@ -296,7 +323,7 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
   from `:posthog-android` per the module dependency graph, and the shared-core
   `PostHogQueueInterface.add(record: Record)` (used by Android) already used the parameter name
   `record` prior to this drift — a cosmetic-only match, zero behavioral change either way.
-- **4.0 re-audit (2026-11-05, `be3ed4b4`; unchanged at `8b63a135`):** still 🟡, on the same gap: `PostHogQueue.start()`
+- **4.0 re-audit (2026-11-05, `be3ed4b4`; unchanged at `aaa23d39`):** still 🟡, on the same gap: `PostHogQueue.start()`
   (`internal/PostHogQueue.kt:623-645`) still schedules the periodic flush with `Timer(true)` (`:626`).
   The capture v1 batching requirement in [#146](https://github.com/PostHog/sdk-specs/pull/146)
   (**Capture v1 batches are byte-aware and server SDKs never shrink them after a 413**) passes.
@@ -312,11 +339,15 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
   executor internally; no public API change, default real-time behavior unchanged.
 - **Remediation:** Route the periodic-flush timer through `config.dateProvider` for testability.
 
+<a id="n7"></a>
+
 ### n7 — Exception Event Metadata (🟡 Partial)
 - **Spec requires:** Every entry in `$exception_list` carries a `mechanism`; the outermost entry's `mechanism.exception_id` SHALL equal `0` and every entry SHALL have a unique non-negative `exception_id`; nested entries SHALL carry `parent_id`, `mechanism.type` of `chained`, and a `mechanism.source` naming the parent edge. A producer SHALL **omit** any optional common field it cannot determine and **MUST NOT represent unknown with `false`**, an empty string, or `null`. `handled` describes disposition at the relevant boundary and MUST NOT be invented for a nested entry. At most 50 entries with cycle detection. Application property bags MUST NOT override SDK-owned `$exception_list`, `$exception_level`, or `$exception_source` (spec line 300).
 - **SDK currently:** Audited from scratch against `posthog/src/main/java/com/posthog/internal/errortracking/ThrowableCoercer.kt`. **Much of this is already right**, and the implementation is visibly spec-aware: `exception_id` and `parent_id` are emitted into the mechanism (`:214-220`); derived entries get `mechanism.type` of `"chained"` for cause-chain members and `"suppressed"` for suppressed exceptions, with the first entry keeping the primary mechanism (`:285-299`); `MAX_EXCEPTION_LIST_SIZE = 50` (`:391`) matches the spec's bound exactly and traversal is cycle-guarded with a `seen` set (`:381`); `thread_id` is populated; and a code comment at `:189-191` shows the author knowingly emitting the linkage fields "for parity with the other SDKs" even though ingestion currently drops them. **Four gaps:** (1) **`"synthetic" to false` is a hardcoded literal** on every entry (`:212`) — this is exactly the "MUST NOT represent unknown with `false`" prohibition; the field should be omitted when undetermined; (2) **nested entries inherit the outermost `handled`** — the same `handled` value is threaded into every item (`:328`, and `:211` writes it unconditionally), which is invented capture-boundary metadata for a cause; (3) **no `mechanism.source`** — the parent edge is encoded in `mechanism.type` (`chained`/`suppressed`) rather than in the dedicated `source` field the spec defines, and **no `$exception_source` property is emitted** anywhere; (4) **`exception_id` is omitted entirely for a single-item list** (`:215-217`, "null for a single-item list, where the ids carry no information") — but the spec requires the outermost entry's `exception_id` to equal `0` unconditionally, because the canonical tree linkage depends on it. Separately, `PostHogStateless.kt:701` documents that "callers can override reserved keys such as `$exception_level`", which is the application-property-bag override spec line 300 forbids.
 - **Backwards compatibility:** Backward-compatible for (1), (3), and (4) — omitting a field, adding `source`/`$exception_source`, and always emitting `exception_id: 0` are additive or strictly more correct wire changes. **Needs deprecation path** for the `$exception_level` caller override, which is currently documented behaviour: a typed override parameter should ship before the generic property-bag path stops winning. Gap (2) is backward-compatible.
 - **Remediation:** Omit `synthetic` unless determined rather than writing `false`; stop threading the boundary `handled` onto derived items; add `mechanism.source` alongside the existing `type` and emit `$exception_source` from the capture boundary; always assign `exception_id`, including on a single-item list. Then add a typed `level` override and stop honouring `$exception_level` from the generic property map.
+
+<a id="n8"></a>
 
 ### n8 — Feature Flag Called Tracker (🟡 Partial)
 - **Spec requires:** dedup semantics for `$feature_flag_called` (per spec.md/acceptance for this
@@ -341,6 +372,8 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
   session-attribution/platform-identity properties; separately consider whether UTM/click-id
   capture belongs in this SDK's scope at all.
 
+<a id="n9"></a>
+
 ### n9 — Get Feature Flags (❌ Fail)
 - **Spec requires:** a public bulk getter returning a flat key→value map (`Record<string,
   boolean|string>`), cache-only (no network I/O), no `$feature_flag_called` side effect.
@@ -357,6 +390,8 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
   `getAllFeatureFlags()`.
 - **Remediation:** Add the new public method; keep `getAllFeatureFlags()` unchanged for
   compatibility.
+
+<a id="n10"></a>
 
 ### n10 — Get Feature Flags And Payloads (❌ Fail)
 - **Spec requires:** a bulk getter returning a `{flags, payloads}` pair of maps, with empty maps
@@ -377,6 +412,8 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
 - **Remediation:** Add the new public method returning empty (not null) maps when no flags are
   known; fix the internal getter's missing lazy-cache-load call as a side benefit.
 
+<a id="n11"></a>
+
 ### n11 — Group (🟡 Partial)
 - **Spec requires:** `group(type, key, properties)` MUST reject blank/empty `type`/`key` (context
   unchanged, warning logged), per `openspec/specs/group/spec.md:128-136` and
@@ -389,6 +426,8 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
   top of `group()`/`groupStateless()`; only affects currently-malformed (blank) input.
 - **Remediation:** Add shared blank `type`/`key` validation, matching `identify()`'s pattern.
 
+<a id="n12"></a>
+
 ### n12 — Group Identify (🟡 Partial)
 - **Spec requires:** same blank-`type`/`key` rejection as Group (Android has no standalone public
   `groupIdentify` method — `group()` internally emits `$groupidentify`, matching the spec's
@@ -400,6 +439,8 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
   (`$group_type`, `$group_key`, `$group_set`) otherwise correct.
 - **Backwards compatibility:** Backward-compatible — same fix as Group.
 - **Remediation:** Add the same blank-check guard used for `group()`.
+
+<a id="n13"></a>
 
 ### n13 — On Feature Flags (🟡 Partial)
 - **Spec requires:** a listener mechanism supporting multiple independent subscribers, with
@@ -418,6 +459,8 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
   the existing `config.onFeatureFlags` field (retained for compatibility), firing synchronously on
   registration if flags are already loaded.
 
+<a id="n14"></a>
+
 ### n14 — Opt In (🟡 Partial)
 - **Spec requires:** (optional, per spec's permissive language) opt-out MAY also clear local
   persistence (distinct id, anonymous id, super properties) when configured.
@@ -429,6 +472,8 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
 - **Backwards compatibility:** Backward-compatible — this capability is explicitly optional per
   spec language. Add an optional parameter (e.g. `optOut(clearLocalStorage: Boolean = false)`).
 - **Remediation:** Add the optional clear-on-opt-out parameter, mirroring the browser SDK pattern.
+
+<a id="n15"></a>
 
 ### n15 — Persistent Storage (🟡 Partial)
 - **Spec requires:** storage failures MUST NOT crash SDK calls, and the SDK SHALL record a storage
@@ -450,6 +495,8 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
 - **Remediation:** Guard the primitive-write branches of `PostHogSharedPreferences.setValue` and
   emit a storage-warning log on failure.
 
+<a id="n16"></a>
+
 ### n16 — Register (🟡 Partial)
 - **Spec requires:** (permissive — "MAY reject") blank/empty keys should not silently persist as
   stray super properties.
@@ -462,6 +509,8 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
   reserved-key check; spec's validation language here is permissive, so this is a minor gap.
 - **Remediation:** Add blank-key rejection to `register()`/`unregister()`.
 
+<a id="n17"></a>
+
 ### n17 — Session Replay Debug Properties (🟡 Partial)
 - **Spec requires:** `client`. Four required keys on **every** captured event except `$snapshot` — `$recording_status`, `$sdk_debug_replay_event_trigger_status`, `$sdk_debug_replay_linked_flag_trigger_status`, `$sdk_debug_replay_internal_buffer_length`. Everything else is an **optional bundle** that goes **only on SDK events** (names starting with `$`, excluding `$feature_flag_called`, `$snapshot`, and the browser's `$$heatmap`) and **at most once every 30 seconds per SDK instance**. The queue-depth key sits outside both tiers and stays on every non-`$snapshot` event. `$snapshot` carries none of them. An SDK with no replay integration produces only `$recording_status: disabled`. **On mobile, a crash-time `$exception` reported on a later launch is stamped from a crash-context snapshot that always carries the full bundle.**
 - **SDK currently:** Audited from scratch, and this is the most complete implementation of the contract outside `posthog-js`. `PostHogReplayIntegration.debugProperties()` (`posthog-android/src/main/java/com/posthog/android/replay/PostHogReplayIntegration.kt:2591-2643`) produces all three cross-platform `$sdk_debug_replay_*` required keys plus a genuine tri-state `$recording_status` (`disabled`/`buffering`/`active`) derived from a real buffering snapshot, and adds a thoughtful optional set: `$sdk_debug_replay_flush_hold_reason` (distinguishing `awaiting_remote_config` from `below_minimum_duration`), `$sdk_debug_replay_pending_trigger_conditions`, `$sdk_debug_replay_capture_mode`, and `$sdk_debug_replay_throttle_delay_ms`. The trigger statuses use a shared `triggerStatus()` helper with a correct `trigger_disabled`/`trigger_pending`/`trigger_activated` vocabulary. The wiring in `PostHog.sdkDebugProperties()` (`PostHog.kt:782-810`) is careful: it is applied only inside the `appendSharedProps` block, which `$snapshot` events skip (`:918-919`), so **the `$snapshot` exclusion is correct**; it is merged **after** the caller's properties so SDK-computed values win, with a comment citing posthog-js's `extend(properties, sdkDebugProperties)` as the model; the replay handler's contribution is guarded separately from the session and queue keys so a throwing handler cannot suppress them, surfacing `$sdk_debug_error_capturing_properties` instead; and it falls back to `$recording_status: disabled` when no replay handler is installed, exactly as the spec's no-integration case requires. `$sdk_debug_pending_queue_size` is attached as the queue-depth key.
@@ -469,6 +518,8 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
   **The previous-process crash case conforms.** `sdkDebugProperties()` returns an empty map when an explicit timestamp predates the current session start (`PostHog.kt:787-791`). `session-replay-debug-properties/spec.md:965-977` says such an event SHALL carry the state persisted at the time if the platform captured one, and otherwise none of these keys, and that this takes precedence over the every-event rule; its scenario "A previous-process crash carries no live debug state" expects exactly that omission. Android persists no crash-time snapshot today, so omitting the keys is the required outcome. Persisting one (as iOS does through `customData`) would be an improvement, not a compliance fix.
 - **Backwards compatibility:** Backward-compatible — the fix removes properties from events, which only shrinks payloads; a consumer reading an optional key off a custom event would lose it, so it warrants a changelog note.
 - **Remediation:** Introduce the required/optional split — keep the four required keys plus the queue-depth key on every non-`$snapshot` event, and gate the rest behind an SDK-event check and a 30-second per-instance throttle, mirroring `packages/browser/src/posthog-core.ts`'s `REQUIRED_REPLAY_PROPERTIES`. Because `posthog-flutter` and `posthog-react-native` embed this SDK, fixing the tiering here improves all three.
+
+<a id="n18"></a>
 
 ### n18 — Session Replay Ingestion Controls (🟡 Partial)
 - **Spec requires:** event-trigger gating for session replay must observe the final (post-
@@ -485,6 +536,8 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
   call sites, no API/wire change.
 - **Remediation:** Pass `postHogEvent.event` instead of the pre-hook `event` variable at
   `PostHog.kt:834` and `836`.
+
+<a id="n19"></a>
 
 ### n19 — Session Replay Privacy (🟡 Partial)
 - **Spec requires:** elements explicitly tagged no-capture MUST be excluded from replay wireframes
@@ -508,6 +561,8 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
 - **Remediation:** Honor `isNoCapture()` inside `toWireframe()`, not just the screenshot path;
   align Compose's unmask/password precedence with the View path.
 
+<a id="n20"></a>
+
 ### n20 — Start Session Recording (❌ Fail)
 - **Spec requires:** session recording MUST remain inactive (or refuse to start) while the user is
   opted out.
@@ -523,6 +578,8 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
   out.
 - **Remediation:** Add an `isOptedOut()` check to `startSessionReplay()`.
 
+<a id="n21"></a>
+
 ### n21 — Stop Session Recording (🟡 Partial)
 - **Spec requires:** stopping session recording should finalize/flush pending replay data, and
   (for symmetry with start) should be opt-out aware.
@@ -536,6 +593,8 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
 - **Backwards compatibility:** Backward-compatible — explicitly flushing the replay queue inside
   `stop()` is additive/clarifying, no signature or common-case behavior change.
 - **Remediation:** Flush the replay queue synchronously inside `stopSessionReplay()`.
+
+<a id="n22"></a>
 
 ### n22 — Surveys (🟡 Partial)
 - **Spec requires:** (acceptance scenario, `@client`, `surveys.feature:126-135`) non-web/native
@@ -557,6 +616,8 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
 - **Remediation:** Add a filter step in `getActiveMatchingSurveys()` excluding surveys where
   `url`/`selector` are the *only* configured display-targeting condition.
 
+<a id="n23"></a>
+
 ### n23 — Traces (❌ Fail)
 - **Spec requires:** OpenTelemetry-shaped span/trace capture (`startSpan`/`withSpan`/
   `getActiveSpan`/`beforeSpanSend`, `resourceSpans`/`scopeSpans` OTLP payload) shipped to
@@ -577,18 +638,30 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
 - **Remediation:** Implement the traces capability net-new, likely reusing the logs pipeline's
   OTLP/queue machinery as a template.
 
+<a id="n24"></a>
+
 ### n24 — Capture (✅ Pass, re-audited for capture v1)
 - **Spec requires:** the capture v1 requirements [#146](https://github.com/PostHog/sdk-specs/pull/146)
-  adds to `capture/spec.md` (text at `5c26b9bc`): the wire contract, request headers, per-event results,
+  adds to `capture/spec.md` (text at `d387ab79`): the wire contract, request headers, per-event results,
   per-event options with legacy-property hoisting, the layer order's steps 4 and 5 (which apply to client
-  SDKs too), **Events name their own library** (`$lib`/`$lib_version` stay in `properties`),
-  session/window id lifting, distinct ids, timestamps, per-event serialization, and failing open on a
-  missing or personal token. Step 4 says "The SDK SHALL NOT add or re-add any value after the hook, with
-  two allowances: it MAY re-impose the uuid it generated before the hook … and it MAY treat a returned
-  event whose `options` is absent as keeping the pre-hook options, while an empty `options` map still
-  clears them". Pipeline step 6 adds that an SDK that keeps the pre-hook options "SHALL also tell callers
-  to return an empty `options` map".
-- **SDK currently (4.0, `8b63a135`):** conforms.
+  SDKs too), **Events name their own library**, session/window id lifting, distinct ids, timestamps,
+  per-event serialization, and failing open on a missing or personal token.
+  - **`$lib` pair.** `$lib` and `$lib_version` stay in `properties`. **Caller-supplied event properties
+    take precedence** names them as its one exception: every SDK, client SDKs included, fills its own
+    pair after every other layer and before `before_send`. When `$lib` is not a non-empty string it sets
+    both, replacing a lone `$lib_version`. When `$lib` is the SDK's own name and `$lib_version` is not set
+    it sets the version. Otherwise it leaves both, and never adds its own version to another library's
+    `$lib`.
+  - **Post-hook allowances.** Step 4 says "The SDK SHALL NOT add or re-add any value after the hook, with
+    two allowances: it MAY re-impose the uuid it generated before the hook … and it MAY treat a returned
+    event whose `options` is absent as keeping the pre-hook options, while an empty `options` map still
+    clears them". Pipeline step 6 adds that an SDK that keeps the pre-hook options "SHALL also tell
+    callers to return an empty `options` map".
+  - **Empty variant** (`main`, #193). A cached flag whose value is `""` is left out of
+    `$active_feature_flags`, and its `$feature/<key>` still carries `""`.
+  - **Null-valued properties** (carried from before capture v1). Null object members are omitted, and
+    null array elements stay JSON `null` at their indices; arrays are never compacted.
+- **SDK currently (4.0, `aaa23d39`):** conforms.
   - **Wire and headers.** `postCaptureV1` (`posthog/src/main/java/com/posthog/internal/PostHogApi.kt:208-279`)
     POSTs `{"created_at", "batch"}` to `/i/v1/analytics/events` with `Authorization: Bearer`,
     `PostHog-Sdk-Info` (`posthog-android/<version>`, also sent as `User-Agent`), `PostHog-Attempt`,
@@ -598,21 +671,41 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
     (allowed for a durable client queue).
   - **Per-event results.** `captureV1Result` (`:318-381`) resends only `retry` uuids. `drop`,
     `duplicates_dropped`, an unknown verdict and an absent uuid are not resent. A 2xx without a
-    readable `results` map is a terminal failure that drops the batch (`:332-338`). The SDK logs one
-    aggregate line per batch with counts and `details` tags and no event content, in debug mode only,
-    as #146 allows a client SDK without an error handler.
+    readable `results` map is a terminal failure that drops the batch (`:332-338`). In debug mode only,
+    as #146 allows a client SDK without an error handler, the SDK logs one aggregate line per batch
+    with the endpoint path, the counts and the `details` tags (`:359-373`); a terminal status or an
+    unreadable 2xx logs the status, the count and the lane (`events` or `AI events`,
+    `PostHogQueue.kt:819`). No line carries event content.
   - **Event shape.** `captureV1Json` (`:882-909`) builds the wire event after `beforeSend` and runs for
-    3.x events still on disk too. It keeps `$lib`/`$lib_version` in properties (PostHog/posthog-android#942,
-    `a2b3c673`; `be3ed4b4` still removed them), hoists the four legacy option properties into options
-    only when the option is missing or `null` (`LEGACY_OPTION_PROPERTIES`, `:865`), and omits an empty
-    `options`. `liftStringProperty` (`:917-929`) lifts string `$session_id`/`$window_id` to the root,
-    drops `null` silently, and drops any other type with a debug log that names the key and JSON type,
-    never the value. `options` is accepted on `capture`, `screen`, `identify`, `setPersonProperties`,
-    `alias`, `group` and `captureException`.
+    3.x events still on disk too. It keeps `$lib`/`$lib_version` in properties, hoists the four legacy
+    option properties into options only when the option is missing or `null`
+    (`LEGACY_OPTION_PROPERTIES`, `:865`), and omits an empty `options`. `liftStringProperty`
+    (`:917-929`) lifts string `$session_id`/`$window_id` to the root, drops `null` silently, and drops
+    any other type with a debug log that names the key and JSON type, never the value. `options` is
+    accepted on `capture`, `screen`, `identify`, `setPersonProperties`, `alias`, `group` and
+    `captureException`. Options a wrapper SDK registers with the internal `registerOptionsForWrapper`
+    (PostHog/posthog-android#954, `PostHog.kt:2972-2981`) sit under each event's own options
+    (`optionsForEvent`, `:1122-1145`); they are not an app-facing global options API.
+  - **`$lib` pair** (PostHog/posthog-android#956). `buildProperties` calls `fillLibraryIdentity`
+    (`posthog/src/main/java/com/posthog/internal/PostHogLibraryIdentity.kt:13-29`) last
+    (`PostHog.kt:1013`), after the SDK's values, registered super properties and the caller's
+    properties, and before `beforeSend`. It reads each value as set only when it is a non-empty string.
+    With no usable `$lib` it sets both, replacing a lone caller `$lib_version`. With `$lib =
+    "posthog-android"` (or a wrapper's configured name) and no usable `$lib_version` it sets the
+    version. A caller's `$lib = "custom-lib"` with no version is sent without `$lib_version`, as the
+    new `@client` scenario requires, and a caller pair is kept as given. Snapshot events go through
+    the same fill. At `8b63a135` a caller's `$lib` merged key by key over the SDK's pair and so carried
+    the SDK's `$lib_version`, which this rule now forbids.
+  - **Empty variant.** `buildProperties` stamps `$feature/<key>` for every cached flag and adds a key
+    to `$active_feature_flags` only when its value is neither `false` nor `""` (`PostHog.kt:914-930`).
+  - **Null-valued properties.** `GsonSafeMapSerializer` omits null map members and, since
+    PostHog/posthog-android#955 (`6b546165`), writes a null or unserializable list element as JSON
+    `null` in place (`internal/GsonSafeMapSerializer.kt:101-112`). Before #955 it skipped null list
+    elements and compacted the array, a gap the 2026-10-19 and 2026-11-05 audits missed.
   - **Distinct ids, names and tokens.** A blank caller `distinctId` falls back to the current id
-    (`PostHog.kt:1340`). There is no local length or placeholder check. An empty event name, including
+    (`PostHog.kt:1360`). There is no local length or placeholder check. An empty event name, including
     one `beforeSend` sets, is dropped locally (`PostHogStateless.kt:472-481`). An empty token or a
-    `phx_` key disables the SDK with an always-on warning (`PostHog.kt:323-336`).
+    `phx_` key disables the SDK with an always-on warning (`PostHog.kt:326-339`).
   - **Timestamps.** Timestamps are UTC with three fractional digits (`formatISO8601Date`), stamped
     once when the event is created.
   - **Post-hook allowances.** `runBeforeSend` (`posthog/src/main/java/com/posthog/PostHogStateless.kt:371-409`)
@@ -620,14 +713,14 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
     returns a different event whose `options` is `null`, copies in the options the hook was given
     (`:387-391`). `options` isn't a `PostHogEvent` constructor parameter, so `copy()` and the constructor
     always produce `null`. Both are the allowances step 4 grants, and the 4.0 migration guide tells
-    callers to set `options` to an empty map to send none (`docs/migration-3.x-to-4.0.md:479`), as step
-    6 requires.
-  - **Caller `$lib`.** A caller's `$lib` merges key by key over the SDK's pair (`PostHog.kt:932-933`,
-    `:985-986`), as the client rule **Caller-supplied event properties take precedence** says. Scored
-    on the assumption that #146 scopes the pair-fill rule to server SDKs; see
-    [`$lib` for client SDKs](#posthog-android-40-re-audit-2026-11-05).
+    callers to set `options` to an empty map to send none (`MIGRATION.md:493`), as step 6 requires.
+  - **GeoIP.** The **Client-level GeoIP control** requirement, including #146's clarification that a
+    call's own `$geoip_disable` beats a per-call argument, binds server SDKs; client SDKs are not
+    required to have the option.
 - **Backwards compatibility:** No change needed.
 - **Remediation:** None.
+
+<a id="n25"></a>
 
 ### n25 — Capture AI (✅ Pass, new applicability)
 - **Spec requires:** [#147](https://github.com/PostHog/sdk-specs/pull/147) extends Applicability to
@@ -641,8 +734,8 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
   - Built-in AI integrations always use the AI method.
 
   The AI method uses "the same event-building order as `capture`".
-- **SDK currently (4.0, `be3ed4b4`, re-checked at `8b63a135`):** conforms.
-  - **Method and routing.** `captureAi` (`posthog/src/main/java/com/posthog/PostHog.kt:1182-1206`)
+- **SDK currently (4.0, `aaa23d39`):** conforms.
+  - **Method and routing.** `captureAi` (`posthog/src/main/java/com/posthog/PostHog.kt:1202-1226`)
     mirrors `capture`'s parameters and returns the uuid, or `null` when the event isn't queued. It logs
     a debug line for a non-`$ai_` name and sends the event to the AI endpoint anyway. `capture` never
     uses the AI lane.
@@ -651,37 +744,46 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
     OkHttp client (`aiCaptureClient`, `internal/PostHogApi.kt:122-136`). That client has read/write idle
     timeouts from `captureAiTimeout` and compression from `captureAiCompression`, which defaults to
     gzip. It shares the capture v1 status policy, per-event results and redirect rule with analytics.
-    The queue starts at setup (`PostHog.kt:509`), so events left from an earlier launch are sent.
-    `flush()` and `close()` signal both lanes (`:2788`, `:770`, line numbers at `8b63a135`).
-  - **Size.** `queueAiEvent` (`:1214-1231`) measures the serialized event before encryption and drops
+    The queue starts at setup (`PostHog.kt:516`), so events left from an earlier launch are sent.
+    `flush()` and `close()` signal both lanes (`:2808`, `:779`).
+  - **Size.** `queueAiEvent` (`:1234-1251`) measures the serialized event before encryption and drops
     one over `captureAiMaxStoredEventBytes` (`internal/EndpointSpec.kt:260-265`, 8 MiB + 64 KiB, which
     can only be lowered). It logs the name and the limit, never content. A configured value above the
-    ceiling is clamped with a log at setup (`PostHog.kt:372-377`). The queue caps at
+    ceiling is clamped with a log at setup (`PostHog.kt:375-380`). The queue caps at
     `captureAiMaxQueueSize` (default 100) and `AI_MAX_QUEUE_BYTES` (50 MiB) and drops the oldest
     first. Batches use the same 5 MiB byte-aware window as analytics ([n6](#n6)).
   - **Not applicable.** The Full AI capture flag and the built-in-integration requirement bind SDKs
     that ship AI wrapper libraries; posthog-android ships none. The OpenTelemetry context requirement
-    binds SDKs with an OTel AI bridge; there is none here. Null-valued property dropping uses the same
-    serializer as `capture`, carried forward from 2026-10-19.
+    binds SDKs with an OTel AI bridge; there is none here.
+  - **Null-valued properties.** AI events use the same serializer as `capture`, so null object members
+    are omitted and null array elements keep their positions since PostHog/posthog-android#955
+    ([n24](#n24)).
+  - **Building order.** AI events go through the same `buildProperties`, so the `$lib` pair fill
+    (PostHog/posthog-android#956) and registered wrapper options (#954) apply as in [n24](#n24).
   - **Hook.** AI events go through the same `runBeforeSend` as `capture`, so the post-hook allowances
     in [n24](#n24) apply to this lane too.
   - **Compression.** `captureAiCompression` is independent of `compression`, as `capture-ai` requires.
-    `http-client`'s whole-client opt-out conflicts with that; the conflict is raised on #146 and not
-    scored here.
+    `http-client`'s whole-client opt-out excludes a delivery lane with its own compression setting, so
+    the two rules agree.
 - **Backwards compatibility:** No change needed.
 - **Remediation:** None.
+
+<a id="n26"></a>
 
 ### n26 — HTTP Client (✅ Pass, re-audited for capture v1)
 - **Spec requires:** [#146](https://github.com/PostHog/sdk-specs/pull/146)'s **Capture v1 transport**:
   - Build `{host}/i/v1/analytics/events` (and `/i/v1/ai/events`), send the token only as
     `Authorization: Bearer`, and send the capture v1 headers on every attempt.
   - Compress with a single declared `Content-Encoding` and a per-lane compression setting.
+    **Request body compression and opt-out** asks for one option that turns compression off for the
+    whole client, "except a delivery lane that has its own compression setting (`capture-ai`, **AI lane
+    configuration is scoped to the AI lane**)".
   - Follow only a same-origin `307`/`308`, at most five times, resending the same method, headers and
     body; any other redirect is terminal.
   - "A caller-supplied HTTP client either keeps its own redirect policy or, where the SDK can intercept
     its redirects, gets this same rule applied to capture requests; both are compliant." (text at
-    `5c26b9bc`; at `0081ef78` the caller's client had to keep its own policy)
-- **SDK currently (4.0, `be3ed4b4`, unchanged at `8b63a135`):** conforms.
+    `d387ab79`)
+- **SDK currently (4.0, `aaa23d39`):** conforms.
   - **Client.** The SDK builds `captureClient` (`posthog/src/main/java/com/posthog/internal/PostHogApi.kt:101-118`)
     with `followRedirects(false)`, `followSslRedirects(false)` and `retryOnConnectionFailure(false)`.
     A network interceptor strips a `503`'s `Retry-After: 0`, so OkHttp never resends on its own.
@@ -689,19 +791,20 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
     (`:397-400`) matches the scheme, host and port of `host`, at most `CAPTURE_V1_MAX_REDIRECTS = 5`
     times, with the same body and headers. Any other 3xx is a terminal `PostHogApiError`.
   - **Headers and compression.** The Bearer header replaces an `Authorization` set in `requestHeaders`
-    for capture requests only. Analytics compression follows `compression`, AI compression follows
-    `captureAiCompression`. `GzipRequestInterceptor` sets exactly `Content-Encoding: gzip` and sends
-    uncompressed when compression fails.
+    for capture requests only. `compression` drives the `GzipRequestInterceptor` on the base client
+    (`PostHogApi.kt:85`), so `NONE` turns off gzip for analytics and every other request the SDK
+    compresses. The AI lane swaps in an interceptor that reads `captureAiCompression`
+    (`:121-136`), which the opt-out's lane exception leaves alone. `GzipRequestInterceptor` sets
+    exactly `Content-Encoding: gzip` and sends uncompressed when compression fails.
   - The flags retry policy and connection-refused handling recorded on 2026-10-19 are unchanged.
   - **Caller-supplied client.** When the app passes `PostHogConfig.httpClient`, `captureClient` is
     built from `httpClient.newBuilder()` with `followRedirects(false)`, so capture requests get the
-    SDK's same-origin rule and other requests keep the caller's policy. #146 now allows this. The
-    migration guide documents it (`docs/migration-3.x-to-4.0.md:381`).
-  - **Open, not scored.** `compression = NONE` doesn't turn off `captureAiCompression`. That follows
-    `capture-ai`'s per-lane rule and conflicts with this spec's whole-client opt-out; the conflict is
-    raised on #146.
+    SDK's same-origin rule and other requests keep the caller's policy. #146 allows this. The
+    migration guide documents it (`MIGRATION.md:385`).
 - **Backwards compatibility:** No change needed.
 - **Remediation:** None.
+
+<a id="n27"></a>
 
 ### n27 — Retry Queue (✅ Pass, re-audited for capture v1)
 - **Spec requires:** [#146](https://github.com/PostHog/sdk-specs/pull/146)'s **Capture v1 status
@@ -714,7 +817,7 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
   - The HTTP library's own retries are off.
   - The existing requirements also apply: durable retention independent of retry scheduling, an
     offline pause, acknowledgement by identity, and jittered backoff (#132).
-- **SDK currently (4.0, `be3ed4b4`, unchanged at `8b63a135`):** conforms.
+- **SDK currently (4.0, `aaa23d39`):** conforms.
   - **Status set.** `isCaptureV1RetriableStatusCode` (`posthog/src/main/java/com/posthog/internal/EndpointSpec.kt:201`)
     is exactly that set, and both capture v1 lanes use it. There is no `/batch` fallback.
   - **Backoff.** `calculateDelay` (`internal/PostHogQueue.kt:604-622`) doubles from 1 s to 30 s with a

@@ -145,7 +145,7 @@ the single most widely-shared non-compliance in the matrix.
 |---|---|---|---|---|---|---|---|---|---|
 | posthog-js | 26/64 fully compliant (41%) | 26 | 21 | 12 | 5 | 0 | 2026-10-05 · `6538babc` (targeted re-audit; most of the 59 pre-existing rows carried from 2026-08-10, see file header) | 33 | [posthog-js.md](posthog-js.md) |
 | posthog-python | 13/64 fully compliant (20%; 30 contracts N/A on a server SDK) | 13 | 16 | 5 | 30 | 0 | 2026-10-12 · `509c8525` | 21 | [posthog-python.md](posthog-python.md) |
-| posthog-android | 38/64 fully compliant (59%) | 38 | 16 | 5 | 5 | 0 | 2026-11-09 · `8b63a135` (4.0: Capture, Capture AI, Event Batcher, HTTP Client, Retry Queue only); other rows 2026-10-19 · `c5e788bd` — see file header | 21 | [posthog-android.md](posthog-android.md) |
+| posthog-android | 38/64 fully compliant (59%) | 38 | 16 | 5 | 5 | 0 | 2026-11-10 · `aaa23d39` (4.0: Capture, Capture AI, Event Batcher, HTTP Client, Retry Queue only); other rows 2026-10-19 · `c5e788bd` — see file header | 21 | [posthog-android.md](posthog-android.md) |
 | posthog-ios | 38/64 fully compliant (59%) | 38 | 16 | 4 | 6 | 0 | 2026-10-08 · `f5cbe87c` + PostHog/posthog-ios#924–#934 (out-of-cycle refresh, see below) | 20 | [posthog-ios.md](posthog-ios.md) |
 | posthog-node | 9/64 fully compliant (14%; 29 contracts N/A on a server SDK) | 9 | 21 | 4 | 29 | 1 | 2026-10-12 · `4f590b36` (posthog-js monorepo; Traces row corrected 2026-10-19) | 25 (+1 ❓) | [posthog-node.md](posthog-node.md) |
 | posthog-flutter | 21/64 fully compliant (33%) | 21 | 29 | 6 | 8 | 0 | 2026-10-19 · `1032c102` | 35 | [posthog-flutter.md](posthog-flutter.md) |
@@ -172,18 +172,22 @@ MCP Analytics ➖, Session Replay Debug Properties 🟡. Details in [posthog-ios
 The roll-up counts include the fixes from PostHog/posthog-ios#924–#934: Shutdown ❌→✅ and five 🟡→✅
 (Group, Group Identify, Stop Session Recording, Feature Flag Called Tracker, HTTP Client); see the "posthog-ios PRs included" table in the per-SDK file.
 
-**2026-11-05 out-of-cycle refresh — posthog-android 4.0 (re-checked 2026-11-09):** re-audited the
+**2026-11-05 out-of-cycle refresh — posthog-android 4.0 (re-checked 2026-11-10):** re-audited the
 five rows the capture v1 specs change (Capture, Capture AI, Event Batcher, HTTP Client, Retry Queue) at
-`8b63a135`, the head of the 4.0 integration PR PostHog/posthog-android#871, against
-[#146](https://github.com/PostHog/sdk-specs/pull/146) (capture v1 delivery) at `5c26b9bc`. That text
-includes [#147](https://github.com/PostHog/sdk-specs/pull/147) (capture v1 AI lane), which merged into
-#146's branch and adds posthog-android 4.0 to `capture-ai`'s Applicability. **Capture AI ➖→✅**: the
-row applies now, and the AI lane conforms. **Capture** and **HTTP Client** stay ✅. The post-hook uuid
-and `null`-options restore and the same-origin redirect rule on a caller's `httpClient` are allowances
-#146 now grants. **Event Batcher** stays 🟡 on its old `Timer` finding; byte-aware batching passes.
-**Retry Queue** stays ✅. Keeping 404'd events queued with no attempt limit is what #146 allows for a
-durable client queue. One #146 conflict is raised on the PR and not scored: the `http-client`
-whole-client compression opt-out against `capture-ai`'s per-lane compression. Every other row carries forward from 2026-10-19.
+`aaa23d39`, the head of the 4.0 integration PR PostHog/posthog-android#871, against `main` at `752f899`
+plus [#146](https://github.com/PostHog/sdk-specs/pull/146) (capture v1 delivery) at `d387ab79`. That
+text includes [#147](https://github.com/PostHog/sdk-specs/pull/147) (capture v1 AI lane), which merged
+into #146's branch and adds posthog-android 4.0 to `capture-ai`'s Applicability. **Capture AI ➖→✅**:
+the row applies now, and the AI lane conforms. **Capture** stays ✅: android fills its own
+`$lib`/`$lib_version` pair after every other layer (PostHog/posthog-android#956), as #146 now requires
+of client SDKs, and keeps null array elements in place (#955). The post-hook uuid and `null`-options
+restore are allowances #146 grants. **HTTP Client** stays ✅: separate `compression` and
+`captureAiCompression` settings are what #146's compression opt-out allows, and so is the same-origin
+redirect rule on a caller's `httpClient`. **Event Batcher** stays 🟡 on its old `Timer` finding;
+byte-aware batching passes. **Retry Queue** stays ✅. Keeping 404'd events queued with no attempt limit
+is what #146 allows for a durable client queue. Every other row carries forward from 2026-10-19; the
+per-SDK file lists the rows that 4.0 and later spec changes (#193, #199, #203 among them) leave for the
+next full audit.
 Details in [posthog-android.md](posthog-android.md#posthog-android-40-re-audit-2026-11-05).
 
 **Row-count note:** **seven of twelve SDKs now carry the full 64-row matrix** — posthog-js,

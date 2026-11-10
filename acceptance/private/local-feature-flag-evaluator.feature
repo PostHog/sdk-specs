@@ -963,14 +963,28 @@ Feature: Local Feature Flag Evaluator
     Then the group result should be <result>
 
     Examples:
-      | group_type | children                | result       |
-      | "OR"       | true and inconclusive   | true         |
-      | "OR"       | false and inconclusive  | inconclusive |
-      | "AND"      | false and inconclusive  | false        |
-      | "AND"      | true and inconclusive   | inconclusive |
-      | "property" | true and true           | true         |
-      | "OR"       | no children             | false        |
-      | "AND"      | no children             | true         |
+      | group_type | children                               | result       |
+      | "OR"       | true and missing-property inconclusive  | true         |
+      | "OR"       | false and missing-property inconclusive | inconclusive |
+      | "AND"      | false and missing-property inconclusive | false        |
+      | "AND"      | true and missing-property inconclusive  | inconclusive |
+      | "property" | true and true                          | true         |
+      | "OR"       | no children                            | false        |
+      | "AND"      | no children                            | true         |
+
+  @server
+  Scenario Outline: Reached unsupported cohort groups stop evaluation before later siblings
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And a dynamic cohort group combines child results <children> with group type <group_type>
+    When the group is evaluated locally
+    Then the group result should be <result>
+
+    Examples:
+      | group_type | children                              | result                     |
+      | "OR"       | unsupported empty XOR group then true  | requires server evaluation |
+      | "AND"      | unsupported empty XOR group then false | requires server evaluation |
+      | "OR"       | true then unsupported empty XOR group  | true                       |
+      | "AND"      | false then unsupported empty XOR group | false                      |
 
   @server
   Scenario: Negation does not turn an inconclusive cohort leaf into a match

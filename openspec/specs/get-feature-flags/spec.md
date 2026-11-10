@@ -56,7 +56,7 @@ getAllFlags(
 ### Surface variants
 
 - **posthog-js core / browser / react-native:** `getFeatureFlags()`
-- **iOS (4.0+), Android (4.0+), flutter (6.0+):** `getAllFeatureFlags()` returns a list of flag result objects (key, enabled, variant, payload), or `null` when flags are unavailable, instead of a key-to-value map. It never sends `$feature_flag_called`.
+- **iOS (4.0+), Android (4.0+), flutter (6.0+):** `getAllFeatureFlags()` returns a list of flag result objects (key, enabled, variant, payload), or `null` when flags are unavailable, instead of a key-to-value map. Each entry matches `getFeatureFlagResult` for that key, so an empty variant reads as disabled. It never sends `$feature_flag_called`.
 - **Node:** `getAllFlags(distinctId, options?)`
 - **Python:** `get_all_flags(distinct_id, *, ...)`
 - **Ruby:** `get_all_flags(distinct_id, groups: {}, person_properties: {}, group_properties: {}, only_evaluate_locally: false)`
@@ -161,3 +161,24 @@ The SDK SHALL implement the canonical `get-feature-flags` behavior described by 
   | beta-ui | true  |
 - **WHEN** get feature flags is called with tracking disabled
 - **THEN** no event named "$feature_flag_called" should be enqueued
+
+### Requirement: Flag result list reads an empty variant as disabled
+
+On SDKs where `getAllFeatureFlags()` returns a list of flag result objects (iOS 4.0+, Android 4.0+, Flutter 6.0+, KMP), each entry SHALL match what `get-feature-flag-result` returns for that key. A flag whose value is the empty string `""` SHALL stay in the list with `enabled: false` and `variant: ""`. SDKs that return a key → value map keep reporting `""`, as `get-feature-flag` does.
+
+#### Scenario: Flag result list reads an empty variant as disabled (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** cached feature flags are:
+  | key       | value |
+  | beta-ui   | true  |
+  | legacy-ui | ""    |
+- **WHEN** get all feature flag results is called
+- **THEN** the returned feature flag results should include:
+  | key       | enabled |
+  | beta-ui   | true    |
+  | legacy-ui | false   |
+- **AND** the returned feature flag result for "legacy-ui" should have variant equal to the JSON value ""

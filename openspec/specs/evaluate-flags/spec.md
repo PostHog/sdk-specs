@@ -1028,13 +1028,13 @@ Creating a snapshot, enumerating its keys, filtering it with `only(...)` or `onl
 - **WHEN** `evaluateFlags("user-123")` is called and no accessor is called
 - **THEN** no `$experiment_exposure` event is emitted
 - **WHEN** `isEnabled("checkout-flow")` is then called on the snapshot
-- **THEN** one `$feature_flag_called` and one `$experiment_exposure` event are emitted for "checkout-flow" with `$feature_flag_variant` "test"
+- **THEN** one `$feature_flag_called` and one `$experiment_exposure` event are emitted for "checkout-flow" with `$feature_flag_variant_key` "test"
 
 #### Scenario: The exposure reports the snapshot's assignment
 - **GIVEN** a snapshot for distinct id "user-123" retains "checkout-flow" as a split with rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
 - **AND** a later definitions refresh would assign "user-123" variant key "control"
 - **WHEN** `getFlag("checkout-flow")` is called on the original snapshot
-- **THEN** the `$experiment_exposure` event has `$feature_flag_variant` "test"
+- **THEN** the `$experiment_exposure` event has `$feature_flag_variant_key` "test"
 - **AND** the read makes no feature-flag evaluation request
 
 #### Scenario: Capture with a snapshot emits no exposure

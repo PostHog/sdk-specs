@@ -21,14 +21,14 @@ reloadFeatureFlags(callback?: (flags?: Record<string, boolean | string>, error?:
 ### Surface variants
 
 - **posthog-js core / browser:** `reloadFeatureFlags(options?: { cb?: (err?: Error, flags?: FeatureFlags) => void }): void`
-- **flutter:** `reloadFeatureFlags(): Future<void>`
+- **flutter:** `reloadFeatureFlags(): Future<PostHogFeatureFlagsLoaded>` (6.0+; before 6.0 it returned `Future<void>`)
 - **react-native:**
   - `reloadFeatureFlags(): void`
   - `reloadFeatureFlagsAsync(): Promise<Record<string, boolean | string> | undefined>`
 - **iOS:**
   - `reloadFeatureFlags()`
   - `reloadFeatureFlags(_ callback: @escaping (PostHogFeatureFlagsLoaded) -> Void)` (4.0+; before 4.0 the callback took no arguments)
-- **Android:** `reloadFeatureFlags(onFeatureFlags: PostHogOnFeatureFlags? = null): void`
+- **Android:** `reloadFeatureFlags(onFeatureFlags: PostHogFeatureFlagsCallback? = null): void`, whose callback receives `PostHogFeatureFlagsLoaded` (4.0+; before 4.0 it took a `PostHogOnFeatureFlags` with no arguments)
 - **Unity:** `ReloadFeatureFlagsAsync(): Task`
 
 ## Behavior

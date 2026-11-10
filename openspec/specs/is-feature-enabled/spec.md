@@ -91,7 +91,7 @@ isFeatureEnabled(
 3. **Convert the result to boolean semantics:**
    - boolean-enabled → `true`
    - boolean-disabled → `false`
-   - variant string → `true`
+   - non-empty variant string → `true`
    - unavailable / unknown → the caller-supplied `defaultValue` when provided; otherwise `undefined` / `None` in some SDKs, or `false` in others
 4. **Optionally emit `$feature_flag_called`.** Server SDKs commonly track accesses by default.
 

@@ -42,3 +42,19 @@ Feature: Get Feature Flags
       | beta-ui | true  |
     When get feature flags is called with tracking disabled
     Then no event named "$feature_flag_called" should be enqueued
+
+  # Only SDKs whose getAllFeatureFlags() returns flag result objects (iOS 4.0+, Android 4.0+, Flutter 6.0+, KMP).
+  # The value "" is the empty string, a variant PostHog no longer accepts for new flags.
+  @client @flag_result_list_capable
+  Scenario: Flag result list reads an empty variant as disabled
+    Given the SDK is initialized with token "test-token"
+    And cached feature flags are:
+      | key       | value |
+      | beta-ui   | true  |
+      | legacy-ui | ""    |
+    When get all feature flag results is called
+    Then the returned feature flag results should include:
+      | key       | enabled |
+      | beta-ui   | true    |
+      | legacy-ui | false   |
+    And the returned feature flag result for "legacy-ui" should have variant equal to the JSON value ""

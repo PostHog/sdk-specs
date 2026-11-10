@@ -94,7 +94,8 @@ type FeatureFlagResult = {
 1. **Read the cached flag entry** from the SDK's local feature-flag cache.
 2. **Assemble the result object** from the cached value and payload.
    - Boolean flag → `enabled = true|false`, `variant = undefined`
-   - Multivariate flag → `enabled = true`, `variant = '<variant>'`
+   - Multivariate flag with a non-empty variant → `enabled = true`, `variant = '<variant>'`
+   - Empty variant `''` → `enabled = false`, `variant = ''`
    - Payload is attached if available.
 3. **Handle missing/unknown flags.** If the SDK cannot determine the flag from cache, return `undefined` / `nil` rather than a partial result object.
 4. **Optionally emit `$feature_flag_called`.** In audited client SDKs this is on by default and can be suppressed with a per-call option in some implementations.
@@ -106,7 +107,8 @@ type FeatureFlagResult = {
 2. **Evaluate the flag** locally and/or remotely according to SDK configuration.
 3. **Construct the result object** from the resolved value and payload.
    - Boolean flag → `enabled = true|false`, `variant = undefined`
-   - Multivariate flag → `enabled = true`, `variant = '<variant>'`
+   - Multivariate flag with a non-empty variant → `enabled = true`, `variant = '<variant>'`
+   - Empty variant `''` → `enabled = false`, `variant = ''`
    - Attach payload when available
 4. **Return `undefined` / `None` when no result is available.** This usually covers unknown flags, unavailable caches, or evaluation failure with no fallback.
 5. **Optionally emit `$feature_flag_called`.** Server SDKs commonly track accesses by default.
@@ -286,3 +288,28 @@ A flag-reading API that lets the caller suppress `$feature_flag_called` for that
 - **WHEN** get feature flag result "beta-ui" is called without the feature flag event option
 - **THEN** the returned result value should be true
 - **AND** one event named "$feature_flag_called" should be enqueued
+
+### Requirement: Empty variant reads as disabled
+
+A flag whose value is the empty string `""` SHALL read as disabled. The SDK SHALL return a result with `enabled: false` and `variant: ""`, and `is-feature-enabled` SHALL return `false` for it, whether or not the caller supplies a default.
+
+Known gap: posthog-js core and react-native still return `enabled: true` from `getFeatureFlagResult` for `""`, because `getEnabledFromValue` reads any string as enabled, while their `isFeatureEnabled` returns `false`. A follow-up should make `getFeatureFlagResult` match.
+
+#### Scenario: Empty variant flag result is disabled (@both)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** cached feature flags are:
+  | key       | value |
+  | legacy-ui | ""    |
+- **WHEN** get feature flag result "legacy-ui" is called
+- **THEN** the returned feature flag result should include:
+  | field   | value     |
+  | key     | legacy-ui |
+  | enabled | false     |
+- **AND** its variant should equal the JSON value ""
+- **WHEN** is feature enabled "legacy-ui" is called
+- **THEN** the returned enabled state should be false
+

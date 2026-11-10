@@ -49,3 +49,17 @@ Feature: On Feature Flags
       | key     | value |
       | beta-ui | true  |
     And payload-carrying feature flag listeners should be told that loading flags errored
+
+  # The value "" is the empty string, a variant PostHog no longer accepts for new flags.
+  Scenario: Listener does not receive an empty variant flag
+    Given the SDK is initialized with token "test-token"
+    And a feature flag listener is registered
+    When feature flags are loaded with values:
+      | key       | value |
+      | beta-ui   | true  |
+      | legacy-ui | ""    |
+    Then the feature flag listener should be invoked
+    And payload-carrying feature flag listeners should receive flags:
+      | key     | value |
+      | beta-ui | true  |
+    And payload-carrying feature flag listeners should not receive flag "legacy-ui"

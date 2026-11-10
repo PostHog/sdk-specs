@@ -148,14 +148,14 @@ complete implementation of that contract outside the browser.
 | # | Contract | Status | Note |
 |---|----------|--------|------|
 | 1 | Alias | ❌ | [n1] |
-| 2 | Application Lifecycle | ✅ |  |
+| 2 | Application Lifecycle | ✅ | [n31] |
 | 3 | Autocapture | ✅ | [n2] |
 | 4 | Before Send Hook | ✅ | [n3] |
 | 5 | Bootstrap | 🟡 | [n4] |
 | 6 | Capture | ✅ | [n24] |
 | 7 | Capture AI | ✅ | [n25] |
 | 8 | Capture Exception | ✅ |  |
-| 9 | Consent Gating | 🟡 | [n5] |
+| 9 | Consent Gating | ✅ | [n5] |
 | 10 | Create Person Profile | ➖ |  |
 | 11 | Debug | ✅ |  |
 | 12 | Device ID Generator | ✅ |  |
@@ -178,7 +178,7 @@ complete implementation of that contract outside the browser.
 | 29 | Group | 🟡 | [n11] |
 | 30 | Group Identify | 🟡 | [n12] |
 | 31 | HTTP Client | ✅ | [n26] |
-| 32 | Identify | ✅ |  |
+| 32 | Identify | 🟡 | [n28] |
 | 33 | Is Feature Enabled | ✅ |  |
 | 34 | Is Opt Out | ✅ |  |
 | 35 | Is Session Replay Active | ✅ |  |
@@ -203,8 +203,8 @@ complete implementation of that contract outside the browser.
 | 54 | Set Group Properties For Flags | ✅ |  |
 | 55 | Set Person Properties | ✅ |  |
 | 56 | Set Person Properties For Flags | ✅ |  |
-| 57 | Setup | ✅ |  |
-| 58 | Shutdown | ✅ |  |
+| 57 | Setup | ✅ | [n29] |
+| 58 | Shutdown | ✅ | [n30] |
 | 59 | Start Session Recording | ❌ | [n20] |
 | 60 | Stop Session Recording | 🟡 | [n21] |
 | 61 | Surveys | 🟡 | [n22] |
@@ -283,22 +283,22 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
 
 <a id="n5"></a>
 
-### n5 — Consent Gating (🟡 Partial) — *downgraded from ✅ Pass this cycle*
-- **Spec requires:** opt-out state gates capture across all product surfaces the spec's
-  "Interactions" section lists, explicitly including session replay (which "may be stopped,
-  skipped, or restarted based on consent state").
-- **SDK currently:** Core capture-path gating is solid — `capture()` (`PostHog.kt:722`,
-  `isOptedOut()` check at line 735), `group()`, `alias()`, `captureException`,
-  `captureLogInternal` all gate on `isOptedOut()` directly or transitively via `capture()`.
-  However, re-examining this cycle in light of the session-replay findings (now [n20](#n20)/[n21](#n21)) surfaced a
-  cross-cutting gap previously missed: `startSessionReplay()`/`stopSessionReplay()` never check
-  `isOptedOut()`, and `optOut()` (`PostHog.kt:1101-1115`) never proactively stops an
-  already-active replay session. Since session replay is explicitly named in this spec's own
-  scope, this is a legitimate consent-gating gap, not merely a start/stop-session-recording-only
-  issue — hence the downgrade from the prior audit's ✅ Pass.
-- **Backwards compatibility:** Backward-compatible — the same fix as n13/n14 (add `isOptedOut()`
-  guards) closes this gap; optionally also make `optOut()` call `stopSessionReplay()`.
-- **Remediation:** Extend opt-out gating to the session-replay start/stop surface.
+### n5 — Consent Gating (✅ Pass; was 🟡)
+- **Spec requires:** capture is blocked while opted out (no enqueue, no capture request) and allowed while
+  opted in, and a persisted opt-out applies before early capture calls (`consent-gating/spec.md:84-117`).
+  Replay "may be stopped, skipped, or restarted" based on consent (`:79`), which is not a MUST. Deferred
+  crash reports follow the `opt-in` rule (`:77`).
+- **SDK currently (4.0, `aaa23d39`):** conforms.
+  - **Capture.** Every event goes through `prepareEvent`, which returns early while opted out
+    (`posthog/src/main/java/com/posthog/PostHog.kt:1354-1357`). `isOptedOut()` reads the persisted
+    `OPT_OUT` before the first capture (`:1936-1954`).
+  - **Replay and integrations.** `optOut()` uninstalls integrations, and `uninstallIntegrations()` calls
+    `stopSessionReplay()` and clears the replay handler (`:632-648`, `:2031-2033`). A launch that starts
+    opted out installs neither (`:537-543`), and a remote config reply doesn't re-arm them (`:580`).
+  - **Deferred native crashes** follow the consent state at crash time ([n14](#n14)).
+  - Flag and remote config requests still go out while opted out, which `opt-in` allows (`opt-in/spec.md:90`).
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.
 
 <a id="n6"></a>
 
@@ -462,16 +462,27 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
 <a id="n14"></a>
 
 ### n14 — Opt In (🟡 Partial)
-- **Spec requires:** (optional, per spec's permissive language) opt-out MAY also clear local
-  persistence (distinct id, anonymous id, super properties) when configured.
-- **SDK currently:** `optIn()`/`optOut()` (`PostHog.kt:1088-1099`, `1101-1115`) — both zero-parameter
-  (`PostHogCoreInterface.kt:36,41`) — correctly gate capture across all surfaces and persist
-  immediately; core required scenarios (block+persist, re-enable+persist) pass. `optOut()`'s only
-  cleanup is the exception-steps buffer and push-token cache, not `distinctId`/`anonymousId`/super
-  properties; `reset()` is a separate, non-equivalent API. Confirmed unchanged via direct read.
-- **Backwards compatibility:** Backward-compatible — this capability is explicitly optional per
-  spec language. Add an optional parameter (e.g. `optOut(clearLocalStorage: Boolean = false)`).
-- **Remediation:** Add the optional clear-on-opt-out parameter, mirroring the browser SDK pattern.
+- **Spec requires:** `optIn()`/`optOut()` persist the decision and gate capture. The `@client` scenario
+  **Opt out can clear local persistence when configured** (`opt-in/spec.md:132-141`). **Opt-in restarts
+  session replay in a new session** and **Opt-in restarts the session replay the app wanted at opt-out**
+  (`:143-251`). **Deferred crash reports honour consent at crash time** (#199, `:253-299`).
+- **SDK currently (4.0, `aaa23d39`):**
+  - **Persist and gate.** `optIn()`/`optOut()` (`posthog/src/main/java/com/posthog/PostHog.kt:1956-2008`,
+    `:2010-2038`) persist `OPT_OUT`; capture is gated in `prepareEvent` (`:1354-1357`).
+  - **Replay.** `optOut()` uninstalls integrations, which stops replay (`:2031-2033`, `:632-648`). `optIn()`
+    rotates the session when the app wanted replay, then reinstalls and restarts it (`:1982-1989`). Start
+    and stop calls made while opted out don't change what the app wanted (`sessionReplayWanted`,
+    `:536`, `:3246-3249`, `:3305-3308`).
+  - **Native crashes** (PostHog/posthog-android#952). `PostHogNativeCrashIntegration` records an opt-out
+    interval on `optOut()` and on a launch that starts opted out
+    (`posthog-android/src/main/java/com/posthog/android/errortracking/PostHogNativeCrashIntegration.kt:170-175`,
+    `PostHogAndroid.kt:151-159`), and the scan skips crashes recorded inside one (`:395-401`).
+  - **Gap.** `optOut()` takes no parameters and `PostHogConfig` has no clear-on-opt-out option. Opt-out
+    clears only the exception-steps buffer (`PostHog.kt:2028`) and push-token state (`:2037`), leaving
+    `distinctId`, `anonymousId` and super properties in place, so the `@client` scenario fails.
+- **Backwards compatibility:** Backward-compatible. An optional `optOut(clearLocalData: Boolean = false)`
+  keeps today's default.
+- **Remediation:** Add the optional clear-on-opt-out parameter.
 
 <a id="n15"></a>
 
@@ -836,3 +847,64 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
     the failed request. `takeFiles` resends the retry window alone (`PostHogQueue.kt:331-352`).
 - **Backwards compatibility:** No change needed.
 - **Remediation:** None.
+
+<a id="n28"></a>
+
+### n28 — Identify (🟡 Partial; was ✅)
+- **Spec requires:** **Canonical identify behavior** (`identify/spec.md:178`): client SDKs keep running
+  `identify` while opted out (#167), but "MUST NOT capture or send the `$identify` or `$set` event, and
+  MUST NOT update the person-properties dedup hash for an event it did not capture."
+- **SDK currently (4.0, `aaa23d39`):**
+  - **Passes.** `identify()` (`posthog/src/main/java/com/posthog/PostHog.kt:2236-2371`) has no opt-out
+    guard. It updates the ids, sets person properties for flags and reloads flags (`:2287-2317`); `capture`
+    then drops the event. All four `@client` scenarios pass.
+  - **Gap.** Two branches update the hash for a `$set` that opt-out drops: the same-id branch through
+    `shouldCapturePersonPropertiesEvent` (`:2350-2358`, `:2450-2466`), and the anonymous-to-identified
+    transition (`:2339-2342`). After opt-in, the same properties are treated as a duplicate and the `$set`
+    is never sent. No scenario covers this path.
+- **Backwards compatibility:** Backward-compatible internal fix.
+- **Remediation:** Skip the hash update while `isOptedOut()`, or update it only after `capture` queued the event.
+
+<a id="n29"></a>
+
+### n29 — Setup (✅ Pass)
+- **Spec requires:** **Canonical setup behavior**, the `projectToken` option name, the deprecated
+  credential alias rules, and the token rename stopping at the public configuration surface
+  (`setup/spec.md:122-217`).
+- **SDK currently (4.0, `aaa23d39`):** conforms. `setup()` (`posthog/src/main/java/com/posthog/PostHog.kt:316-343`)
+  ignores a repeat call, and disables the SDK with a warning when the trimmed token is blank or starts
+  with `phx_` (`:326-339`). `projectToken` is trimmed (`PostHogConfig.kt:477`). The `apiKey` alias shipped
+  as deprecated in 3.x and 4.0 removes it, which a major release may do. Events queued by 3.x are still
+  sent (`MIGRATION.md:503`).
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.
+
+<a id="n30"></a>
+
+### n30 — Shutdown (✅ Pass)
+- **Spec requires:** **Canonical shutdown behavior** (`shutdown/spec.md:110-158`): flush, stop workers,
+  refuse later captures, safe to call twice, no throw on a delivery failure. The timeout requirement
+  applies only where shutdown takes a timeout.
+- **SDK currently (4.0, `aaa23d39`):** conforms. `close()` (`posthog/src/main/java/com/posthog/PostHog.kt:758-800`)
+  flushes first (`:767`), sets `enabled = false` so later captures return (`:769`, `:1351`), uninstalls
+  integrations (`:773`), stops every queue's timer (`:776-779`) and clears the flag-called tracker (`:783`).
+  A second call returns early (`:762-764`) and errors are caught (`:798-799`). Android `close()` takes no
+  timeout.
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.
+
+<a id="n31"></a>
+
+### n31 — Application Lifecycle (✅ Pass)
+- **Spec requires:** **Canonical application-lifecycle behavior**: Installed, Updated (with
+  `previous_version`/`previous_build`), Opened (with `from_background`) and Backgrounded, carrying
+  `$app_version`/`$app_build` (`application-lifecycle/spec.md:76-130`).
+- **SDK currently (4.0, `aaa23d39`):** conforms. `PostHogAppInstallIntegration`
+  (`posthog-android/src/main/java/com/posthog/android/internal/PostHogAppInstallIntegration.kt:41-78`) sends Installed or Updated and persists
+  the version and build. `PostHogLifecycleObserverIntegration.kt` sends `Application Opened` with
+  `from_background` (`:56-79`) and `Application Backgrounded` (`:117-118`). `$app_version`/`$app_build`
+  ride every event (`PostHogAndroidContext.kt:68`, `:71`). Not scored (SHOULD NOT): these events still
+  also send un-prefixed `version`/`build` (`PostHogAppInstallIntegration.kt:75-76`,
+  `PostHogLifecycleObserverIntegration.kt:72-73`).
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None. Optionally drop un-prefixed `version`/`build`.

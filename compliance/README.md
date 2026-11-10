@@ -146,7 +146,7 @@ the single most widely-shared non-compliance in the matrix.
 | posthog-js | 26/64 fully compliant (41%) | 26 | 21 | 12 | 5 | 0 | 2026-10-05 · `6538babc` (targeted re-audit; most of the 59 pre-existing rows carried from 2026-08-10, see file header) | 33 | [posthog-js.md](posthog-js.md) |
 | posthog-python | 13/64 fully compliant (20%; 30 contracts N/A on a server SDK) | 13 | 16 | 5 | 30 | 0 | 2026-10-12 · `509c8525` | 21 | [posthog-python.md](posthog-python.md) |
 | posthog-android | 37/64 fully compliant (58%) | 37 | 16 | 5 | 6 | 0 | 2026-10-19 · `c5e788bd` (targeted re-audit — see file header) | 21 | [posthog-android.md](posthog-android.md) |
-| posthog-ios | 45/69 fully compliant (65%) | 45 | 13 | 1 | 10 | 0 | 2026-11-10 · `e27cbe4cb` (4.0 release branch, before 4.0.0 is published; capture v1 rows against #146 at `d387ab79` as merged; see below) | 14 | [posthog-ios.md](posthog-ios.md) |
+| posthog-ios | 44/69 fully compliant (64%) | 44 | 14 | 1 | 10 | 0 | 2026-11-10 · `e27cbe4cb` (4.0 release branch, before 4.0.0 is published; capture v1 rows against #146 at `d387ab79` as merged; see below) | 15 | [posthog-ios.md](posthog-ios.md) |
 | posthog-node | 9/64 fully compliant (14%; 29 contracts N/A on a server SDK) | 9 | 21 | 4 | 29 | 1 | 2026-10-12 · `4f590b36` (posthog-js monorepo; Traces row corrected 2026-10-19) | 25 (+1 ❓) | [posthog-node.md](posthog-node.md) |
 | posthog-flutter | 21/64 fully compliant (33%) | 21 | 29 | 6 | 8 | 0 | 2026-10-19 · `1032c102` | 35 | [posthog-flutter.md](posthog-flutter.md) |
 | posthog-react-native | 29/64 fully compliant (45%) | 29 | 27 | 3 | 5 | 0 | 2026-10-19 · `3ddaa654` (posthog-js monorepo) | 30 | [posthog-react-native.md](posthog-react-native.md) |
@@ -172,6 +172,8 @@ malformed payload → `nil`, `isFeatureEnabled(_:defaultValue:)`); Capture and C
 (`NSNull` properties omitted, PostHog/posthog-ios#1047); Session Replay Privacy ❌→🟡 (screenshot-only
 replay ends the leak; SwiftUI's explicit mask still wins over `postHogNoMask()`); Get Feature Flags and
 Get Feature Flags And Payloads ❌→🟡 (spec now records `getAllFeatureFlags()` as the iOS 4.0 surface).
+Downgraded: Exception Steps ✅→🟡 (steps are byte-counted and buffered with `NSNull` members that the
+queue and wire later strip, so the representations differ).
 Surveys stays ✅: the popup-delay (#121) and wait-period (#102) SHALLs are met
 (PostHog/posthog-ios#1049); the unmet SHOULD eligibility re-check is not scored. On Feature Flags stays ✅ on the new reset and empty-variant requirements
 (PostHog/posthog-ios#1048). Capture v1 rows (Capture, Before Send Hook, Event Batcher, HTTP Client,
@@ -339,6 +341,7 @@ stalest pointer and its only 59-row file.
 | posthog-ios | Session Replay Privacy | Backward-compatible | **Upgraded from ❌** — 4.0's screenshot-only replay removes the leaking wireframe path; SwiftUI's `postHogMask()` still wins over an enclosing `postHogNoMask()`, the reverse of the spec's precedence (over-masks, no leak) — [posthog-ios.md#n24](posthog-ios.md) |
 | posthog-ios | Get Feature Flags / Get Feature Flags And Payloads | Backward-compatible | **Upgraded from ❌** — the specs now record iOS 4.0's `getAllFeatureFlags()` result list (payloads decoded per entry) as its surface; still not the canonical map shape — [posthog-ios.md#n9](posthog-ios.md) |
 | posthog-ios | Session Replay Debug Properties | Backward-compatible | **New row** — tiers, 30 s window and crash-context snapshot conform; gaps on caller-supplied `$session_id` and backdated events (the `active`-after-timeout gap is fixed in 4.0) — [posthog-ios.md#n26](posthog-ios.md) |
+| posthog-ios | Exception Steps | Backward-compatible | **Downgraded from ✅** — steps are byte-counted, buffered and persisted with `NSNull` members that the analytics queue and capture v1 wire later strip, so the representations the spec requires to be identical differ — [posthog-ios.md#n30](posthog-ios.md#n30) |
 | posthog-node | Flush / Retry Queue (v1 pipeline) | Needs deprecation path | `V1CaptureSender` never throws on exhausted retry, so failed batches are evicted from the queue as if delivered — [posthog-node.md#n8](posthog-node.md) |
 | posthog-node | Feature Flag Called Tracker | Backward-compatible | Allowlist itself is fully compliant (inherited from posthog-js via shared `@posthog/core`), but capacity eviction is a full clear rather than incremental, violating the spec's anti-thundering-herd requirement — [posthog-node.md#n19](posthog-node.md) |
 | posthog-flutter | Session Replay Privacy | Backward-compatible | Independent Dart replay pipeline still has no no-capture marker (a nested `PostHogUnmaskWidget` can reveal anything inside `PostHogMaskWidget`); the unmask primitive, shared sensitive-input detection, and fail-closed mask walk have all landed since the previous audit — [posthog-flutter.md#n29](posthog-flutter.md#n29) |
@@ -386,7 +389,7 @@ stalest pointer and its only 59-row file.
 | posthog-js | Exception Event Metadata | Backward-compatible | **New this run** — the most complete producer envelope audited (full `exception_id`/`parent_id` linkage, canonical sources, correct nested-`handled` omission, spec-exact caps), missing only `$exception_source` and a capture category on the two global handlers, which fall back to `generic` — [posthog-js.md#n35](posthog-js.md) |
 | posthog-js | Session Replay Debug Properties | Backward-compatible | **New this run** — re-scored against `d078270` after #96; tiering, the `$`-prefix gate, and the 30 s throttle conform, but after `stopSessionRecording()` on a loaded recorder events keep `active`/`buffering` instead of `$recording_status: disabled` — [posthog-js.md#n36](posthog-js.md) |
 
-Full contract-by-contract detail (33 posthog-js, 21 posthog-python, 23 posthog-android, 14
+Full contract-by-contract detail (33 posthog-js, 21 posthog-python, 23 posthog-android, 15
 posthog-ios, 26 posthog-node, 34 posthog-flutter, 31 posthog-react-native, 19 posthog-php, 21
 posthog-ruby, 23 posthog-go, 19 posthog-java, and 29 posthog-dotnet non-Pass/non-N/A cells) is in
 the respective per-SDK files.

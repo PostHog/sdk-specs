@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-ios](https://github.com/PostHog/posthog-ios)
 **Audited commit:** `e27cbe4cb0bf5958fe79a061783af2dfb1b17ab4` ([commit](https://github.com/PostHog/posthog-ios/commit/e27cbe4cb0bf5958fe79a061783af2dfb1b17ab4)) on the 4.0 release branch `chore/v4-remove-deprecated` ([PostHog/posthog-ios#873](https://github.com/PostHog/posthog-ios/pull/873)), before 4.0.0 is published — first audited on 2026-11-05 at `3460e534a`, re-checked on 2026-11-10 (see [Re-check](#re-check-2026-11-10))
 **Audited against sdk-specs commit:** `752f899` plus [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79` (capture v1, including #147's AI lane), treated as merged to `main`; first audited against `dd11a6b`
-**Summary:** 45 ✅ · 13 🟡 · 1 ❌ · 10 ➖ (69 rows; previous audit 2026-10-08 at `f5cbe87c` + posthog-ios#924–#934 scored 38/16/4/6 on 64 rows)
+**Summary:** 44 ✅ · 14 🟡 · 1 ❌ · 10 ➖ (69 rows; previous audit 2026-10-08 at `f5cbe87c` + posthog-ios#924–#934 scored 38/16/4/6 on 64 rows)
 
 Note on repo layout: `posthog-ios` is a single-package repo, distributed through Swift Package Manager
 only from 4.0. Core SDK logic lives at `PostHog/` (flat files: `PostHogSDK.swift` — the main public
@@ -42,6 +42,8 @@ Net changes vs. the previous audit:
   Flags and Get Feature Flags And Payloads ❌→🟡 (the specs now record iOS 4.0's `getAllFeatureFlags()`
   list of results, with per-entry payload decoding, as its surface; it is still not the canonical map
   shape).
+- **Downgraded (1):** Exception Steps ✅→🟡. #1047's queue and wire `NSNull` cleanup runs after the
+  step buffer has measured and stored the step, so the buffered and sent forms differ ([n30](#n30)).
 - **Newly applicable (1):** Capture AI ➖→✅. #146 adds iOS 4.0 to its Applicability, and the AI lane
   conforms ([n27](#n27)).
 - **Note-only changes:** Shutdown, HTTP Client, Group, Group Identify, Stop Session Recording and
@@ -63,7 +65,8 @@ Every line reference on this page is at `e27cbe4cb`.
   🟡→✅ ([PostHog/posthog-ios#1047](https://github.com/PostHog/posthog-ios/pull/1047) omits `NSNull`
   properties; [n4](#n4), [n5](#n5), [n27](#n27)); On Feature Flags 🟡→✅
   ([PostHog/posthog-ios#1048](https://github.com/PostHog/posthog-ios/pull/1048) drops loads in flight
-  across `reset()`; [n28](#n28)). Surveys stays ✅:
+  across `reset()`; [n28](#n28)); Exception Steps ✅→🟡 (the same `NSNull` cleanup runs only after the
+  step buffer, so the byte-counted and sent steps differ; [n30](#n30)). Surveys stays ✅:
   [PostHog/posthog-ios#1049](https://github.com/PostHog/posthog-ios/pull/1049) meets every SHALL of the
   popup-delay requirement (#121) and #102's wait period; the one unmet SHOULD (re-check eligibility
   when the delay elapses) is recorded but not scored ([n29](#n29)).
@@ -143,7 +146,7 @@ Retry Queue.
 | 7 | Capture Exception | ✅ | was 🟡; [n5]; `NSNull` custom properties omitted (#1047) |
 | 8 | Create Person Profile | ➖ | unchanged — spec Applicability still says only the posthog-js family exposes it; no `createPersonProfile` in iOS |
 | 9 | Debug | ✅ | |
-| 10 | Exception Steps | ✅ | |
+| 10 | Exception Steps | 🟡 | was ✅; `NSNull` step members are byte-counted and buffered, then stripped on the queue and the wire — [n30](#n30) |
 | 11 | Flush | 🟡 | [n6] |
 | 12 | Get Anonymous ID | ✅ | |
 | 13 | Get Distinct ID | ✅ | |
@@ -740,3 +743,24 @@ Retry Queue.
 - **Remediation (optional, SHOULD):** Before the work item shows the survey, ask the integration to re-run its eligibility
   filter for that survey; when it fails, release the reservation (report the survey closed, which is
   now a no-op for an unshown survey) instead of displaying it.
+
+### n30 — Exception Steps (🟡 Partial; was ✅)
+- **Spec requires:** "Normalize to the wire form once, before processing"
+  (`openspec/specs/exception-steps/spec.md:154-164`): the step is normalized once, before it is
+  byte-counted, buffered, persisted or attached, and these representations "SHALL be identical", with
+  no second, divergent normalization at capture.
+- **SDK currently:** `PostHogExceptionStepsBuffer.add` normalizes with `sanitizeDictionary`, measures
+  that with `JSONSerialization`, stores and publishes it
+  (`PostHog/ErrorTracking/PostHogExceptionStepsBuffer.swift:47-80`). `sanitizeDictionary` keeps
+  `NSNull` (`PostHog/Utils/DictUtils.swift:48-64`, `:211-234`), and the crash custom-data writer
+  serializes the steps as stored (`PostHogExceptionStepsBuffer.swift:168-176`). Capture attaches that
+  snapshot as `$exception_steps` (`PostHog/PostHogSDK.swift:2027-2035`), then the analytics queue
+  removes null object members recursively (`PostHog/QueueEndpoint+Factories.swift:48` →
+  `PostHog/Models/PostHogEvent.swift:130-134` → `PostHog/Utils/DictUtils.swift:151-201`), and the
+  capture v1 builder does it again (`PostHog/PostHogApi.swift:411`). A step with
+  `properties: ["optional": NSNull()]` is byte-counted and persisted with `"optional": null` but sent
+  without it. Null array elements are kept in both. Read from code; not run.
+- **Backwards compatibility:** Backward-compatible; null members would stop using buffer budget.
+- **Remediation:** Apply `droppingNullProperties`'s member cleanup to the step in
+  `PostHogExceptionStepsBuffer.add`, after `sanitizeDictionary` and before measuring, and test that
+  the buffered step equals the decoded queue and wire step.

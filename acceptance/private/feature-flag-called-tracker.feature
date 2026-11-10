@@ -115,7 +115,7 @@ Feature: Feature Flag Called Tracker
       | $feature_flag_reason_code    | experiment_split                     |
       | $feature_flag_rule_id        | 3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13 |
       | $feature_flag_rule_type      | experiment                           |
-      | $feature_flag_variant        | test                                 |
+      | $feature_flag_variant_key    | test                                 |
     And the enqueued event properties should not include "$feature_flag_reason"
 
   @both
@@ -151,7 +151,7 @@ Feature: Feature Flag Called Tracker
       | $feature_flag_reason_code    | <sent_reason_code> |
       | $feature_flag_rule_type      | <sent_rule_type>   |
       | $feature_flag_rule_id        | <sent_rule_id>     |
-    And the enqueued event properties should not include "$feature_flag_variant"
+    And the enqueued event properties should not include "$feature_flag_variant_key"
 
     Examples:
       | outcome                        | flag          | value | reason_code         | rule_type            | rule_id                                | variant_key | sent_reason_code  | sent_rule_type     | sent_rule_id                         |
@@ -179,7 +179,7 @@ Feature: Feature Flag Called Tracker
     And the enqueued event property "$feature_flag_reason_code" should equal "<sent_reason_code>"
     And the enqueued event properties should not include "$feature_flag_rule_id"
     And the enqueued event properties should not include "$feature_flag_rule_type"
-    And the enqueued event properties should not include "$feature_flag_variant"
+    And the enqueued event properties should not include "$feature_flag_variant_key"
     And no event named "$experiment_exposure" should be enqueued
 
     Examples:
@@ -204,7 +204,7 @@ Feature: Feature Flag Called Tracker
     And the enqueued event properties should not include "$feature_flag_reason"
     And the enqueued event properties should not include "$feature_flag_rule_id"
     And the enqueued event properties should not include "$feature_flag_rule_type"
-    And the enqueued event properties should not include "$feature_flag_variant"
+    And the enqueued event properties should not include "$feature_flag_variant_key"
     And no event named "$experiment_exposure" should be enqueued
 
   @both
@@ -235,7 +235,7 @@ Feature: Feature Flag Called Tracker
     And the enqueued event properties should not include "$feature_flag_reason_code"
     And the enqueued event properties should not include "$feature_flag_rule_id"
     And the enqueued event properties should not include "$feature_flag_rule_type"
-    And the enqueued event properties should not include "$feature_flag_variant"
+    And the enqueued event properties should not include "$feature_flag_variant_key"
     And in an SDK that sends "$feature_flag_reason", the enqueued event property "$feature_flag_reason" should equal "Matched condition set 1"
 
   # Config version 2 dedupe key
@@ -275,7 +275,7 @@ Feature: Feature Flag Called Tracker
 
     Examples:
       | change                     | flag          | value | first_reason_code  | first_config_version | first_rule_type | first_rule_id                          | first_variant_key | next_reason_code    | next_rule_type     | next_rule_id                           | next_variant_key | changed_property             | changed_value                        |
-      | another A/A variant        | pricing-page  | true  | "experiment_split" | 2                    | "experiment"    | "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" | "control"         | "experiment_split"  | "experiment"       | "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" | "test"           | $feature_flag_variant        | test                                 |
+      | another A/A variant        | pricing-page  | true  | "experiment_split" | 2                    | "experiment"    | "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" | "control"         | "experiment_split"  | "experiment"       | "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" | "test"           | $feature_flag_variant_key    | test                                 |
       | holdout after a variant    | checkout-flow | false | "experiment_split" | 2                    | "experiment"    | "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" | "control"         | "holdout"           | "experiment"       | "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" | absent           | $feature_flag_reason_code    | holdout                              |
       | paused after a holdout     | checkout-flow | false | "holdout"          | 2                    | "experiment"    | "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" | absent            | "experiment_paused" | "experiment"       | "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" | absent           | $feature_flag_reason_code    | experiment_paused                    |
       | shipping the winner        | checkout-flow | true  | "experiment_split" | 2                    | "experiment"    | "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" | "test"            | "targeting_match"   | "targeted_release" | "d2b8c6f4-1e3a-4c5d-9f07-6a8b2c4e0d13" | absent           | $feature_flag_rule_id        | d2b8c6f4-1e3a-4c5d-9f07-6a8b2c4e0d13 |
@@ -299,7 +299,7 @@ Feature: Feature Flag Called Tracker
       | $feature_flag_reason_code    | experiment_split                     |
       | $feature_flag_rule_id        | 3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13 |
       | $feature_flag_rule_type      | experiment                           |
-      | $feature_flag_variant        | test                                 |
+      | $feature_flag_variant_key    | test                                 |
     And the enqueued event properties should not include "team"
     And the enqueued event properties should not include "$feature_flag_reason"
 

@@ -10,7 +10,7 @@ Config version 1 flags do not change. Ingestion keeps deriving their exposures f
 
 `both`: every client or server SDK that reads `/flags?v=4` records. An SDK that does not read them sees config version 2 flags as legacy values and sends no direct exposure. Server SDKs that evaluate config version 2 flags locally send the same exposure with `locally_evaluated` true.
 
-The public wire contract is `contracts/feature_flag_rules_v2` in [posthog-sdk-test-harness 1.27.0](https://github.com/PostHog/posthog-sdk-test-harness/releases/tag/1.27.0) (contract 8.0.0).
+The public wire contract is `contracts/feature_flag_rules_v2` in posthog-sdk-test-harness, contract 10.0.0 ([posthog-sdk-test-harness#105](https://github.com/PostHog/posthog-sdk-test-harness/pull/105)) or later, which names the variant key `$feature_flag_variant_key`. Contracts 8.0.0 ([posthog-sdk-test-harness 1.27.0](https://github.com/PostHog/posthog-sdk-test-harness/releases/tag/1.27.0)) and 9.0.0 name it `$feature_flag_variant`.
 
 ## Requirements
 
@@ -40,12 +40,12 @@ A typed read that returned the caller default because the value has another type
 - **GIVEN** the record for "checkout-flow" has value true, no `failed` member, reason code `experiment_split`, and metadata config version 2, rule type `experiment`, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
 - **WHEN** a read of "checkout-flow" emits `$feature_flag_called`
 - **THEN** exactly one `$feature_flag_called` event is enqueued for "checkout-flow"
-- **AND** exactly one `$experiment_exposure` event is enqueued for "checkout-flow" with `$feature_flag_variant` "test" and `$feature_flag_rule_id` "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13"
+- **AND** exactly one `$experiment_exposure` event is enqueued for "checkout-flow" with `$feature_flag_variant_key` "test" and `$feature_flag_rule_id` "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13"
 
 #### Scenario: A variant whose value is false is still exposed
 - **GIVEN** the record for "checkout-flow" is a complete config version 2 experiment split with variant key "control" and value false
 - **WHEN** an enablement read of "checkout-flow" returns false and emits `$feature_flag_called`
-- **THEN** one `$experiment_exposure` event is enqueued with `$feature_flag_variant` "control" and `$feature_flag_response` false
+- **THEN** one `$experiment_exposure` event is enqueued with `$feature_flag_variant_key` "control" and `$feature_flag_response` false
 
 #### Scenario: A holdout emits no exposure
 - **GIVEN** the record for "checkout-flow" has value false, reason code `holdout`, config version 2, rule type `experiment` and rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13", and no variant key
@@ -88,7 +88,7 @@ A typed read that returned the caller default because the value has another type
 - **WHEN** an accessor that asks for a string value reads "checkout-flow" with caller default "blue"
 - **AND** it returns "blue" because the value is `false`
 - **THEN** one `$feature_flag_called` event is enqueued with `$feature_flag_response` false
-- **AND** one `$experiment_exposure` event is enqueued with `$feature_flag_variant` "control"
+- **AND** one `$experiment_exposure` event is enqueued with `$feature_flag_variant_key` "control"
 
 #### Scenario: A read of the wrong type emits neither event and reserves nothing
 - **GIVEN** the record for "checkout-flow" is a complete config version 2 experiment split with value "blue", rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
@@ -98,12 +98,12 @@ A typed read that returned the caller default because the value has another type
 - **WHEN** an accessor that asks for a string value then reads "checkout-flow" with caller default "red"
 - **THEN** it returns "blue"
 - **AND** one `$feature_flag_called` event is enqueued with `$feature_flag_response` "blue"
-- **AND** one `$experiment_exposure` event is enqueued with `$feature_flag_variant` "test"
+- **AND** one `$experiment_exposure` event is enqueued with `$feature_flag_variant_key` "test"
 
 #### Scenario: The exposure does not depend on a linked experiment
 - **GIVEN** the record for "checkout-flow" is a complete config version 2 experiment split with variant key "test" and `has_experiment` false
 - **WHEN** a read of "checkout-flow" emits `$feature_flag_called`
-- **THEN** one `$experiment_exposure` event is enqueued with `$feature_flag_variant` "test"
+- **THEN** one `$experiment_exposure` event is enqueued with `$feature_flag_variant_key` "test"
 
 ### Requirement: Malformed experiment splits fail closed
 
@@ -111,7 +111,7 @@ The SDK SHALL treat a config version 2 record that it read without a parse error
 
 - SHALL NOT emit `$experiment_exposure`;
 - SHALL NOT change the value the read returns because of the missing fields;
-- SHALL emit the `$feature_flag_called` event the read would emit for a complete record, keeping `$feature_flag_config_version` 2 and `$feature_flag_reason_code` `experiment_split`, and SHALL omit the whole rule tuple: `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`. It SHALL NOT send part of the tuple;
+- SHALL emit the `$feature_flag_called` event the read would emit for a complete record, keeping `$feature_flag_config_version` 2 and `$feature_flag_reason_code` `experiment_split`, and SHALL omit the whole rule tuple: `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant_key`. It SHALL NOT send part of the tuple;
 - SHALL NOT fill in a missing field from the value, the flag key, `has_experiment`, a linked experiment, another flag's record, or a result cached from an earlier evaluation.
 
 The diagnostic event keeps config version 2 so that ingestion does not derive an exposure from it, and keeps the reason code so the gap stays visible.
@@ -122,13 +122,13 @@ The diagnostic event keeps config version 2 so that ingestion does not derive an
 - **THEN** the read returns "blue"
 - **AND** no `$experiment_exposure` event is enqueued
 - **AND** the `$feature_flag_called` event has `$feature_flag_config_version` 2 and `$feature_flag_reason_code` "experiment_split"
-- **AND** it has none of `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`
+- **AND** it has none of `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant_key`
 
 #### Scenario: A split with another rule type emits no exposure
 - **GIVEN** the record for "checkout-flow" has reason code `experiment_split`, config version 2, rule type `percentage_rollout`, rule id "5a7e3b90-6c1d-4f2e-8b4a-9d0c1e2f3a45" and variant key "test"
 - **WHEN** a read of "checkout-flow" emits `$feature_flag_called`
 - **THEN** no `$experiment_exposure` event is enqueued
-- **AND** the `$feature_flag_called` event has none of `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`
+- **AND** the `$feature_flag_called` event has none of `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant_key`
 
 #### Scenario: A rule ID that is not a UUID counts as missing
 - **GIVEN** the record for "checkout-flow" has value "blue", reason code `experiment_split`, config version 2, rule type `experiment`, rule id "rule-7" and variant key "test"
@@ -136,7 +136,7 @@ The diagnostic event keeps config version 2 so that ingestion does not derive an
 - **THEN** the read returns "blue"
 - **AND** no `$experiment_exposure` event is enqueued
 - **AND** the `$feature_flag_called` event has `$feature_flag_config_version` 2 and `$feature_flag_reason_code` "experiment_split"
-- **AND** it has none of `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`
+- **AND** it has none of `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant_key`
 
 #### Scenario: A rule type of the wrong JSON type is a parse error, not a malformed split
 - **GIVEN** the record for "checkout-flow" has reason code `experiment_split`, config version 2, the number 2 as rule type, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
@@ -160,11 +160,11 @@ Each `$experiment_exposure` event SHALL carry these properties:
 | --- | --- |
 | `$feature_flag` | The flag key. |
 | `$feature_flag_response` | The legacy rendering of the record's value, the same as on the paired `$feature_flag_called` event: `true` or `false` for a boolean, the string for a string, `false` for `null`, and `true` for a number or an object. |
-| `$feature_flag_variant` | `metadata.variant_key` |
+| `$feature_flag_variant_key` | `metadata.variant_key` |
 | `$feature_flag_rule_id` | `metadata.rule_id` |
 | `locally_evaluated` | `true` when local evaluation produced the details, otherwise `false`. Client SDKs, whose values come from the flags service, send `false`. |
 
-`$feature_flag_response` on the exposure is diagnostic only. The variant is `$feature_flag_variant`, which separates variants whose values are equal. The rule ID identifies the experiment rule, and its presence marks the exposure as sent by the SDK.
+`$feature_flag_response` on the exposure is diagnostic only. The variant key is `$feature_flag_variant_key`, which separates variants whose values are equal. It is named after `metadata.variant_key`, not after the value: for config version 2 the variant key and the value are separate, so a variant `control` can have the value `false` and a variant `boosted` the value `25`. The rule ID identifies the experiment rule, and its presence marks the exposure as sent by the SDK.
 
 The exposure SHALL NOT carry `$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_type` or `$experiment_exposure_source`. The SDK sends the exposure only for a config version 2 experiment split, so their values would be constants. The paired `$feature_flag_called` event keeps them (see `feature-flag-called-tracker`).
 
@@ -186,22 +186,22 @@ The exposure MAY also carry `$feature_flag_payload`, `$feature/<key>` and the ot
 - **AND** the response has request id "7c0e5d1a-3b2f-4e6d-8a9c-0f1e2d3c4b5a"
 - **WHEN** a read of "checkout-flow" emits `$feature_flag_called`
 - **THEN** the `$experiment_exposure` event has distinct id "user-123" and these properties:
-  | property                 | value                                |
-  | $feature_flag            | checkout-flow                        |
-  | $feature_flag_response   | true                                 |
-  | $feature_flag_variant    | test                                 |
-  | $feature_flag_rule_id    | 3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13 |
-  | locally_evaluated        | false                                |
-  | $feature_flag_id         | 412                                  |
-  | $feature_flag_version    | 9                                    |
-  | $feature_flag_request_id | 7c0e5d1a-3b2f-4e6d-8a9c-0f1e2d3c4b5a |
+  | property                  | value                                |
+  | $feature_flag             | checkout-flow                        |
+  | $feature_flag_response    | true                                 |
+  | $feature_flag_variant_key | test                                 |
+  | $feature_flag_rule_id     | 3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13 |
+  | locally_evaluated         | false                                |
+  | $feature_flag_id          | 412                                  |
+  | $feature_flag_version     | 9                                    |
+  | $feature_flag_request_id  | 7c0e5d1a-3b2f-4e6d-8a9c-0f1e2d3c4b5a |
 - **AND** it has none of `$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_type` and `$experiment_exposure_source`
 - **AND** its event UUID differs from the UUID of the paired `$feature_flag_called` event
 
 #### Scenario: A number-valued variant is rendered as true
 - **GIVEN** the record for "search-ranking" is a complete config version 2 experiment split with variant key "boosted" and the number value 25
 - **WHEN** a read of "search-ranking" emits `$feature_flag_called`
-- **THEN** the `$experiment_exposure` event has `$feature_flag_response` true and `$feature_flag_variant` "boosted"
+- **THEN** the `$experiment_exposure` event has `$feature_flag_response` true and `$feature_flag_variant_key` "boosted"
 
 #### Scenario: An unexpected experiment ID is not sent
 - **GIVEN** the record for "checkout-flow" is a complete config version 2 experiment split with variant key "test" that also carries `metadata.experiment_id` 301
@@ -257,7 +257,7 @@ The namespace SHALL be bounded and evicted like the flag-called tracker: when it
 - **AND** a read for distinct id "user-123" emitted an exposure for variant key "control"
 - **WHEN** a later evaluation for "user-123" assigns variant key "test" in the same rule, still with value true
 - **AND** "pricing-page" is read again
-- **THEN** a second `$experiment_exposure` event is enqueued for "pricing-page" with `$feature_flag_variant` "test"
+- **THEN** a second `$experiment_exposure` event is enqueued for "pricing-page" with `$feature_flag_variant_key` "test"
 
 #### Scenario: A new experiment rule is a new exposure
 - **GIVEN** a read for distinct id "user-123" emitted an exposure for "checkout-flow" with rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
@@ -275,7 +275,7 @@ The namespace SHALL be bounded and evicted like the flag-called tracker: when it
 - **AND** the exposure namespace has since evicted that exposure key, while the flag-called tracker still holds its entry
 - **WHEN** "checkout-flow" is read again for "user-123" with the same record
 - **THEN** no second `$feature_flag_called` event is enqueued
-- **AND** one more `$experiment_exposure` event is enqueued with `$feature_flag_variant` "test"
+- **AND** one more `$experiment_exposure` event is enqueued with `$feature_flag_variant_key` "test"
 
 #### Scenario: The flag-called entry does not suppress its exposure
 - **GIVEN** an SDK stores flag-called and exposure dedupe entries in one cache
@@ -314,7 +314,7 @@ Payload reads stay silent by default, as `get-feature-flag-payload` defines. Whe
 - **GIVEN** a server SDK whose payload read accepts an option to send flag events
 - **AND** remote evaluation for distinct id "user-123" returns "checkout-flow" as a complete config version 2 experiment split with variant key "test"
 - **WHEN** the payload of "checkout-flow" is read for "user-123" with flag events turned on and no match value
-- **THEN** one `$feature_flag_called` event and one `$experiment_exposure` event with `$feature_flag_variant` "test" are enqueued
+- **THEN** one `$feature_flag_called` event and one `$experiment_exposure` event with `$feature_flag_variant_key` "test" are enqueued
 
 #### Scenario: A caller-supplied match value sends no exposure and reserves nothing
 - **GIVEN** a server SDK whose payload read accepts a match value and an option to send flag events
@@ -322,7 +322,7 @@ Payload reads stay silent by default, as `get-feature-flag-payload` defines. Whe
 - **WHEN** the payload of "checkout-flow" is read for "user-123" with match value "annual" and flag events turned on
 - **THEN** no `$experiment_exposure` event is enqueued
 - **WHEN** "checkout-flow" is then read for "user-123" with a value read
-- **THEN** one `$experiment_exposure` event is enqueued with `$feature_flag_variant` "test"
+- **THEN** one `$experiment_exposure` event is enqueued with `$feature_flag_variant_key` "test"
 
 ### Requirement: Bootstrapped and overridden values emit no exposure
 
@@ -337,15 +337,15 @@ Once a flags response replaces a bootstrapped value (see `bootstrap`), the next 
 - **AND** no `$experiment_exposure` event is enqueued
 - **WHEN** a flags response arrives whose record for "checkout-flow" is a complete config version 2 experiment split with value true and variant key "test"
 - **AND** "checkout-flow" is read again
-- **THEN** a second `$feature_flag_called` event is enqueued with `$feature_flag_variant` "test"
-- **AND** one `$experiment_exposure` event is enqueued with `$feature_flag_variant` "test"
+- **THEN** a second `$feature_flag_called` event is enqueued with `$feature_flag_variant_key` "test"
+- **AND** one `$experiment_exposure` event is enqueued with `$feature_flag_variant_key` "test"
 
 #### Scenario: An override suppresses the exposure
 - **GIVEN** the loaded record for "checkout-flow" is a complete config version 2 experiment split with variant key "test"
 - **AND** a client-side override sets "checkout-flow" to true
 - **WHEN** "checkout-flow" is read
 - **THEN** no `$experiment_exposure` event is enqueued
-- **AND** the `$feature_flag_called` event carries no `$feature_flag_rule_id` and no `$feature_flag_variant`
+- **AND** the `$feature_flag_called` event carries no `$feature_flag_rule_id` and no `$feature_flag_variant_key`
 
 ### Requirement: Locally evaluated results
 
@@ -356,7 +356,7 @@ Config version 1 flags SHALL NOT get a direct SDK exposure, whether they are eva
 #### Scenario: A locally evaluated split is exposed
 - **GIVEN** a server SDK with config version 2 local evaluation resolves "checkout-flow" for distinct id "user-123" to an experiment split with rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
 - **WHEN** a read of "checkout-flow" emits `$feature_flag_called`
-- **THEN** one `$experiment_exposure` event is enqueued with `locally_evaluated` true and `$feature_flag_variant` "test"
+- **THEN** one `$experiment_exposure` event is enqueued with `locally_evaluated` true and `$feature_flag_variant_key` "test"
 
 #### Scenario: A locally evaluated config version 1 flag gets no SDK exposure
 - **GIVEN** a server SDK evaluates the config version 1 multivariate flag "legacy-layout" locally to variant "compact"
@@ -390,7 +390,7 @@ When capture fails, including when application code that runs during capture thr
 - **THEN** one `$feature_flag_called` event is enqueued and no `$experiment_exposure` event is enqueued
 - **WHEN** "checkout-flow" is read again for "user-123"
 - **THEN** no second `$feature_flag_called` event is enqueued
-- **AND** one `$experiment_exposure` event is enqueued with `$feature_flag_variant` "test"
+- **AND** one `$experiment_exposure` event is enqueued with `$feature_flag_variant_key` "test"
 
 #### Scenario: A flag-called event the queue rejects reserves no key and does not stop the exposure
 - **GIVEN** the record for "checkout-flow" is a complete config version 2 experiment split with value true, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"

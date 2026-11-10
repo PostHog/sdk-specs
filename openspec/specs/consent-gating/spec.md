@@ -74,7 +74,7 @@ Usually none directly; this component mostly reads state written by `optIn` / `o
 
 - **`opt-in` / `opt-out`** — mutate the state this component reads.
 - **`capture` / `identify` / `group` / `alias`** — commonly consult consent gating before any event construction or enqueue.
-- **exception capture** — often separately gated to avoid collecting crash data while opted out.
+- **exception capture** — often separately gated to avoid collecting crash data while opted out. A crash recorded by a platform mechanism and reconstructed on a later launch follows the consent state at crash time, per the `opt-in` requirement "Deferred crash reports honour consent at crash time".
 - **persistent storage** — browser consent gating may also influence whether persistence itself remains enabled.
 - **session replay / integrations** — may be stopped, skipped, or restarted based on consent state.
 - **wrapper-managed integrations** — Flutter's error autocapture integration is installed during setup and explicitly uninstalled on `optOut()`, so consent gating also controls wrapper-owned exception interception.

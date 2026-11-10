@@ -43,7 +43,7 @@ Browser-specific opt-in accepts extra options such as a custom capture event nam
 2. **Persist opted-out state.** Store a local flag indicating capture is disabled.
 3. **Block future capture.** Subsequent `capture(...)`, `group(...)`, and related APIs short-circuit while opted out. `identify(...)` does not short-circuit: it still updates local identity state and person properties for flags, and reloads feature flags when the distinct id changes. Only its `$identify` / `$set` event is not captured (see `identify`).
 4. **Keep the decision across restarts.** The opted-out state is persisted locally in audited SDKs so it survives app restarts.
-5. **Apply SDK-specific cleanup if needed.** Some SDKs also clear in-flight data or stop auxiliary systems such as session replay. Mobile client SDKs that stop session replay also record there and then whether the app wanted it, because that decides what opt-in restarts.
+5. **Apply SDK-specific cleanup if needed.** Data the SDK accepted while opted in stays deliverable, including queued, retried, offline, or deferred data; opt-out stops new capture and does not discard that data. Some SDKs also stop auxiliary systems such as session replay. Mobile client SDKs that stop session replay also record there and then whether the app wanted it, because that decides what opt-in restarts. A mobile client SDK whose fatal crashes are recorded by a platform mechanism it cannot turn off also records at opt-out that consent is off, so a crash recorded after that point is not sent on a later launch.
 
 ### `optIn`
 
@@ -93,6 +93,9 @@ Browser-specific opt-in accepts extra options such as a custom capture event nam
   client SDK restarts replay on opt-in, the requirements below govern the new session and the restart decision. Opt-in restarts
   replay the app wanted at opt-out even when sampling, a linked flag, or an event trigger held it off then; those
   gates are evaluated again in the new session.
+- **Deferred crash reports** — where a mobile client SDK reconstructs a fatal crash on a later launch, the report follows the
+  consent state at the time of the crash (see "Deferred crash reports honour consent at crash time" below): a report recorded
+  while opted out is never sent, and a consented report found by an opted-out launch waits for opt-in.
 - **Browser consent APIs** — browser uses richer consent semantics than the mobile/core SDKs and maps opt-in/out to persistence and cookieless-mode behavior. The replay restart requirements below do not apply to it.
 
 ## Requirements
@@ -246,3 +249,51 @@ A mobile client SDK (iOS, Android, React Native, or Flutter on a native platform
 - **AND** analytics capture is opted out
 - **WHEN** opt in is called
 - **THEN** session recording should be active
+
+### Requirement: Deferred crash reports honour consent at crash time
+
+A client SDK that reconstructs a terminating failure on a later launch rather than capturing it in-process (a native crash, an out-of-memory termination, or any failure recorded by a platform mechanism that outlives the process; iOS, Android, and React Native and Flutter on a native platform through the native SDK) SHALL decide whether to send the reconstructed `$exception` from the consent state at the time of the failure, not from the consent state at the time the report is found. A report of a failure that occurred while the SDK was opted out SHALL NOT be sent on any later launch, regardless of the consent state at that launch. A report of a failure that occurred while the SDK was opted in SHALL remain deliverable: when the launch that finds it is opted out, the SDK SHALL leave the report in place and SHALL deliver it once the user opts in, where the platform still holds it, and SHALL NOT discard or acknowledge it merely because opt-out happened later. The requirement is on the observable outcome, not the mechanism: because the recording mechanism usually cannot be disabled once installed, the SDK MAY mark the recording context at opt-out so that a report recorded after that point carries the marker, or MAY persist the opt-out intervals and compare each report's failure time against them. Where the SDK writes identity or event properties into the crash context (see `exception-steps`, "Crash-durable persistence for fatal-crash SDKs"), opting out SHALL also stop that context from carrying the user's identity or properties into any later failure. Reports recorded by SDK versions that predate the consent signal are out of scope and MAY be sent. This requirement does not apply to the browser SDK, to Flutter on web, or to uncaught-exception handlers that capture in-process, whose `$exception` is gated at capture time by `consent-gating`.
+
+#### Scenario: A crash recorded while opted out is not sent after opt in
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** the SDK reconstructs terminating failures on a later launch
+- **AND** analytics capture is opted out
+- **WHEN** a terminating failure is recorded at "2025-01-01T00:10:00Z"
+- **AND** the application is relaunched
+- **AND** opt in is called
+- **THEN** no event named "$exception" should be enqueued
+- **AND** no event named "$exception" should be sent
+
+#### Scenario: A crash recorded while opted in is delivered once consent returns
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** the SDK reconstructs terminating failures on a later launch
+- **AND** analytics capture is opted in
+- **WHEN** a terminating failure is recorded at "2025-01-01T00:10:00Z"
+- **AND** the application is relaunched with analytics capture opted out
+- **THEN** no event named "$exception" should be enqueued
+- **AND** no network request should be sent
+- **WHEN** opt in is called
+- **THEN** one event named "$exception" should be enqueued
+- **AND** that event should describe the failure recorded at "2025-01-01T00:10:00Z"
+
+#### Scenario: A crash after a runtime opt out is not sent after opt in
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** the SDK reconstructs terminating failures on a later launch
+- **WHEN** opt out is called
+- **AND** a terminating failure is recorded at "2025-01-01T00:10:00Z"
+- **AND** the application is relaunched
+- **AND** opt in is called
+- **THEN** no event named "$exception" should be enqueued
+- **AND** no event named "$exception" should be sent

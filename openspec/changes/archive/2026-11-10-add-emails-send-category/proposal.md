@@ -14,9 +14,9 @@ The send API now takes an optional `category` on a code send, defined in PostHog
   - A marketing email honors the recipient's opt-outs, and its HTML, or its text when it has no HTML, needs an `{{ unsubscribe_url }}` placeholder.
   - The template form doesn't take `category`: a template made in PostHog sends in its own category.
   - PostHog's refusal codes `category_mismatch`, `too_many_categories`, `unsubscribe_link_required`, `copies_not_allowed` (400) and `recipient_opted_out` (422) follow the existing error rules: they keep their code, are named `validation_error` like `recipient_suppressed`, and are not retried. An SDK that types error codes as a closed set includes them.
-- **`Send code form`**: lists the message category among the code form's inputs, so the one-form rule refuses it on a template send, through the SDK's types or with an argument error.
+- **`Send code form`**: lists the message category among the code form's inputs, so the one-form rule refuses it on a template send, through the SDK's types or with an argument error. A template key that matches a stored template sends in that template's category.
 - **`Send request`**: the code form holds `category` only when the caller passed one.
-- **`Argument checks`**: the SDK checks the category's shape that its types can't enforce, and may also refuse an empty or blank key or name, the one length check it may make, or an unknown field. PostHog owns the key's format and every other length.
+- **`Argument checks`**: the SDK checks the category's shape that its types can't enforce, and may also refuse an empty or blank key or name, the only length-related check it may make, or an unknown field. PostHog owns the key's format and every other length.
 - **`Error names`**: the error name is called "a coarse class" instead of "a coarse category", so it can't be confused with a message category.
 - Prose alignment at archive: the Purpose, the "Not covered" line, and the code-form rows of the public surface and HTTP mapping tables.
 - `acceptance/public/emails.feature`: scenarios for the category on the wire, and for a refused category send keeping PostHog's code without a retry.

@@ -59,9 +59,11 @@ Feature: Emails
     And the send should fail with error code "<code>", name "validation_error" and status <status>
 
     Examples:
-      | status | code                |
-      | 400    | category_mismatch   |
-      | 422    | recipient_opted_out |
+      | status | code                      |
+      | 400    | category_mismatch         |
+      | 400    | too_many_categories       |
+      | 400    | unsubscribe_link_required |
+      | 422    | recipient_opted_out       |
 
   # Requirement: Custom host refusal
 

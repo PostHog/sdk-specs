@@ -1097,7 +1097,7 @@ An SDK that delivers events through capture v1 SHALL remove `$session_id` and `$
 
 An SDK that delivers events through capture v1 SHALL treat an empty or whitespace-only caller `distinct_id` as missing. A missing id keeps the SDK's existing behavior: a generated personless id (UUIDv7, with `process_person_profile: false` set as an option) or a clear error returned to the caller. The SDK SHALL never send an event without a `distinct_id` key.
 
-The SDK SHALL NOT shorten, hash or reject distinct ids by length or by placeholder value: capture v1 drops an event whose `distinct_id` is over 200 UTF-8 bytes (`distinct_id_too_large`) and accepts placeholder values such as `anonymous` without a person profile, and reports both in that event's `results` entry. A `$groupidentify` event's `distinct_id` SHALL be the caller's id when given, else the request-context id where the SDK has one, else `$<group type>_<group key>`, and never a random value. An `alias` call SHALL never take its target from the request context. Global and context layers reach person-only events (`$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`) like any other event; `$groupidentify` never takes the context session id. When a layer sets `process_person_profile: false` on a person-only event, capture still accepts it and reports it `ok`, but ingestion drops it (ingestion warning `invalid_event_when_process_person_profile_is_false`), so the identify, alias, merge or group update never takes effect. Client SDKs have no request context: they send `$groupidentify` with the current distinct id, and with the session id like any other event.
+The SDK SHALL NOT shorten, hash or reject distinct ids by length or by placeholder value: capture v1 drops an event whose `distinct_id` is over 200 UTF-8 bytes (`distinct_id_too_large`) and accepts placeholder values such as `anonymous` without a person profile, and reports both in that event's `results` entry. A `$groupidentify` event's `distinct_id` SHALL be the caller's id when given, else the request-context id where the SDK has one, else `$<group type>_<group key>`, and never a random value. An `alias` call SHALL never take its target from the request context. Global, context and registered layers reach person-only events (`$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`) and `$set` events like any other event, including a layered `process_person_profile: false` option or `$process_person_profile: false` property; `$groupidentify` never takes the context session id. When the final `process_person_profile` on a person-only event is `false`, capture still accepts it and reports it `ok`, but ingestion drops it (ingestion warning `invalid_event_when_process_person_profile_is_false`), so the identify, alias, merge or group update never takes effect; a `$set` event is kept without its person update. A `process_person_profile: true` call option, or one set in `before_send`, beats every layer and keeps the event. SDK docs and migration guides SHALL show that call option on an identity call as the way to keep identifying under a layered `false`, and SHALL NOT offer a per-call `$process_person_profile: true` property for it, because a legacy property does not replace a layered option (see **Per-event options replace the legacy option properties**). Client SDKs have no request context: they send `$groupidentify` with the current distinct id, and with the session id like any other event.
 
 Legacy capture: distinct ids over 200 characters were shortened and the event kept; posthog-python 6.x used a random id for `$groupidentify` without a caller id.
 
@@ -1130,6 +1130,19 @@ Legacy capture: distinct ids over 200 characters were shortened and the event ke
 - **WHEN** capture is called with a distinct id of 250 ASCII characters and event "Long Id"
 - **AND** pending captures are flushed
 - **THEN** the first received event field "distinct_id" should have length 250
+
+#### Scenario: A call option keeps a person-only event under a layered personless option (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** the SDK-level default options carry "process_person_profile" equal to false
+- **WHEN** group identify is called with JSON arguments:
+  """application/json
+  {"group_type":"company","group_key":"acme","distinct_id":"user-123","options":{"process_person_profile":true}}
+  """
+- **AND** pending captures are flushed
+- **THEN** the first received event field "event" should equal "$groupidentify"
+- **AND** the first received event option "process_person_profile" should equal JSON true
 
 ### Requirement: Timestamps on capture v1
 

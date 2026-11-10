@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-react-native](https://github.com/PostHog/posthog-react-native) (archived; code lives in `packages/react-native` + `packages/react-native-plugin` of the `posthog-js` monorepo)
 **Audited commit:** `3ddaa65402896c91dcb7b04cfe433e0b1d2f3313` ([commit](https://github.com/PostHog/posthog-js/commit/3ddaa65402896c91dcb7b04cfe433e0b1d2f3313)) — audited on 2026-10-19. **Nine rows re-audited on 2026-11-10 for `@posthog/react-native-plugin` 3.0** at `210bf35d8c19a15003d0643999ae63bcc2102fb6` ([commit](https://github.com/PostHog/posthog-js/commit/210bf35d8c19a15003d0643999ae63bcc2102fb6), head of [PostHog/posthog-js#5194](https://github.com/PostHog/posthog-js/pull/5194)) — see [react-native-plugin 3.0](#react-native-plugin-30-re-audit-2026-11-10)
 **Audited against sdk-specs commit:** `c72e367` (2026-10-19 rows); `752f899` plus [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79`, treated as merged, for the nine plugin 3.0 rows
-**Summary:** 32 ✅ · 25 🟡 · 2 ❌ · 5 ➖ · 0 ❓ (64 rows; 2026-10-19 at `3ddaa654` scored 29/27/3/5/0; previous full audit 2026-08-06 at `e1efa57` scored 31/23/2/2/1 on 59 rows)
+**Summary:** 31 ✅ · 26 🟡 · 2 ❌ · 5 ➖ · 0 ❓ (64 rows; 2026-10-19 at `3ddaa654` scored 29/27/3/5/0; previous full audit 2026-08-06 at `e1efa57` scored 31/23/2/2/1 on 59 rows)
 
 **Repo layout (unchanged, re-confirmed):** `PostHog/posthog-react-native` is archived; the SDK lives at
 `packages/react-native/src` (`PostHog extends PostHogCore`, `posthog-rn.ts`, now 3,345 lines — up from
@@ -54,7 +54,7 @@ then also touch rows outside this scope, which the next full audit must re-verif
 | Is Session Replay Active | 🟡 | ✅ | The getter reads native `isSessionReplayActive()`, which in 4.0 reports a running recorder for this session, and JS stops the native recorder whenever its linked-flag, event-trigger or consent gate holds replay off ([n18](#n18)) |
 | Opt In | ✅ | ✅ | Meets #138: JS owns the session id and rotates it before native restarts replay, and the restart follows what the app wanted at opt-out. Meets #199 through the native SDKs: a native crash recorded while opted out is dropped, and one recorded while opted in waits for opt-in ([n32](#n32)) |
 | Session Replay Debug Properties | ❌ | 🟡 | Required and optional tiers, the 30 s window from acceptance, `screenshot` capture mode, the minimal `$feature_flag_called` strip and backdated events conform; the SDK-computed keys overwrite registered and caller values ([n24](#n24)) |
-| Session Replay Ingestion Controls | 🟡 | ✅ | Sampling and minimum-duration buffering run in posthog-ios 4.0 and posthog-android 4.0, which implement both; the JS gates are unchanged ([n25](#n25)) |
+| Session Replay Ingestion Controls | 🟡 | 🟡 | Sampling and minimum-duration buffering run in posthog-ios 4.0 and posthog-android 4.0. Gap: RN hands native the cached project sample rate as a local rate, so a changed project rate doesn't apply until the next launch ([n25](#n25)) |
 | Session Replay Privacy | 🟡 | ✅ | 4.0 records masked screenshots only, so the posthog-ios wireframe leak this row inherited is gone; RN exposes only a mask marker, so an unmask-precedence gap can't arise ([n26](#n26)) |
 | Start Session Recording | ✅ | ✅ | Unchanged; a start while opted out doesn't change what opt-in restores |
 | Stop Session Recording | 🟡 | 🟡 | posthog-ios 4.0 flushes the replay queue on stop; posthog-android 4.0 still doesn't ([n29](#n29)) |
@@ -173,7 +173,7 @@ on its pre-existing empty-event-name gap.
 | 49 | Screen | 🟡 | [n23] |
 | 50 | Session Manager | ✅ | |
 | 51 | Session Replay Debug Properties | 🟡 | [n24] |
-| 52 | Session Replay Ingestion Controls | ✅ | [n25] |
+| 52 | Session Replay Ingestion Controls | 🟡 | [n25] |
 | 53 | Session Replay Privacy | ✅ | [n26] |
 | 54 | Set Group Properties For Flags | ✅ | |
 | 55 | Set Person Properties | ✅ | |
@@ -339,11 +339,11 @@ on its pre-existing empty-event-name gap.
 - **Backwards compatibility:** Backward-compatible — letting registered and caller values win only changes events whose caller set these keys.
 - **Remediation:** Fill the debug keys only where the event's properties leave them unset, as the client precedence rule does for other SDK-set values.
 
-### n25 — Session Replay Ingestion Controls (✅ Pass; was 🟡)
+### n25 — Session Replay Ingestion Controls (🟡 Partial)
 - **Spec requires:** Linked-flag, event-trigger, sample-rate, and minimum-duration gating of replay ingestion, with restrictive (AND) combination on mobile.
-- **SDK currently (plugin 3.0, `210bf35d8`):** the JS gates are unchanged: linked flag (all three shapes), event triggers after `before_send`, AND combination, persisted activation per session (`packages/react-native/src/posthog-rn.ts:3600-3615`). The two 2026-10-19 gaps were left to the native SDKs, and plugin 3.0's native SDKs implement both. RN validates the sample rate and passes it to native (`:3270-3305`; `packages/react-native-plugin/ios/PosthogReactNativePlugin.swift:409`, `PosthogReactNativePluginModule.kt:178`). posthog-ios 4.0 samples on the session id, with the local rate winning over the remote one, and buffers until the minimum duration is met (posthog-ios `e27cbe4cb` `PostHog/Replay/PostHogReplayIntegration.swift:463-470`, `:641-649`); posthog-android 4.0 keeps the session-keyed sampling decision (`shouldRecordSession`, posthog-android `aaa23d39` `PostHog.kt:3228`) and reports `below_minimum_duration` holds (`PostHogReplayIntegration.kt:3007`). posthog-android's own 🟡 on this row (event triggers matched on the pre-hook name) doesn't reach RN, whose triggers are matched in JS after `before_send`.
-- **Backwards compatibility:** No change needed.
-- **Remediation:** None.
+- **SDK currently (plugin 3.0, `210bf35d8`):** the JS gates are unchanged: linked flag (all three shapes), event triggers after `before_send`, AND combination, persisted activation per session (`packages/react-native/src/posthog-rn.ts:3600-3615`). The two 2026-10-19 gaps were left to the native SDKs, and plugin 3.0's native SDKs implement both. RN validates the sample rate and passes it to native (`:3270-3305`; `packages/react-native-plugin/ios/PosthogReactNativePlugin.swift:409`, `PosthogReactNativePluginModule.kt:178`). posthog-ios 4.0 samples on the session id, with the local rate winning over the remote one, and buffers until the minimum duration is met (posthog-ios `e27cbe4cb` `PostHog/Replay/PostHogReplayIntegration.swift:463-470`, `:641-649`); posthog-android 4.0 keeps the session-keyed sampling decision (`shouldRecordSession`, posthog-android `aaa23d39` `PostHog.kt:3228`) and reports `below_minimum_duration` holds (`PostHogReplayIntegration.kt:3007`). posthog-android's own 🟡 on this row (event triggers matched on the pre-hook name) doesn't reach RN, whose triggers are matched in JS after `before_send`. **Gap:** without a local `sessionReplayConfig.sampleRate`, RN passes the project rate from the cached remote config (`posthog-rn.ts:3270-3284`) as the native SDK's local rate, and both native SDKs prefer a local rate over their fresh remote one (posthog-ios `PostHogReplayIntegration.swift:462-470`; posthog-android `PostHogRemoteConfig.kt:1464-1467`). Once native is set up RN doesn't reconfigure it (`posthog-rn.ts:3192-3198`, `:3650-3652`), so a project rate changed from 1 to 0 keeps sampling sessions in until the next launch, as RN's own log says (`:3313-3314`). The spec requires re-deciding when the sample rate changes.
+- **Backwards compatibility:** Backward-compatible — following the current project rate is what an app without a local rate already expects.
+- **Remediation:** Pass native only the app's local rate and let native read the project rate from its own remote config, or re-send the rate when remote config changes.
 
 ### n26 — Session Replay Privacy (✅ Pass; was 🟡)
 - **Spec requires:** Mask text inputs, images, and sandboxed/secure views by default; honour `ph-no-capture` containers including their children; explicit unmask markers take precedence over explicit mask markers where an SDK offers both.

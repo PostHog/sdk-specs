@@ -149,7 +149,7 @@ the single most widely-shared non-compliance in the matrix.
 | posthog-ios | 38/64 fully compliant (59%) | 38 | 16 | 4 | 6 | 0 | 2026-10-08 · `f5cbe87c` + PostHog/posthog-ios#924–#934 (out-of-cycle refresh, see below) | 20 | [posthog-ios.md](posthog-ios.md) |
 | posthog-node | 9/64 fully compliant (14%; 29 contracts N/A on a server SDK) | 9 | 21 | 4 | 29 | 1 | 2026-10-12 · `4f590b36` (posthog-js monorepo; Traces row corrected 2026-10-19) | 25 (+1 ❓) | [posthog-node.md](posthog-node.md) |
 | posthog-flutter | 21/64 fully compliant (33%) | 21 | 29 | 6 | 8 | 0 | 2026-10-19 · `1032c102` | 35 | [posthog-flutter.md](posthog-flutter.md) |
-| posthog-react-native | 32/64 fully compliant (50%) | 32 | 25 | 2 | 5 | 0 | 2026-11-10 · `210bf35d8` (react-native-plugin 3.0: six session replay rows, Opt In, Capture Exception, Exception Event Metadata only); other rows 2026-10-19 · `3ddaa654` — see file header | 27 | [posthog-react-native.md](posthog-react-native.md) |
+| posthog-react-native | 31/64 fully compliant (48%) | 31 | 26 | 2 | 5 | 0 | 2026-11-10 · `210bf35d8` (react-native-plugin 3.0: six session replay rows, Opt In, Capture Exception, Exception Event Metadata only); other rows 2026-10-19 · `3ddaa654` — see file header | 28 | [posthog-react-native.md](posthog-react-native.md) |
 | posthog-php | 11/63 fully compliant (17%; 33 contracts N/A on a server SDK; **needs +1: MCP Analytics**) | 11 | 11 | 8 | 33 | 0 | 2026-09-28 · `5451f4e0` | 19 | [posthog-php.md](posthog-php.md) |
 | posthog-ruby | 9/63 fully compliant (14%; 33 contracts N/A on a server SDK; **needs +1: MCP Analytics**) | 9 | 13 | 8 | 33 | 0 | 2026-09-28 · `185060ab` | 21 | [posthog-ruby.md](posthog-ruby.md) |
 | posthog-go | 8/64 fully compliant (13%; 33 contracts N/A on a server SDK) | 8 | 14 | 9 | 33 | 0 | 2026-10-05 · `08549f42` | 23 | [posthog-go.md](posthog-go.md) |
@@ -178,7 +178,9 @@ of [PostHog/posthog-js#5194](https://github.com/PostHog/posthog-js/pull/5194), w
 at posthog-ios `e27cbe4cb` and posthog-android `aaa23d39`, against sdk-specs `752f899` plus
 [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79`, treated as merged. **Is Session
 Replay Active 🟡→✅**: the native getter reports a running recorder and the JS gates drive it. **Session
-Replay Ingestion Controls 🟡→✅**: sampling and minimum-duration buffering run in the 4.0 native SDKs.
+Replay Ingestion Controls** stays 🟡: sampling and minimum-duration buffering now run in the 4.0 native
+SDKs, but RN hands native the cached project sample rate as a local rate, so a rate change waits for the
+next launch.
 **Session Replay Privacy 🟡→✅**: 4.0 records masked screenshots only, ending the inherited posthog-ios
 wireframe leak. **Session Replay Debug Properties ❌→🟡**: implemented in posthog-react-native since
 2026-10-19; the SDK-computed keys still overwrite registered and caller values. **Opt In** stays ✅ and
@@ -384,7 +386,7 @@ stalest pointer and its only 59-row file.
 | posthog-js | Session Replay Debug Properties | Backward-compatible | **New this run** — re-scored against `d078270` after #96; tiering, the `$`-prefix gate, and the 30 s throttle conform, but after `stopSessionRecording()` on a loaded recorder events keep `active`/`buffering` instead of `$recording_status: disabled` — [posthog-js.md#n36](posthog-js.md) |
 
 Full contract-by-contract detail (33 posthog-js, 21 posthog-python, 23 posthog-android, 20
-posthog-ios, 26 posthog-node, 34 posthog-flutter, 27 posthog-react-native, 19 posthog-php, 21
+posthog-ios, 26 posthog-node, 34 posthog-flutter, 28 posthog-react-native, 19 posthog-php, 21
 posthog-ruby, 23 posthog-go, 19 posthog-java, and 29 posthog-dotnet non-Pass/non-N/A cells) is in
 the respective per-SDK files.
 

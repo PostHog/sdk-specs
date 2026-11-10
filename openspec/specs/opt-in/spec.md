@@ -43,7 +43,7 @@ Browser-specific opt-in accepts extra options such as a custom capture event nam
 2. **Persist opted-out state.** Store a local flag indicating capture is disabled.
 3. **Block future capture.** Subsequent `capture(...)`, `group(...)`, and related APIs short-circuit while opted out. `identify(...)` does not short-circuit: it still updates local identity state and person properties for flags, and reloads feature flags when the distinct id changes. Only its `$identify` / `$set` event is not captured (see `identify`).
 4. **Keep the decision across restarts.** The opted-out state is persisted locally in audited SDKs so it survives app restarts.
-5. **Apply SDK-specific cleanup if needed.** Some SDKs also clear in-flight data or stop auxiliary systems such as session replay. Mobile client SDKs that stop session replay also record there and then whether the app wanted it, because that decides what opt-in restarts. A mobile client SDK whose fatal crashes are recorded by a platform mechanism it cannot turn off also records at opt-out that consent is off, so a crash recorded after that point is not sent on a later launch.
+5. **Apply SDK-specific cleanup if needed.** Data the SDK accepted while opted in stays deliverable, including queued, retried, offline, or deferred data; opt-out stops new capture and does not discard that data. Some SDKs also stop auxiliary systems such as session replay. Mobile client SDKs that stop session replay also record there and then whether the app wanted it, because that decides what opt-in restarts. A mobile client SDK whose fatal crashes are recorded by a platform mechanism it cannot turn off also records at opt-out that consent is off, so a crash recorded after that point is not sent on a later launch.
 
 ### `optIn`
 

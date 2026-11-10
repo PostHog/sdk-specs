@@ -72,7 +72,8 @@ Surveys ([n35](#n35): posthog-android still moves the last-seen survey date on s
 dismiss, against #102; posthog-ios now writes it on show), Opt In ([n23](#n23): #138's replay restart
 and #199's deferred crash consent are met through the native SDKs), Get Feature Flags ([n16](#n16):
 on web, posthog-js reads an empty variant as enabled in the list), Session Replay Debug Properties
-([n28](#n28): mobile events now carry the native bundle), Event Batcher ([n8](#n8)), Retry Queue
+([n28](#n28): mobile events now carry the native bundle; the Dart core still sends session start and
+duration on every desktop event), Event Batcher ([n8](#n8)), Retry Queue
 ([n38](#n38)), Group ([n18](#n18)), Alias ([n1](#n1)).
 
 **New rows (5):** Experiment Exposure ➖ (every path requests `/flags/?v=2`: Dart core
@@ -328,9 +329,9 @@ Notes [n2](#n2), [n4](#n4), [n5](#n5), [n7](#n7), [n10](#n10)–[n12](#n12), [n2
 
 ### n28 — Session Replay Debug Properties (🟡 Partial)
 - **Spec requires:** `$recording_status` and the three `$sdk_debug_replay_*` trigger/buffer keys on every event except `$snapshot`, a throttled optional bundle on SDK events, and (#197) `$sdk_debug_replay_capture_mode` always `screenshot` on mobile. An SDK with no replay integration sends only `$recording_status: disabled`.
-- **SDK currently (`82123e6`):** the Dart layer adds no replay debug keys. On iOS, macOS and Android events are now built by the native SDK (`buildEvent` / `capture`), so they carry posthog-ios's and posthog-android's bundles, including `screenshot` for the Flutter host; posthog-ios 4.0 is 🟡 here (`compliance/posthog-ios.md` n26): at `e27cbe4cb` `$sdk_debug_session_start` still comes from the session manager even when the event carries a caller-supplied `$session_id`, and a backdated event still gets live state (`PostHogSDK.swift:764-765`). Windows/Linux have no replay and send `$recording_status: disabled` (`lib/src/posthog_desktop_client.dart:45`), which conforms. Web inherits posthog-js (🟡, `compliance/posthog-js.md` n36). Not verified: whether the native trigger statuses reflect Flutter's Dart capture pipeline.
-- **Backwards compatibility:** Backward-compatible.
-- **Remediation:** None in this repo; track posthog-ios n26 and posthog-js n36.
+- **SDK currently (`82123e6`):** the Dart layer adds no `$sdk_debug_replay_*` keys. On iOS, macOS and Android events are now built by the native SDK (`buildEvent` / `capture`), so they carry posthog-ios's and posthog-android's bundles, including `screenshot` for the Flutter host; posthog-ios 4.0 is 🟡 here (`compliance/posthog-ios.md` n26): at `e27cbe4cb` `$sdk_debug_session_start` still comes from the session manager even when the event carries a caller-supplied `$session_id`, and a backdated event still gets live state (`PostHogSDK.swift:764-765`). Windows/Linux have no replay and send `$recording_status: disabled` (`lib/src/posthog_desktop_client.dart:42-46`). **Gap on Windows/Linux:** the Dart core also adds `$sdk_debug_session_start`, `$sdk_debug_current_session_duration` and `$sdk_debug_pending_queue_size` to every event, custom events included (`_sessionDebugProperties`, `lib/src/core/posthog_core.dart:195`, `:253-261`; `test/core/posthog_core_test.dart:89-110` expects them on a custom event). No SDK may attach the duration (`openspec/specs/session-replay-debug-properties/spec.md:564-565`), and custom events carry none of the optional bundle (`:132-139`, `:164-170`); the queue-depth key is allowed. Web inherits posthog-js (🟡, `compliance/posthog-js.md` n36). Not verified: whether the native trigger statuses reflect Flutter's Dart capture pipeline.
+- **Backwards compatibility:** Backward-compatible — removes debug properties only.
+- **Remediation:** In the Dart core, stop sending `$sdk_debug_current_session_duration`, and send `$sdk_debug_session_start` only on `$`-prefixed events, at most every 30 seconds. Track posthog-ios n26 and posthog-js n36.
 
 ### n29 — Session Replay Privacy (🟡 Partial)
 - **Spec requires:** Mask text, images, and sensitive inputs by default; honour explicit mask and unmask markers; elements marked no-capture MUST be excluded with all their descendants; password/sensitive input masking takes precedence over disabled broad masking; mask-discovery failures MUST fail closed (skip the snapshot).

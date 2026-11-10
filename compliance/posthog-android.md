@@ -2,8 +2,8 @@
 
 **Repo:** [PostHog/posthog-android](https://github.com/PostHog/posthog-android)
 **Audited commit:** `c5e788bd603d3bdda77ac4d213538b9db637299a` ([commit](https://github.com/PostHog/posthog-android/commit/c5e788bd603d3bdda77ac4d213538b9db637299a)) — audited on 2026-10-19. **31 rows re-audited against posthog-android 4.0** at `aaa23d39af4424978bd2439028282e47417490b8` ([commit](https://github.com/PostHog/posthog-android/commit/aaa23d39af4424978bd2439028282e47417490b8), head of the 4.0 integration PR [PostHog/posthog-android#871](https://github.com/PostHog/posthog-android/pull/871)) on 2026-11-10 — see [posthog-android 4.0](#posthog-android-40-re-audit-2026-11-05)
-**Audited against sdk-specs commit:** `c72e367` (2026-10-19 rows); `752f899` plus the capture v1 text of [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79`, which includes [#147](https://github.com/PostHog/sdk-specs/pull/147) (merged into #146's branch as `6a9ed0f`), for the 31 4.0 rows
-**Summary:** 43 ✅ · 15 🟡 · 1 ❌ · 5 ➖ · 0 ❓ (64 rows; 2026-10-19 at `c5e788bd` scored 37/16/5/6/0; previous full audit 2026-08-10 at `8659a7b4` scored 31/16/9/3/0 on 59 rows)
+**Audited against sdk-specs commit:** `c72e367` (2026-10-19 rows); `752f899` plus the capture v1 text of [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79`, which includes [#147](https://github.com/PostHog/sdk-specs/pull/147) (merged into #146's branch as `6a9ed0f`), for the 31 4.0 rows; Capture also against #146's identity-call guide rule from `15501ca`
+**Summary:** 42 ✅ · 16 🟡 · 1 ❌ · 5 ➖ · 0 ❓ (64 rows; 2026-10-19 at `c5e788bd` scored 37/16/5/6/0; previous full audit 2026-08-10 at `8659a7b4` scored 31/16/9/3/0 on 59 rows)
 
 **Why the 2026-10-19 run:** rotation priority 3 — the pointer was ten weeks old, and android carries the
 mobile reference for Session Replay Debug Properties. It was also the cheapest third slot available:
@@ -47,7 +47,7 @@ replay, so the next full audit must re-verify it.
 | Alias | ❌ | ✅ | `$create_alias` carries the source id as `properties.distinct_id` too (PostHog/posthog-android#819) ([n1](#n1)) |
 | Application Lifecycle | ✅ | ✅ | Installed, Updated, Opened and Backgrounded carry the required properties; un-prefixed `version`/`build` break only a SHOULD NOT ([n31](#n31)) |
 | Before Send Hook | ✅ | ✅ | Chain, drop and fail-closed unchanged; `options` and the uuid survive a hook as capture allows ([n3](#n3)) |
-| Capture | ✅ | ✅ | Capture v1 wire, headers, per-event results, options, the `$lib`/`$lib_version` pair fill, session id lifting, timestamps and fail-open token all conform; the post-hook uuid and `null`-options restore are the two allowances #146 grants ([n24](#n24)) |
+| Capture | ✅ | 🟡 | Capture v1 wire, headers, per-event results, options, the `$lib`/`$lib_version` pair fill, session id lifting, timestamps and fail-open token all conform; the migration guide doesn't yet show the `process_person_profile: true` call option that keeps identity calls under a registered `false` (#146 at `15501ca`; clears with PostHog/posthog-android#966) ([n24](#n24)) |
 | Capture AI | ➖ | ✅ | Applies now (#147). The AI lane conforms in full, including its own compression setting ([n25](#n25)) |
 | Capture Exception | ✅ | ✅ | Handled and uncaught JVM exceptions share one coercer; the native crash serializer keeps frames and drops only unset fields (#124) ([n40](#n40)) |
 | Consent Gating | 🟡 | ✅ | Capture is gated, `optOut()` stops replay and integrations, and deferred native crashes follow consent at crash time ([n5](#n5)) |
@@ -76,7 +76,7 @@ replay, so the next full audit must re-verify it.
 | Start Session Recording | ❌ | ✅ | Replay isn't installed while opted out, so a start stays inactive ([n20](#n20)) |
 | Surveys | 🟡 | 🟡 | Web-only exclusion and popup delay conform; submit and dismiss move the last-seen date (#102), and an unknown question type blocks later surveys ([n22](#n22)) |
 
-android moves from 37/16/5/6 on 2026-10-19 to **43/15/1/5** (58%→67%).
+android moves from 37/16/5/6 on 2026-10-19 to **42/16/1/5** (58%→66%).
 
 **Behavior the spec permits for client SDKs, recorded so it isn't mistaken for a gap:** a `404` (or
 any retryable status) keeps the events on disk with no attempt limit, so a proxy that doesn't serve
@@ -150,7 +150,7 @@ complete implementation of that contract outside the browser.
 | 3 | Autocapture | ✅ | [n2] |
 | 4 | Before Send Hook | ✅ | [n3] |
 | 5 | Bootstrap | 🟡 | [n4] |
-| 6 | Capture | ✅ | [n24] |
+| 6 | Capture | 🟡 | [n24] |
 | 7 | Capture AI | ✅ | [n25] |
 | 8 | Capture Exception | ✅ | [n40] |
 | 9 | Consent Gating | ✅ | [n5] |
@@ -690,7 +690,7 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
 
 <a id="n24"></a>
 
-### n24 — Capture (✅ Pass, re-audited for capture v1)
+### n24 — Capture (🟡 Partial, re-audited for capture v1)
 - **Spec requires:** the capture v1 requirements [#146](https://github.com/PostHog/sdk-specs/pull/146)
   adds to `capture/spec.md` (text at `d387ab79`): the wire contract, request headers, per-event results,
   per-event options with legacy-property hoisting, the layer order's steps 4 and 5 (which apply to client
@@ -711,7 +711,14 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
     `$active_feature_flags`, and its `$feature/<key>` still carries `""`.
   - **Null-valued properties** (carried from before capture v1). Null object members are omitted, and
     null array elements stay JSON `null` at their indices; arrays are never compacted.
-- **SDK currently (4.0, `aaa23d39`):** conforms.
+  - **Identity calls under a layered `false`** (#146 at `15501ca`). A `process_person_profile: true` call
+    option beats every layer, and "SDK docs and migration guides SHALL show that call option on an
+    identity call as the way to keep identifying under a layered `false`".
+- **SDK currently (4.0, `aaa23d39`):** conforms except the migration guide.
+  - **Identity-call guide gap.** The SDK behaves as required: a call option wins over a registered
+    `$process_person_profile: false`. But `MIGRATION.md:500` only says a registered `false` makes PostHog
+    drop `$identify`, `$create_alias` and `$groupidentify`; it shows no `process_person_profile: true`
+    call option on an identity call. PostHog/posthog-android#966 (open) adds that example.
   - **Wire and headers.** `postCaptureV1` (`posthog/src/main/java/com/posthog/internal/PostHogApi.kt:208-279`)
     POSTs `{"created_at", "batch"}` to `/i/v1/analytics/events` with `Authorization: Bearer`,
     `PostHog-Sdk-Info` (`posthog-android/<version>`, also sent as `User-Agent`), `PostHog-Attempt`,
@@ -767,8 +774,8 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
   - **GeoIP.** The **Client-level GeoIP control** requirement, including #146's clarification that a
     call's own `$geoip_disable` beats a per-call argument, binds server SDKs; client SDKs are not
     required to have the option.
-- **Backwards compatibility:** No change needed.
-- **Remediation:** None.
+- **Backwards compatibility:** Docs-only.
+- **Remediation:** Merge PostHog/posthog-android#966; the row is ✅ once it lands.
 
 <a id="n25"></a>
 

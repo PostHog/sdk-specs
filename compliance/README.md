@@ -145,7 +145,7 @@ the single most widely-shared non-compliance in the matrix.
 |---|---|---|---|---|---|---|---|---|---|
 | posthog-js | 26/64 fully compliant (41%) | 26 | 21 | 12 | 5 | 0 | 2026-10-05 · `6538babc` (targeted re-audit; most of the 59 pre-existing rows carried from 2026-08-10, see file header) | 33 | [posthog-js.md](posthog-js.md) |
 | posthog-python | 13/64 fully compliant (20%; 30 contracts N/A on a server SDK) | 13 | 16 | 5 | 30 | 0 | 2026-10-12 · `509c8525` | 21 | [posthog-python.md](posthog-python.md) |
-| posthog-android | 43/64 fully compliant (67%) | 43 | 15 | 1 | 5 | 0 | 2026-11-10 · `aaa23d39` (4.0: 31 rows); other rows 2026-10-19 · `c5e788bd` — see file header | 16 | [posthog-android.md](posthog-android.md) |
+| posthog-android | 42/64 fully compliant (66%) | 42 | 16 | 1 | 5 | 0 | 2026-11-10 · `aaa23d39` (4.0: 31 rows); other rows 2026-10-19 · `c5e788bd` — see file header | 17 | [posthog-android.md](posthog-android.md) |
 | posthog-ios | 38/64 fully compliant (59%) | 38 | 16 | 4 | 6 | 0 | 2026-10-08 · `f5cbe87c` + PostHog/posthog-ios#924–#934 (out-of-cycle refresh, see below) | 20 | [posthog-ios.md](posthog-ios.md) |
 | posthog-node | 9/64 fully compliant (14%; 29 contracts N/A on a server SDK) | 9 | 21 | 4 | 29 | 1 | 2026-10-12 · `4f590b36` (posthog-js monorepo; Traces row corrected 2026-10-19) | 25 (+1 ❓) | [posthog-node.md](posthog-node.md) |
 | posthog-flutter | 21/64 fully compliant (33%) | 21 | 29 | 6 | 8 | 0 | 2026-10-19 · `1032c102` | 35 | [posthog-flutter.md](posthog-flutter.md) |
@@ -177,7 +177,7 @@ rows at `aaa23d39`, the head of the 4.0 integration PR PostHog/posthog-android#8
 `752f899` plus [#146](https://github.com/PostHog/sdk-specs/pull/146) (capture v1 delivery) at `d387ab79`,
 which includes [#147](https://github.com/PostHog/sdk-specs/pull/147) (capture v1 AI lane). The 31 are the
 five capture v1 rows, the 25 rows that 4.0 code or spec text merged since 2026-10-19 changes, and
-Alias, whose code changed in PostHog/posthog-android#819. android moves from 37/16/5/6 to **43/15/1/5**:
+Alias, whose code changed in PostHog/posthog-android#819. android moves from 37/16/5/6 to **42/16/1/5**:
 - **Alias ❌→✅:** `$create_alias` carries `distinct_id` in its properties (PostHog/posthog-android#819).
 - **Capture AI ➖→✅:** #147 adds android 4.0 to Applicability, and the AI lane conforms.
 - **Start Session Recording ❌→✅:** replay isn't installed while opted out, so a start stays inactive.
@@ -188,8 +188,10 @@ Alias, whose code changed in PostHog/posthog-android#819. android moves from 37/
 - **Get Feature Flags and Get Feature Flags And Payloads ❌→🟡:** the specs now record `getAllFeatureFlags()`
   as android's form; it returns `null` after a restart until the disk cache is loaded.
 - **Identify ✅→🟡:** while opted out it updates the person-properties dedup hash for a `$set` it dropped.
+- **Capture ✅→🟡:** the migration guide doesn't yet show the `process_person_profile: true` call option on
+  identity calls that #146 requires from `15501ca`; it clears with PostHog/posthog-android#966.
 
-The other rows keep their scores. Capture, HTTP Client and Retry Queue conform to capture v1, and Event
+The other rows keep their scores. HTTP Client and Retry Queue conform to capture v1, and Event
 Batcher stays 🟡 on its `Timer` finding. Stop Session Recording carries forward from 2026-10-19 and is
 stale: its opt-out point predates 4.0.
 Details in [posthog-android.md](posthog-android.md#posthog-android-40-re-audit-2026-11-05).
@@ -333,6 +335,7 @@ stalest pointer and its only 59-row file.
 | posthog-node | Local Feature Flag Evaluator | Backward-compatible | Holdouts **are** implemented in `@posthog/core`, and the acceptance-asset sync gap is unchanged; new this run, a non-scalar group key buckets on `"true"` / `"[object Object]"` instead of going inconclusive — [posthog-node.md#n24](posthog-node.md) |
 | posthog-ios | Exception Event Metadata | Backward-compatible | Chain linkage, 50-entry cap, `$exception_source`, empty `value` and UUID-less image filtering land in PostHog/posthog-ios#931; caller properties can still override `$exception_level`/`$exception_source` on purpose (no typed level parameter yet, and Android/JS behave the same) — [posthog-ios.md#n19](posthog-ios.md) |
 | posthog-android | Exception Event Metadata | Needs deprecation path | Nested entries copy the outermost `handled`, suppressed entries have no `mechanism.source`, a single-entry list has no `exception_id: 0`, no `$exception_source`, and `$exception_level` is a documented caller override (re-audited at 4.0 `aaa23d39`) — [posthog-android.md#n7](posthog-android.md#n7) |
+| posthog-android | Capture | Backward-compatible | The migration guide doesn't show a `process_person_profile: true` call option as the way to keep identity calls under a registered `false`, as #146 requires from `15501ca`; PostHog/posthog-android#966 adds it (4.0 `aaa23d39`) — [posthog-android.md#n24](posthog-android.md#n24) |
 | posthog-android | Identify | Backward-compatible | While opted out, `identify` updates the person-properties dedup hash for a `$set` it dropped, so the same properties are skipped after opt-in (4.0 `aaa23d39`) — [posthog-android.md#n28](posthog-android.md#n28) |
 | posthog-android | Get Feature Flags / Get Feature Flags And Payloads | Backward-compatible | `getAllFeatureFlags()` is the spec's android 4.0 form but returns `null` after a restart until the disk cache is loaded (4.0 `aaa23d39`) — [posthog-android.md#n9](posthog-android.md#n9) |
 | posthog-android | Surveys | Backward-compatible | Submit and dismiss move the last-seen survey date (#102), and a survey with an unknown question type blocks later surveys until reset (4.0 `aaa23d39`) — [posthog-android.md#n22](posthog-android.md#n22) |
@@ -385,7 +388,7 @@ stalest pointer and its only 59-row file.
 | posthog-js | Exception Event Metadata | Backward-compatible | **New this run** — the most complete producer envelope audited (full `exception_id`/`parent_id` linkage, canonical sources, correct nested-`handled` omission, spec-exact caps), missing only `$exception_source` and a capture category on the two global handlers, which fall back to `generic` — [posthog-js.md#n35](posthog-js.md) |
 | posthog-js | Session Replay Debug Properties | Backward-compatible | **New this run** — re-scored against `d078270` after #96; tiering, the `$`-prefix gate, and the 30 s throttle conform, but after `stopSessionRecording()` on a loaded recorder events keep `active`/`buffering` instead of `$recording_status: disabled` — [posthog-js.md#n36](posthog-js.md) |
 
-Full contract-by-contract detail (33 posthog-js, 21 posthog-python, 16 posthog-android, 20
+Full contract-by-contract detail (33 posthog-js, 21 posthog-python, 17 posthog-android, 20
 posthog-ios, 26 posthog-node, 34 posthog-flutter, 31 posthog-react-native, 19 posthog-php, 21
 posthog-ruby, 23 posthog-go, 19 posthog-java, and 29 posthog-dotnet non-Pass/non-N/A cells) is in
 the respective per-SDK files.

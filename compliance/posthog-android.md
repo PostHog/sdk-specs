@@ -154,7 +154,7 @@ complete implementation of that contract outside the browser.
 | 5 | Bootstrap | 🟡 | [n4] |
 | 6 | Capture | ✅ | [n24] |
 | 7 | Capture AI | ✅ | [n25] |
-| 8 | Capture Exception | ✅ |  |
+| 8 | Capture Exception | ✅ | [n40] |
 | 9 | Consent Gating | ✅ | [n5] |
 | 10 | Create Person Profile | ➖ |  |
 | 11 | Debug | ✅ |  |
@@ -341,10 +341,34 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
 <a id="n7"></a>
 
 ### n7 — Exception Event Metadata (🟡 Partial)
-- **Spec requires:** Every entry in `$exception_list` carries a `mechanism`; the outermost entry's `mechanism.exception_id` SHALL equal `0` and every entry SHALL have a unique non-negative `exception_id`; nested entries SHALL carry `parent_id`, `mechanism.type` of `chained`, and a `mechanism.source` naming the parent edge. A producer SHALL **omit** any optional common field it cannot determine and **MUST NOT represent unknown with `false`**, an empty string, or `null`. `handled` describes disposition at the relevant boundary and MUST NOT be invented for a nested entry. At most 50 entries with cycle detection. Application property bags MUST NOT override SDK-owned `$exception_list`, `$exception_level`, or `$exception_source` (spec line 300).
-- **SDK currently:** Audited from scratch against `posthog/src/main/java/com/posthog/internal/errortracking/ThrowableCoercer.kt`. **Much of this is already right**, and the implementation is visibly spec-aware: `exception_id` and `parent_id` are emitted into the mechanism (`:214-220`); derived entries get `mechanism.type` of `"chained"` for cause-chain members and `"suppressed"` for suppressed exceptions, with the first entry keeping the primary mechanism (`:285-299`); `MAX_EXCEPTION_LIST_SIZE = 50` (`:391`) matches the spec's bound exactly and traversal is cycle-guarded with a `seen` set (`:381`); `thread_id` is populated; and a code comment at `:189-191` shows the author knowingly emitting the linkage fields "for parity with the other SDKs" even though ingestion currently drops them. **Four gaps:** (1) **`"synthetic" to false` is a hardcoded literal** on every entry (`:212`) — this is exactly the "MUST NOT represent unknown with `false`" prohibition; the field should be omitted when undetermined; (2) **nested entries inherit the outermost `handled`** — the same `handled` value is threaded into every item (`:328`, and `:211` writes it unconditionally), which is invented capture-boundary metadata for a cause; (3) **no `mechanism.source`** — the parent edge is encoded in `mechanism.type` (`chained`/`suppressed`) rather than in the dedicated `source` field the spec defines, and **no `$exception_source` property is emitted** anywhere; (4) **`exception_id` is omitted entirely for a single-item list** (`:215-217`, "null for a single-item list, where the ids carry no information") — but the spec requires the outermost entry's `exception_id` to equal `0` unconditionally, because the canonical tree linkage depends on it. Separately, `PostHogStateless.kt:701` documents that "callers can override reserved keys such as `$exception_level`", which is the application-property-bag override spec line 300 forbids.
-- **Backwards compatibility:** Backward-compatible for (1), (3), and (4) — omitting a field, adding `source`/`$exception_source`, and always emitting `exception_id: 0` are additive or strictly more correct wire changes. **Needs deprecation path** for the `$exception_level` caller override, which is currently documented behaviour: a typed override parameter should ship before the generic property-bag path stops winning. Gap (2) is backward-compatible.
-- **Remediation:** Omit `synthetic` unless determined rather than writing `false`; stop threading the boundary `handled` onto derived items; add `mechanism.source` alongside the existing `type` and emit `$exception_source` from the capture boundary; always assign `exception_id`, including on a single-item list. Then add a typed `level` override and stop honouring `$exception_level` from the generic property map.
+- **Spec requires:** `both` (`exception-event-metadata/spec.md:11`). Every entry has a non-empty `type` and a
+  string `value`, which may be empty (`:24`). Every entry's mechanism carries `exception_id`, `0` on the
+  outermost entry (`:26`, `:219`). A nested entry omits `handled` unless known for that entry (`:150`), and
+  uses `mechanism.type` `chained` with `mechanism.source` `cause` or `suppressed` (`:91`, `:215-219`).
+  `$exception_source` comes from the capture boundary, `android.uncaught_exception_handler` for Android's
+  uncaught handler (`:93-124`). Application property bags MUST NOT override `$exception_list`,
+  `$exception_level` or `$exception_source` (`:314`, `:330-334`). #123's trace context binds server SDKs
+  only (`:433`, `:454`).
+- **SDK currently (4.0, `aaa23d39`):** in `posthog/src/main/java/com/posthog/internal/errortracking/ThrowableCoercer.kt`,
+  boundary defaults, `chained` cause entries with `parent_id`, the 50-entry cap and the cycle guard
+  conform (`:257-259`, `:285-294`, `:372-389`), and `synthetic: false` (`:212`) is correct for a real JVM
+  `Throwable` with its own stack (`:186-196`). Gaps:
+  1. Nested entries copy the outermost `handled` (`:211`, `:326`).
+  2. Suppressed entries use `mechanism.type` `suppressed` (`:309`), and no entry has `mechanism.source`.
+  3. A single-entry list has no `exception_id` (`:316-318`), nor does the native crash mechanism
+     (`posthog-android/src/main/java/com/posthog/android/internal/errortracking/NativeCrashEventCoercer.kt:69-74`).
+  4. No Android path sets `$exception_source`, including the uncaught handler
+     (`posthog/src/main/java/com/posthog/errortracking/PostHogErrorTrackingAutoCaptureIntegration.kt:118-121`) and native crashes.
+  5. `captureException` merges caller properties over the generated ones (`posthog/src/main/java/com/posthog/PostHog.kt:1726-1728`), and
+     `PostHogStateless.kt:851-852` documents that callers can override `$exception_level`.
+  6. `value` is left out when the throwable has no message (`ThrowableCoercer.kt:229-233`).
+- **Backwards compatibility:** Gaps 1-4 and 6 are backward-compatible (each omits or adds a field, and
+  `source` keeps the suppressed relationship). Gap 5 needs a deprecation path: ship a typed `level`
+  override before the property map stops winning.
+- **Remediation:** Omit `handled` on nested entries; emit `type: chained` with `source: cause`/`suppressed`;
+  always set `exception_id` (`0` outermost), including native crashes; set `$exception_source` at each
+  boundary; always emit `value`; add a typed `level` override, then stop the property map replacing
+  reserved keys.
 
 <a id="n8"></a>
 
@@ -617,24 +641,30 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
 <a id="n22"></a>
 
 ### n22 — Surveys (🟡 Partial)
-- **Spec requires:** (acceptance scenario, `@client`, `surveys.feature:126-135`) non-web/native
-  SDKs MUST exclude surveys whose only display-targeting conditions are web-only (`url`/
-  `selector`).
-- **SDK currently:** Rich, otherwise-correct implementation
-  (`posthog-android/src/main/java/com/posthog/android/surveys/PostHogSurveysIntegration.kt`)
-  covering active/date-window filtering, device-type matching, seen state, wait period,
-  linked/targeting/multi feature-flag gating, event-based activation, all 5 question types, and
-  opt-out-gated event emission. `getActiveMatchingSurveys()` (lines 226-277) never reads
-  `survey.conditions?.url` or `survey.conditions?.selector` anywhere, reconfirmed via exhaustive
-  grep this cycle — zero matches for `conditions?.url`, `conditions?.selector`, despite
-  `SurveyConditions.kt` deserializing those fields. A survey whose only targeting condition is a
-  CSS selector or URL match passes all Android eligibility checks and is shown natively with an
-  inert, non-functional targeting condition.
-- **Backwards compatibility:** Needs deprecation path — the fix is additive (a new exclusion check
-  tightens eligibility, no public API change) but is a user-visible behavior change (some
-  currently-shown surveys would stop displaying), so ship with a changelog note.
-- **Remediation:** Add a filter step in `getActiveMatchingSurveys()` excluding surveys where
-  `url`/`selector` are the *only* configured display-targeting condition.
+- **Spec requires:** `client`.
+  - **Wait period** (#102): the last-seen survey date is written when a survey is shown, and "Submit and
+    dismiss SHALL NOT move the date" (`surveys/spec.md:425-429`; scenario `:472-487`).
+  - **Undisplayable questions:** a survey with a question type the SDK can't display is skipped, not
+    marked seen, and "SHALL NOT prevent another eligible survey from being displayed" (`:262-269`).
+  - **Popup delay** (#121, `:323-354`) and **web-only conditions** (`:43`, `:126-135`).
+- **SDK currently (4.0, `aaa23d39`):**
+  - **Conforms.** The shown callback writes the date
+    (`posthog-android/src/main/java/com/posthog/android/surveys/PostHogSurveysIntegration.kt:522-523`).
+    The integration reserves the survey before the popup delay, and a repeat trigger hits that reservation
+    (`:357-366`, `:867`); the Compose host waits `surveyPopupDelaySeconds` before presenting. Surveys with
+    `url` or `selector` conditions are excluded (`hasWebConditions`, `:219-222`, `:269`).
+  - **Gap 1.** `setSurveySeen` writes the date again (`:1201-1202`), and it runs on dismiss (`:457`) and on
+    submit (`:994`), so the dismiss scenario fails.
+  - **Gap 2 (from reading the code).** `GsonSurveyQuestionAdapter` returns `null` for an unknown question
+    type (`posthog/src/main/java/com/posthog/internal/surveys/GsonSurveyQuestionAdapter.kt:36-43`), leaving
+    a `null` entry in `questions`. `showSurvey` reserves the survey (`:363-364`), then
+    `SurveyProgressStore.questionOrder` reads `it.type` on that entry (`SurveyProgressStore.kt:68`) and
+    throws. The caller catches it, but the reservation is never released, so no later survey shows until
+    reset.
+  - **Not scored (SHOULD).** Eligibility isn't re-checked after the popup delay (`:346-348`).
+- **Backwards compatibility:** Backward-compatible; no public API changes.
+- **Remediation:** Drop `setLastSeenSurveyDate` from `setSurveySeen`. Exclude surveys with an undisplayable
+  question before reserving, or release the reservation when `showSurvey` fails.
 
 <a id="n23"></a>
 
@@ -1030,5 +1060,22 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
 - **SDK currently (4.0, `aaa23d39`):** conforms. `getFeatureFlag`
   (`posthog/src/main/java/com/posthog/PostHog.kt:2766-2774`) returns `variant ?: enabled` from the flag
   result (`FeatureFlagResult.kt:28-29`) and sends `$feature_flag_called` unless suppressed (`:2700-2760`).
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.
+
+<a id="n40"></a>
+
+### n40 — Capture Exception (✅ Pass)
+- **Spec requires:** type and message from `$exception_list[0]`, frames bottom-up, an existing stack kept,
+  null custom properties dropped, `ignoredExceptionTypes` on every path. #124: a separate fatal serializer
+  emits the same entries and frames, omitting an unset optional field rather than the frame or entry
+  (`capture-exception/spec.md:390-434`).
+- **SDK currently (4.0, `aaa23d39`):** conforms. `captureException`
+  (`posthog/src/main/java/com/posthog/PostHog.kt:1704-1738`) builds `$exception_list` with frames reversed
+  to bottom-up (`internal/errortracking/ThrowableCoercer.kt:129`), and uncaught JVM exceptions use the same
+  path (`errortracking/PostHogErrorTrackingAutoCaptureIntegration.kt:118-121`). The native crash serializer
+  adds each optional frame field only when known and always keeps the frame and stack trace
+  (`posthog-android/src/main/java/com/posthog/android/internal/errortracking/NativeCrashEventCoercer.kt:23-82`).
+  `ignoredExceptionTypes` also applies to `$exception` events handed to `capture` (`PostHog.kt:1388-1397`).
 - **Backwards compatibility:** No change needed.
 - **Remediation:** None.

@@ -27,6 +27,6 @@ _None._
 ## Impact
 
 - SDK implementations in review rename the property before they ship: posthog-python ([PostHog/posthog-python#1154](https://github.com/PostHog/posthog-python/pull/1154)) and posthog-node ([PostHog/posthog-js#5636](https://github.com/PostHog/posthog-js/pull/5636)).
-- posthog-sdk-test-harness renames the property in `schemas/experiment_exposure_properties.schema.json` and `schemas/feature_flag_called_context.schema.json`, a major contract version.
+- posthog-sdk-test-harness renames the property in `schemas/experiment_exposure_properties.schema.json` and `schemas/feature_flag_called_context.schema.json`, as contract 10.0.0 ([posthog-sdk-test-harness#105](https://github.com/PostHog/posthog-sdk-test-harness/pull/105)).
 - The PostHog server does not read `$feature_flag_variant`. Experiment analysis of config version 2 flags (task 2.3 of the archived `add-experiment-exposure` change) reads `$feature_flag_variant_key`.
 - The archived change `2026-11-05-add-experiment-exposure` keeps the old name as history.

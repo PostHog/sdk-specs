@@ -10,7 +10,7 @@ Config version 1 flags do not change. Ingestion keeps deriving their exposures f
 
 `both`: every client or server SDK that reads `/flags?v=4` records. An SDK that does not read them sees config version 2 flags as legacy values and sends no direct exposure. Server SDKs that evaluate config version 2 flags locally send the same exposure with `locally_evaluated` true.
 
-The public wire contract is `contracts/feature_flag_rules_v2` in posthog-sdk-test-harness, contract 10.0.0 or later, which names the variant key `$feature_flag_variant_key`. Contracts 8.0.0 ([posthog-sdk-test-harness 1.27.0](https://github.com/PostHog/posthog-sdk-test-harness/releases/tag/1.27.0)) and 9.0.0 name it `$feature_flag_variant`.
+The public wire contract is `contracts/feature_flag_rules_v2` in posthog-sdk-test-harness, contract 10.0.0 ([posthog-sdk-test-harness#105](https://github.com/PostHog/posthog-sdk-test-harness/pull/105)) or later, which names the variant key `$feature_flag_variant_key`. Contracts 8.0.0 ([posthog-sdk-test-harness 1.27.0](https://github.com/PostHog/posthog-sdk-test-harness/releases/tag/1.27.0)) and 9.0.0 name it `$feature_flag_variant`.
 
 ## Requirements
 

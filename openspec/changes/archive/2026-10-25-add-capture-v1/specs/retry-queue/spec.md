@@ -2,7 +2,7 @@
 
 When syncing this delta into the canonical `retry-queue` spec:
 
-- In Behavior step 5, split the classification by wire. Legacy capture: retryable includes rate limits / `429`. Capture v1: retryable is exactly `404`, `408`, `429`, `500`, `502`, `503`, `504`, network errors and timeouts; `429` comes from a layer in front of capture and carries no `Retry-After` today, so its retries use the normal waits. Capture's own `408`, `500`, `503` and `504` responses, and a 2xx with `retry` entries, carry `Retry-After: 1`.
+- In Behavior step 5, split the classification by wire. Legacy capture: retryable includes rate limits / `429`. Capture v1: retryable is exactly `404`, `408`, `429`, `500`, `502`, `503`, `504`, network errors and timeouts; `429` comes from a layer in front of capture and carries no `Retry-After`, so its retries use the normal waits. Capture's own `408`, `500`, `503` and `504` responses, and a 2xx with `retry` entries, carry `Retry-After: 1`.
 - In Behavior step 10 and the "adjusted batch size" State entries, mark batch shrinking on `413` as legacy behavior: on capture v1 `413` is terminal on server SDKs and byte-aware batching keeps requests under the body limit (see `event-batcher`); a client SDK MAY halve a batch of more than one event.
 - Leave the durable-queue, offline and acknowledgement requirements unchanged; they describe client SDKs with persistent queues and are not changed by capture v1.
 

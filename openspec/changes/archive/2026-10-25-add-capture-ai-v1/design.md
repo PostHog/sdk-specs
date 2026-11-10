@@ -39,7 +39,7 @@ The current spec predates all four: it names only Python and Node, ties wrapper 
 
 - [The analytics endpoint's acceptance of `$ai_*` events ends on a date PostHog has not set] → the requirement says "temporary" and that SDKs never rely on it, as the public docs do.
 - [The posthog-node series is unmerged] → every rule here is also in Python, Go or Rust; Node appears only in option names and the compression variation.
-- [Draft #118 and this change both touch the Configuration section] → #118 is superseded; its author is the PostHog bot, so closing it is a maintainer call.
+- [Draft #118 and this change both touch the Configuration section] → #118 is superseded and was closed on 2026-10-27.
 
 ## Migration Plan
 

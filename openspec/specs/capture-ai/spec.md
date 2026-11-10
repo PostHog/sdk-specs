@@ -20,7 +20,7 @@ contract, headers, per-event results and event-building order.
 
 ## Applicability
 
-`server`, and client SDKs on capture v1 that ship an AI method — implemented
+`server`, and client SDKs on capture v1 that ship an AI method. It is implemented
 by posthog-python 8.0 (`capture_ai`), posthog-node 6.0 (`captureAi`), posthog-go
 v2 (`EnqueueAI`), posthog-rs 1.0 (`capture_ai`), posthog-ios 4.0 and
 posthog-android 4.0 (`captureAi`), and posthog-flutter 6.0 (`captureAi`: native
@@ -126,7 +126,7 @@ longer than analytics because AI payloads are much larger; posthog-ios,
 posthog-android and the posthog-flutter Windows and Linux lane default to 100
 events, 50 MiB on disk and a 60 second timeout. The compression default is the
 SDK's: none in posthog-python, posthog-go and posthog-rs, gzip in posthog-node
-and the mobile SDKs. The analytics lane's compression and queue capacity never
+and the client SDKs. The analytics lane's compression and queue capacity never
 reach the AI lane; batching settings may be shared. The per-event cap is
 optionally exposed (`capture_ai_max_event_bytes` in posthog-python) and can
 only be lowered; the batch target is an internal constant. See **AI
@@ -165,7 +165,7 @@ lane configuration is scoped to the AI lane**.
 
 - `capture_ai` never throws under normal operation, matching `capture`.
 - Events exceeding the operational per-event size cap are dropped locally,
-  logging the event name and byte size only — never payload content, which
+  logging only the event name and byte size, never payload content, which
   may be unredacted multimodal data. An SDK that stops measuring once an
   event passes the cap logs "over N bytes" instead of the full size. Client
   SDKs MAY log this drop only in debug mode, like their other drop lines.
@@ -267,7 +267,7 @@ the scenarios below.
 
 An SDK that ships PostHog AI wrapper libraries SHALL expose a single boolean
 option (default false), named `enable_full_ai_capture` adapted to platform
-convention (today posthog-python and posthog-node), that governs what the
+convention (posthog-python and posthog-node ship it), that governs what the
 SDK's AI wrapper libraries capture. When true, the wrappers skip string truncation and pass media through unredacted; when false, they truncate long strings and replace media with a type-aware placeholder. The flag SHALL NOT change which route the wrappers use: on a capture v1 SDK they always send through the AI method (see **Built-in AI integrations always use the AI method**). It SHALL NOT alter payloads passed to
 `capture_ai` directly.
 
@@ -383,7 +383,7 @@ The AI lane SHALL have its own queue, flush cycle, retry state and in-flight req
 
 Every platform of an SDK that delivers events through capture v1 SHALL ship this lane and the AI method; a wrapper SDK SHALL NOT leave a capture v1 platform without them. On a platform still on legacy capture (posthog-flutter on the web, which sends through posthog-js), the AI method SHALL send nothing, log that AI capture is unsupported there, and return the SDK's not-admitted value, and SHALL NOT fall back to `capture`.
 
-Capture currently accepts `$ai_*` events on the analytics endpoint and forwards them to the AI pipeline. That acceptance is temporary; the SDK and its built-in integrations SHALL NOT rely on it.
+Capture also accepts `$ai_*` events on the analytics endpoint and forwards them to the AI pipeline, but only temporarily; the SDK and its built-in integrations SHALL NOT rely on it.
 
 Legacy capture: the AI route was `/i/v0/ai/batch/`, which rejected a whole batch containing a non-AI event.
 
@@ -506,7 +506,7 @@ The analytics lane's compression and queue capacity, including environment varia
 
 ### Requirement: AI event size and batching on capture v1
 
-An SDK that delivers events through capture v1 and supports AI capture SHALL NOT send an AI event it measures over the 8 MiB ceiling on `properties`. With the default cap and an exact `properties` measure, it SHALL NOT refuse one at or under that size; a lowered cap or the whole-event measure below MAY refuse a smaller event. The SDK SHALL either measure `properties` exactly or measure the whole serialized event against the ceiling plus a fixed envelope headroom (64 KiB in posthog-python, posthog-go, posthog-ios, posthog-android and the posthog-flutter 6.0 Windows and Linux lane); an event the whole-event measure admits but capture rejects comes back as `details: ai_event_too_big` and is surfaced like any other drop. An event over the SDK's measure SHALL be dropped on every send path, including immediate and synchronous ones, and reported through the SDK's error surface or a log line that names the event and its byte size (or "over N bytes" when the SDK stops measuring at the cap) and never its content.
+An SDK that delivers events through capture v1 and supports AI capture SHALL NOT send an AI event it measures over the 8 MiB ceiling on `properties`. With the default cap and an exact `properties` measure, it SHALL NOT refuse one at or under that size; a lowered cap, or the whole-event measure described next, MAY refuse a smaller event. The SDK SHALL either measure `properties` exactly or measure the whole serialized event against the ceiling plus a fixed envelope headroom (64 KiB in posthog-python, posthog-go, posthog-ios, posthog-android and the posthog-flutter 6.0 Windows and Linux lane); an event the whole-event measure admits but capture rejects comes back as `details: ai_event_too_big` and is surfaced like any other drop. An event over the SDK's measure SHALL be dropped on every send path, including immediate and synchronous ones, and reported through the SDK's error surface or a log line that names the event and its byte size (or "over N bytes" when the SDK stops measuring at the cap) and never its content.
 
 The AI lane SHALL batch by bytes with a 5 MiB target, checked before appending: when the batch is non-empty and the next event would exceed the target, the batch is sent first and the event starts the next one, so order is kept and an event over the target ships alone.
 

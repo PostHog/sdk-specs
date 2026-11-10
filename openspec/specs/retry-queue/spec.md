@@ -47,7 +47,7 @@ nextDelay(attempt): Duration
    - The batch is sent to PostHog using the configured HTTP transport.
 5. **Classify failures.**
    - Legacy capture. Retryable: network errors, many server errors, rate limits / `429`, timeouts, and some transient transport errors. Non-retryable: malformed payloads, most 4xx client errors, or SDK-specific parse/serialization failures.
-   - Capture v1. Retryable: exactly `404`, `408`, `429`, `500`, `502`, `503`, `504`, network errors and timeouts, plus the `retry` entries of a 2xx `results` map. Everything else is terminal. `429` comes from a layer in front of capture and carries no `Retry-After` today, so its retries use the normal waits. Capture's own `408`, `500`, `503` and `504` responses, and a 2xx with `retry` entries, carry `Retry-After: 1`. See **Capture v1 status classification and attempt budget**.
+   - Capture v1. Retryable: exactly `404`, `408`, `429`, `500`, `502`, `503`, `504`, network errors and timeouts, plus the `retry` entries of a 2xx `results` map. Everything else is terminal. `429` comes from a layer in front of capture and carries no `Retry-After`, so its retries use the normal waits. Capture's own `408`, `500`, `503` and `504` responses, and a 2xx with `retry` entries, carry `Retry-After: 1`. See **Capture v1 status classification and attempt budget**.
 6. **Apply retry policy for retryable failures.**
    - Retry after an exponential or linear backoff delay.
    - Some SDKs pause flushing globally until the backoff window expires.

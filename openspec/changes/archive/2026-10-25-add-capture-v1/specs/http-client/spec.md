@@ -13,7 +13,7 @@ When syncing this delta into the canonical `http-client` spec:
 
 An SDK that delivers events through capture v1 SHALL build the capture URL as `{host}/i/v1/analytics/events` (and `{host}/i/v1/ai/events` for the AI lane), SHALL send the project token only as `Authorization: Bearer <token>`, and SHALL send the header set defined in `capture` (**Capture v1 request headers**) on every attempt.
 
-The SDK MAY compress the body with `gzip`, `deflate`, `br` or `zstd`, offering only the codecs its runtime provides, and SHALL then set `Content-Encoding` to exactly that token. It SHALL NOT use legacy encodings (`gzip-js`, `lz64`, `base64`) or a `?compression=` query parameter on capture v1. If local compression fails, the SDK MAY send the body uncompressed without `Content-Encoding`. Each delivery lane SHALL have its own compression setting; the analytics setting SHALL NOT change AI uploads. The default is the SDK's choice: posthog-python, posthog-go and posthog-rs default to no compression; posthog-node keeps gzip.
+The SDK MAY compress the body with `gzip`, `deflate`, `br` or `zstd`, offering only the codecs its runtime provides, and SHALL then set `Content-Encoding` to exactly that token. It SHALL NOT use legacy encodings (`gzip-js`, `lz64`, `base64`) or a `?compression=` query parameter on capture v1. If local compression fails, the SDK MAY send the body uncompressed without `Content-Encoding`. Each delivery lane SHALL have its own compression setting; the analytics setting SHALL NOT change AI uploads. The default is the SDK's choice: posthog-python, posthog-go and posthog-rs default to no compression; posthog-node defaults to gzip, and client SDKs default to gzip as **Request body compression and opt-out** requires.
 
 For capture requests the transport SHALL follow a redirect only when the status is `307` or `308` and the target has the same origin (scheme, host and port) as the configured host, at most five times, resending the same method, headers and body. Any other redirect, a cross-origin target or a sixth hop is a terminal failure of that request. A caller-supplied HTTP client either keeps its own redirect policy or, where the SDK can intercept its redirects, gets this same rule applied to capture requests; both are compliant.
 
@@ -83,7 +83,7 @@ When compression is turned off, every request the SDK would otherwise have compr
 
 A client SDK's opt-out SHALL be reachable through configuration. An SDK that reserves `Content-Encoding` against caller-supplied custom headers SHALL NOT treat overriding that header as the way to disable compression.
 
-When compression fails locally — for example a gzip encoder that throws — the SDK MAY send the uncompressed body instead of dropping the request. The SDK SHALL NOT silently downgrade to an uncompressed body and resend after a server rejects a compressed request; a server rejection is surfaced to the retry layer like any other failure, and opting out stays an explicit application decision.
+When compression fails locally, for example when a gzip encoder throws, the SDK MAY send the uncompressed body instead of dropping the request. The SDK SHALL NOT silently downgrade to an uncompressed body and resend after a server rejects a compressed request; a server rejection is surfaced to the retry layer like any other failure, and opting out stays an explicit application decision.
 
 #### Scenario: Compression is on by default (@client)
 - **GIVEN** a fresh SDK acceptance test harness

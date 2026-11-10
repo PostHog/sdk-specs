@@ -38,7 +38,7 @@ The canonical specs predate the port. `capture` still says server SDKs stamp `$l
 - Network failures after the last attempt: posthog-node 6 puts the events back at the head of its queue for the next flush, bounded by the queue cap; Python, Go and Rust report them as exhausted.
 - Hoisting the legacy option properties and the AI per-event measurement are mechanisms the SDK chooses; the observable result is fixed.
 
-**Flag properties are folded into the layer-order requirement.** #145 proposes the same rule (flag properties fill under the call, the context and the global defaults, before `before_send`). This change states the whole order once and cites #145; if #145 merges first, the archive step reconciles the two requirements into one.
+**Flag properties are folded into the layer-order requirement.** #145 proposed the same rule (flag properties fill under the call, the context and the global defaults, before `before_send`). This change states the whole order once, and #145 was closed in its favor.
 
 **Scenarios stay black-box.** Every scenario asserts received traffic or a public return value: endpoint paths, headers across attempts, the serialized event, the error handler's input. Nothing inspects a private queue.
 
@@ -46,7 +46,7 @@ The canonical specs predate the port. `capture` still says server SDKs stamp `$l
 
 - [Legacy SDKs read as non-conformant on new rows of `compliance/<sdk>.md`] → the rows are scoped to capture v1, so an audit records "not yet on capture v1" rather than a defect. Their next-major port closes the rows.
 - [The posthog-node series is unmerged and can still change] → requirements cite only behavior that is also in Python, Go or Rust; Node-only details are limited to option names in examples. Re-check at the Node 6 release.
-- [Open spec PRs #140 and #145 overlap] → named in the proposal's Impact; each needs a decision before this change merges. #81 merged with its gzip default scoped to client SDKs.
+- [Open spec PR #140 overlaps] → named in the proposal's Impact; it needs a decision before this change merges. #145 was closed in favor of this change. #81 merged with its gzip default scoped to client SDKs.
 - [404 and 429 were terminal in the first draft] → decided 2026-10-27: both are retried like `408` and the `5xx` statuses, so a transient status does not drop data. The requirement and both scenario tables carry the decided rule.
 
 ## Migration Plan

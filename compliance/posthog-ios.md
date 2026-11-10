@@ -2,8 +2,8 @@
 
 **Repo:** [PostHog/posthog-ios](https://github.com/PostHog/posthog-ios)
 **Audited commit:** `e27cbe4cb0bf5958fe79a061783af2dfb1b17ab4` ([commit](https://github.com/PostHog/posthog-ios/commit/e27cbe4cb0bf5958fe79a061783af2dfb1b17ab4)) on the 4.0 release branch `chore/v4-remove-deprecated` ([PostHog/posthog-ios#873](https://github.com/PostHog/posthog-ios/pull/873)), before 4.0.0 is published — first audited on 2026-11-05 at `3460e534a`, re-checked on 2026-11-10 (see [Re-check](#re-check-2026-11-10))
-**Audited against sdk-specs commit:** `752f899` plus [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79` (capture v1, including #147's AI lane), treated as merged to `main`; first audited against `dd11a6b`
-**Summary:** 44 ✅ · 14 🟡 · 1 ❌ · 10 ➖ (69 rows; previous audit 2026-10-08 at `f5cbe87c` + posthog-ios#924–#934 scored 38/16/4/6 on 64 rows)
+**Audited against sdk-specs commit:** `752f899` plus [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79` (capture v1, including #147's AI lane), treated as merged to `main`, with Capture's identity-call migration-guide requirement checked at #146 `15501ca`; first audited against `dd11a6b`
+**Summary:** 43 ✅ · 15 🟡 · 1 ❌ · 10 ➖ (69 rows; previous audit 2026-10-08 at `f5cbe87c` + posthog-ios#924–#934 scored 38/16/4/6 on 64 rows)
 
 Note on repo layout: `posthog-ios` is a single-package repo, distributed through Swift Package Manager
 only from 4.0. Core SDK logic lives at `PostHog/` (flat files: `PostHogSDK.swift` — the main public
@@ -30,11 +30,11 @@ to the README table since then: **Experiment Exposure**, **AI Datasets**, **AI S
 Evaluations** and **Emails** (all ➖).
 
 Net changes vs. the previous audit:
-- **Improved (9):** Get Feature Flag Payload 🟡→✅ (4.0 removes `getFeatureFlagPayload(_:)`; payloads
+- **Improved (8):** Get Feature Flag Payload 🟡→✅ (4.0 removes `getFeatureFlagPayload(_:)`; payloads
   are read with `getFeatureFlagResult(_:sendFeatureFlagEvent: false)?.payload`, which the new "Payload
   reads through the flag result getter" requirement permits), Get Feature Flag Result and Feature Flag
   Cache 🟡→✅ (a malformed, empty or whitespace-only payload is `nil`; bootstrapped payloads are decoded
-  once), Is Feature Enabled 🟡→✅ (`isFeatureEnabled(_:defaultValue:)`), Capture and Capture Exception
+  once), Is Feature Enabled 🟡→✅ (`isFeatureEnabled(_:defaultValue:)`), Capture Exception
   🟡→✅ (empty event names are dropped and `NSNull` properties are omitted on the queue and the wire,
   [PostHog/posthog-ios#1047](https://github.com/PostHog/posthog-ios/pull/1047)), Session Replay Privacy
   ❌→🟡 (4.0 records masked screenshots only, so the leaking wireframe path is gone; SwiftUI's explicit
@@ -61,7 +61,7 @@ Net changes vs. the previous audit:
 Re-checked at the 4.0 branch head `e27cbe4cb` against sdk-specs `752f899` and #146 at `d387ab79`.
 Every line reference on this page is at `e27cbe4cb`.
 
-- **Rows that changed status since the 2026-11-05 audit:** Capture, Capture AI and Capture Exception
+- **Rows that changed status since the 2026-11-05 audit:** Capture AI and Capture Exception
   🟡→✅ ([PostHog/posthog-ios#1047](https://github.com/PostHog/posthog-ios/pull/1047) omits `NSNull`
   properties; [n4](#n4), [n5](#n5), [n27](#n27)); On Feature Flags 🟡→✅
   ([PostHog/posthog-ios#1048](https://github.com/PostHog/posthog-ios/pull/1048) drops loads in flight
@@ -69,7 +69,14 @@ Every line reference on this page is at `e27cbe4cb`.
   step buffer, so the byte-counted and sent steps differ; [n30](#n30)). Surveys stays ✅:
   [PostHog/posthog-ios#1049](https://github.com/PostHog/posthog-ios/pull/1049) meets every SHALL of the
   popup-delay requirement (#121) and #102's wait period; the one unmet SHOULD (re-check eligibility
-  when the delay elapses) is recorded but not scored ([n29](#n29)).
+  when the delay elapses) is recorded but not scored ([n29](#n29)). Capture stays 🟡: #1047 closes
+  its `NSNull` gap, but #146 at `15501ca` adds a migration-guide requirement that is not met yet (next
+  bullet).
+- **#146 at `15501ca`:** migration guides SHALL show a call option `process_person_profile: true` on an
+  identity call as the way to keep identifying under a layered `false`. The SDK behaves that way, but
+  `MIGRATION.md` at `e27cbe4cb` only says those events are dropped; the example lands with
+  [PostHog/posthog-ios#1053](https://github.com/PostHog/posthog-ios/pull/1053), open. Capture is 🟡
+  until it merges ([n4](#n4)).
 - **#146 since `5c26b9bc`:** `http-client` now leaves "a delivery lane that has its own compression
   setting (`capture-ai`)" out of the whole-client opt-out, so `captureAiCompression` conforms and HTTP
   Client is scored ✅ on its merits ([n22](#n22)). "Events name their own library" now applies to
@@ -141,7 +148,7 @@ Retry Queue.
 | 2 | Traces | ❌ | [n2] |
 | 3 | Tracing Headers | ✅ | new server span-context bridge requirements (#129) are `@server` only |
 | 4 | Alias | 🟡 | [n3] |
-| 5 | Capture | ✅ | was 🟡; [n4]; capture v1 wire conforms (#146); empty event names dropped (also after `beforeSend`); `NSNull` properties omitted (#1047); own `$lib` pair filled after caller properties (#1050); empty variant left out of `$active_feature_flags` |
+| 5 | Capture | 🟡 | [n4]; `MIGRATION.md` lacks the identity-call `process_person_profile: true` example #146 requires (met once posthog-ios#1053 merges); capture v1 wire conforms (#146); empty event names dropped (also after `beforeSend`); `NSNull` properties omitted (#1047); own `$lib` pair filled after caller properties (#1050); empty variant left out of `$active_feature_flags` |
 | 6 | Capture AI | ✅ | was ➖; #146 adds iOS 4.0 to Applicability; the AI lane conforms, including the `NSNull` cleanup (#1047) — [n27] |
 | 7 | Capture Exception | ✅ | was 🟡; [n5]; `NSNull` custom properties omitted (#1047) |
 | 8 | Create Person Profile | ➖ | unchanged — spec Applicability still says only the posthog-js family exposes it; no `createPersonProfile` in iOS |
@@ -250,7 +257,7 @@ Retry Queue.
 - **Remediation:** Set `props["distinct_id"] = distinctId` (or fix the spec scenario to match
   Behavior step 4), and drop a blank alias with a log, as `identify()` does.
 
-### n4 — Capture (✅ Pass; was 🟡)
+### n4 — Capture (🟡 Partial)
 - **Spec requires:** "Capture drops null-valued object properties" (`@both` scenarios): explicit
   nulls (`NSNull()`) omitted from custom properties recursively, null array elements kept at their
   index, emptied objects kept as `{}`, applied after `before_send` and on disk serialization.
@@ -263,8 +270,16 @@ Retry Queue.
   not an active feature flag". "Event uuid is sent in canonical form" (#119) and "Client-level GeoIP
   control" (#131) are server requirements ("Client SDKs SHALL NOT require the option"); "Client-side
   capture rate limiting never loses tokens to a clock change" (#127) applies only to a client SDK that
-  rate-limits captures (posthog-js).
+  rate-limits captures (posthog-js). #146 at `15501ca`: layered options reach person-only events, and
+  "SDK docs and migration guides SHALL show that call option on an identity call as the way to keep
+  identifying under a layered `false`".
 - **SDK currently:**
+  - **Identity calls under a registered `false` (gap).** A per-call `process_person_profile: true`
+    option keeps an `identify`, `alias`, `group` or `setPersonProperties` event processed, but
+    `MIGRATION.md` at `e27cbe4cb` (line 297) only says a registered `false` makes PostHog drop those
+    events and shows no call option.
+    [PostHog/posthog-ios#1053](https://github.com/PostHog/posthog-ios/pull/1053) (open) adds the
+    example; Capture is ✅ once it merges.
   - **Empty event names are dropped.** `prepareCaptureEvent` checks after `beforeSend`
     (`PostHog/PostHogSDK.swift:2102-2109`) and `queueEvent` checks again for every path
     (`:2745-2751`), with a one-time warning (`:2664-2672`). Whitespace-only names still pass; the

@@ -254,7 +254,7 @@ A server SDK that delivers events through capture v1 SHALL build each event in t
 
 In a wrapper whose events a native SDK delivers (posthog-flutter on iOS, macOS and Android), the wrapper's hook runs first, then the native SDK adds its own values, then the native SDK's `before_send` runs and has the final say. The wrapper's hooks do not run on every event type (see `before-send-hook`).
 
-A per-call argument such as `disable_geoip` belongs to step 2, so it beats a context or global `$geoip_disable`; the client-level setting belongs to step 3, so a context or global value beats it. A built-in AI or MCP integration SHALL set `process_person_profile: false` at step 2 when it substitutes a trace or session id for a missing user id. Adding groups to an event SHALL NOT turn person processing on.
+A per-call argument such as `disable_geoip` belongs to step 2, so it beats a context or global `$geoip_disable`, while a `$geoip_disable` in the same call's `properties` still wins over it (see **Client-level GeoIP control with per-call override**); the client-level setting belongs to step 3, so a context or global value beats it. A built-in AI or MCP integration SHALL set `process_person_profile: false` at step 2 when it substitutes a trace or session id for a missing user id. Adding groups to an event SHALL NOT turn person processing on.
 
 Legacy capture: posthog-python 7.x merged `super_properties` over the call's properties and posthog-go 1.x merged `DefaultEventProperties` over the call's properties; both reversed in their capture v1 majors.
 

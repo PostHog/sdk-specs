@@ -104,10 +104,10 @@ identify(
 
 ### Client-side flow
 
-1. **Guards.** Short-circuit if the SDK is disabled, the user is opted out, or person processing is disallowed (`personProfiles == 'never'`). If the provided `distinctId` is empty or whitespace-only, log and drop.
+1. **Guards.** Short-circuit if the SDK is disabled or person processing is disallowed (`personProfiles == 'never'`). If the provided `distinctId` is empty or whitespace-only, log and drop. Opt-out is **not** a guard: an opted-out SDK still runs the rest of this flow. It updates local identity state (distinct id, anonymous id, `isIdentified`), updates person properties for flags, and reloads feature flags when the distinct id changes. Opt-out gates event capture only: the `$identify` or `$set` event is not captured or sent, and the person-properties dedup hash is not updated, because nothing was captured. Feature flag loading is not gated by opt-out.
 2. **Resolve distinct ids.** Let `previousDistinctId = current persisted distinct id (or the device/anonymous id)`. Let `newDistinctId = caller-provided value` (if any) `else previousDistinctId`.
 3. **Decide the emission path:**
-   - **New distinct id, not yet identified** → emit `$identify`. Persist `newDistinctId` as the distinct id, persist `previousDistinctId` as the anonymous id (unless `reuseAnonymousId` is true), mark `isIdentified = true`. Reload feature flags. Notify integrations (crash reporting, surveys) of the context change. Update cached person-properties hash.
+   - **New distinct id, not yet identified** → emit `$identify`. Persist `newDistinctId` as the distinct id, persist `previousDistinctId` as the anonymous id (unless `reuseAnonymousId` is true), mark `isIdentified = true`. Reload feature flags. Notify integrations (crash reporting, surveys) of the context change. Update cached person-properties hash only if capture accepted the `$identify` event.
    - **Same distinct id, still anonymous (`isIdentified` is `false`)** → treat this as the anonymous → identified transition even though the distinct id is unchanged: mark `isIdentified = true` and emit a single `$set` event (not `$identify` — there is no anonymous id to merge, since the caller-supplied id already *is* the persisted anonymous/device id), carrying any supplied `userProperties`/`userPropertiesSetOnce` (or empty `$set`/`$set_once` if none were supplied — the transition itself is the effect being recorded). The person-properties dedup hash is updated only *after* this event is captured, so a stale hash from an earlier no-op call cannot suppress the transition. Feature flags are reloaded only if properties were supplied (the identified-state flag alone is not part of the `/flags` request).
    - **Same distinct id, already identified, but userProperties / userPropertiesSetOnce provided** → emit `$set` (not `$identify`), with the new properties. Feature flags are **not** reloaded (property changes are processed async server-side). A hash check suppresses no-op duplicate calls with the same properties.
    - **Same distinct id, already identified, no properties** → log "already identified", drop.
@@ -137,7 +137,7 @@ identify(
   - New distinct id → persisted as the ambient distinct id.
   - Previous distinct id → persisted as the anonymous id (unless `reuseAnonymousId`).
   - `isIdentified` flag → `true`.
-  - Cached person-properties hash → updated to suppress duplicate `$set` emissions.
+  - Cached person-properties hash → updated to suppress duplicate `$set` emissions, only when capture accepted the event.
   - `PersonMode` → `identified` (posthog-js core).
 
 ### Server-side state
@@ -153,7 +153,7 @@ identify(
 ## Error handling
 
 - **Never throw or reject** to the caller. An omitted server distinct id follows the context/UUID fallback instead of producing a validation error; SDKs that currently raise for this input need correction.
-- **Drop silently** on: disabled SDK, opted-out user, invalid client-side distinct id, person-processing disabled, duplicate identified-user call with same properties, `before_send` returning null.
+- **Drop silently** on: disabled SDK, invalid client-side distinct id, person-processing disabled, duplicate identified-user call with same properties, `before_send` returning null.
 - **Log** drops with a descriptive reason in mobile / browser SDKs.
 
 ## Concurrency & ordering
@@ -175,7 +175,7 @@ identify(
 
 ### Requirement: Canonical identify behavior
 
-The SDK SHALL implement the canonical `identify` behavior described by this spec. Implementations MAY adapt method names, parameter casing, type syntax, and lifecycle hooks to platform idioms where this spec explicitly allows variation, but MUST preserve the observable outcomes in the scenarios below. Server SDKs MUST resolve an omitted per-call distinct id from request-scoped analytics context when available, otherwise generate a fresh UUID for the event and disable person-profile processing unless the caller explicitly supplied `$process_person_profile`. For legacy `/batch/` delivery, this control MUST be represented by `properties.$process_person_profile = false`; for Capture v1 `/i/v1/analytics/events` delivery, it MUST be represented by `options.process_person_profile = false` with no `$process_person_profile` sentinel left in `properties`. An explicit per-call distinct id MUST take precedence over context. Server `identify` MUST NOT throw or reject to the application when the distinct id is omitted. Generated ids MUST NOT be used for feature-flag evaluation or persisted as ambient user identity.
+The SDK SHALL implement the canonical `identify` behavior described by this spec. Implementations MAY adapt method names, parameter casing, type syntax, and lifecycle hooks to platform idioms where this spec explicitly allows variation, but MUST preserve the observable outcomes in the scenarios below. Server SDKs MUST resolve an omitted per-call distinct id from request-scoped analytics context when available, otherwise generate a fresh UUID for the event and disable person-profile processing unless the caller explicitly supplied `$process_person_profile`. For legacy `/batch/` delivery, this control MUST be represented by `properties.$process_person_profile = false`; for Capture v1 `/i/v1/analytics/events` delivery, it MUST be represented by `options.process_person_profile = false` with no `$process_person_profile` sentinel left in `properties`. An explicit per-call distinct id MUST take precedence over context. Server `identify` MUST NOT throw or reject to the application when the distinct id is omitted. Generated ids MUST NOT be used for feature-flag evaluation or persisted as ambient user identity. Client SDKs MUST NOT short-circuit `identify` because the user is opted out: while opted out, `identify` MUST make the same local state changes it makes when opted in (distinct id, anonymous id, identified flag, person properties for flags, and the feature flag reload when the distinct id changes). Opt-out gates event capture only: the SDK MUST NOT capture or send the `$identify` or `$set` event, and MUST NOT update the person-properties dedup hash for an event it did not capture.
 
 #### Scenario: Client identify changes the current distinct id and sends identity properties (@client)
 - **GIVEN** a fresh SDK acceptance test harness
@@ -206,6 +206,37 @@ The SDK SHALL implement the canonical `identify` behavior described by this spec
 - **WHEN** identify is called with distinct id "anon-123"
 - **THEN** get distinct id should return "anon-123"
 - **AND** one event named "$set" should be enqueued
+- **AND** no event named "$identify" should be enqueued
+
+#### Scenario: Identify while opted out updates identity and reloads flags without sending events (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** the current distinct id is "anon-123"
+- **AND** analytics capture is opted out
+- **WHEN** identify is called with distinct id "user-123"
+- **THEN** get distinct id should return "user-123"
+- **AND** the mock server should receive a feature flag request for distinct id "user-123"
+- **AND** no event should be enqueued
+
+#### Scenario: Identify while opted out does not suppress the same properties after opt in (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** the current distinct id is "anon-123"
+- **AND** analytics capture is opted out
+- **WHEN** identify is called with distinct id "user-123" and properties:
+  | property | value          |
+  | email    | user@test.test |
+- **AND** opt in is called
+- **AND** identify is called with distinct id "user-123" and properties:
+  | property | value          |
+  | email    | user@test.test |
+- **THEN** one event named "$set" should be enqueued
 - **AND** no event named "$identify" should be enqueued
 
 #### Scenario: Server identify delivers a profile update for explicit distinct id (@server)

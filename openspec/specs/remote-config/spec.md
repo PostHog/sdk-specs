@@ -44,7 +44,7 @@ In js-core-based SDKs, remote config is partially intertwined with feature-flag 
    - feature-flag bootstrapping decisions
 4. **Optionally trigger feature-flag loading.** If the remote config says feature flags exist and preloading is enabled, the manager kicks off or coordinates a flags load using the current identity/group context.
 5. **Notify dependents after config changes.** Integrations and listeners are informed when remote config has been loaded/applied so they can enable/disable behavior.
-6. **Allow wrapper SDKs to configure and observe an underlying remote-config manager without owning the fetch path.** Flutter forwards remote-config-relevant setup options like `preloadFeatureFlags`, `sendFeatureFlagEvents`, `sessionReplay`, `sessionReplayConfig`, `surveys`, and `errorTrackingConfig` to the native SDKs, and exposes `onFeatureFlags` as its main callback surface rather than a first-class remote-config API.
+6. **Allow wrapper SDKs to configure and observe an underlying remote-config manager without owning the fetch path.** Flutter forwards remote-config-relevant setup options like `preloadFeatureFlags`, `sendFeatureFlagEvent`, `sessionReplay`, `sessionReplayConfig`, `surveys`, and `errorTrackingConfig` to the native SDKs, and exposes the `Posthog().onFeatureFlags(callback)` listener as its main callback surface rather than a first-class remote-config API.
 7. **Prefer cached values when needed.** On startup, the manager may preload cached remote config into memory so dependent integrations can make early decisions before the network returns.
 8. **Avoid duplicate in-flight loads.** Concurrent remote-config fetches are typically deduplicated or ignored while one is already in progress.
 9. **Clear config on reset or teardown when user-scoped data must be invalidated.** Cached remote-config-derived state may be removed as part of reset/clear flows.
@@ -194,14 +194,18 @@ Common optional wire fields include:
 | `errorTracking` | boolean or object | Error tracking configuration |
 | `capturePerformance` | boolean or object | Performance/network timing configuration |
 | `supportedCompression` | array of strings | Advertised compression formats |
+| `quotaLimited` | array of strings | Billing resources whose quota the project has exhausted; the values the server sends today are `recordings` and `feature_flags` |
+
+`quotaLimited` is absent when no quota is exhausted. The project config response currently lists only `recordings`, and the server sets `sessionRecording` to `false` in the same response, so an SDK does not need a second replay gate from this field. The flags response carries the same field and can list `feature_flags`, `recordings`, or both. An SDK that reads the field SHALL ignore values it does not recognize.
 
 This is not an exhaustive schema and does not require every SDK to implement every product. Nested replay/survey/error-tracking settings retain their product-specific semantics. Conceptual acceptance settings such as `session_replay_enabled` and `feature_flags_available` SHALL NOT be treated as actual JSON wire field names.
 
 #### Scenario: Parse real wire fields and tolerate extensions
-- **GIVEN** the JSON endpoint returns HTTP 200 with `{"hasFeatureFlags":false,"sessionRecording":false,"surveys":false,"futureSetting":{"enabled":true}}`
+- **GIVEN** the JSON endpoint returns HTTP 200 with `{"hasFeatureFlags":false,"sessionRecording":false,"surveys":false,"quotaLimited":["recordings","futureResource"],"futureSetting":{"enabled":true}}`
 - **WHEN** the SDK processes the response
 - **THEN** it recognizes the supported project settings using their wire names
 - **AND** the unknown `futureSetting` field does not prevent applying those settings
+- **AND** the unknown `futureResource` value in `quotaLimited` is ignored
 - **AND** absent optional fields do not make the response invalid
 
 ### Requirement: Project configuration delivery and scope

@@ -929,7 +929,13 @@ Filtered snapshots returned by `only(...)` / `onlyAccessed()` scope capture enri
 
 An SDK that evaluates flags locally SHOULD log a diagnostic warning, when the platform exposes SDK logging, for each loaded definition that local evaluation can never resolve: a flag whose unresolved reason would be `experience_continuity` or `unsupported_definition`. These causes come from the definition, so the SDK knows them when definitions load. A flag that can be unresolved only for `missing_context` or `unresolved_dependency` does not trigger the warning, because those causes depend on the call or on another flag. This applies whether or not the SDK exposes unresolved flags. An SDK that logs the warning SHALL follow the rules below.
 
+For server SDKs, the definition-load warning SHALL exclude flags whose `evaluation_runtime` is `"client"`. This exclusion applies to both `experience_continuity` and `unsupported_definition`, for API and shared-cache loads. Flags with runtime `"server"` or `"all"`, a null runtime, or no runtime field remain eligible for the warning. SDKs SHALL retain the runtime metadata needed to make this distinction when decoding or hydrating definitions. Treating a null or absent runtime as eligible for this warning does not change "Snapshot evaluation runtime access", where a flag with an unknown runtime matches no runtime criterion.
+
+The SDK SHALL retain client-only definitions and their normal local evaluation behavior. Suppressing this warning SHALL NOT remove definitions, change evaluation results, or prevent a caller from evaluating a client-only flag locally for browser bootstrapping.
+
 The warning SHALL name the flag and the reason. The SDK SHALL NOT repeat the warning for the same flag until that flag's definition changes. A refresh that leaves the definition unchanged, including a not-modified response or a shared-cache load, SHALL NOT repeat it.
+
+A server SDK SHALL stop tracking a flag as warned when its definition becomes client-only. If that flag's `evaluation_runtime` later changes to anything other than `"client"` (including null or removal of the field) and it remains unresolvable from its definition, the SDK SHALL warn again.
 
 The warning helps a developer notice the flag early. It does not replace the per-snapshot reporting in "Snapshot unresolved flag reporting", which also covers `missing_context`.
 
@@ -950,3 +956,90 @@ The warning helps a developer notice the flag early. It does not replace the per
 - **AND** the local feature flag definition for "checkout" has experience continuity enabled
 - **WHEN** local feature flag definitions are refreshed successfully with a changed definition for "checkout" that still has experience continuity enabled
 - **THEN** exactly two warnings naming "checkout" and reason "experience_continuity" should be logged
+
+#### Scenario Outline: Server definition loads do not warn about client-only flags (@unresolvable_flag_warning_capable)
+- **GIVEN** SDK logging is enabled
+- **AND** <definition>
+- **AND** the local feature flag definition for "checkout" reports evaluation runtime "client"
+- **WHEN** local feature flag definitions are refreshed successfully using "<refresh result>"
+- **THEN** no warning naming "checkout" should be logged
+- **AND** no remote feature flag evaluation request should have been sent
+
+  | definition | refresh result |
+  | the local feature flag definition for "checkout" has experience continuity enabled | changed definitions |
+  | the local feature flag definition for "checkout" has experience continuity enabled | successful shared-cache load |
+  | local feature flag definitions include a flag "checkout" matching a static cohort | changed definitions |
+  | local feature flag definitions include a flag "checkout" matching a static cohort | successful shared-cache load |
+
+#### Scenario Outline: Definitions not restricted to client runtime still log warnings (@unresolvable_flag_warning_capable)
+- **GIVEN** SDK logging is enabled
+- **AND** <definition>
+- **AND** the local feature flag definition for "checkout" <runtime step>
+- **WHEN** local feature flag definitions are refreshed successfully using "changed definitions"
+- **THEN** exactly one warning naming "checkout" and reason "<reason>" should be logged
+- **AND** no remote feature flag evaluation request should have been sent
+
+  | definition | runtime step | reason |
+  | the local feature flag definition for "checkout" has experience continuity enabled | reports evaluation runtime "server" | experience_continuity |
+  | the local feature flag definition for "checkout" has experience continuity enabled | reports evaluation runtime "all" | experience_continuity |
+  | the local feature flag definition for "checkout" has experience continuity enabled | reports evaluation runtime null | experience_continuity |
+  | the local feature flag definition for "checkout" has experience continuity enabled | reports no evaluation runtime | experience_continuity |
+  | local feature flag definitions include a flag "checkout" matching a static cohort | reports evaluation runtime "server" | unsupported_definition |
+
+#### Scenario Outline: Suppressing client-only warnings preserves local evaluation (@unresolvable_flag_warning_capable)
+- **GIVEN** SDK logging is enabled
+- **AND** local feature flag definitions resolve "client-flag" for distinct id "user-123" as true
+- **AND** the local feature flag definition for "client-flag" reports evaluation runtime "client"
+- **AND** the local feature flag definition for "checkout" has experience continuity enabled
+- **AND** the local feature flag definition for "checkout" reports evaluation runtime "client"
+- **WHEN** local feature flag definitions are refreshed successfully using "<refresh result>"
+- **AND** evaluate flags is called for distinct id "user-123" with local-only evaluation enabled
+- **THEN** the snapshot should contain "client-flag" with value true
+- **AND** the snapshot unresolved flags should contain "checkout" with reason "experience_continuity"
+- **AND** no warning naming "checkout" should be logged
+- **AND** no remote feature flag evaluation request should have been sent
+
+  | refresh result |
+  | changed definitions |
+  | successful shared-cache load |
+
+#### Scenario: A flag returning from client-only to server runtime warns again (@unresolvable_flag_warning_capable)
+- **GIVEN** SDK logging is enabled
+- **AND** the local feature flag definition for "checkout" has experience continuity enabled
+- **AND** the local feature flag definition for "checkout" reports evaluation runtime "server"
+- **WHEN** local feature flag definitions are refreshed successfully using "changed definitions"
+- **THEN** exactly one warning naming "checkout" and reason "experience_continuity" should be logged
+- **WHEN** local feature flag definitions are refreshed successfully with a changed definition for "checkout" that reports evaluation runtime "client"
+- **THEN** exactly one warning naming "checkout" and reason "experience_continuity" should be logged
+- **WHEN** local feature flag definitions are refreshed successfully with a changed definition for "checkout" that reports evaluation runtime "server"
+- **THEN** exactly two warnings naming "checkout" and reason "experience_continuity" should be logged
+- **AND** no remote feature flag evaluation request should have been sent
+
+### Requirement: Snapshot reads report experiment exposure
+
+The snapshot SHALL retain, with each evaluated record, the evaluation details that `experiment-exposure` and the config version 2 attribution on `$feature_flag_called` need: the config version, the reason code, the rule ID, the rule type, the variant key, whether the record was read without a parse error and is not `failed`, whether local evaluation produced it, and, in an SDK that can put a bootstrapped or overridden value in a snapshot, that the value came from there. The flag ID, version, request ID, evaluation time and definitions-loaded time that the exposure copies from the paired `$feature_flag_called` event are already retained as the evaluation metadata of "Point-in-time flag values and enablement". Like the snapshot's values, these details SHALL NOT change after the snapshot is created.
+
+A snapshot enablement or value read, or a typed read where the SDK has one, whose feature flag event decision is `true` SHALL apply the `experiment-exposure` rules to the details retained for that key, in the same step that reports `$feature_flag_called` under "Lazy feature-flag access tracking". The exposure therefore reports the assignment that the snapshot's evaluation produced, even when flag definitions or remote results changed after it. A read whose decision is `false` emits neither event, as "Snapshot feature flag event control" and `experiment-exposure` define.
+
+Creating a snapshot, enumerating its keys, filtering it with `only(...)` or `onlyAccessed()`, reading a payload, and passing the snapshot to `capture(...)` SHALL NOT emit `$experiment_exposure`.
+
+#### Scenario: Evaluation emits no experiment exposure until a flag is read
+- **GIVEN** remote evaluation for distinct id "user-123" returns "checkout-flow" as a complete config version 2 experiment split with value true, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
+- **WHEN** `evaluateFlags("user-123")` is called and no accessor is called
+- **THEN** no `$experiment_exposure` event is emitted
+- **WHEN** `isEnabled("checkout-flow")` is then called on the snapshot
+- **THEN** one `$feature_flag_called` and one `$experiment_exposure` event are emitted for "checkout-flow" with `$feature_flag_variant` "test"
+
+#### Scenario: The exposure reports the snapshot's assignment
+- **GIVEN** a snapshot for distinct id "user-123" retains "checkout-flow" as a split with rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
+- **AND** a later definitions refresh would assign "user-123" variant key "control"
+- **WHEN** `getFlag("checkout-flow")` is called on the original snapshot
+- **THEN** the `$experiment_exposure` event has `$feature_flag_variant` "test"
+- **AND** the read makes no feature-flag evaluation request
+
+#### Scenario: Capture with a snapshot emits no exposure
+- **GIVEN** a snapshot for distinct id "user-123" retains "checkout-flow" as a complete config version 2 experiment split with variant key "test"
+- **AND** no accessor has been called on the snapshot
+- **WHEN** an event is captured with the snapshot
+- **THEN** the captured event has `$feature/checkout-flow` set from the snapshot
+- **AND** no `$feature_flag_called` and no `$experiment_exposure` event is emitted

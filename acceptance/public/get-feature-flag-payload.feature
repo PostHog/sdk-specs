@@ -103,3 +103,15 @@ Feature: Get Feature Flag Payload
       | "{broken" |
       | ""        |
       | "   "     |
+
+  @client
+  Scenario: Silent result read returns the payload without tracking
+    Given the SDK is initialized with token "test-token"
+    And cached feature flags are:
+      | key      | value | payload             |
+      | checkout | blue  | {"cta":"Try now"}   |
+    When get feature flag result "checkout" is called with the feature flag event option disabled
+    Then the returned payload should include:
+      | field | value   |
+      | cta   | Try now |
+    And no event named "$feature_flag_called" should be enqueued

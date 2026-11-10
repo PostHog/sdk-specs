@@ -1,9 +1,9 @@
 # posthog-android — SDK Compliance
 
 **Repo:** [PostHog/posthog-android](https://github.com/PostHog/posthog-android)
-**Audited commit:** `c5e788bd603d3bdda77ac4d213538b9db637299a` ([commit](https://github.com/PostHog/posthog-android/commit/c5e788bd603d3bdda77ac4d213538b9db637299a)) — audited on 2026-10-19. **Five rows (Capture, Capture AI, Event Batcher, HTTP Client, Retry Queue) re-audited against posthog-android 4.0** at `aaa23d39af4424978bd2439028282e47417490b8` ([commit](https://github.com/PostHog/posthog-android/commit/aaa23d39af4424978bd2439028282e47417490b8), head of the 4.0 integration PR [PostHog/posthog-android#871](https://github.com/PostHog/posthog-android/pull/871)) on 2026-11-10 — see [posthog-android 4.0](#posthog-android-40-re-audit-2026-11-05)
-**Audited against sdk-specs commit:** `c72e367` (2026-10-19 rows); `752f899` plus the capture v1 text of [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79`, which includes [#147](https://github.com/PostHog/sdk-specs/pull/147) (merged into #146's branch as `6a9ed0f`), for the five 4.0 rows
-**Summary:** 38 ✅ · 16 🟡 · 5 ❌ · 5 ➖ · 0 ❓ (64 rows; 2026-10-19 at `c5e788bd` scored 37/16/5/6/0; previous full audit 2026-08-10 at `8659a7b4` scored 31/16/9/3/0 on 59 rows)
+**Audited commit:** `c5e788bd603d3bdda77ac4d213538b9db637299a` ([commit](https://github.com/PostHog/posthog-android/commit/c5e788bd603d3bdda77ac4d213538b9db637299a)) — audited on 2026-10-19. **30 rows re-audited against posthog-android 4.0** at `aaa23d39af4424978bd2439028282e47417490b8` ([commit](https://github.com/PostHog/posthog-android/commit/aaa23d39af4424978bd2439028282e47417490b8), head of the 4.0 integration PR [PostHog/posthog-android#871](https://github.com/PostHog/posthog-android/pull/871)) on 2026-11-10 — see [posthog-android 4.0](#posthog-android-40-re-audit-2026-11-05)
+**Audited against sdk-specs commit:** `c72e367` (2026-10-19 rows); `752f899` plus the capture v1 text of [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79`, which includes [#147](https://github.com/PostHog/sdk-specs/pull/147) (merged into #146's branch as `6a9ed0f`), for the 30 4.0 rows
+**Summary:** 42 ✅ · 15 🟡 · 2 ❌ · 5 ➖ · 0 ❓ (64 rows; 2026-10-19 at `c5e788bd` scored 37/16/5/6/0; previous full audit 2026-08-10 at `8659a7b4` scored 31/16/9/3/0 on 59 rows)
 
 **Why the 2026-10-19 run:** rotation priority 3 — the pointer was ten weeks old, and android carries the
 mobile reference for Session Replay Debug Properties. It was also the cheapest third slot available:
@@ -29,56 +29,53 @@ The capture v1 specs name android 4.0 directly: [#146](https://github.com/PostHo
 adds the capture v1 requirements to `capture`, `event-batcher`, `http-client` and `retry-queue`, and
 [#147](https://github.com/PostHog/sdk-specs/pull/147) adds client SDKs on capture v1 that ship an AI
 method, posthog-android 4.0 among them, to `capture-ai`'s Applicability. #147 merged into #146's
-branch. The rows below are scored at `aaa23d39` against `main` at `752f899` plus #146's text at
-`d387ab79`, treated as merged to `main`.
+branch. 4.0 also changes consent handling, remote config, the flag API, session replay and surveys, and
+specs merged since 2026-10-19 change those rows (#81, #102, #109, #111, #115, #121, #123, #124, #135, #138,
+#155, #160, #161, #162, #167, #170, #193, #197, #198, #199, #203).
 
-**Scope.** Only the five rows these specs change were re-audited. Every other row carries forward from
-2026-10-19 at `c5e788bd`, scored against `c72e367`. 4.0 code and spec text merged since then change
-these rows, which the next full audit must re-verify:
-
-- **Opt In** ([n14](#n14)): 4.0 rotates the session before restarting replay, as #138 requires. #199
-  adds **Deferred crash reports honour consent at crash time**, and 4.0 now drops native crashes
-  recorded while opted out (PostHog/posthog-android#952). #167 keeps `identify` running while opted
-  out (also **Identify**). **Consent Gating** ([n5](#n5)) points at the #199 rule.
-- **Remote Config:** 4.0 removes the `remoteConfig` option and ignores replies that arrive after
-  `close()` or from a closed setup (PostHog/posthog-android#953, #961). #198 adds `quotaLimited` to the
-  wire-field table.
-- **Flag reads.** #193 reads an empty variant (`""`) as disabled in **Get Feature Flag Result**, **Get
-  Feature Flags** ([n9](#n9)), **On Feature Flags** ([n13](#n13)) and **Is Feature Enabled**.
-  `getFeatureFlagResult` in 4.0 already returns `enabled = false` for `""`. #170 records the removal of
-  `getFeatureFlagPayload()` (**Get Feature Flag Payload**: a malformed payload is now `null`; also
-  **Get Feature Flag**, **Get Feature Flags And Payloads** ([n10](#n10)) and **Feature Flag Cache**).
-  #161 records runtime `onFeatureFlags()` registration, and #111 and #109 change **Get Feature Flag
-  Result**. **Reload Feature Flags**' callback now receives `PostHogFeatureFlagsLoaded`.
-- **Feature Flag Called Tracker** ([n8](#n8)): #162 adds config version 2 attribution and SDK-sent
-  `$experiment_exposure`, and #203 renames its `$feature_flag_variant` to `$feature_flag_variant_key`.
-  4.0 sends neither, so the rename changes no android code.
-- **Session Replay Privacy** ([n19](#n19)): 4.0 removes wireframe recording (#197), so finding (1) no
-  longer applies. #160 adds fully masked `FLAG_SECURE` windows, and #197 also changes **Start Session
-  Recording** ([n20](#n20)).
-- **Session Replay Debug Properties** ([n17](#n17)): 4.0 hardcodes the `screenshot` capture mode and
-  adds a 30 s bundle interval. #155 and #197 change the spec.
-- **Surveys** ([n22](#n22)): `setSurveySeen` also rewrites the last-seen survey date on submit and
-  dismiss, which the wait-period requirement from #102 forbids. #121 adds the popup delay.
-- **Setup:** `apiKey` removed; a `phx_` key or blank token disables the SDK with a warning.
-- **Before Send Hook** ([n3](#n3)): `PostHogEvent.options`.
-- **Exception rows:** #123 requires trace context on exception events (**Exception Event Metadata**,
-  [n7](#n7)), and #124 keeps the stack trace in fatal exception payloads (**Capture Exception**).
-- **Logs:** #81 adds the compression opt-out to `logs`.
-- **Shutdown:** #135. **Application Lifecycle:** #115.
-
-The other spec changes merged since 2026-10-19 bind server SDKs, posthog-js, another platform, or
+**Scope.** 30 rows are scored at `aaa23d39` against `main` at `752f899` plus #146's text at `d387ab79`,
+treated as merged to `main`: the five capture v1 rows and the 25 rows those other changes touch. The
+other 34 rows carry forward from 2026-10-19 at `c5e788bd`, scored against `c72e367`. The spec changes
+merged since then that this page doesn't score bind server SDKs, posthog-js, another platform, or
 contracts that are ➖ here (#205, #178, #185, #116, #129, #94, #88, #130, #85, #169, #171, and the MCP
-analytics, AI evaluation and emails changes). The ones that touch the five rows (#81, #119, #125, #127,
-#131, #132, #143, #193's `$active_feature_flags` rule) are scored below.
+analytics, AI evaluation and emails changes). One carried-forward row is stale: **Stop Session
+Recording** ([n21](#n21)) still cites the opt-out asymmetry that 4.0's `optOut()` removes by uninstalling
+replay, so the next full audit must re-verify it.
 
 | Contract | 2026-10-19 | 4.0 | Why |
 |---|---|---|---|
+| Application Lifecycle | ✅ | ✅ | Installed, Updated, Opened and Backgrounded carry the required properties; un-prefixed `version`/`build` break only a SHOULD NOT ([n31](#n31)) |
+| Before Send Hook | ✅ | ✅ | Chain, drop and fail-closed unchanged; `options` and the uuid survive a hook as capture allows ([n3](#n3)) |
 | Capture | ✅ | ✅ | Capture v1 wire, headers, per-event results, options, the `$lib`/`$lib_version` pair fill, session id lifting, timestamps and fail-open token all conform; the post-hook uuid and `null`-options restore are the two allowances #146 grants ([n24](#n24)) |
 | Capture AI | ➖ | ✅ | Applies now (#147). The AI lane conforms in full, including its own compression setting ([n25](#n25)) |
+| Capture Exception | ✅ | ✅ | Handled and uncaught JVM exceptions share one coercer; the native crash serializer keeps frames and drops only unset fields (#124) ([n40](#n40)) |
+| Consent Gating | 🟡 | ✅ | Capture is gated, `optOut()` stops replay and integrations, and deferred native crashes follow consent at crash time ([n5](#n5)) |
 | Event Batcher | 🟡 | 🟡 | Capture v1 byte-aware 5 MiB batching and client-permitted 413 halving conform; the periodic flush still runs on `java.util.Timer`, not the injectable clock ([n6](#n6)) |
+| Exception Event Metadata | 🟡 | 🟡 | Nested `handled`, `suppressed` mechanism type with no `source`, no single-entry `exception_id`, no `$exception_source`, caller override of reserved keys, missing empty `value` ([n7](#n7)) |
+| Feature Flag Cache | ✅ | ✅ | A malformed cached payload reads as `null` (#170) ([n33](#n33)) |
+| Feature Flag Called Tracker | 🟡 | 🟡 | Dedupe conforms; the minimal-event allowlist drops `$os_name`/`$os_version` and registered attribution keys. Config version 2 (#162, #203) doesn't apply on `/flags?v=2` ([n8](#n8)) |
+| Get Feature Flag | ✅ | ✅ | Matches the 4.0 android variant without `defaultValue` ([n39](#n39)) |
+| Get Feature Flag Payload | ✅ | ✅ | The getter is gone, as #170 allows; payloads read through `getFeatureFlagResult` ([n38](#n38)) |
+| Get Feature Flag Result | ✅ | ✅ | `""` reads as disabled (#193); a malformed payload is `null` without touching the flag ([n36](#n36)) |
+| Get Feature Flags | ❌ | 🟡 | `getAllFeatureFlags()` is the spec's android variant now, but returns `null` after a restart until the disk cache is loaded ([n9](#n9)) |
+| Get Feature Flags And Payloads | ❌ | 🟡 | The spec records `getAllFeatureFlags()` as android's form; same cold-start gap ([n10](#n10)) |
 | HTTP Client | ✅ | ✅ | Capture v1 transport conforms; `compression` turns off analytics compression and leaves `captureAiCompression` alone, as #146 allows; applying the same-origin redirect rule to a caller-supplied `httpClient` is one of the two choices #146 allows ([n26](#n26)) |
+| Identify | ✅ | 🟡 | Runs while opted out (#167), but updates the dedup hash for a `$set` it dropped ([n28](#n28)) |
+| Is Feature Enabled | ✅ | ✅ | Caller default, known value wins, `""` reads as `false` ([n37](#n37)) |
+| Logs | ✅ | ✅ | `compression = NONE` sends raw JSON with no `Content-Encoding` (#81) ([n35](#n35)) |
+| On Feature Flags | 🟡 | ✅ | Runtime `onFeatureFlags()` with unsubscribe, late replay and stale-load suppression (#161) ([n13](#n13)) |
+| Opt In | 🟡 | 🟡 | Replay restart and crash-time consent (#138, #199) conform; `optOut()` still can't clear local data ([n14](#n14)) |
+| Reload Feature Flags | ✅ | ✅ | Callback gets `PostHogFeatureFlagsLoaded`, the android variant ([n34](#n34)) |
+| Remote Config | ✅ | ✅ | Request, asset host and cache fallback conform; replies after `close()` or from an earlier setup are dropped ([n32](#n32)) |
 | Retry Queue | ✅ | ✅ | Capture v1 status set, 1 s→30 s jittered backoff, `Retry-After` floor, per-event `retry` resends, no OkHttp retries ([n27](#n27)) |
+| Session Replay Debug Properties | 🟡 | ✅ | Required keys on every event; the optional bundle only on `$` events, at most once per 30 s ([n17](#n17)) |
+| Session Replay Privacy | 🟡 | ✅ | Wireframe mode is gone (#197), View and Compose unmask agree, and `FLAG_SECURE` windows record black (#160) ([n19](#n19)) |
+| Setup | ✅ | ✅ | `projectToken` only; a blank or `phx_` token disables the SDK with a warning ([n29](#n29)) |
+| Shutdown | ✅ | ✅ | `close()` flushes, stops queues and integrations, and can be called twice ([n30](#n30)) |
+| Start Session Recording | ❌ | ✅ | Replay isn't installed while opted out, so a start stays inactive ([n20](#n20)) |
+| Surveys | 🟡 | 🟡 | Web-only exclusion and popup delay conform; submit and dismiss move the last-seen date (#102), and an unknown question type blocks later surveys ([n22](#n22)) |
+
+android moves from 37/16/5/6 on 2026-10-19 to **42/15/2/5** (58%→66%).
 
 **Behavior the spec permits for client SDKs, recorded so it isn't mistaken for a gap:** a `404` (or
 any retryable status) keeps the events on disk with no attempt limit, so a proxy that doesn't serve
@@ -218,6 +215,8 @@ Note numbers were reassigned this run when the matrix was re-sorted alphabetical
 forward from the 2026-08-10 audit keep their original analysis, re-checked for existence at
 `c5e788bd`; notes [n2](#n2), [n7](#n7), and [n17](#n17) are new or rewritten this run. A reference
 to "posthog-android nX" in a document written before 2026-10-19 refers to the old numbering.
+Notes [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14](#n14), [n17](#n17), [n19](#n19),
+[n20](#n20), [n22](#n22) and [n24](#n24)-[n40](#n40) are scored at `aaa23d39`.
 
 <a id="n1"></a>
 

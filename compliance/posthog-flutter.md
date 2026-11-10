@@ -60,8 +60,8 @@ and Dart AI lanes conform, but on Windows/Linux AI events share capture's sessio
 **Downgraded on new spec text (2):** **Identify ✅→🟡** ([n40](#n40)): the Dart core ignores `identify()`
 while opted out, but #167 made opt-out "not a guard" for identify. **Capture ✅→🟡** ([n41](#n41)):
 under #146, the Dart core replaces an empty or non-string caller `$session_id` with its own instead of
-lifting or dropping it. Every path fills `$lib`/`$lib_version` as a pair after the caller's
-properties, and leaves an empty variant out of `$active_feature_flags`.
+lifting or dropping it. Every path except web fills `$lib`/`$lib_version` as a pair after the
+caller's properties, and leaves an empty variant out of `$active_feature_flags`.
 
 **Same status, new or changed findings:** Get Feature Flag Payload and Get Feature Flag Result
 ([n14](#n14), [n15](#n15): `getFeatureFlagPayload()` is removed and payloads are read through

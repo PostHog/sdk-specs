@@ -178,8 +178,8 @@ lanes conform apart from capture's desktop session-id gap). Downgraded on new sp
 replaces an empty or non-string caller `$session_id` instead of lifting or dropping it, against
 #146). Get Feature Flag Payload and Get Feature Flag Result stay 🟡: payloads are
 read through the result getter and posthog-ios 4.0 returns no payload for malformed JSON, but on web
-posthog-js still returns the raw string. Every path fills `$lib`/`$lib_version` as a pair after the
-caller's properties. Surveys stays 🟡: posthog-android still moves the last-seen survey date on
+posthog-js still returns the raw string. Every path except web fills `$lib`/`$lib_version` as a pair
+after the caller's properties. Surveys stays 🟡: posthog-android still moves the last-seen survey date on
 submit and dismiss (#102). Details in [posthog-flutter.md](posthog-flutter.md).
 
 **2026-10-08 out-of-cycle refresh — posthog-ios:** re-audited all 64 rows at `f5cbe87c` against

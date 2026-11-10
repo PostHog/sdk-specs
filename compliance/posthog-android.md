@@ -197,15 +197,15 @@ complete implementation of that contract outside the browser.
 | 48 | Retry Queue | ✅ | [n27] |
 | 49 | Screen | ✅ |  |
 | 50 | Session Manager | ✅ |  |
-| 51 | Session Replay Debug Properties | 🟡 | [n17] |
+| 51 | Session Replay Debug Properties | ✅ | [n17] |
 | 52 | Session Replay Ingestion Controls | 🟡 | [n18] |
-| 53 | Session Replay Privacy | 🟡 | [n19] |
+| 53 | Session Replay Privacy | ✅ | [n19] |
 | 54 | Set Group Properties For Flags | ✅ |  |
 | 55 | Set Person Properties | ✅ |  |
 | 56 | Set Person Properties For Flags | ✅ |  |
 | 57 | Setup | ✅ | [n29] |
 | 58 | Shutdown | ✅ | [n30] |
-| 59 | Start Session Recording | ❌ | [n20] |
+| 59 | Start Session Recording | ✅ | [n20] |
 | 60 | Stop Session Recording | 🟡 | [n21] |
 | 61 | Surveys | 🟡 | [n22] |
 | 62 | Traces | ❌ | [n23] |
@@ -516,13 +516,29 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
 
 <a id="n17"></a>
 
-### n17 — Session Replay Debug Properties (🟡 Partial)
-- **Spec requires:** `client`. Four required keys on **every** captured event except `$snapshot` — `$recording_status`, `$sdk_debug_replay_event_trigger_status`, `$sdk_debug_replay_linked_flag_trigger_status`, `$sdk_debug_replay_internal_buffer_length`. Everything else is an **optional bundle** that goes **only on SDK events** (names starting with `$`, excluding `$feature_flag_called`, `$snapshot`, and the browser's `$$heatmap`) and **at most once every 30 seconds per SDK instance**. The queue-depth key sits outside both tiers and stays on every non-`$snapshot` event. `$snapshot` carries none of them. An SDK with no replay integration produces only `$recording_status: disabled`. **On mobile, a crash-time `$exception` reported on a later launch is stamped from a crash-context snapshot that always carries the full bundle.**
-- **SDK currently:** Audited from scratch, and this is the most complete implementation of the contract outside `posthog-js`. `PostHogReplayIntegration.debugProperties()` (`posthog-android/src/main/java/com/posthog/android/replay/PostHogReplayIntegration.kt:2591-2643`) produces all three cross-platform `$sdk_debug_replay_*` required keys plus a genuine tri-state `$recording_status` (`disabled`/`buffering`/`active`) derived from a real buffering snapshot, and adds a thoughtful optional set: `$sdk_debug_replay_flush_hold_reason` (distinguishing `awaiting_remote_config` from `below_minimum_duration`), `$sdk_debug_replay_pending_trigger_conditions`, `$sdk_debug_replay_capture_mode`, and `$sdk_debug_replay_throttle_delay_ms`. The trigger statuses use a shared `triggerStatus()` helper with a correct `trigger_disabled`/`trigger_pending`/`trigger_activated` vocabulary. The wiring in `PostHog.sdkDebugProperties()` (`PostHog.kt:782-810`) is careful: it is applied only inside the `appendSharedProps` block, which `$snapshot` events skip (`:918-919`), so **the `$snapshot` exclusion is correct**; it is merged **after** the caller's properties so SDK-computed values win, with a comment citing posthog-js's `extend(properties, sdkDebugProperties)` as the model; the replay handler's contribution is guarded separately from the session and queue keys so a throwing handler cannot suppress them, surfacing `$sdk_debug_error_capturing_properties` instead; and it falls back to `$recording_status: disabled` when no replay handler is installed, exactly as the spec's no-integration case requires. `$sdk_debug_pending_queue_size` is attached as the queue-depth key.
-  **One real deviation: no tiering and no throttle.** The spec puts everything beyond the four required keys into an optional bundle restricted to SDK events and rate-limited to once per 30 seconds per instance. Android attaches the *entire* set — `$sdk_debug_replay_capture_mode`, `$sdk_debug_replay_throttle_delay_ms`, `$sdk_debug_replay_pending_trigger_conditions`, `$sdk_debug_replay_flush_hold_reason`, `$sdk_debug_session_start`, `$sdk_debug_current_session_duration` — to **every** event with shared props, including custom (non-`$`) events, with no throttle window anywhere. There is no `REQUIRED_REPLAY_PROPERTIES`-equivalent split. That is a per-event payload cost on every customer event, which is the cost the tiering exists to avoid.
-  **The previous-process crash case conforms.** `sdkDebugProperties()` returns an empty map when an explicit timestamp predates the current session start (`PostHog.kt:787-791`). `session-replay-debug-properties/spec.md:965-977` says such an event SHALL carry the state persisted at the time if the platform captured one, and otherwise none of these keys, and that this takes precedence over the every-event rule; its scenario "A previous-process crash carries no live debug state" expects exactly that omission. Android persists no crash-time snapshot today, so omitting the keys is the required outcome. Persisting one (as iOS does through `customData`) would be an improvement, not a compliance fix.
-- **Backwards compatibility:** Backward-compatible — the fix removes properties from events, which only shrinks payloads; a consumer reading an optional key off a custom event would lose it, so it warrants a changelog note.
-- **Remediation:** Introduce the required/optional split — keep the four required keys plus the queue-depth key on every non-`$snapshot` event, and gate the rest behind an SDK-event check and a 30-second per-instance throttle, mirroring `packages/browser/src/posthog-core.ts`'s `REQUIRED_REPLAY_PROPERTIES`. Because `posthog-flutter` and `posthog-react-native` embed this SDK, fixing the tiering here improves all three.
+### n17 — Session Replay Debug Properties (✅ Pass; was 🟡)
+- **Spec requires:** `client`. Four required keys on every event except `$snapshot` and the minimal
+  `$feature_flag_called` envelope (`session-replay-debug-properties/spec.md:30-58`). The optional bundle goes
+  only on `$` events other than `$feature_flag_called` and `$snapshot`, decided before `beforeSend`
+  (`:117-137`), at most once per 30 s per instance, with the window starting when the event is accepted
+  (`:194-231`). `$sdk_debug_pending_queue_size` on every non-`$snapshot` event (`:339-347`). Capture mode is
+  always `screenshot` (#197, `:606-617`). A previous-process crash carries a persisted snapshot or none of
+  the keys (`:969-980`).
+- **SDK currently (4.0, `aaa23d39`):** conforms.
+  - **Tiers.** `sdkDebugProperties` (`posthog/src/main/java/com/posthog/PostHog.kt:1028-1056`) copies only
+    `REQUIRED_REPLAY_DEBUG_PROPERTY_KEYS` (`:66-72`) unless it holds the bundle claim; the queue depth is
+    always added (`:1051`).
+  - **Eligibility and window.** `isReplayDebugEvent` (`:88-91`) is checked on the name passed to capture,
+    before `beforeSend`. `claimReplayDebugPropertiesWindow` (`:1071-1081`) holds one claim at a time on
+    `config.dateProvider`'s clock with a 30 s interval (`:63`); the window starts when the event is queued
+    and the claim is released on every other exit (`:1289-1300`), and `close()` clears it (`:787-790`).
+  - **Keys.** `debugProperties()` (`posthog-android/src/main/java/com/posthog/android/replay/PostHogReplayIntegration.kt:2993-3044`)
+    reports `disabled`/`buffering`/`active`, the three trigger statuses, and capture mode `"screenshot"`
+    (`:3039`). `$snapshot` skips shared properties (`PostHog.kt:1420`).
+  - **Crash case.** An event timestamped before the current session start gets no keys (`:1031-1033`).
+    Android persists no crash-time snapshot, so that is the required outcome.
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.
 
 <a id="n18"></a>
 
@@ -544,44 +560,43 @@ to "posthog-android nX" in a document written before 2026-10-19 refers to the ol
 
 <a id="n19"></a>
 
-### n19 — Session Replay Privacy (🟡 Partial)
-- **Spec requires:** elements explicitly tagged no-capture MUST be excluded from replay wireframes
-  in all capture modes (not just screenshot mode); unmask/password precedence should be consistent
-  across UI frameworks.
-- **SDK currently:** Default text/image masking, password special-casing, and fail-closed
-  screenshot-mode masking are all correctly implemented
-  (`posthog-android/src/main/java/com/posthog/android/replay/PostHogReplayIntegration.kt`). Both
-  prior findings reconfirmed via direct read this cycle: (1) `isNoCapture()` is consulted only in
-  the screenshot-mode masking path (`findMaskableWidgets()`, line 1021) — never inside
-  `toWireframe()` (lines 1356-1654), Android's **default** capture mode (`screenshot = false` per
-  `PostHogSessionReplayConfig.kt:38`); a view tagged `ph-no-capture` is still emitted as a full
-  wireframe node in default mode. (2) Unmask-vs-password precedence differs between the View path
-  (`shouldMaskTextView()`, lines 990-993 — password always wins) and the Compose path (lines
-  1130-1146 — `isUnmaskEnabled` checked first, short-circuits before password detection) — same
-  developer intent, different security-relevant outcome depending on UI framework.
-- **Backwards compatibility:** Needs deprecation path for (1) — adding an early-return `null` in
-  `toWireframe()` for tagged nodes changes what data leaves the device for tagged views in the
-  default capture mode, so should ship with a changelog note. (2) is Backward-compatible — align
-  Compose to match View's more conservative precedence.
-- **Remediation:** Honor `isNoCapture()` inside `toWireframe()`, not just the screenshot path;
-  align Compose's unmask/password precedence with the View path.
+### n19 — Session Replay Privacy (✅ Pass; was 🟡)
+- **Spec requires:** `client`. Mask explicitly masked elements and every match in a subtree, exclude
+  no-capture elements and their descendants, redact passwords by default, and redact before queueing
+  (`session-replay-privacy/spec.md:111-161`). Explicit unmask beats mask markers and category masks (`:54`,
+  `:100`). **Android secure windows are recorded fully masked** (#160, `:243-288`).
+- **SDK currently (4.0, `aaa23d39`):** conforms.
+  - **One capture mode.** 4.0 removes wireframe recording (#197), so `ph-no-capture` goes through the only
+    path left: `maskRule` (`posthog-android/src/main/java/com/posthog/android/replay/PostHogReplayIntegration.kt:1601-1619`)
+    sends no-capture Views and ComposeViews to `NO_CAPTURE`, and `findMaskableWidgets` masks the subtree
+    (`:1535-1595`).
+  - **Unmask and passwords.** View `maskRule` checks `isUnmasked()` first (`:1605`) and Compose checks
+    `postHogUnmask` first (`:1863-1867`), so both UI toolkits agree. Passwords are masked on both paths
+    when broad text masking is off (`:1464-1467`, `:1877-1880`).
+  - **Secure windows.** A window that is secure at capture start gets a black frame without copying pixels
+    (`:2615-2643`); the flag is re-read after the copy and the bitmap erased if it turned secure
+    (`:2775-2783`). Touches on a secure window are dispatched but not recorded (`:845-859`).
+  - **Not scored.** An explicit unmask on a password field leaves it unmasked on both paths; the spec
+    doesn't rank unmask against password masking.
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.
 
 <a id="n20"></a>
 
-### n20 — Start Session Recording (❌ Fail)
-- **Spec requires:** session recording MUST remain inactive (or refuse to start) while the user is
-  opted out.
-- **SDK currently:** `startSessionReplay(resumeCurrent: Boolean = true)`
-  (`PostHog.kt:2126-2163`) only guards on `isEnabled()` (line 2127) and
-  `isSessionReplayFlagEnabled()` (remote-config gating, line 2131) — reconfirmed this cycle that
-  `isOptedOut()` is never referenced anywhere in the method or its helpers
-  (`shouldRecordSession()`, `isSessionReplayFlagEnabled()`). A caller who has opted out can still
-  successfully start recording. Idempotency, remote-config/linked-flag gating, and sampling gating
-  are otherwise correctly implemented.
-- **Backwards compatibility:** Backward-compatible — adding an `isOptedOut()` guard at the top of
-  `startSessionReplay` is additive; no legitimate caller depends on replay starting while opted
-  out.
-- **Remediation:** Add an `isOptedOut()` check to `startSessionReplay()`.
+### n20 — Start Session Recording (✅ Pass; was ❌)
+- **Spec requires:** `client`. Start activates replay, a repeat start is a no-op, and a start while opted out
+  leaves recording inactive (`start-session-recording/spec.md:101-139`). Start failures don't crash the
+  app (`:141-181`).
+- **SDK currently (4.0, `aaa23d39`):** conforms.
+  - **Opt-out.** The replay handler doesn't exist while opted out: setup installs integrations only when
+    opted in (`posthog/src/main/java/com/posthog/PostHog.kt:536-543`), and `optOut()` uninstalls them,
+    stopping replay and clearing `sessionReplayHandler` (`:2031-2033`, `:632-648`). `startSessionReplay`
+    (`:3238-3252`) ignores a start while opted out without recording the intent, and
+    `startSessionReplayInternal` only logs that replay isn't installed (`:3293-3295`). `$snapshot` events are also dropped by `prepareEvent` (`:1354-1357`).
+  - **Other gates.** Remote-config gating (`:3262-3267`), the already-active no-op (`:3271-3273`) and
+    sampling (`:3276`, `:3287`) are in place. Integration install runs in a try/catch (`:599-621`).
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.
 
 <a id="n21"></a>
 

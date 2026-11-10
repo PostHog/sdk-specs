@@ -1,9 +1,9 @@
 # posthog-flutter — SDK Compliance
 
 **Repo:** [PostHog/posthog-flutter](https://github.com/PostHog/posthog-flutter)
-**Audited commit:** `6be9a1e9eeb798fff350d0cd74d36d2ca10695ee` ([commit](https://github.com/PostHog/posthog-flutter/commit/6be9a1e9eeb798fff350d0cd74d36d2ca10695ee)), the head of the posthog_flutter 6.0 release PR [PostHog/posthog-flutter#637](https://github.com/PostHog/posthog-flutter/pull/637) — audited on 2026-11-09, before 6.0.0 is published
-**Audited against sdk-specs commit:** `8306698` plus [#146](https://github.com/PostHog/sdk-specs/pull/146) at `5c26b9bc` (capture v1, including #147's AI lane), treated as merged to `main`
-**Summary:** 26 ✅ · 27 🟡 · 4 ❌ · 12 ➖ · 0 ❓ (69 rows; previous audit 2026-10-19 at `1032c102` (5.x) scored 21/29/6/8/0 on 64 rows)
+**Audited commit:** `82123e6d8815c89a9f603b4f23e72d72494eee2b` ([commit](https://github.com/PostHog/posthog-flutter/commit/82123e6d8815c89a9f603b4f23e72d72494eee2b)), the head of the posthog_flutter 6.0 release PR [PostHog/posthog-flutter#637](https://github.com/PostHog/posthog-flutter/pull/637) — audited on 2026-11-10, before 6.0.0 is published
+**Audited against sdk-specs commit:** `752f899` plus [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79` (capture v1, including #147's AI lane), treated as merged to `main`
+**Summary:** 27 ✅ · 26 🟡 · 4 ❌ · 12 ➖ · 0 ❓ (69 rows; previous audit 2026-10-19 at `1032c102` (5.x) scored 21/29/6/8/0 on 64 rows)
 
 **Why this run:** posthog_flutter 6.0 ([PostHog/posthog-flutter#637](https://github.com/PostHog/posthog-flutter/pull/637))
 adopts posthog-ios 4.0 and posthog-android 4.0 (`Package.swift` pins `"4.0.0" ..< "5.0.0"`,
@@ -11,21 +11,21 @@ adopts posthog-ios 4.0 and posthog-android 4.0 (`Package.swift` pins `"4.0.0" ..
 except web, makes `beforeSend` synchronous and runs it on the event the native SDK built, and removes
 the APIs deprecated in 5.x (`.changeset/v6-major-release.md`, `posthog_flutter/MIGRATION.md`).
 
-**Scope.** All 64 rows were re-read at `6be9a1e9ee`, and five rows were added for contracts the README
+**Scope.** All 64 rows were re-read at `82123e6`, and five rows were added for contracts the README
 table carries (Experiment Exposure, AI Datasets, AI Scorers, Offline Evaluations, Emails). Where a
-row's behaviour on iOS, macOS or Android comes from the native SDK, it cites the posthog-ios 4.0
-(`1f91c5b2`, sdk-specs #187) and posthog-android 4.0 (`8b63a135`, sdk-specs #186) audits. Windows and
-Linux run this repo's Dart core and are scored directly; web delegates to posthog-js. Notes for rows
-whose Dart code and governing spec text did not change carry forward from 2026-10-19, with line
-references at `1032c102`; every rewritten note cites `6be9a1e9ee`, with paths relative to
-`posthog_flutter/`.
+row's behaviour on iOS, macOS or Android comes from the native SDK, it was checked in posthog-ios at
+`e27cbe4cb` and posthog-android at `aaa23d39`, the heads of their unreleased 4.0 branches
+(`chore/v4-remove-deprecated`); some notes also cite those SDKs' compliance files for gaps that
+didn't change. Windows and Linux run this repo's Dart core and are scored directly; web delegates to
+posthog-js. Notes for rows whose Dart code and governing spec text did not change carry forward from
+2026-10-19, with line references at `1032c102`; every rewritten note cites `82123e6`, with paths
+relative to `posthog_flutter/`.
 
-**Spec assumptions.** #146's capture v1 text is treated as merged. Its `$lib` conflict is taken as
-settled for client SDKs: a caller's `$lib` merges key by key, as **Caller-supplied event properties take
-precedence** says. Its compression conflict (`http-client`'s whole-client opt-out against
-`capture-ai`'s per-lane compression) is
-[open on #146](https://github.com/PostHog/sdk-specs/pull/146#issuecomment-6743564814) and not scored:
-Flutter, like the native SDKs, has separate `compression` and `captureAiCompression` options.
+**Spec assumptions.** #146's capture v1 text at `d387ab79` is treated as merged, including two points
+settled on that PR: a client SDK fills its own `$lib`/`$lib_version` pair after every other property
+layer and before `beforeSend` (**Events name their own library**, the one exception to **Caller-supplied
+event properties take precedence**), and a delivery lane with its own compression setting
+(`capture-ai`) is outside `http-client`'s whole-client compression opt-out.
 
 ## Platforms
 
@@ -41,15 +41,20 @@ Where the paths disagree the row is 🟡 and the note says which platform fails.
 
 ## Movement this run
 
-**Improved (8):**
+**Improved (9):**
 - **Get Feature Flag 🟡→✅** ([n13](#n13)): `getFeatureFlag(key, {sendFeatureFlagEvent})` on every path.
 - **Get Feature Flag Payload 🟡→✅** ([n14](#n14)) and **Get Feature Flag Result 🟡→✅** ([n15](#n15)):
   `getFeatureFlagPayload()` is removed, and payloads are read through `getFeatureFlagResult(key,
   sendFeatureFlagEvent: false)`, which the spec permits. posthog-ios 4.0 returns no payload for
-  malformed JSON, so the iOS/macOS half of the old gap is gone.
+  malformed JSON, so the iOS/macOS half of the old gap is gone. An empty variant reads as disabled
+  on every path (#193).
 - **Is Feature Enabled 🟡→✅** ([n20](#n20)): `isFeatureEnabled(key, {sendFeatureFlagEvent, defaultValue})`.
 - **HTTP Client 🟡→✅** ([n19](#n19)): the Dart core no longer retries a refused `/flags` connection, backs
-  off exponentially, and its capture v1 transport conforms.
+  off exponentially, and its capture v1 transport conforms. Separate `compression` and
+  `captureAiCompression` options are what #146 now allows.
+- **On Feature Flags 🟡→✅** ([n22](#n22)): `Posthog().onFeatureFlags()` returns a subscription, and
+  posthog-ios 4.0 now drops a `/flags` load in flight across `reset()`, so no path delivers a load
+  that `reset()` or `close()` discarded. Listeners never receive an empty variant (#193).
 - **Get Feature Flags ❌→🟡** ([n16](#n16)) and **Get Feature Flags And Payloads ❌→🟡** ([n17](#n17)):
   `getAllFeatureFlags()` returns a list of flag results, the surface the spec records for flutter 6.0;
   it is still not the canonical map shape.
@@ -59,17 +64,20 @@ Where the paths disagree the row is 🟡 and the note says which platform fails.
 **Downgraded on new spec text (1):** **Identify ✅→🟡** ([n40](#n40)): the Dart core ignores `identify()`
 while opted out, but #167 made opt-out "not a guard" for identify.
 
-**Same status, new or changed findings:** Before Send Hook ([n3](#n3): the throwing-hook log line now has
-to name the event and omit the exception message), On Feature Flags ([n22](#n22): the registration API
-exists; posthog-ios's reset race reaches Dart listeners), Surveys ([n35](#n35): both native SDKs move the
-last-seen survey date on submit and dismiss, against #102), Opt In ([n23](#n23): #138's replay restart
-is met), Session Replay Debug Properties ([n28](#n28): mobile events now carry the native bundle),
-Capture ([n41](#n41): capture v1 conforms on every capture v1 path), Event Batcher ([n8](#n8)),
-Retry Queue ([n38](#n38)), Group ([n18](#n18)), Alias ([n1](#n1)).
+**Same status, new or changed findings:** Capture ([n41](#n41): every path fills `$lib`/`$lib_version`
+as a pair after the caller's properties, and leaves an empty variant out of `$active_feature_flags`),
+Before Send Hook ([n3](#n3): the throwing-hook log line now has to name the event and omit the exception
+message), Surveys ([n35](#n35): posthog-android still moves the last-seen survey date on submit and
+dismiss, against #102; posthog-ios now writes it on show), Opt In ([n23](#n23): #138's replay restart
+and #199's deferred crash consent are met through the native SDKs), Get Feature Flags ([n16](#n16):
+on web, posthog-js reads an empty variant as enabled in the list), Session Replay Debug Properties
+([n28](#n28): mobile events now carry the native bundle), Event Batcher ([n8](#n8)), Retry Queue
+([n38](#n38)), Group ([n18](#n18)), Alias ([n1](#n1)).
 
 **New rows (5):** Experiment Exposure ➖ (every path requests `/flags/?v=2`: Dart core
-`lib/src/core/posthog_core_stateless.dart:476`, posthog-android `PostHogApi.kt:598`, posthog-ios and
-posthog-js likewise), AI Datasets ➖, AI Scorers ➖, Offline Evaluations ➖, Emails ➖ (all server-only).
+`lib/src/core/posthog_core_stateless.dart:471`, posthog-ios `PostHogApi.swift:596-597`, posthog-android
+`PostHogApi.kt:598`, and posthog-js likewise), AI Datasets ➖, AI Scorers ➖, Offline Evaluations ➖,
+Emails ➖ (all server-only).
 
 ## Matrix
 
@@ -113,7 +121,7 @@ posthog-js likewise), AI Datasets ➖, AI Scorers ➖, Offline Evaluations ➖, 
 | 36 | Local Feature Flag Evaluator | ➖ | |
 | 37 | Logs | 🟡 | [n21] |
 | 38 | MCP Analytics | ➖ | |
-| 39 | On Feature Flags | 🟡 | [n22] |
+| 39 | On Feature Flags | ✅ | [n22] |
 | 40 | Opt In | 🟡 | [n23] |
 | 41 | Persistent Storage | 🟡 | [n24] |
 | 42 | Register | 🟡 | [n25] |
@@ -150,12 +158,13 @@ posthog-js likewise), AI Datasets ➖, AI Scorers ➖, Offline Evaluations ➖, 
 Notes [n2](#n2), [n4](#n4), [n5](#n5), [n7](#n7), [n10](#n10)–[n12](#n12), [n21](#n21), [n24](#n24)–[n27](#n27),
 [n29](#n29), [n30](#n30), [n33](#n33), [n34](#n34), [n36](#n36) and [n37](#n37) carry forward from the
 2026-10-19 audit: the Dart code they cite and the spec text that governs them are unchanged at
-`6be9a1e9ee`, and their status holds. Their line references are at `1032c102`. The other notes are
-rewritten for 6.0, and [n39](#n39)–[n41](#n41) are new.
+`82123e6`, and their status holds. Their line references are at `1032c102`; [n10](#n10) and
+[n25](#n25) add one sentence each at `82123e6`. The other notes are rewritten for 6.0, and
+[n39](#n39)–[n41](#n41) are new.
 
 ### n1 — Alias (🟡 Partial)
 - **Spec requires:** the `@client` scenario (`acceptance/public/alias.feature:28-40`) wants `alias` and `distinct_id` in the `$create_alias` properties, and the `@both` scenario (`:42-50`) wants a call with a missing identity dropped with a validation warning.
-- **SDK currently (`6be9a1e9ee`):** `Posthog().alias({required String alias, options})` (`lib/src/posthog.dart:480-481`) forwards without a blank check, so the mobile paths rely on the native SDKs. posthog-android 4.0 now adds `distinct_id` (`PostHog.kt:2092-2121` at `8b63a135`) but still accepts a blank alias; posthog-ios is 🟡 for the same reason (`compliance/posthog-ios.md` n3). Web forwards to posthog-js `alias()` (no empty-alias guard, `compliance/posthog-js.md` n1). Windows/Linux conform: the Dart core warns and ignores a blank alias and sends both properties.
+- **SDK currently (`82123e6`):** `Posthog().alias({required String alias, options})` (`lib/src/posthog.dart:480-481`) forwards without a blank check, so the mobile paths rely on the native SDKs. posthog-android 4.0 now adds `distinct_id` (`PostHog.kt:2112-2141` at `aaa23d39`) but still accepts a blank alias; posthog-ios is 🟡 for the same reason (`compliance/posthog-ios.md` n3). Web forwards to posthog-js `alias()` (no empty-alias guard, `compliance/posthog-js.md` n1). Windows/Linux conform: the Dart core warns and ignores a blank alias and sends both properties.
 - **Backwards compatibility:** Backward-compatible — rejecting a blank alias only affects calls that produce a malformed event today.
 - **Remediation:** Reject a blank alias with a warning in `Posthog().alias()`, which covers every platform.
 
@@ -167,7 +176,7 @@ rewritten for 6.0, and [n39](#n39)–[n41](#n41) are new.
 
 ### n3 — Before Send Hook (🟡 Partial)
 - **Spec requires:** fail closed on a throwing hook: record a warning, stop the chain, drop the event. #146 adds: "The log line for a throwing hook SHALL name the dropped event and the exception type, and SHALL NOT include the exception message or any event content … A client SDK MAY print it only in debug mode, like its other logs." Layer order step 4: the SDK adds nothing after the hook, except it MAY re-impose the uuid.
-- **SDK currently (`6be9a1e9ee`):** callbacks are synchronous and run on the event the SDK built: on iOS, macOS and Android the native SDK builds it (`buildEvent`), Dart runs the callbacks and the native SDK sends what they return (`lib/src/posthog_flutter_io.dart:107-170`); Windows/Linux build it in the Dart core and queue what the callbacks return, keeping the prepared uuid (`lib/src/posthog_flutter_desktop.dart:742-870`); web runs them before posthog-js. A throw drops the event on every path (`lib/src/utils/before_send.dart:17-21`). Printing only under `kDebugMode` is now allowed for a client SDK, which retires the earlier finding. **Gap:** the log line is `'… beforeSend callback threw an exception; dropping event: $e'` (`before_send.dart:18-20`): it interpolates the exception, message included, and doesn't name the dropped event.
+- **SDK currently (`82123e6`):** callbacks are synchronous and run on the event the SDK built: on iOS, macOS and Android the native SDK builds it (`buildEvent`), Dart runs the callbacks and the native SDK sends what they return (`lib/src/posthog_flutter_io.dart:107-170`); Windows/Linux build it in the Dart core and queue what the callbacks return, keeping the prepared uuid (`lib/src/posthog_flutter_desktop.dart:753-881`); web runs them before posthog-js. A throw drops the event on every path (`lib/src/utils/before_send.dart:17-21`). Printing only under `kDebugMode` is now allowed for a client SDK, which retires the earlier finding. **Gap:** the log line is `'… beforeSend callback threw an exception; dropping event: $e'` (`before_send.dart:18-20`): it interpolates the exception, message included, and doesn't name the dropped event.
 - **Backwards compatibility:** Backward-compatible — log text only.
 - **Remediation:** Log the event name and `e.runtimeType` instead of `$e`.
 
@@ -185,7 +194,7 @@ rewritten for 6.0, and [n39](#n39)–[n41](#n41) are new.
 
 ### n6 — Consent Gating (🟡 Partial)
 - **Spec requires:** while opted out, event-producing APIs return early without enqueueing, and consent gating runs before the before-send hook; wrapper-managed integrations and session replay are gated too.
-- **SDK currently (`6be9a1e9ee`):** Windows/Linux check opt-out before building the event or running `beforeSend` (`lib/src/posthog_flutter_desktop.dart:271`, `:344`, `:619`). On iOS, macOS and Android the native SDK builds the event first and `beforeSend` runs on what it returns (`lib/src/posthog_flutter_io.dart:139-170`), so native opt-out comes first. `optOut()` uninstalls Flutter error autocapture and leaves replay to the native SDK (`lib/src/posthog.dart:506-520`). **Gaps:** (1) web `capture` runs `beforeSend` before posthog-js sees the event, with no opt-out check (`lib/posthog_flutter_web.dart:262-280`); (2) `captureLog()` runs the logs `beforeSend` chain with no opt-out check on any platform (`lib/src/posthog.dart:403-450`). Delivery is still blocked downstream; only the hook side effects leak.
+- **SDK currently (`82123e6`):** Windows/Linux check opt-out before building the event or running `beforeSend` (`lib/src/posthog_flutter_desktop.dart:271`, `:344`, `:630`). On iOS, macOS and Android the native SDK builds the event first and `beforeSend` runs on what it returns (`lib/src/posthog_flutter_io.dart:139-170`), so native opt-out comes first. `optOut()` uninstalls Flutter error autocapture and leaves replay to the native SDK (`lib/src/posthog.dart:506-520`). A crash the native SDK reconstructs on a later launch follows the consent at crash time ([n23](#n23)). **Gaps:** (1) web `capture` runs `beforeSend` before posthog-js sees the event, with no opt-out check (`lib/posthog_flutter_web.dart:262-280`); (2) `captureLog()` runs the logs `beforeSend` chain with no opt-out check on any platform (`lib/src/posthog.dart:403-450`). Delivery is still blocked downstream; only the hook side effects leak.
 - **Backwards compatibility:** Backward-compatible.
 - **Remediation:** Check opt-out before running the web `beforeSend` chain and at the top of `captureLog()`.
 
@@ -197,25 +206,25 @@ rewritten for 6.0, and [n39](#n39)–[n41](#n41) are new.
 
 ### n8 — Event Batcher (🟡 Partial)
 - **Spec requires:** count- and time-based batching, a bounded queue with oldest-first eviction, and for capture v1 (#146) byte-aware batches of at most 5 MiB; a client SDK MAY halve a multi-event batch on 413.
-- **SDK currently (`6be9a1e9ee`):** Windows/Linux conform: batches are taken with `peek(maxBatchSize, maxBytes: captureV1MaxBatchBytes)` (`lib/src/core/posthog_core_stateless.dart:745`, 5 MiB at `lib/src/core/capture_v1.dart:10`), a full 5 MiB of queued bytes flushes like `flushAt` (`posthog_core_stateless.dart:600-606`), the queue evicts the oldest first, and a multi-event 413 halves the batch and `flushAt` (`:769-780`). posthog-ios 4.0 conforms. **Gap:** posthog-android 4.0 still runs its periodic flush on `java.util.Timer`, not the injectable clock (`compliance/posthog-android.md` n6). Web is posthog-js's batcher.
+- **SDK currently (`82123e6`):** Windows/Linux conform: batches are taken with `peek(maxBatchSize, maxBytes: captureV1MaxBatchBytes)` (`lib/src/core/posthog_core_stateless.dart:761`, 5 MiB at `lib/src/core/capture_v1.dart:10`), a full 5 MiB of queued bytes flushes like `flushAt` (`posthog_core_stateless.dart:616-622`), the queue evicts the oldest first, and a multi-event 413 halves the batch and `flushAt` (`:785-796`). posthog-ios 4.0 conforms. **Gap:** posthog-android 4.0 still runs its periodic flush on `java.util.Timer`, not the injectable clock (`PostHogQueue.kt:625-628` at `aaa23d39`; `compliance/posthog-android.md` n6). Web is posthog-js's batcher.
 - **Backwards compatibility:** Backward-compatible — the fix is in posthog-android.
 - **Remediation:** None in this repo; track posthog-android n6.
 
 ### n9 — Exception Event Metadata (❌ Fail)
 - **Spec requires:** every `$exception_list` entry carries a `mechanism` with a unique `exception_id` (`0` outermost); nested entries carry `parent_id`, `mechanism.type: chained` and a `mechanism.source`; `handled` is not invented for nested entries; at most 50 entries; application properties MUST NOT override `$exception_list`, `$exception_level` or `$exception_source`.
-- **SDK currently (`6be9a1e9ee`):** unchanged in substance. `lib/src/error_tracking/dart_exception_processor.dart` still has no `exception_id` or `parent_id`; causes inherit the outermost `handled` (`:210`); `$exception_level` is the literal `'error'` and no `$exception_source` is sent (`:148`); caller properties are spread last, so they override SDK-owned keys (`:150`); and `maxExceptionChainLength = 10` (`:20`).
+- **SDK currently (`82123e6`):** unchanged in substance. `lib/src/error_tracking/dart_exception_processor.dart` still has no `exception_id` or `parent_id`; causes inherit the outermost `handled` (`:210`); `$exception_level` is the literal `'error'` and no `$exception_source` is sent (`:148`); caller properties are spread last, so they override SDK-owned keys (`:150`); and `maxExceptionChainLength = 10` (`:20`).
 - **Backwards compatibility:** **Needs deprecation path** — stopping the property bag from overriding `$exception_level` needs a typed override first.
 - **Remediation:** Assign `exception_id`/`parent_id` depth-first, set `mechanism.type: 'chained'` and a source on causes, stop propagating `handled`, derive the level and send `$exception_source`, raise the cap to 50, add typed overrides, then stop the bag from overriding reserved keys.
 
 ### n10 — Feature Flag Called Tracker (🟡 Partial)
 - **Spec requires:** Dedupe `$feature_flag_called` per (flag, value), re-fire on value change, clear on `reset()`, and honour the minimal-envelope allowlist.
-- **SDK currently:** **Resolved from ❓ Unknown.** The Dart core implements the tracker directly: `_flagCallReported` is a `Map<String, Set<PostHogFeatureFlagValue?>>` (`posthog_core.dart:25-26`), the dedup check is `!(_flagCallReported[key]?.contains(flagValue) ?? false)` (`:780`) — keyed on the value, so a changed value correctly re-fires — the set is populated after reporting (`:815`), `$feature_flag_called` is captured at `:838`, and the whole map is cleared on reset (`:82`). Failure cases are recorded for the event (`:888`). The Dart core also implements the minimal envelope on desktop: `core/feature_flag_utils.dart:25` parses the server's `minimalFlagCalledEvents` gate from the `/flags` response, `posthog_core.dart:652` persists it with the flag details and `:120-121` reads it back, and `posthog_core_stateless.dart:229-236` keeps only `minimalFeatureFlagCalledProperties` (`feature_flag_utils.dart:70`) on non-experiment `$feature_flag_called` events, so desktop passes. **Why 🟡:** the mobile path is the embedded native tracker, which `compliance/posthog-android.md` n8 records as 🟡 (posthog-ios is ✅).
+- **SDK currently:** **Resolved from ❓ Unknown.** The Dart core implements the tracker directly: `_flagCallReported` is a `Map<String, Set<PostHogFeatureFlagValue?>>` (`posthog_core.dart:25-26`), the dedup check is `!(_flagCallReported[key]?.contains(flagValue) ?? false)` (`:780`) — keyed on the value, so a changed value correctly re-fires — the set is populated after reporting (`:815`), `$feature_flag_called` is captured at `:838`, and the whole map is cleared on reset (`:82`). Failure cases are recorded for the event (`:888`). The Dart core also implements the minimal envelope on desktop: `core/feature_flag_utils.dart:25` parses the server's `minimalFlagCalledEvents` gate from the `/flags` response, `posthog_core.dart:652` persists it with the flag details and `:120-121` reads it back, and `posthog_core_stateless.dart:229-236` keeps only `minimalFeatureFlagCalledProperties` (`feature_flag_utils.dart:70`) on non-experiment `$feature_flag_called` events, so desktop passes. **Why 🟡:** the mobile path is the embedded native tracker, which `compliance/posthog-android.md` n8 records as 🟡 (posthog-ios is ✅). At `aaa23d39` posthog-android's minimal allowlist (`PostHogStateless.kt:929-951`) still has no OS/runtime identity properties, and no path reads config version 2 records (every path requests `/flags/?v=2`), so #203's `$feature_flag_variant_key` attribution doesn't arise.
 - **Backwards compatibility:** Backward-compatible.
 - **Remediation:** None in the Dart core; track the Android half under posthog-android n8.
 
 ### n11 — Flush (🟡 Partial)
 - **Spec requires:** `both`. No-op on an empty queue; drain immediately; a failed batch stays queued.
-- **SDK currently (`6be9a1e9ee`):** Windows/Linux flush both capture v1 lanes through the Dart core; iOS, macOS and Android call the native `flush()`. **Gap, unchanged:** on web, `case 'flush':` in `lib/src/posthog_flutter_web_handler.dart:522-525` has the delegating call commented out, so `flush()` resolves without doing anything.
+- **SDK currently (`82123e6`):** Windows/Linux flush both capture v1 lanes through the Dart core; iOS, macOS and Android call the native `flush()`. **Gap, unchanged:** on web, `case 'flush':` in `lib/src/posthog_flutter_web_handler.dart:522-525` has the delegating call commented out, so `flush()` resolves without doing anything.
 - **Backwards compatibility:** Backward-compatible.
 - **Remediation:** Delegate to `window.posthog` or log that flush is unsupported on web.
 
@@ -227,50 +236,49 @@ rewritten for 6.0, and [n39](#n39)–[n41](#n41) are new.
 
 ### n13 — Get Feature Flag (✅ Pass)
 - **Spec requires:** `getFeatureFlag(key, options?: { sendFeatureFlagEvent?: boolean })`, with a per-call way to turn off `$feature_flag_called`.
-- **SDK currently (`6be9a1e9ee`):** `getFeatureFlag(String key, {bool? sendFeatureFlagEvent})` (`lib/src/posthog.dart:1018-1020`); `null` follows `PostHogConfig.sendFeatureFlagEvent`. Every path passes it through: the method channel (`lib/src/posthog_flutter_io.dart:973-990`), web (`lib/posthog_flutter_web.dart:615-625`, posthog-js options at `lib/src/posthog_flutter_web_handler.dart:486-491`) and the Dart core (`lib/src/posthog_flutter_desktop.dart:581-590`).
+- **SDK currently (`82123e6`):** `getFeatureFlag(String key, {bool? sendFeatureFlagEvent})` (`lib/src/posthog.dart:1056-1058`); `null` follows `PostHogConfig.sendFeatureFlagEvent`. Every path passes it through: the method channel (`lib/src/posthog_flutter_io.dart:973-990`), web (`lib/posthog_flutter_web.dart:632-642`, posthog-js options at `lib/src/posthog_flutter_web_handler.dart:486-491`) and the Dart core (`lib/src/posthog_flutter_desktop.dart:592-601`).
 - **Backwards compatibility:** No change needed.
 - **Remediation:** None.
 
 ### n14 — Get Feature Flag Payload (✅ Pass)
 - **Spec requires:** a cache-only payload read with no `$feature_flag_called`; malformed JSON is no payload. "A client SDK MAY omit a dedicated payload getter when its flag result getter … returns the payload and accepts a per-call `sendFeatureFlagEvent` option. posthog-ios 4.0, posthog-android 4.0 and posthog_flutter 6.0 do this." (`openspec/specs/get-feature-flag-payload/spec.md:236`)
-- **SDK currently (`6be9a1e9ee`):** `getFeatureFlagPayload()` is removed; the read is `getFeatureFlagResult(key, sendFeatureFlagEvent: false)?.payload` ([n15](#n15)). The malformed-payload rule holds on Windows/Linux (`lib/src/core/feature_flags.dart`, `parsePayload`), on iOS/macOS through posthog-ios 4.0 (`compliance/posthog-ios.md` n7, ✅) and on Android through posthog-android 4.0.
+- **SDK currently (`82123e6`):** `getFeatureFlagPayload()` is removed; the read is `getFeatureFlagResult(key, sendFeatureFlagEvent: false)?.payload` ([n15](#n15)). The malformed-payload rule holds on Windows/Linux (`lib/src/core/feature_flags.dart`, `parsePayload`), on iOS/macOS through posthog-ios 4.0 (`compliance/posthog-ios.md` n7, ✅) and on Android through posthog-android 4.0.
 - **Backwards compatibility:** No change needed.
 - **Remediation:** None.
 
 ### n15 — Get Feature Flag Result (✅ Pass)
-- **Spec requires:** a structured result (`key`, `enabled`, `variant`, `payload`), `null` for an unknown flag, malformed payloads as no payload, and a per-call `sendFeatureFlagEvent`.
-- **SDK currently (`6be9a1e9ee`):** `getFeatureFlagResult(key, {sendFeatureFlagEvent})` (`lib/src/posthog.dart:1041-1046`) follows `PostHogConfig.sendFeatureFlagEvent` when the option is omitted. Payloads are no payload for malformed, empty or whitespace JSON on iOS/macOS (posthog-ios 4.0, `compliance/posthog-ios.md` n8, ✅), Android and Windows/Linux. A flag whose variant is an empty string reads as disabled on every native and desktop path.
+- **Spec requires:** a structured result (`key`, `enabled`, `variant`, `payload`), `null` for an unknown flag, malformed payloads as no payload, and a per-call `sendFeatureFlagEvent`; (#193) a flag whose value is `""` reads as disabled, `enabled: false` with `variant: ""`.
+- **SDK currently (`82123e6`):** `getFeatureFlagResult(key, {sendFeatureFlagEvent})` (`lib/src/posthog.dart:1079-1084`) follows `PostHogConfig.sendFeatureFlagEvent` when the option is omitted. Payloads are no payload for malformed, empty or whitespace JSON on iOS/macOS (posthog-ios 4.0, `compliance/posthog-ios.md` n8, ✅), Android and Windows/Linux. An empty variant gives `enabled: false, variant: ""` on Windows/Linux (`lib/src/core/posthog_core.dart:1135-1139`), iOS/macOS (`PostHogRemoteConfig.swift:1184-1192` at `e27cbe4cb`), Android (`PostHogRemoteConfig.kt:1344-1348` at `aaa23d39`) and web, where posthog-js's browser `getFeatureFlagResult` sets `enabled: !!flagValue` and Flutter passes the result through (`lib/src/utils/channel_serialization.dart:176-188`).
 - **Backwards compatibility:** No change needed.
 - **Remediation:** None.
 
 ### n16 — Get Feature Flags (🟡 Partial)
 - **Spec requires:** a bulk getter returning every known flag as a key → value map. The spec records "**iOS (4.0+), Android (4.0+), flutter (6.0+):** `getAllFeatureFlags()` returns a list of flag result objects (key, enabled, variant, payload), or `null` when flags are unavailable, instead of a key-to-value map" (`openspec/specs/get-feature-flags/spec.md:59`).
-- **SDK currently (`6be9a1e9ee`):** `getAllFeatureFlags()` (`lib/src/posthog.dart:1068-1069`) on every path (`lib/src/posthog_flutter_io.dart:1016`, `lib/posthog_flutter_web.dart:644`, `lib/src/posthog_flutter_desktop.dart:603`), never sending `$feature_flag_called`. It is the recorded surface, but not the canonical map shape, so the row is 🟡 as for posthog-ios 4.0.
-- **Backwards compatibility:** Backward-compatible — a map-returning getter would be additive.
-- **Remediation:** None required beyond the recorded surface; optionally add a map view.
+- **SDK currently (`82123e6`):** `getAllFeatureFlags()` (`lib/src/posthog.dart:1106-1107`) on every path (`lib/src/posthog_flutter_io.dart:1016`, `lib/posthog_flutter_web.dart:661`, `lib/src/posthog_flutter_desktop.dart:614`), never sending `$feature_flag_called`. It is the recorded surface, but not the canonical map shape, so the row is 🟡 as for posthog-ios 4.0. (#193) Each entry matches `getFeatureFlagResult` on iOS/macOS (`getAllFeatureFlagResults`, `PostHogRemoteConfig.swift:1168-1182` at `e27cbe4cb`), Android (`PostHog.kt:2776-2785` at `aaa23d39`) and Windows/Linux (`lib/src/core/posthog_core.dart:1145-1152`). **Gap on web:** Flutter returns posthog-js's `getAllFeatureFlags()` unchanged (`lib/src/posthog_flutter_web_handler.dart:497-505`), and posthog-js builds each entry with `getEnabledFromValue`, which reads `""` as enabled (`packages/browser-common/src/feature-flags.ts:871-883`, `packages/core/src/featureFlagUtils.ts:158-160` at posthog-js `5e31f126d`).
+- **Backwards compatibility:** Backward-compatible — a map-returning getter would be additive, and reading `""` as disabled on web changes only flags that are off everywhere else.
+- **Remediation:** Optionally add a map view. On web, set `enabled: false` for a `""` entry in Flutter, or fix it in posthog-js.
 
 ### n17 — Get Feature Flags And Payloads (🟡 Partial)
 - **Spec requires:** a combined getter returning flags and their decoded payloads.
-- **SDK currently (`6be9a1e9ee`):** `getAllFeatureFlags()` ([n16](#n16)) returns each flag's decoded payload with its value, which the spec records as the flutter 6.0 surface; it is not the canonical combined shape.
+- **SDK currently (`82123e6`):** `getAllFeatureFlags()` ([n16](#n16)) returns each flag's decoded payload with its value, which the spec records as the flutter 6.0 surface; it is not the canonical combined shape, and on web an empty variant is listed as enabled ([n16](#n16)).
 - **Backwards compatibility:** Backward-compatible.
 - **Remediation:** Same as [n16](#n16).
 
 ### n18 — Group (🟡 Partial)
 - **Spec requires:** `group(type, key, properties)` MUST reject a blank `type` or `key`, leaving group state unchanged and logging a warning.
-- **SDK currently (`6be9a1e9ee`):** `Posthog().group(...)` (`lib/src/posthog.dart:854-865`) does no blank check. iOS/macOS now pin posthog-ios 4.x, which rejects blank values (`compliance/posthog-ios.md` n12, ✅), and Windows/Linux reject them in the Dart core. **Gap:** posthog-android 4.0's `group()` (`PostHog.kt:2505-2530` at `8b63a135`) still has no blank check (`compliance/posthog-android.md` n11).
+- **SDK currently (`82123e6`):** `Posthog().group(...)` (`lib/src/posthog.dart:892-903`) does no blank check. iOS/macOS now pin posthog-ios 4.x, which rejects blank values (`compliance/posthog-ios.md` n12, ✅), and Windows/Linux reject them in the Dart core. **Gap:** posthog-android 4.0's `group()` (`PostHog.kt:2525-2550` at `aaa23d39`) still has no blank check (`compliance/posthog-android.md` n11).
 - **Backwards compatibility:** Backward-compatible.
 - **Remediation:** Add a blank `groupType`/`groupKey` guard in `Posthog().group()`.
 
 ### n19 — HTTP Client (✅ Pass)
-- **Spec requires:** gzip with one declared `Content-Encoding`; a `/flags` retry that skips a refused connection and doesn't retry before 300 ms; and, for capture v1 (#146), the capture URLs, the token only as `Authorization: Bearer`, the capture v1 headers on every attempt, and only same-origin 307/308 redirects, at most five.
-- **SDK currently (`6be9a1e9ee`):** Windows/Linux: `_isRetryableFlagsError` excludes a refused connection (`lib/src/core/posthog_core_stateless.dart:58-60`, `:90-96`, `ECONNREFUSED`/`WSAECONNREFUSED`/`ERROR_CONNECTION_REFUSED`); `/flags` retries start at 300 ms and double up to 30 s (`:129-130`, `retriable` in `lib/src/core/utils/utils.dart:13-40`). Capture requests send `Authorization: Bearer`, `PostHog-Sdk-Info`, `PostHog-Attempt`, `PostHog-Request-Id` and `PostHog-Request-Timestamp` (`posthog_core_stateless.dart:871-877`), and `_fetchCaptureV1` follows only same-origin 307/308, at most 5 (`:932-960`, `:137`), with `followRedirects = false` on the request. iOS, macOS and Android use the native 4.0 transports (HTTP Client ✅ in both audits). Web uses posthog-js's transport and is not on capture v1.
-- **Not scored:** the whole-client compression opt-out against `capture-ai`'s per-lane `captureAiCompression` is open on #146.
+- **Spec requires:** gzip by default with one declared `Content-Encoding` and a whole-client opt-out, which (#146) doesn't cover a delivery lane with its own compression setting; a `/flags` retry that skips a refused connection and doesn't retry before 300 ms; and, for capture v1 (#146), the capture URLs, the token only as `Authorization: Bearer`, the capture v1 headers on every attempt, and only same-origin 307/308 redirects, at most five.
+- **SDK currently (`82123e6`):** Windows/Linux: `_isRetryableFlagsError` excludes a refused connection (`lib/src/core/posthog_core_stateless.dart:58-60`, `:90-96`, `ECONNREFUSED`/`WSAECONNREFUSED`/`ERROR_CONNECTION_REFUSED`); `/flags` retries start at 300 ms and double up to 30 s (`:129-130`, `retriable` in `lib/src/core/utils/utils.dart:13-40`). Capture requests send `Authorization: Bearer`, `PostHog-Sdk-Info`, `PostHog-Attempt`, `PostHog-Request-Id` and `PostHog-Request-Timestamp` (`posthog_core_stateless.dart:887-893`), and `_fetchCaptureV1` follows only same-origin 307/308, at most 5 (`:948-976`, `:137`), with `followRedirects = false` on the request. `PostHogConfig.compression` (gzip by default, `none` to opt out, `lib/src/posthog_config.dart:217`) covers `/flags` and the analytics lane (`posthog_core_stateless.dart:172`, `:194`, `:986`), and `captureAiCompression` sets the AI lane alone (`:211`), as #146 now allows. iOS, macOS and Android use the native 4.0 transports (HTTP Client ✅ in both audits). Web uses posthog-js's transport and is not on capture v1.
 - **Backwards compatibility:** No change needed.
 - **Remediation:** None.
 
 ### n20 — Is Feature Enabled (✅ Pass)
 - **Spec requires:** a boolean getter accepting a caller-supplied default; the spec lists "**flutter:** `isFeatureEnabled(key, {sendFeatureFlagEvent, defaultValue}): Future<bool>`".
-- **SDK currently (`6be9a1e9ee`):** `isFeatureEnabled(String key, {bool? sendFeatureFlagEvent, bool? defaultValue})` (`lib/src/posthog.dart:645-649`), passed through on web (`lib/posthog_flutter_web.dart:536-546`) and the Dart core (`lib/src/posthog_flutter_desktop.dart:514-522`); an empty-string variant reads as disabled.
+- **SDK currently (`82123e6`):** `isFeatureEnabled(String key, {bool? sendFeatureFlagEvent, bool? defaultValue})` (`lib/src/posthog.dart:683-687`), passed through on web (`lib/posthog_flutter_web.dart:552-565`) and the Dart core (`lib/src/posthog_flutter_desktop.dart:525-533`); an empty-string variant reads as disabled (`lib/src/core/posthog_core.dart:1175-1180`).
 - **Backwards compatibility:** No change needed.
 - **Remediation:** None.
 
@@ -280,15 +288,15 @@ rewritten for 6.0, and [n39](#n39)–[n41](#n41) are new.
 - **Backwards compatibility:** Backward-compatible — an early return for opted-out users skips only hooks whose record would have been dropped anyway.
 - **Remediation:** Check `await _posthog.isOptOut()` at the top of `captureLog()`, before the blank-body check and the `beforeSend` loop.
 
-### n22 — On Feature Flags (🟡 Partial)
-- **Spec requires:** a listener registration that also serves late registrations, stays active across `close()`/`setup()` until unsubscribed, and "Loads discarded by reset or close reach no listener".
-- **SDK currently (`6be9a1e9ee`):** `PostHogConfig.onFeatureFlags` is replaced by `Posthog().onFeatureFlags(callback)` returning a `PostHogFeatureFlagsSubscription` (`lib/src/posthog.dart:707-713`). A late listener gets the last load in a microtask (`lib/src/feature_flags_listeners.dart:26-39`), and `reset()`/`close()` forget the last load and bump a generation (`:62-67`). The native plugins tag each load with the generation they last received (`darwin/.../PosthogFlutterPlugin.swift:146-150`), and Dart drops a load sent before the native SDK got the reset (`lib/src/posthog_flutter_io.dart:260-271`). **Gap:** a `/flags` load already in flight inside posthog-ios when `reset()` runs completes after the plugin has the new generation, so it is tagged current and delivered — the posthog-ios 4.0 gap (`compliance/posthog-ios.md` n28) reaches Flutter listeners on iOS and macOS.
-- **Backwards compatibility:** Backward-compatible — the fix is in posthog-ios.
-- **Remediation:** None in this repo beyond the generation tag; track posthog-ios n28.
+### n22 — On Feature Flags (✅ Pass; was 🟡)
+- **Spec requires:** a listener registration that also serves late registrations, stays active across `close()`/`setup()` until unsubscribed, and "Loads discarded by reset or close reach no listener"; (#193) a payload-carrying listener leaves a flag whose value is `""` out of the keys and variants it receives.
+- **SDK currently (`82123e6`):** `PostHogConfig.onFeatureFlags` is replaced by `Posthog().onFeatureFlags(callback)` returning a `PostHogFeatureFlagsSubscription` (`lib/src/posthog.dart:745-751`). A late listener gets the last load in a microtask (`lib/src/feature_flags_listeners.dart:26-39`), and `reset()`/`close()` forget the last load and bump a generation (`:62-67`). The native plugins tag each load with the generation they last received (`darwin/.../PosthogFlutterPlugin.swift:146-150`), and Dart drops a load sent before the native SDK got the reset (`lib/src/posthog_flutter_io.dart:260-271`). A load already in flight inside the native SDK when `reset()` runs no longer reaches Flutter: posthog-ios 4.0 drops it before it writes the cache or notifies listeners (`PostHogRemoteConfig.swift:493-497`, `:820-829` at `e27cbe4cb`, PostHog/posthog-ios#1048), and posthog-android 4.0 binds each load's listener notification to the generation at its start (`PostHog.kt:253-260` at `aaa23d39`). Web drops loads from an earlier `setup()` or `close()` in Dart (`lib/posthog_flutter_web.dart:195-217`), and posthog-js bumps a request generation on `reset()`. `PostHogFeatureFlagsLoaded` keeps only `true` and non-empty variants on every path (`lib/src/feature_flags_loaded.dart:39-48`), so listeners never receive an empty variant.
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None.
 
 ### n23 — Opt In (🟡 Partial)
-- **Spec requires:** persisted opt-in/opt-out that gates capture; "Opt out can clear local persistence when configured"; and on mobile (#138) opt-in restarts the replay the app wanted at opt-out, in a new session.
-- **SDK currently (`6be9a1e9ee`):** `optOut()`/`optIn()` (`lib/src/posthog.dart:506-541`; `enable()`/`disable()` are removed). Replay restart meets #138 on iOS, macOS and Android: `optOut()` leaves stopping replay to the native SDK, so native records whether the app wanted replay (`:515-519`), and native opt-in rotates the session before restarting (posthog-ios 4.0 `optIn()`, posthog-android 4.0 `PostHog.kt:1936-1975`). Dart restarts its screenshot pipeline only when it was running at opt-out, and starts a fresh replay session for it (`:532-540`). **Gap:** `optOut()` still takes no clear-local-data option on any path, as in posthog-ios and posthog-android.
+- **Spec requires:** persisted opt-in/opt-out that gates capture; "Opt out can clear local persistence when configured"; on mobile (#138) opt-in restarts the replay the app wanted at opt-out, in a new session; and (#199) a crash the SDK reconstructs on a later launch follows the consent at crash time: never sent when recorded while opted out, kept and sent after opt-in when recorded while opted in.
+- **SDK currently (`82123e6`):** `optOut()`/`optIn()` (`lib/src/posthog.dart:506-541`; `enable()`/`disable()` are removed). Replay restart meets #138 on iOS, macOS and Android: `optOut()` leaves stopping replay to the native SDK, so native records whether the app wanted replay (`:515-519`), and native opt-in rotates the session before restarting (posthog-ios 4.0 `optIn()`, posthog-android 4.0 `PostHog.kt:1956-1995` at `aaa23d39`). Dart restarts its screenshot pipeline only when it was running at opt-out, and starts a fresh replay session for it (`:532-540`). Deferred crash reports come from the native SDKs, which Flutter enables through `captureNativeExceptions` and, on Android, `captureNativeCrashes` (`lib/src/posthog_config.dart:1097`, `:1121`). Both meet #199: posthog-ios marks the crash context at opt-out and drops a marked report (`PostHogErrorTrackingAutoCaptureIntegration.swift:119-125`, `:267-270` at `e27cbe4cb`), and leaves an earlier report on disk while opted out because its integrations aren't installed until opt-in; posthog-android records opt-out intervals and drops a native crash whose time falls in one (`PostHogNativeCrashIntegration.kt:171-174`, `:372-400` at `aaa23d39`, PostHog/posthog-android#952). **Gap:** `optOut()` still takes no clear-local-data option on any path, as in posthog-ios and posthog-android.
 - **Backwards compatibility:** Backward-compatible with an optional parameter.
 - **Remediation:** Add an optional clear-local-data option to `optOut()`.
 
@@ -301,6 +309,7 @@ rewritten for 6.0, and [n39](#n39)–[n41](#n41) are new.
 ### n25 — Register (🟡 Partial)
 - **Spec requires:** Register a super property merged into later events, with a per-event value winning; implementations MAY reject invalid input such as empty keys (`openspec/specs/register/spec.md:42`), so blank keys should not silently persist as stray super properties.
 - **SDK currently:** `Posthog().register(String key, Object value)` (`lib/src/posthog.dart:467-468`) and `PosthogFlutterIO.register` (`posthog_flutter_io.dart:714-727`) forward the key with no blank check, and so does every other path: Android `PosthogFlutterPlugin.kt:1989` (presence-only `!!`, inheriting `compliance/posthog-android.md` n16 🟡), web `posthog_flutter_web_handler.dart:384-389`, and desktop `posthog_flutter_desktop.dart:401-402` → `core/posthog_core_stateless.dart:388-393`. An empty-string key silently persists as a super property. Per-event properties correctly win over registered ones on desktop (`core/posthog_core.dart:152-154`).
+- **6.0 (`82123e6`):** `registerOptions()`/`unregisterOptions()` (`lib/src/posthog.dart:594-605`) register capture options next to super properties; no contract covers registered options on a client SDK, so they don't change this row, and the blank-key finding above still holds on every path.
 - **Backwards compatibility:** Backward-compatible — a blank-key guard only affects invalid input; the spec's validation language is permissive, so this is a minor gap.
 - **Remediation:** Add blank-key rejection to `Posthog().register()`.
 
@@ -318,7 +327,7 @@ rewritten for 6.0, and [n39](#n39)–[n41](#n41) are new.
 
 ### n28 — Session Replay Debug Properties (🟡 Partial)
 - **Spec requires:** `$recording_status` and the three `$sdk_debug_replay_*` trigger/buffer keys on every event except `$snapshot`, a throttled optional bundle on SDK events, and (#197) `$sdk_debug_replay_capture_mode` always `screenshot` on mobile. An SDK with no replay integration sends only `$recording_status: disabled`.
-- **SDK currently (`6be9a1e9ee`):** the Dart layer adds no replay debug keys. On iOS, macOS and Android events are now built by the native SDK (`buildEvent` / `capture`), so they carry posthog-ios's and posthog-android's bundles, including `screenshot` for the Flutter host; posthog-ios 4.0 is 🟡 here (`compliance/posthog-ios.md` n26: caller-supplied `$session_id` and backdated events). Windows/Linux have no replay and send `$recording_status: disabled` (`lib/src/posthog_desktop_client.dart:45`), which conforms. Web inherits posthog-js (🟡, `compliance/posthog-js.md` n36). Not verified: whether the native trigger statuses reflect Flutter's Dart capture pipeline.
+- **SDK currently (`82123e6`):** the Dart layer adds no replay debug keys. On iOS, macOS and Android events are now built by the native SDK (`buildEvent` / `capture`), so they carry posthog-ios's and posthog-android's bundles, including `screenshot` for the Flutter host; posthog-ios 4.0 is 🟡 here (`compliance/posthog-ios.md` n26): at `e27cbe4cb` `$sdk_debug_session_start` still comes from the session manager even when the event carries a caller-supplied `$session_id`, and a backdated event still gets live state (`PostHogSDK.swift:764-765`). Windows/Linux have no replay and send `$recording_status: disabled` (`lib/src/posthog_desktop_client.dart:45`), which conforms. Web inherits posthog-js (🟡, `compliance/posthog-js.md` n36). Not verified: whether the native trigger statuses reflect Flutter's Dart capture pipeline.
 - **Backwards compatibility:** Backward-compatible.
 - **Remediation:** None in this repo; track posthog-ios n26 and posthog-js n36.
 
@@ -336,13 +345,13 @@ rewritten for 6.0, and [n39](#n39)–[n41](#n41) are new.
 
 ### n31 — Setup (🟡 Partial)
 - **Spec requires:** the project credential named `projectToken`; lifecycle hygiene on re-initialization.
-- **SDK currently (`6be9a1e9ee`):** `PostHogConfig.apiKey` and the `API_KEY` manifest/Info.plist key are removed; `setup()` skips a blank or `phx_` token with one log line (`lib/src/utils/project_token.dart:5-17`, `lib/src/posthog.dart:76-79`) and reinstalls Flutter integrations without stacking them. **Gap, unchanged:** no double-init guard or warning: a second `setup()` re-runs the whole path and native setup.
+- **SDK currently (`82123e6`):** `PostHogConfig.apiKey` and the `API_KEY` manifest/Info.plist key are removed; `setup()` skips a blank or `phx_` token with one log line (`lib/src/utils/project_token.dart:5-17`, `lib/src/posthog.dart:76-79`) and reinstalls Flutter integrations without stacking them. **Gap, unchanged:** no double-init guard or warning: a second `setup()` re-runs the whole path and native setup.
 - **Backwards compatibility:** Backward-compatible.
 - **Remediation:** Warn or no-op on a second `setup()` without an intervening `close()`.
 
 ### n32 — Shutdown (🟡 Partial)
 - **Spec requires:** flush pending events before tearing down.
-- **SDK currently (`6be9a1e9ee`):** `Posthog().close()` (`lib/src/posthog.dart:1244-1262`) does no flush of its own and delegates. Android and iOS flush in their native `close()`; Windows/Linux make one bounded send attempt of up to two seconds (`lib/src/posthog_flutter_desktop.dart:665`). **Gap, unchanged:** web `close` is a no-op with the delegating call commented out (`lib/src/posthog_flutter_web_handler.dart:526-529`).
+- **SDK currently (`82123e6`):** `Posthog().close()` (`lib/src/posthog.dart:1282-1298`) does no flush of its own and delegates. Android and iOS flush in their native `close()`; Windows/Linux make one bounded send attempt of up to two seconds (`lib/src/posthog_flutter_desktop.dart:676`). **Gap, unchanged:** web `close` is a no-op with the delegating call commented out (`lib/src/posthog_flutter_web_handler.dart:526-529`).
 - **Backwards compatibility:** Backward-compatible.
 - **Remediation:** Implement web `close` and add a bounded Dart-side flush before delegating.
 
@@ -360,9 +369,9 @@ rewritten for 6.0, and [n39](#n39)–[n41](#n41) are new.
 
 ### n35 — Surveys (🟡 Partial)
 - **Spec requires:** native SDKs exclude surveys whose only display conditions are web-only (`url`/`selector`); the popup delay (#121), where a survey dropped before display is not marked seen and sends no event; and (#102) "Submit and dismiss SHALL NOT move the date" — the device-wide last-seen survey date is written on show.
-- **SDK currently (`6be9a1e9ee`):** Flutter renders surveys for the native survey engines (`PostHogFlutterSurveysDelegate.kt`, `PostHogDisplaySurvey+Dict.swift`). Its own popup delay (`lib/src/surveys/survey_service.dart:14-125`) drops a survey still waiting without calling `onClosed` (`:219-231`), so the native "closed before shown" path is never hit from Flutter. Seen keys and the last-seen date are written by the native SDKs. **Gaps:** (1) both posthog-ios 4.0 and posthog-android 4.0 also write the last-seen date in `setSurveySeen`, on submit and dismiss (`compliance/posthog-ios.md` n29; `PostHogSurveysIntegration.kt:1188-1203` at `8b63a135`), so the wait period runs from the close, not the show; (2) posthog-android still shows web-only surveys (`compliance/posthog-android.md` n22), and the Dart model has no `conditions` to filter them. Windows/Linux have no surveys.
-- **Backwards compatibility:** Backward-compatible for (1). (2) needs a changelog note: some surveys would stop showing on Android.
-- **Remediation:** None in this repo; track the native fixes and raise the floors once they ship.
+- **SDK currently (`82123e6`):** Flutter renders surveys for the native survey engines (`PostHogFlutterSurveysDelegate.kt`, `PostHogDisplaySurvey+Dict.swift`) and reports shown, response and closed back to them. Its own popup delay (`lib/src/surveys/survey_service.dart:14-125`) drops a survey still waiting without calling `onClosed` (`:219-231`), so the native "closed before shown" path is never hit from Flutter. Seen keys and the last-seen date are written by the native SDKs. posthog-ios 4.0 now writes the date on show (`handleSurveyShown`, `PostHogSurveyIntegration.swift:529-537` at `e27cbe4cb`) and no longer on submit or dismiss (`setSurveySeen`, `:395-401`; PostHog/posthog-ios#1049). posthog-android 4.0 excludes web-only surveys (`PostHogSurveysIntegration.kt:215-222`, `:267-269` at `aaa23d39`). **Gap:** posthog-android 4.0 writes the date on show and again in `setSurveySeen` (`PostHogSurveysIntegration.kt:1188-1203`), which runs on close (`:457`) and on submit (`:994`), so on Android the wait period runs from the close. Windows/Linux have no surveys.
+- **Backwards compatibility:** Backward-compatible — the wait period only gets shorter by the time a survey stays on screen.
+- **Remediation:** None in this repo; track the posthog-android fix and raise the floor once it ships.
 
 ### n36 — Traces (❌ Fail)
 - **Spec requires:** An OTLP span pipeline to `/i/v1/traces` with W3C `traceparent`/`tracestate` interop.
@@ -378,25 +387,24 @@ rewritten for 6.0, and [n39](#n39)–[n41](#n41) are new.
 
 ### n38 — Retry Queue (🟡 Partial)
 - **Spec requires:** (#146, durable client queue) retry exactly 404/408/429/500/502/503/504, network errors and `retry` results; 1–30 s backoff with jitter; `Retry-After` as a floor capped at 30 s; no attempt limit allowed; retries resend only the failed request's events.
-- **SDK currently (`6be9a1e9ee`):** Windows/Linux conform: `isRetriableCaptureV1Status` (`lib/src/core/capture_v1.dart:31-38`), `captureRetryDelay` (1 s doubling to 30 s, ±25% jitter, `Retry-After` floor capped at 30 s, `lib/src/core/posthog_core_stateless.dart:73-88`), a transient failure keeps the batch and backs off (`:791-799`), only `retry` uuids stay queued and resend under the same request identity (`:801-833`, `:846-860`), and a 404 keeps events queued with one always-on warning (`:783-790`). iOS and Android conform (Retry Queue ✅ in both 4.0 audits). **Gap:** web uses posthog-js's `RetryQueue`, which drops a 429 (`compliance/posthog-js.md` n28).
+- **SDK currently (`82123e6`):** Windows/Linux conform: `isRetriableCaptureV1Status` (`lib/src/core/capture_v1.dart:31-38`), `captureRetryDelay` (1 s doubling to 30 s, ±25% jitter, `Retry-After` floor capped at 30 s, `lib/src/core/posthog_core_stateless.dart:73-88`), a transient failure keeps the batch and backs off (`:807-815`), only `retry` uuids stay queued and resend under the same request identity (`:817-849`, `:862-876`), and a 404 keeps events queued with one always-on warning (`:799-806`). iOS and Android retry a capture v1 404 too and conform (Retry Queue ✅ in both 4.0 audits). **Gap:** web uses posthog-js's `RetryQueue`, which drops a 429 (`compliance/posthog-js.md` n28).
 - **Backwards compatibility:** Inherits posthog-js n28's verdict (Needs deprecation path).
 - **Remediation:** None in this repo; clears with posthog-js n28.
 
 ### n39 — Capture AI (✅ Pass; was ➖)
 - **Spec requires:** #146 (with #147) extends Applicability to "posthog-flutter 6.0 (`captureAi`: native on iOS, macOS and Android, its own Dart lane on Windows and Linux)". AI events ride their own lane to `/i/v1/ai/events` with lane-scoped compression, queue capacity and timeout; the whole event is capped at 8 MiB + 64 KiB (a larger configured cap is clamped or refused); batches are byte-aware at 5 MiB; client SDKs start their durable queue at launch; null-valued properties are dropped as in capture.
-- **SDK currently (`6be9a1e9ee`):** `captureAi()` (`lib/src/posthog.dart:313-348`) returns the event's uuid. On iOS, macOS and Android it goes through the native `captureAi` (posthog-ios 4.0 and posthog-android 4.0 AI lanes); Flutter drops null-valued properties before the channel (`PropertyNormalizer`, `lib/src/posthog_flutter_io.dart:595-620`), so posthog-ios's `NSNull` gap doesn't arise for Flutter events. Windows/Linux have a separate lane (`lib/src/core/posthog_core_stateless.dart:197-218`): `captureAiMaxQueueSize` (default 100), `captureAiTimeout` (default 60 s), `captureAiCompression` (default gzip), `captureAiMaxEventBytes` clamped to 8 MiB + 64 KiB with a warning, and a 50 MiB disk cap (`lib/src/core/capture_v1.dart:12-27`). An oversized event is dropped with a name-and-size log (`posthog_core_stateless.dart:577-584`). Queues left from an earlier run are flushed at setup (`:220-232`). Web is outside Applicability; `captureAi` there logs and returns `null` (`lib/posthog_flutter_web.dart:324-336`).
-- **Not scored:** per-lane compression is the #146 conflict noted in [n19](#n19).
+- **SDK currently (`82123e6`):** `captureAi()` (`lib/src/posthog.dart:313-348`) returns the event's uuid. On iOS, macOS and Android it goes through the native `captureAi` (posthog-ios 4.0 and posthog-android 4.0 AI lanes); Flutter drops null-valued properties before the channel (`PropertyNormalizer`, `lib/src/posthog_flutter_io.dart:595-620`), and posthog-ios 4.0 now omits them as well (PostHog/posthog-ios#1047). Windows/Linux have a separate lane (`lib/src/core/posthog_core_stateless.dart:197-218`): `captureAiMaxQueueSize` (default 100), `captureAiTimeout` (default 60 s), `captureAiCompression` (default gzip, separate from the whole-client `compression`, which #146 allows), `captureAiMaxEventBytes` clamped to 8 MiB + 64 KiB with a warning, and a 50 MiB disk cap (`lib/src/core/capture_v1.dart:12-27`). An oversized event is dropped with a name-and-size log (`posthog_core_stateless.dart:593-600`). Queues left from an earlier run are flushed at setup (`:220-232`). Web is outside Applicability; `captureAi` there logs and returns `null` (`lib/posthog_flutter_web.dart:324-336`).
 - **Backwards compatibility:** No change needed.
 - **Remediation:** None.
 
 ### n40 — Identify (🟡 Partial; was ✅)
 - **Spec requires:** (#167) "Opt-out is **not** a guard: an opted-out SDK still runs the rest of this flow. It updates local identity state (distinct id, anonymous id, `isIdentified`), updates person properties for flags, and reloads feature flags when the distinct id changes" (`openspec/specs/identify/spec.md:107`; scenarios "Identify while opted out …" at `:211-235`).
-- **SDK currently (`6be9a1e9ee`):** iOS, macOS and Android delegate to the native SDKs. **Gap on Windows/Linux:** the Dart core's `identify()` returns early while opted out (`if (_ignoredWhileOptedOut('posthog.identify')) return;`, `lib/src/core/posthog_core.dart:365`), so the distinct id doesn't change and flags aren't reloaded until opt-in.
+- **SDK currently (`82123e6`):** iOS, macOS and Android delegate to the native SDKs. **Gap on Windows/Linux:** the Dart core's `identify()` returns early while opted out (`if (_ignoredWhileOptedOut('posthog.identify')) return;`, `lib/src/core/posthog_core.dart:391`), so the distinct id doesn't change and flags aren't reloaded until opt-in.
 - **Backwards compatibility:** Backward-compatible — the opted-out user's identity starts tracking what the app set.
 - **Remediation:** Run identify's identity, flag-property and reload steps while opted out and skip only the event.
 
 ### n41 — Capture (✅ Pass)
-- **Spec requires:** main's capture requirements plus #146's capture v1 contract for every SDK on capture v1: the wire shape and headers, per-event results, legacy option hoisting, `$lib`/`$lib_version` kept in properties, session/window id lifting, blank distinct-id fallback, empty event names dropped, timestamps, and failing open on a blank or `phx_` token.
-- **SDK currently (`6be9a1e9ee`):** iOS, macOS and Android send through posthog-ios 4.0 and posthog-android 4.0 capture v1; Flutter strips null-valued properties before the channel, so posthog-ios's `NSNull` gap doesn't apply to Flutter events. Windows/Linux: `captureV1Event` hoists the legacy option properties, keeps `$lib`/`$lib_version`, and lifts string `$session_id`/`$window_id` (other types dropped with a log naming the JSON type) (`lib/src/core/capture_v1.dart:59-115`); per-event results resend only `retry`, count `drop` by a sanitized `details` tag, and treat a 2xx without readable results as terminal (`:163-200`, `lib/src/core/posthog_core_stateless.dart:906-926`); `created_at` and the request id are kept across retries of the same uuids (`:846-860`). The desktop wrapper drops an empty event name and falls back to the prepared distinct id when a callback blanks it (`lib/src/posthog_flutter_desktop.dart:826-876`). `setup()` skips a blank or `phx_` token (`lib/src/utils/project_token.dart:5-17`). Web uses posthog-js and is not on capture v1.
+- **Spec requires:** main's capture requirements plus #146's capture v1 contract for every SDK on capture v1: the wire shape and headers, per-event results, legacy option hoisting, `$lib`/`$lib_version` kept in properties and filled by the SDK as a pair after every other layer and before `beforeSend` (set both when `$lib` is unset, only the version when `$lib` is the SDK's own name, never the SDK's version on another library's `$lib`), session/window id lifting, blank distinct-id fallback, empty event names dropped, timestamps, and failing open on a blank or `phx_` token; and (#193) a flag whose value is `""` stays out of `$active_feature_flags` while `$feature/<key>` keeps `""`.
+- **SDK currently (`82123e6`):** iOS, macOS and Android send through posthog-ios 4.0 and posthog-android 4.0 capture v1; Flutter strips null-valued properties before the channel, and posthog-ios now omits them too. The plugins configure the native SDKs with `posthog-flutter` and its version (`darwin/.../PosthogFlutterPlugin.swift:546-547`, `android/.../PosthogFlutterPlugin.kt:908-909`), so the native fill treats `posthog-flutter` as the SDK's own name: posthog-ios fills the pair after the caller's properties (`fillLibraryIdentity`, `PostHogSDK.swift:701-710`, called at `:919-922` at `e27cbe4cb`) and posthog-android as the last step of `buildProperties` (`PostHog.kt:1013`, `internal/PostHogLibraryIdentity.kt:13-29` at `aaa23d39`), in the build `buildEventForWrapper` uses, so the Dart `beforeSend` sees the filled pair. Windows/Linux: `getCommonEventProperties` no longer sets `$lib` (`lib/src/core/posthog_core_stateless.dart:258`), and `_enrichProperties` fills the pair after the context, SDK, registered and caller layers (`_fillLibraryIdentity`, `lib/src/core/posthog_core.dart:206`, `:210-224`), before the desktop wrapper runs `beforeSend` (`lib/src/posthog_flutter_desktop.dart:765-814`). `captureV1Event` hoists the legacy option properties, keeps `$lib`/`$lib_version`, and lifts string `$session_id`/`$window_id` (other types dropped with a log naming the JSON type) (`lib/src/core/capture_v1.dart:59-115`); per-event results resend only `retry`, count `drop` by a sanitized `details` tag, and treat a 2xx without readable results as terminal (`:163-200`, `lib/src/core/posthog_core_stateless.dart:922-942`); `created_at` and the request id are kept across retries of the same uuids (`:862-876`). The desktop wrapper drops an empty event name and falls back to the prepared distinct id when a callback blanks it (`lib/src/posthog_flutter_desktop.dart:837-887`). `setup()` skips a blank or `phx_` token (`lib/src/utils/project_token.dart:5-17`). An empty variant stays out of `$active_feature_flags` on Windows/Linux (`lib/src/core/posthog_core.dart:139-145`), iOS/macOS (`PostHogSDK.swift:609-623` at `e27cbe4cb`) and Android (`PostHog.kt:916-928` at `aaa23d39`). Web uses posthog-js and is not on capture v1.
 - **Backwards compatibility:** No change needed.
 - **Remediation:** None.

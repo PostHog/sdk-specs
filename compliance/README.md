@@ -156,7 +156,7 @@ the single most widely-shared non-compliance in the matrix.
 | posthog-android | 43/69 fully compliant (62%; 43/64 = 67% on the shared basis) | 43 | 15 | 1 | 10 | 0 | 2026-11-10 · `aaa23d39` (4.0: 31 rows); other rows 2026-10-19 · `c5e788bd` — see file header | 16 | [posthog-android.md](posthog-android.md) |
 | posthog-ios | 44/69 fully compliant (64%; 44/64 = 69% on the shared basis) | 44 | 14 | 1 | 10 | 0 | 2026-11-10 · `e27cbe4cb` (4.0 release branch, before 4.0.0 is published; capture v1 rows against #146 at `d387ab79` as merged; see below) | 15 | [posthog-ios.md](posthog-ios.md) |
 | posthog-node | 9/64 fully compliant (14%; 29 contracts N/A on a server SDK) | 9 | 21 | 4 | 29 | 1 | 2026-10-12 · `4f590b36` (posthog-js monorepo; Traces row corrected 2026-10-19) | 25 (+1 ❓) | [posthog-node.md](posthog-node.md) |
-| posthog-flutter | 21/64 fully compliant (33%) | 21 | 29 | 6 | 8 | 0 | 2026-10-19 · `1032c102` | 35 | [posthog-flutter.md](posthog-flutter.md) |
+| posthog-flutter | 23/69 fully compliant (33%; 23/64 = 36% on the shared basis) | 23 | 30 | 4 | 12 | 0 | 2026-11-10 · `82123e6` (6.0 release PR, before 6.0.0 is published; capture v1 rows against #146 as merged; see below) | 34 | [posthog-flutter.md](posthog-flutter.md) |
 | posthog-react-native | 29/64 fully compliant (45%) | 29 | 28 | 2 | 5 | 0 | 2026-11-10 · `210bf35d8` (react-native-plugin 3.0: six session replay rows, Opt In, Capture Exception, Exception Event Metadata only); other rows 2026-10-19 · `3ddaa654` — see file header | 30 | [posthog-react-native.md](posthog-react-native.md) |
 | posthog-php | 11/63 fully compliant (17%; 33 contracts N/A on a server SDK; **needs +1: MCP Analytics**) | 11 | 11 | 8 | 33 | 0 | 2026-09-28 · `5451f4e0` | 19 | [posthog-php.md](posthog-php.md) |
 | posthog-ruby | 9/63 fully compliant (14%; 33 contracts N/A on a server SDK; **needs +1: MCP Analytics**) | 9 | 13 | 8 | 33 | 0 | 2026-09-28 · `185060ab` | 21 | [posthog-ruby.md](posthog-ruby.md) |
@@ -191,6 +191,26 @@ treated as merged, and conform, including the per-lane AI compression and the cl
 lane conforms. Opt In meets the #138 replay-restart and #199 deferred-crash-consent requirements and
 stays 🟡 on its old gap.
 Details in [posthog-ios.md](posthog-ios.md).
+
+**2026-11-10 out-of-cycle refresh — posthog-flutter 6.0:** re-audited all 64 rows at `82123e6`,
+the head of the 6.0 release PR ([PostHog/posthog-flutter#637](https://github.com/PostHog/posthog-flutter/pull/637)),
+against sdk-specs `752f899` plus [#146](https://github.com/PostHog/sdk-specs/pull/146) at `23c2478`,
+treated as merged, and added five ➖ rows (Experiment Exposure, AI Datasets, AI Scorers, Offline
+Evaluations, Emails). 6.0 adopts posthog-ios 4.x and posthog-android 4.x; mobile rows were checked at
+the heads of their 4.0 branches (posthog-ios `e27cbe4cb`, posthog-android `aaa23d39`). Improved: Get
+Feature Flag, Is Feature Enabled, HTTP Client and On Feature Flags 🟡→✅ (per-call
+`sendFeatureFlagEvent`, `defaultValue`, a desktop transport that no longer retries a refused `/flags`
+connection, and posthog-ios 4.0 dropping a flag load in flight across `reset()`); Get
+Feature Flags and Get Feature Flags And Payloads ❌→🟡 (`getAllFeatureFlags()`, the surface the spec
+records for flutter 6.0). Capture AI ➖→🟡 (#146 names posthog-flutter 6.0; the native and Dart AI
+lanes conform apart from capture's desktop session-id gap). Downgraded on new spec text: Identify ✅→🟡
+(the Dart core ignores `identify()` while opted out, against #167) and Capture ✅→🟡 (the Dart core
+replaces an empty or non-string caller `$session_id` instead of lifting or dropping it, against
+#146; the identity-call migration-guide example lands in 6.0 with posthog-flutter#718). Get Feature Flag Payload and Get Feature Flag Result stay 🟡: payloads are
+read through the result getter and posthog-ios 4.0 returns no payload for malformed JSON, but on web
+posthog-js still returns the raw string. Every path except web fills `$lib`/`$lib_version` as a pair
+after the caller's properties. Surveys stays 🟡: posthog-android still moves the last-seen survey date on
+submit and dismiss (#102). Details in [posthog-flutter.md](posthog-flutter.md).
 
 **2026-10-08 out-of-cycle refresh — posthog-ios:** re-audited all 64 rows at `f5cbe87c` against
 sdk-specs `f238b16`, outside the weekly 3-slot rotation. 7 rows improved (On Feature Flags and
@@ -322,8 +342,6 @@ stalest pointer and its only 59-row file.
 | posthog-node | Traces | ~~Backward-compatible~~ **corrected to ❓** | The ❌ was a **false negative**: `packages/core/src/traces/` merged 2026-09-10 and posthog-node wires it (`client.ts:698-703`). Moved to ❓ pending a real scoring pass — [posthog-node.md#n2](posthog-node.md#n2) |
 | posthog-node | Set/Reset Person/Group Properties For Flags (×4) | Backward-compatible | Zero implementation; methods exist only on the client-only base class node doesn't extend — [posthog-node.md#n15](posthog-node.md) |
 | posthog-flutter | Get Anonymous ID | Backward-compatible | Method still doesn't exist in the Dart API at all — [posthog-flutter.md#n12](posthog-flutter.md#n12) |
-| posthog-flutter | Get Feature Flags | Backward-compatible | No bulk flag getter anywhere in Dart, though the Dart core holds the full flag map internally — [posthog-flutter.md#n16](posthog-flutter.md#n16) |
-| posthog-flutter | Get Feature Flags And Payloads | Backward-compatible | No combined getter; notably the decode half this depends on is already correct in the Dart core, so only the surface is missing — [posthog-flutter.md#n17](posthog-flutter.md#n17) |
 | posthog-flutter | Exception Event Metadata | Needs deprecation path | **New this run** — no `exception_id`/`parent_id` linkage at all, causes inherit the outermost `handled`, `$exception_level` hardcoded, caller property bag overrides SDK-owned keys, and the chain caps at 10 where the spec says 50 — [posthog-flutter.md#n9](posthog-flutter.md#n9) |
 | posthog-flutter | Traces | Backward-compatible | No implementation; net-new, pre-GA — [posthog-flutter.md#n36](posthog-flutter.md#n36) |
 | posthog-flutter | Tracing Headers | Backward-compatible | No implementation; Flutter has no Dart-side HTTP client of its own to intercept app traffic with — [posthog-flutter.md#n37](posthog-flutter.md#n37) |
@@ -395,10 +413,13 @@ stalest pointer and its only 59-row file.
 | posthog-node | Feature Flag Called Tracker | Backward-compatible | Allowlist itself is fully compliant (inherited from posthog-js via shared `@posthog/core`), but capacity eviction is a full clear rather than incremental, violating the spec's anti-thundering-herd requirement — [posthog-node.md#n19](posthog-node.md) |
 | posthog-flutter | Session Replay Privacy | Backward-compatible | Independent Dart replay pipeline still has no no-capture marker (a nested `PostHogUnmaskWidget` can reveal anything inside `PostHogMaskWidget`); the unmask primitive, shared sensitive-input detection, and fail-closed mask walk have all landed since the previous audit — [posthog-flutter.md#n29](posthog-flutter.md#n29) |
 | posthog-flutter | Remote Config | Backward-compatible | **Resolved from ❓** — mobile delegates to the native SDK (✅ there), but the new Dart desktop core never fetches remote config at all, so Windows/Linux clients get no server-side replay or survey gating — [posthog-flutter.md#n26](posthog-flutter.md#n26) |
-| posthog-flutter | HTTP Client | Backward-compatible | **Resolved from ❓** — the Dart core retries a refused `/flags` connection (every transport exception is wrapped into one retryable type), and `retriable` has no backoff multiplier — [posthog-flutter.md#n19](posthog-flutter.md#n19) |
-| posthog-flutter | Session Replay Debug Properties | Backward-compatible | **New this run** — none of the three `$sdk_debug_replay_*` required keys exist on any platform, and `$recording_status` is emitted only on desktop, where replay does not run — [posthog-flutter.md#n28](posthog-flutter.md#n28) |
-| posthog-flutter | Get Feature Flag Payload / Result | Backward-compatible | **Downgraded on new spec text** — the Dart core returns no payload for malformed JSON, but on iOS/macOS the value comes from posthog-ios, which returns the raw string; the fix is in posthog-ios — [posthog-flutter.md#n14](posthog-flutter.md#n14) |
+| posthog-flutter | Get Feature Flag Payload / Result | Backward-compatible | **6.0** — payloads are read through `getFeatureFlagResult`, and posthog-ios 4.0 returns no payload for malformed JSON; on web posthog-js still returns the raw string — [posthog-flutter.md#n15](posthog-flutter.md#n15) |
+| posthog-flutter | Get Feature Flags / Get Feature Flags And Payloads | Backward-compatible | **Upgraded from ❌ (6.0)** — the specs now record `getAllFeatureFlags()`'s result list as the flutter 6.0 surface; still not the canonical map shape, and on web an empty variant reads as enabled and a malformed payload is the raw string — [posthog-flutter.md#n16](posthog-flutter.md#n16) |
+| posthog-flutter | Session Replay Debug Properties | Backward-compatible | **6.0** — mobile events are built by posthog-ios/posthog-android 4.x and carry their bundles (posthog-ios 🟡); desktop sends `$recording_status: disabled`, but the Dart core also puts `$sdk_debug_session_start` and `$sdk_debug_current_session_duration` on every event, custom events included, and no SDK may send the duration — [posthog-flutter.md#n28](posthog-flutter.md#n28) |
 | posthog-flutter | Retry Queue | Needs deprecation path (inherited) | **Resolved from ❓** — desktop and mobile keep failed batches queued, but Flutter Web uses posthog-js's `RetryQueue`, which drops a 429; clears with posthog-js n28 — [posthog-flutter.md#n38](posthog-flutter.md#n38) |
+| posthog-flutter | Capture / Capture AI | Backward-compatible | **6.0, against #146** — the Windows/Linux Dart core replaces an empty or non-string caller `$session_id` with its own session id, so it is never lifted or dropped with a warning; native paths keep the caller's value — [posthog-flutter.md#n41](posthog-flutter.md#n41) |
+| posthog-flutter | Identify | Backward-compatible | **Downgraded on new spec text (6.0)** — the Windows/Linux Dart core returns early from `identify()` while opted out, so the distinct id and flags don't follow until opt-in; #167 says opt-out is not a guard — [posthog-flutter.md#n40](posthog-flutter.md#n40) |
+| posthog-flutter | Surveys | Backward-compatible | **6.0** — posthog-android still moves the last-seen survey date on submit and dismiss (#102); posthog-ios now writes it on show — [posthog-flutter.md#n35](posthog-flutter.md#n35) |
 | posthog-react-native | Bootstrap | Backward-compatible | Flag-merge spread order is inverted — previously-persisted flags win over a fresh bootstrap value, the opposite of the spec's required precedence — [posthog-react-native.md#n4](posthog-react-native.md) |
 | posthog-react-native | Flush / Retry Queue | Backward-compatible | Shared-core catch handler evicts an exhausted-retry HTTP failure as if delivered instead of preserving it — same defect class as posthog-node, and precisely what posthog-flutter's new Dart core gets right — [posthog-react-native.md#n9](posthog-react-native.md#n9) |
 | posthog-react-native | Setup | Backward-compatible | **Downgraded on new spec text** — `PostHogProvider` still takes only `apiKey`; PR [#108](https://github.com/PostHog/sdk-specs/pull/108) names it explicitly and prescribes the non-breaking fix (add `projectToken`, deprecate `apiKey` in the same release) — [posthog-react-native.md#n27](posthog-react-native.md#n27) |

@@ -26,9 +26,9 @@ PR [#87](https://github.com/PostHog/sdk-specs/pull/87), and **Bootstrap**, added
 this run: **AI Datasets**, **AI Scorers** and **Offline Evaluations** (PR
 [#137](https://github.com/PostHog/sdk-specs/pull/137)), **Emails** (PR
 [#159](https://github.com/PostHog/sdk-specs/pull/159)) and **Experiment Exposure** (PR
-[#162](https://github.com/PostHog/sdk-specs/pull/162)). Only posthog-ios carries them so far (all ➖),
-so its row is out of 69; every other SDK is out of 64 or fewer until its next audit adds the five
-rows. On the shared 64-row basis posthog-ios is 43/64 (67%), since all five of its new rows are ➖.
+[#162](https://github.com/PostHog/sdk-specs/pull/162)). A per-SDK file re-audited since then carries
+the five rows and its row below is out of 69; every other SDK stays out of 64 or fewer until its next
+audit adds them. Rows out of 69 also give their score on the shared 64-row basis, for comparison.
 
 Five contracts are newer than most per-SDK files. **Capture AI**, **Evaluate Flags**, and **Exception
 Event Metadata** merged between 2026-08-10 and 2026-08-13; **Session Replay Debug Properties** on
@@ -154,7 +154,7 @@ the single most widely-shared non-compliance in the matrix.
 | posthog-js | 26/64 fully compliant (41%) | 26 | 21 | 12 | 5 | 0 | 2026-10-05 · `6538babc` (targeted re-audit; most of the 59 pre-existing rows carried from 2026-08-10, see file header) | 33 | [posthog-js.md](posthog-js.md) |
 | posthog-python | 13/64 fully compliant (20%; 30 contracts N/A on a server SDK) | 13 | 16 | 5 | 30 | 0 | 2026-10-12 · `509c8525` | 21 | [posthog-python.md](posthog-python.md) |
 | posthog-android | 37/64 fully compliant (58%) | 37 | 16 | 5 | 6 | 0 | 2026-10-19 · `c5e788bd` (targeted re-audit — see file header) | 21 | [posthog-android.md](posthog-android.md) |
-| posthog-ios | 44/69 fully compliant (64%) | 44 | 14 | 1 | 10 | 0 | 2026-11-10 · `e27cbe4cb` (4.0 release branch, before 4.0.0 is published; capture v1 rows against #146 at `d387ab79` as merged; see below) | 15 | [posthog-ios.md](posthog-ios.md) |
+| posthog-ios | 44/69 fully compliant (64%; 44/64 = 69% on the shared basis) | 44 | 14 | 1 | 10 | 0 | 2026-11-10 · `e27cbe4cb` (4.0 release branch, before 4.0.0 is published; capture v1 rows against #146 at `d387ab79` as merged; see below) | 15 | [posthog-ios.md](posthog-ios.md) |
 | posthog-node | 9/64 fully compliant (14%; 29 contracts N/A on a server SDK) | 9 | 21 | 4 | 29 | 1 | 2026-10-12 · `4f590b36` (posthog-js monorepo; Traces row corrected 2026-10-19) | 25 (+1 ❓) | [posthog-node.md](posthog-node.md) |
 | posthog-flutter | 21/64 fully compliant (33%) | 21 | 29 | 6 | 8 | 0 | 2026-10-19 · `1032c102` | 35 | [posthog-flutter.md](posthog-flutter.md) |
 | posthog-react-native | 29/64 fully compliant (45%) | 29 | 27 | 3 | 5 | 0 | 2026-10-19 · `3ddaa654` (posthog-js monorepo) | 30 | [posthog-react-native.md](posthog-react-native.md) |

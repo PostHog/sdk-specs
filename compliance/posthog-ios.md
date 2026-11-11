@@ -141,7 +141,7 @@ Retry Queue.
 | 2 | Traces | ❌ | [n2] |
 | 3 | Tracing Headers | ✅ | new server span-context bridge requirements (#129) are `@server` only |
 | 4 | Alias | 🟡 | [n3] |
-| 5 | Capture | ✅ | was 🟡; [n4]; capture v1 wire conforms (#146); empty event names dropped (also after `beforeSend`); `NSNull` properties omitted (#1047); own `$lib` pair filled after caller properties (#1050); empty variant left out of `$active_feature_flags` |
+| 5 | Capture | ✅ | was 🟡; [n4]; identity-call migration-guide example (#146 `15501ca`) lands in 4.0 with posthog-ios#1053; capture v1 wire conforms (#146); empty event names dropped (also after `beforeSend`); `NSNull` properties omitted (#1047); own `$lib` pair filled after caller properties (#1050); empty variant left out of `$active_feature_flags` |
 | 6 | Capture AI | ✅ | was ➖; #146 adds iOS 4.0 to Applicability; the AI lane conforms, including the `NSNull` cleanup (#1047) — [n27] |
 | 7 | Capture Exception | ✅ | was 🟡; [n5]; `NSNull` custom properties omitted (#1047) |
 | 8 | Create Person Profile | ➖ | unchanged — spec Applicability still says only the posthog-js family exposes it; no `createPersonProfile` in iOS |
@@ -263,8 +263,14 @@ Retry Queue.
   not an active feature flag". "Event uuid is sent in canonical form" (#119) and "Client-level GeoIP
   control" (#131) are server requirements ("Client SDKs SHALL NOT require the option"); "Client-side
   capture rate limiting never loses tokens to a clock change" (#127) applies only to a client SDK that
-  rate-limits captures (posthog-js).
+  rate-limits captures (posthog-js). #146 at `15501ca` adds that "SDK docs and migration guides SHALL
+  show that call option on an identity call as the way to keep identifying under a layered `false`".
 - **SDK currently:**
+  - **Identity calls under a registered `false` (tracking 4.0).** A per-call
+    `process_person_profile: true` keeps an `identify`, `alias`, `group` or `setPersonProperties`
+    event processed. `MIGRATION.md` at `e27cbe4cb` (line 297) doesn't show it yet; the example lands
+    in 4.0 with [PostHog/posthog-ios#1053](https://github.com/PostHog/posthog-ios/pull/1053), which
+    targets the release branch, so this audit doesn't score it as a gap. Recheck at the release-tag repin.
   - **Empty event names are dropped.** `prepareCaptureEvent` checks after `beforeSend`
     (`PostHog/PostHogSDK.swift:2102-2109`) and `queueEvent` checks again for every path
     (`:2745-2751`), with a one-time warning (`:2664-2672`). Whitespace-only names still pass; the

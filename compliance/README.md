@@ -22,6 +22,14 @@ capabilities listed in the root `README.md` table, including **MCP Analytics**, 
 PR [#87](https://github.com/PostHog/sdk-specs/pull/87), and **Bootstrap**, added to the table by PR
 [#97](https://github.com/PostHog/sdk-specs/pull/97).
 
+**Update (2026-11-10):** the root `README.md` table now lists **69 contracts**. Five were added after
+this run: **AI Datasets**, **AI Scorers** and **Offline Evaluations** (PR
+[#137](https://github.com/PostHog/sdk-specs/pull/137)), **Emails** (PR
+[#159](https://github.com/PostHog/sdk-specs/pull/159)) and **Experiment Exposure** (PR
+[#162](https://github.com/PostHog/sdk-specs/pull/162)). A per-SDK file re-audited since then carries
+the five rows and its row below is out of 69; every other SDK stays out of 64 or fewer until its next
+audit adds them. Rows out of 69 also give their score on the shared 64-row basis, for comparison.
+
 Five contracts are newer than most per-SDK files. **Capture AI**, **Evaluate Flags**, and **Exception
 Event Metadata** merged between 2026-08-10 and 2026-08-13; **Session Replay Debug Properties** on
 2026-09-28 (PR [#72](https://github.com/PostHog/sdk-specs/pull/72)); and **MCP Analytics** on 2026-10-05
@@ -145,7 +153,7 @@ the single most widely-shared non-compliance in the matrix.
 |---|---|---|---|---|---|---|---|---|---|
 | posthog-js | 26/64 fully compliant (41%) | 26 | 21 | 12 | 5 | 0 | 2026-10-05 · `6538babc` (targeted re-audit; most of the 59 pre-existing rows carried from 2026-08-10, see file header) | 33 | [posthog-js.md](posthog-js.md) |
 | posthog-python | 13/64 fully compliant (20%; 30 contracts N/A on a server SDK) | 13 | 16 | 5 | 30 | 0 | 2026-10-12 · `509c8525` | 21 | [posthog-python.md](posthog-python.md) |
-| posthog-android | 43/69 fully compliant (62%) | 43 | 15 | 1 | 10 | 0 | 2026-11-10 · `aaa23d39` (4.0: 31 rows); other rows 2026-10-19 · `c5e788bd` — see file header | 16 | [posthog-android.md](posthog-android.md) |
+| posthog-android | 43/69 fully compliant (62%; 43/64 = 67% on the shared basis) | 43 | 15 | 1 | 10 | 0 | 2026-11-10 · `aaa23d39` (4.0: 31 rows); other rows 2026-10-19 · `c5e788bd` — see file header | 16 | [posthog-android.md](posthog-android.md) |
 | posthog-ios | 38/64 fully compliant (59%) | 38 | 16 | 4 | 6 | 0 | 2026-10-08 · `f5cbe87c` + PostHog/posthog-ios#924–#934 (out-of-cycle refresh, see below) | 20 | [posthog-ios.md](posthog-ios.md) |
 | posthog-node | 9/64 fully compliant (14%; 29 contracts N/A on a server SDK) | 9 | 21 | 4 | 29 | 1 | 2026-10-12 · `4f590b36` (posthog-js monorepo; Traces row corrected 2026-10-19) | 25 (+1 ❓) | [posthog-node.md](posthog-node.md) |
 | posthog-flutter | 21/64 fully compliant (33%) | 21 | 29 | 6 | 8 | 0 | 2026-10-19 · `1032c102` | 35 | [posthog-flutter.md](posthog-flutter.md) |
@@ -227,7 +235,7 @@ and posthog-dotnet is computed against the contracts actually applicable to a se
 (posthog-python: 13 Pass / 34 applicable = 38%; posthog-node: 9 Pass / 35 applicable = 26%;
 posthog-php: 11 Pass / 30 applicable = 37%; posthog-ruby: 9 Pass / 30 applicable = 30%;
 posthog-go: 8 Pass / 31 applicable = 26%; posthog-java: 12 Pass / 31 applicable = 39%;
-posthog-dotnet: 5 Pass / 34 applicable = 15%); shown above as raw Pass/(59, 63 or 64) for
+posthog-dotnet: 5 Pass / 34 applicable = 15%); shown above as raw Pass/(59, 63, 64 or 69) for
 comparability with client SDKs, which see N/A far less often. posthog-js's 26/64 is likewise 26 Pass
 / 59 applicable = 44%, since Capture AI and Evaluate Flags are ➖ on a browser SDK. **posthog-node
 note:** the standalone `PostHog/posthog-node` repo has been archived/redirected — its code now lives

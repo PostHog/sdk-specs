@@ -20,7 +20,7 @@ Each event SHALL be a JSON object with the fields `event`, `uuid`, `distinct_id`
 
 Session replay stays outside capture v1. Client SDKs keep sending `$snapshot` data to `/s/` with `api_key` in the body, and these rules do not apply to it.
 
-Capture v1 rejects the whole request with `400 request_parsing_error` when the body is not valid JSON, a required field is missing, or a string field (`created_at`, `event`, `uuid`, `distinct_id`, `timestamp`, `session_id`, `window_id`) has another JSON type. It checks `properties` and `options` per event: a `properties` value that is not an object, or an invalid option, drops only that event (`malformed_event_properties`, `invalid_options`) and the rest of the request is processed. The SDK SHALL therefore guarantee these types on the wire, including after `before_send`: an event whose hook leaves `distinct_id` or `event` non-string, or whose serialization fails, is dropped locally and reported through the SDK's error surface or a log line, and never sent.
+Capture v1 rejects the whole request with `400 request_parsing_error` when the body is not valid JSON, a required field is missing, or a required string field (`created_at`, `event`, `uuid`, `distinct_id`, `timestamp`) has another JSON type. The optional `session_id` and `window_id` may be absent or `null`; any other non-string value rejects the request the same way. It checks `properties` and `options` per event: a `properties` value that is not an object, or an invalid option, drops only that event (`malformed_event_properties`, `invalid_options`) and the rest of the request is processed. The SDK SHALL therefore guarantee these types on the wire, including after `before_send`: an event whose hook leaves `distinct_id` or `event` non-string, or whose serialization fails, is dropped locally and reported through the SDK's error surface or a log line, and never sent.
 
 Legacy capture: the body carried `api_key` and `sent_at`, `uuid` and `timestamp` were optional, and a non-string `distinct_id` was converted to text.
 
@@ -561,7 +561,7 @@ Legacy capture: whole-batch serialization let one bad value lose every event in 
 
 ### Requirement: The client fails open on a missing or personal API key
 
-Constructing an SDK client SHALL never throw or fail because of the project token. An empty or whitespace-only token, or a token that starts with `phx_` (a personal API key, which capture always rejects), SHALL produce a disabled client that accepts every call, sends nothing, returns flag defaults and logs one message, so a secret key never reaches the wire. The SDK SHALL log that message whether or not debug mode is on, client SDKs included, at any level that is always on (an error, or a warning on posthog-android). Any other malformed token SHALL be sent as given, and capture's `401` SHALL reach the error surface. A server SDK SHALL offer an explicit way to build a disabled client for tests. A built-in integration SHALL NOT raise or return a constructor error over an analytics-only setup problem; it logs one error and turns its own capture off.
+Constructing an SDK client that delivers events through capture v1 SHALL never throw or fail because of the project token. An empty or whitespace-only token, or a token that starts with `phx_` (a personal API key, which capture always rejects), SHALL produce a disabled client that accepts every call, sends nothing, returns flag defaults and logs one message, so a secret key never reaches the wire. The SDK SHALL log that message whether or not debug mode is on, client SDKs included, at any level that is always on (an error, or a warning on posthog-android). Any other malformed token SHALL be sent as given, and capture's `401` SHALL reach the error surface. A server SDK SHALL offer an explicit way to build a disabled client for tests. A built-in integration SHALL NOT raise or return a constructor error over an analytics-only setup problem; it logs one error and turns its own capture off.
 
 #### Scenario: A personal API key disables the client without throwing (@server)
 - **GIVEN** a fresh SDK acceptance test harness
@@ -592,7 +592,7 @@ On client SDKs, an event's properties SHALL be merged in this order, each layer 
 2. Registered (super) properties.
 3. The properties the caller passes on the event.
 
-`$lib` and `$lib_version` are the one exception: the SDK fills its own pair after these layers and before `before_send`, as **Events name their own library** describes.
+On capture v1, `$lib` and `$lib_version` are the one exception: the SDK fills its own pair after these layers and before `before_send`, as **Events name their own library** describes.
 
 `before_send` (Behavior step 6) then runs over the assembled message and can change any of them.
 
@@ -611,12 +611,12 @@ This requirement does not apply to server SDKs. Server SDKs that deliver through
 - **AND** the mock PostHog server is reset
 - **GIVEN** the SDK is initialized with token "test-token"
 - **WHEN** capture is called with event "Signed Up" and properties:
-  | property | value      |
-  | $lib     | custom-lib |
+  | property  | value      |
+  | $app_name | custom-app |
 - **THEN** one event named "Signed Up" should be enqueued
 - **AND** the enqueued event properties should include:
-  | property | value      |
-  | $lib     | custom-lib |
+  | property  | value      |
+  | $app_name | custom-app |
 
 #### Scenario: Registered property overrides an SDK-set property (@client)
 - **GIVEN** a fresh SDK acceptance test harness

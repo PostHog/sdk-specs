@@ -17,7 +17,7 @@
 - [x] 3.1 Run `openspec validate add-capture-v1 --type change --strict`.
 - [x] 3.2 Archive the change on this branch (`openspec archive add-capture-v1 --yes`), then apply each delta's "Narrative alignment" notes to the canonical specs by hand.
 - [x] 3.3 Run `openspec validate --specs --strict --no-interactive` and compare the totals with `main` (67 passed, 0 failed on 2026-10-25).
-- [ ] 3.4 Reconcile with sdk-specs #140 (non-finite numbers) before merge; it is still open. #145 (flag properties) was closed in favor of this change. #81 (compression default) merged on 2026-10-30 with its gzip default scoped to client SDKs, which matches the v1 server defaults in `http-client`.
+- [x] 3.4 Reconcile with sdk-specs #140 (non-finite numbers). **Each event is serialized on its own and the body is strict JSON** in this change covers what #140 proposes for capture v1: a body a strict JSON parser accepts, and a non-finite number inside `properties` sent as JSON `null`. #140 should rebase onto this change and keep only the rules it does not cover, or close. #145 (flag properties) was closed in favor of this change. #81 (compression default) merged on 2026-10-30 with its gzip default scoped to client SDKs, which matches the v1 server defaults in `http-client`.
 
 ## 4. Harness parity features
 

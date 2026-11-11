@@ -229,17 +229,17 @@ The SDK SHALL implement the canonical `capture` behavior described by this spec.
 
 ### Requirement: Capture drops null-valued object properties
 
-The SDK SHALL omit custom event object properties whose values are explicit nulls (for example Python `None`, JavaScript `null`, or Swift `NSNull()`) or `undefined` where supported by the runtime, when serializing events for wire delivery or disk-backed event queues/caches. A null/undefined-valued property SHALL NOT cause an otherwise valid, previously supported capture call to be rejected. The SDK MUST NOT serialize that object member as JSON `null` or convert its value to the string `"null"` or `"undefined"`.
+An SDK MAY omit custom event object properties whose values are explicit nulls (for example Python `None`, JavaScript `null`, or Swift `NSNull()`) or `undefined` where supported by the runtime, when serializing events for wire delivery or disk-backed event queues/caches. An SDK that keeps them sends them as JSON `null`, and PostHog stores the property with a `null` value. Either way, a null/undefined-valued property SHALL NOT cause an otherwise valid, previously supported capture call to be rejected, and the SDK MUST NOT convert its value to the string `"null"` or `"undefined"`. Scenarios that assert omission, here and in the AI and exception capture requirements that inherit this one, are labeled `@null_property_omission_capable`; their acceptance features carry `@requires:null_property_omission`, so the harness runs them only for an SDK that declares that capability.
 
-This is a serialization rule, not a public API restriction. If an SDK's public capture API already accepts null/undefined property values, it SHALL continue accepting them with the same signatures and property value types. Implementations MUST NOT narrow those types, introduce null/undefined input validation errors for previously supported values, or require callers to pre-filter properties to comply. The rule does not require widening APIs that do not currently accept those values. In-memory event representations MAY retain them until serialization. This compatibility rule also applies to the AI and exception capture methods that inherit this requirement.
+Omission is a serialization rule, not a public API restriction. If an SDK's public capture API already accepts null/undefined property values, it SHALL continue accepting them with the same signatures and property value types. Implementations MUST NOT narrow those types, introduce null/undefined input validation errors for previously supported values, or require callers to pre-filter properties to comply. The rule does not require widening APIs that do not currently accept those values. In-memory event representations MAY retain them until serialization. This compatibility rule also applies to the AI and exception capture methods that inherit this requirement.
 
-This cleanup SHALL apply recursively to nested objects, including objects inside arrays. Null array elements SHALL remain JSON `null` at their original indices; cleanup MUST NOT compact or reorder arrays. JavaScript undefined array entries SHALL follow normal JSON serialization as null array elements without changing their positions. Other values, including `false`, `0`, empty strings, the literal strings `"null"` and `"undefined"`, and empty objects/arrays, SHALL remain unchanged by this cleanup. Objects made empty by removing null/undefined-valued members SHALL remain `{}`, including when they occupy an array slot. If all custom properties are removed, the SDK SHALL still send an otherwise admissible event with its normal SDK metadata.
+An SDK that omits them SHALL apply the cleanup recursively to nested objects, including objects inside arrays. Null array elements SHALL remain JSON `null` at their original indices; cleanup MUST NOT compact or reorder arrays. JavaScript undefined array entries SHALL follow normal JSON serialization as null array elements without changing their positions. Other values, including `false`, `0`, empty strings, the literal strings `"null"` and `"undefined"`, and empty objects/arrays, SHALL remain unchanged by this cleanup. Objects made empty by removing null/undefined-valued members SHALL remain `{}`, including when they occupy an array slot. If all custom properties are removed, the SDK SHALL still send an otherwise admissible event with its normal SDK metadata.
 
-The same rule SHALL apply to queued and immediate/synchronous capture. The wire payload SHALL satisfy it after enrichment and `before_send` processing, including for null/undefined-valued custom object members introduced by a hook. Each disk serialization of a captured event SHALL apply the same object-member cleanup to the event being written; cleanup only at network send time is insufficient for SDKs that persist events. This does not require adding disk persistence or changing hook timing. Events restored from disk SHALL also satisfy the wire serialization rule. Missing custom keys MUST NOT be synthesized. Caller-configured privacy filtering and event drops remain authoritative; cleanup MUST NOT restore removed data.
+An SDK that omits them SHALL apply the same rule to queued and immediate/synchronous capture. The wire payload SHALL satisfy it after enrichment and `before_send` processing, including for null/undefined-valued custom object members introduced by a hook. Each disk serialization of a captured event SHALL apply the same object-member cleanup to the event being written; cleanup only at network send time is insufficient for SDKs that persist events. This does not require adding disk persistence or changing hook timing. Events restored from disk SHALL also satisfy the wire serialization rule. Missing custom keys MUST NOT be synthesized. Caller-configured privacy filtering and event drops remain authoritative; cleanup MUST NOT restore removed data.
 
 This requirement concerns custom event property values, not a missing/null properties container, required envelope fields, or reserved fields with their own type/validation contracts. It does not change those field-specific rules, unrelated persistent-storage/cache semantics, or the OTLP attribute rules for logs and traces.
 
-#### Scenario: Queued capture drops null-valued properties and preserves array positions (@both)
+#### Scenario: Queued capture drops null-valued properties and preserves array positions (@both @null_property_omission_capable)
 - **GIVEN** an initialized SDK with a valid distinct id and no property-changing hooks or filters
 - **WHEN** capture is called with event "Nullable Properties" and custom properties represented by JSON `{"test":null,"nested":{"drop":null},"items":["1",null,2,{"drop":null},[null]],"empty":"","zero":0,"enabled":false,"literal":"null","emptyArray":[]}`
 - **AND** the SDK is flushed
@@ -247,7 +247,7 @@ This requirement concerns custom event property values, not a missing/null prope
 - **AND** its custom properties should equal JSON `{"nested":{},"items":["1",null,2,{},[null]],"empty":"","zero":0,"enabled":false,"literal":"null","emptyArray":[]}`
 - **AND** the absent custom property "missing" should remain absent
 
-#### Scenario: Immediate capture drops null-valued properties and preserves array positions (@both)
+#### Scenario: Immediate capture drops null-valued properties and preserves array positions (@both @null_property_omission_capable)
 - **GIVEN** an initialized SDK supporting immediate delivery with a valid distinct id and no property-changing hooks or filters
 - **AND** capture is configured for immediate delivery
 - **WHEN** capture is called with event "Nullable Properties" and custom properties represented by JSON `{"test":null,"nested":{"drop":null},"items":["1",null,2,{"drop":null},[null]]}`
@@ -255,7 +255,7 @@ This requirement concerns custom event property values, not a missing/null prope
 - **THEN** one event named "Nullable Properties" should be received
 - **AND** its custom properties should equal JSON `{"nested":{},"items":["1",null,2,{},[null]]}`
 
-#### Scenario: All-null custom properties do not drop the event (@both)
+#### Scenario: All-null custom properties do not drop the event (@both @null_property_omission_capable)
 - **GIVEN** an initialized SDK with a valid distinct id and no property-changing hooks or filters
 - **WHEN** capture is called with event "Only Null Properties" and custom properties represented by JSON `{"test":null}`
 - **AND** the SDK is flushed
@@ -263,7 +263,7 @@ This requirement concerns custom event property values, not a missing/null prope
 - **AND** its custom properties should equal JSON `{}`
 - **AND** it should retain its normal SDK metadata
 
-#### Scenario: Null object properties introduced by before-send are omitted (@both)
+#### Scenario: Null object properties introduced by before-send are omitted (@both @null_property_omission_capable)
 - **GIVEN** an initialized SDK supporting before-send with a valid distinct id
 - **AND** before-send adds custom properties represented by JSON `{"hookNull":null,"hookItems":[null,{"drop":null}]}`
 - **WHEN** capture is called with event "Hook Properties" and no custom properties
@@ -271,14 +271,14 @@ This requirement concerns custom event property values, not a missing/null prope
 - **THEN** one event named "Hook Properties" should be received
 - **AND** its custom properties should equal JSON `{"hookItems":[null,{}]}`
 
-#### Scenario: JavaScript null and undefined object properties are omitted (@both)
+#### Scenario: JavaScript null and undefined object properties are omitted (@both @null_property_omission_capable)
 - **GIVEN** an initialized JavaScript SDK with a valid distinct id and no property-changing hooks or filters
 - **WHEN** capture is called with event "Null And Undefined" and JavaScript properties `{ test: null, missing: undefined, items: ["1", null, 2] }`
 - **AND** the SDK is flushed
 - **THEN** one event named "Null And Undefined" should be received
 - **AND** its custom properties should equal JSON `{"items":["1",null,2]}`
 
-#### Scenario: Existing nullable capture inputs remain supported (@both)
+#### Scenario: Existing nullable capture inputs remain supported (@both @null_property_omission_capable)
 - **GIVEN** the SDK's existing public capture API accepts null or undefined property values
 - **AND** an existing caller supplies those values using the supported public property types
 - **WHEN** the SDK adopts the serialization cleanup rule
@@ -286,7 +286,7 @@ This requirement concerns custom event property values, not a missing/null prope
 - **AND** capture should not reject the call or require caller-side filtering solely because of those values
 - **AND** serializing the captured event should omit null/undefined-valued object members while preserving array positions
 
-#### Scenario: Disk-backed event serialization omits null object properties (@both)
+#### Scenario: Disk-backed event serialization omits null object properties (@both @null_property_omission_capable)
 - **GIVEN** an initialized SDK with disk-backed event persistence, a valid distinct id, and no property-changing hooks or filters
 - **AND** network delivery is paused
 - **WHEN** capture is called with event "Persisted Properties" and custom properties represented by JSON `{"test":null,"nested":{"drop":null},"items":["1",null,2,{"drop":null}]}`
@@ -296,7 +296,7 @@ This requirement concerns custom event property values, not a missing/null prope
 - **WHEN** the persisted event is restored and delivered
 - **THEN** the received event's custom properties should equal JSON `{"nested":{},"items":["1",null,2,{}]}`
 
-#### Scenario: JavaScript disk serialization omits undefined object members without compacting arrays (@both)
+#### Scenario: JavaScript disk serialization omits undefined object members without compacting arrays (@both @null_property_omission_capable)
 - **GIVEN** an initialized JavaScript SDK with disk-backed event persistence, a valid distinct id, and no property-changing hooks or filters
 - **AND** network delivery is paused
 - **WHEN** capture is called with event "Persisted Undefined" and JavaScript properties `{ test: null, missing: undefined, nested: { missing: undefined }, items: ["1", undefined, null, 2], literal: "undefined" }`
@@ -397,7 +397,7 @@ On client SDKs, an event's properties SHALL be merged in this order, each layer 
 2. Registered (super) properties.
 3. The properties the caller passes on the event.
 
-`$lib` and `$lib_version` are the one exception: the SDK fills its own pair after these layers and before `before_send`, as **Events name their own library** describes.
+On capture v1, `$lib` and `$lib_version` are the one exception: the SDK fills its own pair after these layers and before `before_send`, as **Events name their own library** describes.
 
 `before_send` (Behavior step 6) then runs over the assembled message and can change any of them.
 
@@ -416,12 +416,12 @@ This requirement does not apply to server SDKs. Server SDKs that deliver through
 - **AND** the mock PostHog server is reset
 - **GIVEN** the SDK is initialized with token "test-token"
 - **WHEN** capture is called with event "Signed Up" and properties:
-  | property | value      |
-  | $lib     | custom-lib |
+  | property  | value      |
+  | $app_name | custom-app |
 - **THEN** one event named "Signed Up" should be enqueued
 - **AND** the enqueued event properties should include:
-  | property | value      |
-  | $lib     | custom-lib |
+  | property  | value      |
+  | $app_name | custom-app |
 
 #### Scenario: Registered property overrides an SDK-set property (@client)
 - **GIVEN** a fresh SDK acceptance test harness
@@ -638,7 +638,7 @@ Each event SHALL be a JSON object with the fields `event`, `uuid`, `distinct_id`
 
 Session replay stays outside capture v1. Client SDKs keep sending `$snapshot` data to `/s/` with `api_key` in the body, and these rules do not apply to it.
 
-Capture v1 rejects the whole request with `400 request_parsing_error` when the body is not valid JSON, a required field is missing, or a string field (`created_at`, `event`, `uuid`, `distinct_id`, `timestamp`, `session_id`, `window_id`) has another JSON type. It checks `properties` and `options` per event: a `properties` value that is not an object, or an invalid option, drops only that event (`malformed_event_properties`, `invalid_options`) and the rest of the request is processed. The SDK SHALL therefore guarantee these types on the wire, including after `before_send`: an event whose hook leaves `distinct_id` or `event` non-string, or whose serialization fails, is dropped locally and reported through the SDK's error surface or a log line, and never sent.
+Capture v1 rejects the whole request with `400 request_parsing_error` when the body is not valid JSON, a required field is missing, or a required string field (`created_at`, `event`, `uuid`, `distinct_id`, `timestamp`) has another JSON type. The optional `session_id` and `window_id` may be absent or `null`; any other non-string value rejects the request the same way. It checks `properties` and `options` per event: a `properties` value that is not an object, or an invalid option, drops only that event (`malformed_event_properties`, `invalid_options`) and the rest of the request is processed. The SDK SHALL therefore guarantee these types on the wire, including after `before_send`: an event whose hook leaves `distinct_id` or `event` non-string, or whose serialization fails, is dropped locally and reported through the SDK's error surface or a log line, and never sent.
 
 Legacy capture: the body carried `api_key` and `sent_at`, `uuid` and `timestamp` were optional, and a non-string `distinct_id` was converted to text.
 
@@ -1231,7 +1231,7 @@ Legacy capture: whole-batch serialization let one bad value lose every event in 
 
 ### Requirement: The client fails open on a missing or personal API key
 
-Constructing an SDK client SHALL never throw or fail because of the project token. An empty or whitespace-only token, or a token that starts with `phx_` (a personal API key, which capture always rejects), SHALL produce a disabled client that accepts every call, sends nothing, returns flag defaults and logs one message, so a secret key never reaches the wire. The SDK SHALL log that message whether or not debug mode is on, client SDKs included, at any level that is always on (an error, or a warning on posthog-android). Any other malformed token SHALL be sent as given, and capture's `401` SHALL reach the error surface. A server SDK SHALL offer an explicit way to build a disabled client for tests. A built-in integration SHALL NOT raise or return a constructor error over an analytics-only setup problem; it logs one error and turns its own capture off.
+Constructing an SDK client that delivers events through capture v1 SHALL never throw or fail because of the project token. An empty or whitespace-only token, or a token that starts with `phx_` (a personal API key, which capture always rejects), SHALL produce a disabled client that accepts every call, sends nothing, returns flag defaults and logs one message, so a secret key never reaches the wire. The SDK SHALL log that message whether or not debug mode is on, client SDKs included, at any level that is always on (an error, or a warning on posthog-android). Any other malformed token SHALL be sent as given, and capture's `401` SHALL reach the error surface. A server SDK SHALL offer an explicit way to build a disabled client for tests. A built-in integration SHALL NOT raise or return a constructor error over an analytics-only setup problem; it logs one error and turns its own capture off.
 
 #### Scenario: A personal API key disables the client without throwing (@server)
 - **GIVEN** a fresh SDK acceptance test harness

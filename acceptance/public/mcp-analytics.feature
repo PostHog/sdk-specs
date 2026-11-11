@@ -400,7 +400,8 @@ Feature: MCP analytics
       """
     And pending captures are flushed
     Then the "$mcp_tool_call" event's distinct_id should equal its property "$session_id"
-    And the "$mcp_tool_call" event property "$process_person_profile" should equal JSON false
+    And the "$mcp_tool_call" event option "process_person_profile" should equal JSON false
+    And the "$mcp_tool_call" event property "$process_person_profile" should be absent
 
   @server
   Scenario: An identified call processes the person
@@ -413,7 +414,7 @@ Feature: MCP analytics
     And pending captures are flushed
     Then the "$mcp_tool_call" event field "distinct_id" should equal "user-123"
     And the "$mcp_tool_call" event property "$set" should equal JSON {"plan":"pro"}
-    And the "$mcp_tool_call" event property "$process_person_profile" should not equal JSON false
+    And the "$mcp_tool_call" event option "process_person_profile" should not equal JSON false
     And no event named "$identify" should be enqueued
 
   @server

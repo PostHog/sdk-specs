@@ -10,7 +10,7 @@ error, and the status is right there on its `response`.
 ## What Changes
 
 - **Failure capture**: `$mcp_error_status` stays a `MAY`. An SDK that derives it from a thrown error
-  SHALL walk the cause chain from the thrown error inward and take the first integer from 100 to 599
+  SHALL walk the cause chain from the thrown error inward, at most 50 errors, and take the first integer from 100 to 599
   found in `status_code`, `statusCode`, or `status`, on the error or its `response`. A caller's
   explicit value wins. One new scenario.
 - Property reference: the row says the value is an integer from 100 to 599 (prose alignment, applied

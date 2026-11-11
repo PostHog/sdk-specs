@@ -245,9 +245,9 @@ A failed call (an `isError` result or a thrown error) SHALL set `$mcp_is_error: 
 The SDK MAY set `$mcp_error_status` to the HTTP status behind a failed call. An SDK that derives it
 from a thrown error SHALL derive it this way, so the same failure groups the same in every language:
 
-- Walk the cause chain from the thrown error inward, visiting each error once: in Python `__cause__`,
-  else `__context__` unless `__suppress_context__` is set (the chain a traceback prints); in
-  JavaScript `cause`; elsewhere the platform's standard unwrapping.
+- Walk the cause chain from the thrown error inward, visiting each error once and at most 50 errors:
+  in Python `__cause__`, else `__context__` unless `__suppress_context__` is set (the chain a
+  traceback prints); in JavaScript `cause`; elsewhere the platform's standard unwrapping.
 - On each error read `status_code`, `statusCode`, and `status`, in that order, first on the error and
   then on its `response`. The first value that is an integer from 100 to 599 is the status; a boolean
   or a numeric string is not one.

@@ -29,7 +29,7 @@ None.
 ## Impact
 
 - **posthog-ios**: [#1050](https://github.com/PostHog/posthog-ios/pull/1050), merged into `chore/v4-remove-deprecated` on 2026-11-10 as `0a5e7655228988894b522d1dc448cafaa595ffcc`.
-- **posthog-android**: [#965](https://github.com/PostHog/posthog-android/pull/965), open against `chore/v4-remove-deprecated`.
+- **posthog-android**: [#965](https://github.com/PostHog/posthog-android/pull/965), open against `chore/v4-remove-deprecated`, and [#967](https://github.com/PostHog/posthog-android/pull/967), open against `main`, which reads the update after `beforeSend` and records the hash only once it is queued.
 - **Flutter on iOS and Android** inherits the behaviour from the native SDKs.
 - **React Native** doesn't: `setPersonProperties` and the `$set` hash live in the JS core (`packages/core/src/posthog-core.ts`, `_cachedPersonProperties`). Only replay, crash and push events go through the native SDKs.
 - **Not audited here**: other SDKs that keep a person-properties hash. See the PR description.

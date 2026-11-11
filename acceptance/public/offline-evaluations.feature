@@ -6,6 +6,62 @@ Feature: Offline Evaluations
   Background:
     Given an isolated SDK instance
 
+  # Requirement: Explicit composite calculation declarations
+
+  Scenario: A saved calculation is restored
+    Given a calculation declaration attached to a reusable evaluation item
+    When the caller serializes and restores the declaration
+    Then the item and scorer-version UUIDs and calculate=true are unchanged
+    And the declaration contains no value or result metadata
+
+  Scenario: A calculation rejects a supplied score
+    When the caller requests calculate=true with value false
+    Then validation fails before any upload
+
+  Scenario: Ordinary requests retain legacy wire fields
+    When the caller uploads a reported result with calculate omitted or false
+    Then the request omits calculate and retains its ordinary status and value
+
+  # Requirement: Composite dependencies remain in one upload request
+
+  Scenario: A count boundary cannot separate a composite from its inputs
+    Given 999 independent results followed by an input and its calculation for one item
+    When the caller uploads the sequence
+    Then the service receives requests containing 999 results and 2 results
+    And receipt order matches caller order
+
+  Scenario: Interleaved dependencies form one group
+    Given reported A, calculated B, calculated A, and reported B in that order
+    When the caller uploads these results
+    Then all four results are sent together in their original order
+
+  Scenario: Oversized groups send no partial work
+    Given valid early results followed by a composite group larger than a request limit
+    When the caller uploads the sequence
+    Then validation fails before any request is sent
+
+  Scenario: A failed group can be replayed exactly
+    Given an acknowledged first chunk and a composite group whose response was lost
+    When the caller retries the bulk error's pending results
+    Then the failed group's request is reproduced exactly with the original result index retained in the error
+    And no complete or fail operation is sent automatically
+
+  # Requirement: Calculated outcomes are visible in upload receipts
+
+  Scenario: A formula failure is an acknowledged outcome
+    When the service accepts an upload with composite status error and code composite_formula_error
+    Then the receipt exposes that error status and code without requiring a result-read request
+
+  Scenario: A composite acknowledgment cannot omit the outcome
+    When the service acknowledges a calculation without status or error_code fields
+    Then the SDK reports invalid_response with unknown persistence
+
+  Scenario: Derived outcomes count toward completion
+    Given two reported inputs and one accepted composite error for an item
+    When the experiment is completed with expected_result_count 3
+    Then the composite error counts toward completion
+    And only the newly accepted reported inputs contribute billing usage
+
   # Requirement: Acknowledged project-bound client
 
   Scenario: Success is an acknowledgment

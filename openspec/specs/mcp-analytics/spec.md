@@ -108,7 +108,7 @@ means set whenever the SDK can determine the value. Events: "call" is `$mcp_tool
 | `$mcp_session_source` | all | `"client_metadata"`, `"conversation"`, `"transport"`, or `"generated"` | should, from automatic instrumentation |
 | `$mcp_error_type` | failed call | string, low cardinality, at most 256 characters | failed calls |
 | `$mcp_error_message` | failed call | string, at most 2,048 characters | failed calls |
-| `$mcp_error_status` | failed call | JSON number, an HTTP status code | may |
+| `$mcp_error_status` | failed call | JSON number, an integer HTTP status code from 100 to 599 | may |
 | `$mcp_server_build` | all | string, 1 to 256 characters, an immutable build id (a commit SHA or image digest); rejected at configuration when out of range, never truncated or shrunk | may |
 | `$mcp_input_keys` | call | array of at most 20 entries: recorded top-level argument names, declared ones (the schema's and accepted aliases) sorted, then others sorted, then one `"[redacted]"` entry if room remains and a name was not recorded or exceeded 64 characters; injected names the tool does not declare are excluded | may |
 | `$mcp_input_aliases_used` | call | array of at most 20 sorted `"<alias>:<canonical>"` strings, each name at most 64 characters, one for each argument the agent sent only under an alias, naming the first alias present in the server's order | may |
@@ -242,10 +242,22 @@ A failed call (an `isError` result or a thrown error) SHALL set `$mcp_is_error: 
 - `$mcp_error_message`: the thrown message or the text of the tool's own `isError` content (never
   the SDK's appended handle), sanitized per "Payload privacy".
 
-The SDK MAY set `$mcp_error_status` to an upstream HTTP status code. When it emits `$exception`, the
-event SHALL follow the `exception-event-metadata` capability, with `$exception_source:
-"mcp.tool_call"`, `mechanism.handled: true` (the framework turns the failure into a response to the
-client), and `mechanism.synthetic: true` for an `isError` result that carried no thrown error; the
+The SDK MAY set `$mcp_error_status` to the HTTP status behind a failed call. An SDK that derives it
+from a thrown error SHALL derive it this way, so the same failure groups the same in every language:
+
+- Walk the cause chain from the thrown error inward, visiting each error once and at most 50 errors:
+  in Python `__cause__`, else `__context__` unless `__suppress_context__` is set (the chain a
+  traceback prints); in JavaScript `cause`; elsewhere the platform's standard unwrapping.
+- On each error read `status_code`, `statusCode`, and `status`, in that order, first on the error and
+  then on its `response`. The first value that is an integer from 100 to 599 is the status; a boolean
+  or a numeric string is not one.
+- The first error in the chain that yields a status wins, so a status the tool raised itself beats
+  one from the error it wrapped. Without one the property is absent, and an `isError` result with no
+  thrown error has none. A value the caller sets explicitly wins over a derived one.
+
+When it emits `$exception`, the event SHALL follow the `exception-event-metadata` capability, with
+`$exception_source: "mcp.tool_call"`, `mechanism.handled: true` (the framework turns the failure into
+a response to the client), and `mechanism.synthetic: true` for an `isError` result that carried no thrown error; the
 exception's type SHALL be the thrown error's own type (`"Error"` for an `isError` result), never the
 explicit label, so error tracking groups by real types; and the event SHALL carry `$exception_level:
 "error"` and the call's `$session_id` and `$mcp_tool_name`. Failure analytics SHALL NOT depend on
@@ -258,6 +270,13 @@ explicit label, so error tracking groups by real types; and the event SHALL carr
 - **THEN** the "$mcp_tool_call" event's property "$mcp_is_error" should be the boolean true
 - **AND** its property "$mcp_error_type" should name the "UpstreamTimeout" type (platform spelling, such as "UpstreamTimeout" or "errors.UpstreamTimeout")
 - **AND** the client should receive the same failure it would receive without instrumentation
+
+#### Scenario: A failed call carries the HTTP status of the error it wraps
+- **GIVEN** an MCP server instrumented by the SDK, deriving `$mcp_error_status`, with a tool "fetch_invoice" whose handler throws an error with message "invoice lookup failed" caused by an error whose `response` has status 503
+- **WHEN** an MCP client calls tool "fetch_invoice"
+- **AND** the SDK is flushed
+- **THEN** the "$mcp_tool_call" event's property "$mcp_error_status" should be the JSON number 503
+- **AND** its property "$mcp_error_message" should be "invoice lookup failed"
 
 ### Requirement: Session identity
 

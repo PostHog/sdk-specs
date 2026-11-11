@@ -111,6 +111,10 @@ First-party integrations SHALL use the following canonical sources where applica
 | Rails request middleware | `rails.middleware` |
 | Rails error reporter | `rails.error_reporter` |
 | Rails Active Job | `rails.active_job` |
+| Rails Action Cable | `rails.action_cable` |
+| Rails runner terminal exit hook | `rails.runner` |
+| Sidekiq error handler | `sidekiq.error_handler` |
+| Sidekiq death handler | `sidekiq.death_handler` |
 | PHP exception handler | `php.exception_handler` |
 | PHP error handler | `php.error_handler` |
 | PHP shutdown handler | `php.shutdown_handler` |
@@ -133,6 +137,13 @@ A maintained integration not listed here SHALL use the same lowercase `<technolo
 - **WHEN** the public exception API captures a caught exception without integration context
 - **THEN** the outermost exception should have `mechanism.type` equal to `generic`
 - **AND** the event should omit `$exception_source`
+
+#### Scenario: Worker terminal failure handler keeps the category separate from the hook (@server)
+- **GIVEN** a background worker's terminal failure callback observes a job failure that escaped the job
+- **WHEN** the integration captures the exception
+- **THEN** the outermost exception should have `mechanism.type` equal to `task`
+- **AND** the outermost exception should have `mechanism.handled` equal to `false`
+- **AND** `$exception_source` should name the concrete worker hook
 
 #### Scenario: Unknown integration type is preserved (@both)
 - **GIVEN** a typed integration supplies an unknown non-empty mechanism type

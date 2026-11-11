@@ -917,7 +917,7 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
     transition (`:2339-2342`). After opt-in, the same properties are treated as a duplicate and the `$set`
     is never sent. No scenario covers this path.
 - **Backwards compatibility:** Backward-compatible internal fix.
-- **Remediation:** Skip the hash update while `isOptedOut()`, or update it only after `capture` queued the event.
+- **Remediation:** Update the hash only after `capture` queued the event. [PostHog/posthog-android#967](https://github.com/PostHog/posthog-android/pull/967) does this on `main` (open); recheck once it reaches the 4.0 branch.
 
 <a id="n29"></a>
 

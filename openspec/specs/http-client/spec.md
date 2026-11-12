@@ -34,7 +34,7 @@ Platform-specific implementations often split these into dedicated methods per e
 ## Behavior
 
 1. **Build endpoint URLs from host configuration.**
-   - Event ingestion uses `/batch` or `/capture` on legacy capture, and `/i/v1/analytics/events` (analytics) and `/i/v1/ai/events` (AI) on capture v1 (posthog-python 8.0, posthog-go v2, posthog-rs 1.0, posthog-node 6.0, posthog-ios 4.0, posthog-android 4.0 and posthog-flutter 6.0, on Windows and Linux with its own transport and on iOS, macOS and Android through the native SDKs).
+   - Event ingestion uses `/batch` or `/capture` on legacy capture, and `/i/v1/analytics/events` (analytics) and `/i/v1/ai/events` (AI) on capture v1 (posthog-python 8.0, posthog-go v2, posthog-rs 1.0 and posthog-node 6.0).
    - Feature flags use `/flags` or `/decide`-family endpoints.
    - Remote config / local evaluation may use asset/API endpoints distinct from the ingestion host.
 2. **Construct request bodies.**
@@ -54,7 +54,7 @@ Platform-specific implementations often split these into dedicated methods per e
    - `UnityWebRequest` in Unity
    - `requests.Session` in Python
    - `HttpClient` in .NET
-6. **Allow wrapper SDKs to delegate transport ownership instead of creating a second HTTP client.** Flutter's Dart layer forwards setup/config to the underlying native SDKs and delegates all runtime transport to those native/browser clients rather than implementing its own request stack. posthog-flutter 6.0 on Windows and Linux has its own Dart transport.
+6. **Allow wrapper SDKs to delegate transport ownership instead of creating a second HTTP client.** Flutter's Dart layer forwards setup/config to the underlying native SDKs and delegates all runtime transport to those native/browser clients rather than implementing its own request stack.
 7. **Translate HTTP failures into SDK-meaningful errors.**
    - Status codes and response bodies are surfaced so retry/caching layers can decide whether to retry, clear caches, or log errors.
    - Some transports parse `Retry-After` headers.
@@ -103,7 +103,7 @@ Usually none directly, aside from transient request/response objects. Higher lay
 - **feature-flag-cache** and **reload-feature-flags** depend on flag/decide/remote-config requests made by this layer.
 - **persistent-storage** may persist metadata returned by HTTP-backed components (for example cached flags/request ids).
 - **consent-gating** may prevent higher layers from calling the transport at all.
-- **wrapper setup/config** may act only as a pass-through surface. Flutter serializes host/API/batching/privacy config into platform setup payloads and then relies on native/browser transports to perform the actual requests, except on Windows and Linux, where posthog-flutter 6.0 sends them itself.
+- **wrapper setup/config** may act only as a pass-through surface. Flutter serializes host/API/batching/privacy config into platform setup payloads and then relies on native/browser transports to perform the actual requests.
 ## Requirements
 ### Requirement: Canonical http-client behavior
 

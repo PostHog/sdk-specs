@@ -185,7 +185,7 @@ Legacy capture: a 2xx meant the whole request was accepted and there was no per-
 
 An SDK that delivers events through capture v1 SHALL accept an `options` object on every event-producing call (capture, AI capture, exception capture, identify or person-property calls, alias and group identify), SHALL send it as the event's `options` with every key and value as given, and SHALL NOT validate, convert or filter option values, except for the conversion its encoder needs (for example a client SDK's JSON sanitizer that writes dates and URLs as strings and drops values JSON cannot hold, or the Flutter platform channel codec). Capture reads options leniently and drops an event whose value it cannot read with `details: invalid_options`, which the SDK reports like any other drop. Keys the SDK does not know SHALL pass through unchanged. A non-object `options` value on a dynamically typed SDK SHALL be logged as an error and the event sent without caller options. posthog-flutter on the web delivers through posthog-js, which is on legacy capture, so there it maps options to the legacy option properties.
 
-The legacy option properties are the `$`-prefixed properties legacy capture reads as settings: `$process_person_profile`, `$cookieless_mode`, `$ignore_sent_at` and `$product_tour_id`. In the wire builder, after the last `before_send` hook and once per event, the SDK SHALL remove each of them from `properties` and SHALL copy its value into the matching option (`process_person_profile`, `cookieless_mode`, `disable_skew_correction`, `product_tour_id`) only when that option is absent or `null`. An option set by any layer therefore wins over a legacy property set by any layer. On a client SDK, the personless `process_person_profile: false` that the SDK sets itself is an SDK value: it fills only when no layer set the option or `$process_person_profile` (see **Caller-supplied event properties take precedence**), so a caller or registered `$process_person_profile: true` keeps person processing on. SDK-internal code (personless defaults, built-in AI and MCP integrations) SHALL set options directly and never write a legacy option property. Capture v1 takes these settings from `options`.
+The legacy option properties are the `$`-prefixed properties legacy capture reads as settings: `$process_person_profile`, `$cookieless_mode`, `$ignore_sent_at` and `$product_tour_id`. In the wire builder, after the last `before_send` hook and once per event, the SDK SHALL remove each of them from `properties` and SHALL copy its value into the matching option (`process_person_profile`, `cookieless_mode`, `disable_skew_correction`, `product_tour_id`) only when that option is absent or `null`. An option set by any layer therefore wins over a legacy property set by any layer, except on a server SDK's identify-style event, whose own legacy property moves into the option when the call submits it (see **Distinct ids and identity fallbacks on capture v1**). On a client SDK, the personless `process_person_profile: false` that the SDK sets itself is an SDK value: it fills only when no layer set the option or `$process_person_profile` (see **Caller-supplied event properties take precedence**), so a caller or registered `$process_person_profile: true` keeps person processing on. SDK-internal code (personless defaults, built-in AI and MCP integrations) SHALL set options directly and never write a legacy option property. Capture v1 takes these settings from `options`.
 
 A server SDK with global default properties SHALL offer global default options with the same interface, and an SDK with a request-context layer for properties SHALL offer context options (for example `super_options` and `set_context_option` in posthog-python, `Config.DefaultEventOptions` and `RequestContext.Options` in posthog-go, `registerOptions()` and context `options` in posthog-node). An SDK with neither layer needs neither. posthog-ios and posthog-android keep `register()` super properties without public global options; posthog_flutter 6.0 adds `registerOptions()` / `unregisterOptions()` on every platform except web.
 
@@ -249,9 +249,9 @@ Legacy capture: SDKs validated and converted `$process_person_profile` and `$coo
 A server SDK that delivers events through capture v1 SHALL build each event in this order, for every event type its public API produces (capture, AI capture, exception capture, identify or person-property events, alias and group identify). Steps 4 and 5 apply to every SDK on capture v1, client SDKs included; a client SDK builds steps 1 to 3 as **Caller-supplied event properties take precedence** describes:
 
 1. **Identity resolves first.** The distinct id comes from the call, then the ambient request context, then a generated personless id (or the SDK's existing error for a missing id). A context session id becomes `$session_id` unless the event has its own.
-2. **The call's own values.** The call's `properties` and `options`, and typed call values (`groups`, a typed `$set` or `$set_once`), which win key by key over the same key in `properties`.
+2. **The call's own values.** The call's `properties` and `options`, and typed call values (`groups`, a typed `$set` or `$set_once`), which win key by key over the same key in `properties`. On an identify-style event this step also sets `process_person_profile` from the call alone: the call's option, else its `$process_person_profile` property moved into the option, else `true` unless step 1 generated a personless id (see **Distinct ids and identity fallbacks on capture v1**).
 3. **Fill-only defaults**, each layer filling only what the layers above left unset: a built-in integration's library label (`$lib` with `$lib_version`, see **Events name their own library**), then the ambient request context, then the SDK-level default properties and options, then the values the SDK adds itself (`$is_server`, `$geoip_disable` from the client setting, system context, the `$feature/<key>` and `$active_feature_flags` properties derived from a flags snapshot or `send_feature_flags`, `$release_id`, the `process_person_profile: false` option for a personless event, `$trace_id` with `$span_id` from an active OpenTelemetry span, added as a pair only when no layer set either key, and last the SDK's own `$lib` and `$lib_version`, filled as a pair by the rule in **Events name their own library**). A property is unset only when its key is missing, so a `null` property blocks the fill; an option is unset when it is missing or `null`. `$lib` and `$lib_version` merge key by key like other properties. An SDK MAY also treat a `$lib` or `$lib_version` that is not a non-empty string as unset while merging layers; the SDK's own pair fill always does. `$set`, `$set_once`, `$groups` and `$group_set` fill one level deep when both values are objects.
-4. **`before_send`** runs on an isolated copy of the assembled event, including `options`, and has the final say. The SDK SHALL NOT add or re-add any value after the hook, with two allowances: it MAY re-impose the uuid it generated before the hook, because a hook must not resend an SDK-generated uuid (see **Event uuid is sent in canonical form**), and it MAY treat a returned event whose `options` is absent as keeping the pre-hook options, while an empty `options` map still clears them. Where a minimized `$feature_flag_called` event is built, its allowlist SHALL be applied after step 3 and before step 4, and SHALL keep the legacy option properties, `$session_id` and `$window_id`.
+4. **`before_send`** runs on an isolated copy of the assembled event, including `options`, and has the final say. On an identify-style event whose option is set, the SDK removes any `$process_person_profile` property first, so the hook sees one value. The SDK SHALL NOT add or re-add any value after the hook, with two allowances: it MAY re-impose the uuid it generated before the hook, because a hook must not resend an SDK-generated uuid (see **Event uuid is sent in canonical form**), and it MAY treat a returned event whose `options` is absent as keeping the pre-hook options, while an empty `options` map still clears them. Where a minimized `$feature_flag_called` event is built, its allowlist SHALL be applied after step 3 and before step 4, and SHALL keep the legacy option properties, `$session_id` and `$window_id`.
 5. **Hoisting**, once, in the wire builder: the legacy option properties move into `options`, `$session_id` and `$window_id` move to their top-level fields. `$lib` and `$lib_version` stay in `properties`.
 
 In a wrapper whose events a native SDK delivers (posthog-flutter on iOS, macOS and Android), the wrapper's hook runs first, then the native SDK adds its own values, then the native SDK's `before_send` runs and has the final say. The wrapper's hooks do not run on every event type (see `before-send-hook`).
@@ -429,7 +429,7 @@ An SDK that delivers events through capture v1 SHALL remove `$session_id` and `$
 
 An SDK that delivers events through capture v1 SHALL treat an empty or whitespace-only caller `distinct_id` as missing. A missing id keeps the SDK's existing behavior: a generated personless id (UUIDv7, with `process_person_profile: false` set as an option) or a clear error returned to the caller. The SDK SHALL never send an event without a `distinct_id` key.
 
-The SDK SHALL NOT shorten, hash or reject distinct ids by length or by placeholder value: capture v1 drops an event whose `distinct_id` is over 200 UTF-8 bytes (`distinct_id_too_large`) and accepts placeholder values such as `anonymous` without a person profile, and reports both in that event's `results` entry. A `$groupidentify` event's `distinct_id` SHALL be the caller's id when given, else the request-context id where the SDK has one, else `$<group type>_<group key>`, and never a random value. An `alias` call SHALL never take its target from the request context. Global, context and registered layers reach person-only events (`$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`) and `$set` events like any other event, including a layered `process_person_profile: false` option or `$process_person_profile: false` property; `$groupidentify` never takes the context session id. When the final `process_person_profile` on a person-only event is `false`, capture still accepts it and reports it `ok`, but ingestion drops it (ingestion warning `invalid_event_when_process_person_profile_is_false`), so the identify, alias, merge or group update never takes effect; a `$set` event is kept without its person update. A `process_person_profile: true` call option, or one set in `before_send`, beats every layer and keeps the event. SDK docs and migration guides SHALL show that call option on an identity call as the way to keep identifying under a layered `false`, and SHALL NOT offer a per-call `$process_person_profile: true` property for it, because a legacy property does not replace a layered option (see **Per-event options replace the legacy option properties**). Client SDKs have no request context: they send `$groupidentify` with the current distinct id, and with the session id like any other event.
+The SDK SHALL NOT shorten, hash or reject distinct ids by length or by placeholder value: capture v1 drops an event whose `distinct_id` is over 200 UTF-8 bytes (`distinct_id_too_large`) and accepts placeholder values such as `anonymous` without a person profile, and reports both in that event's `results` entry. A `$groupidentify` event's `distinct_id` SHALL be the caller's id when given, else the request-context id where the SDK has one, else `$<group type>_<group key>`, and never a random value. An `alias` call SHALL never take its target from the request context. A server SDK SHALL default identify-style events (`$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`, `$set` and `$set_once`) to person processing when the call submits them, before any layer fills and before `before_send`: a non-`null` `process_person_profile` option on the call stands; otherwise a non-`null` `$process_person_profile` property on the call moves into the option and leaves the properties; otherwise the option is `true`, unless the SDK generated the event's distinct id, which keeps the personless `false`. A `null` option or property counts as unset. So global, context and registered layers do not set `process_person_profile` on an identify-style event whose distinct id the SDK did not generate; they reach it like any other event for every other property and option, and `$groupidentify` never takes the context session id. Once the option is set, the SDK SHALL remove any `$process_person_profile` property from the event before `before_send`, so the hook sees one value; the hook can still change the option and has the final say. The default applies to the event name the call submitted, so a hook that builds an identify-style event, or renames an event to one, sets the option itself, and SDK docs SHALL say so. When the final `process_person_profile` on `$identify`, `$create_alias`, `$merge_dangerously` or `$groupidentify` is `false`, capture still accepts it and reports it `ok`, but ingestion drops it (ingestion warning `invalid_event_when_process_person_profile_is_false`), so the identify, alias, merge or group update never takes effect; a `$set` or `$set_once` event is kept without its person update. SDK docs and migration guides SHALL describe this default, and SHALL tell apps that want an identify-style event personless to set `process_person_profile: false` on the call or in `before_send`, or to turn person processing off for the project. On a client SDK, global and registered layers still reach these events like any other event, and a `process_person_profile: true` call option, or one set in `before_send`, keeps them. Client SDKs have no request context: they send `$groupidentify` with the current distinct id, and with the session id like any other event.
 
 Legacy capture: distinct ids over 200 characters were shortened and the event kept; posthog-python 6.x used a random id for `$groupidentify` without a caller id.
 
@@ -463,18 +463,84 @@ Legacy capture: distinct ids over 200 characters were shortened and the event ke
 - **AND** pending captures are flushed
 - **THEN** the first received event field "distinct_id" should have length 250
 
-#### Scenario: A call option keeps a person-only event under a layered personless option (@server)
+#### Scenario: A layered personless option does not reach an identify-style event (@server)
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the mock PostHog server is reset
 - **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
 - **AND** the SDK-level default options carry "process_person_profile" equal to false
 - **WHEN** group identify is called with JSON arguments:
   """application/json
-  {"group_type":"company","group_key":"acme","distinct_id":"user-123","options":{"process_person_profile":true}}
+  {"group_type":"company","group_key":"acme","distinct_id":"user-123"}
   """
 - **AND** pending captures are flushed
 - **THEN** the first received event field "event" should equal "$groupidentify"
 - **AND** the first received event option "process_person_profile" should equal JSON true
+
+#### Scenario: A layered legacy personless property does not reach an identify-style event (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** the SDK-level default properties carry "$process_person_profile" equal to false
+- **WHEN** capture is called with JSON arguments:
+  """application/json
+  {"distinct_id":"user-123","event":"$set","properties":{"$set":{"plan":"pro"}}}
+  """
+- **AND** pending captures are flushed
+- **THEN** the first received event option "process_person_profile" should equal JSON true
+- **AND** the first received event property "$process_person_profile" should be absent
+
+#### Scenario: A call option sets person processing on an identify-style event (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **WHEN** group identify is called with JSON arguments:
+  """application/json
+  {"group_type":"company","group_key":"acme","distinct_id":"user-123","options":{"process_person_profile":false}}
+  """
+- **AND** pending captures are flushed
+- **THEN** the first received event option "process_person_profile" should equal JSON false
+
+#### Scenario: A call's legacy property becomes the option on an identify-style event (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** the SDK-level default options carry "process_person_profile" equal to true
+- **WHEN** capture is called with JSON arguments:
+  """application/json
+  {"distinct_id":"user-123","event":"$identify","properties":{"$process_person_profile":false}}
+  """
+- **AND** pending captures are flushed
+- **THEN** the first received event option "process_person_profile" should equal JSON false
+- **AND** the first received event property "$process_person_profile" should be absent
+
+#### Scenario: An identify-style event with a generated distinct id stays personless (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** the SDK generates a personless id for a missing distinct id
+- **WHEN** capture is called with distinct id "   " and event "$set"
+- **AND** pending captures are flushed
+- **THEN** the first received event option "process_person_profile" should equal JSON false
+
+#### Scenario: Other events keep a layered personless option (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** the SDK-level default options carry "process_person_profile" equal to false
+- **WHEN** capture is called with distinct id "user-123" and event "Signed Up"
+- **AND** pending captures are flushed
+- **THEN** the first received event option "process_person_profile" should equal JSON false
+
+#### Scenario: before_send sees one person processing value on an identify-style event (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** the SDK-level default properties carry "$process_person_profile" equal to false
+- **AND** before-send deletes the event options
+- **WHEN** capture is called with distinct id "user-123" and event "$identify"
+- **AND** pending captures are flushed
+- **THEN** the first received event option "process_person_profile" should be absent
+- **AND** the first received event property "$process_person_profile" should be absent
 
 ### Requirement: Timestamps on capture v1
 

@@ -42,6 +42,22 @@ Feature: Get Feature Flag Result
     When get feature flag result "missing-flag" is called
     Then no feature flag result should be returned
 
+  # The value "" is the empty string, a variant PostHog no longer accepts for new flags.
+  @both
+  Scenario: Empty variant flag result is disabled
+    Given the SDK is initialized with token "test-token"
+    And cached feature flags are:
+      | key       | value |
+      | legacy-ui | ""    |
+    When get feature flag result "legacy-ui" is called
+    Then the returned feature flag result should include:
+      | field   | value     |
+      | key     | legacy-ui |
+      | enabled | false     |
+    And its variant should equal the JSON value ""
+    When is feature enabled "legacy-ui" is called
+    Then the returned enabled state should be false
+
   # serialized_payload_json encodes the serialized input as a JSON string.
   @client
   Scenario Outline: Invalid cached payload does not change the flag result

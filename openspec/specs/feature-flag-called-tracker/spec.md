@@ -37,7 +37,7 @@ In some SDKs, `shouldTrack` and `markSeen` are combined into one atomic "add if 
 3. **Suppress duplicate tracking events.** If the same combination has already been seen, do not emit another `$feature_flag_called` event.
 4. **Allow new tracking when the response or evaluation context changes.** If a flag's value changes for the same key, or if a server-side call evaluates the same flag/value for a different `distinct_id` or group context, allow a new `$feature_flag_called` event.
 5. **Reset on flag change and lifecycle boundaries.** When feature flag state changes, caches are reset, identity is reset, or the SDK is closed/shut down, clear the dedupe tracker so post-reset/reloaded SDK state can emit fresh tracking events and shutdown state cannot leak across SDK lifetimes. On client-side flag reloads, SDKs MAY retain the tracker if they can reliably compare the complete relevant flag state before and after reload (including flag keys, values, payloads, and other cached flag metadata used by accessors) and determine it is unchanged; otherwise, they SHOULD clear the tracker after reload.
-6. **Expose tracking controls unevenly at the wrapper layer when applicable.** For example, Flutter delegates to the underlying native/browser trackers and only exposes a per-call suppression flag on `getFeatureFlagResult(sendFeatureFlagEvent: ...)` (named `sendEvent` before 6.0), while `getFeatureFlag(...)` and `isFeatureEnabled(...)` always use the default tracking path.
+6. **Expose tracking controls unevenly at the wrapper layer when applicable.** For example, Flutter delegates to the underlying native/browser trackers. Flutter 6.0 exposes a per-call `sendFeatureFlagEvent` option on `getFeatureFlag(...)`, `isFeatureEnabled(...)` and `getFeatureFlagResult(...)`; before 6.0 only `getFeatureFlagResult(sendEvent: ...)` had one, and `getFeatureFlag(...)` and `isFeatureEnabled(...)` always used the default tracking path.
 7. **Cap memory usage where needed.** Larger-scale implementations evict old entries using bounded maps or LRU-style caches. When a bounded tracker reaches its capacity, it SHOULD evict the oldest or least-recently-used entries incrementally. Capacity pressure SHOULD NOT clear the entire tracker, because doing so can flood analytics with duplicate `$feature_flag_called` events. Full tracker clears are reserved for explicit lifecycle/context boundaries such as observed flag-state change/cache reset, identity reset, or SDK close/shutdown.
 
 ## State & lifecycle
@@ -210,7 +210,7 @@ When gated on, the event's properties SHALL be reduced to an allowlist covering,
 - **Session/SDK linkage** (e.g. `$session_id`, `$lib`, `$lib_version`) and, on server SDKs, the server marker (e.g. `$is_server`).
 - **Static, low-cardinality platform/runtime identity properties** the SDK already attaches to every event, kept for platform/runtime breakdowns on flag-call debugging (e.g. `$os`/`$python_version` on posthog-python; the equivalent OS/runtime identity fields on other SDKs).
 - **Session-attribution properties** — `$referring_domain` and the canonical campaign/click-id params the SDK already registers as super properties (e.g. `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`, `gad_source`, `mc_cid`, and click-id params such as `gclid`/`fbclid`). Web-analytics session-initial attribution (UTM values, channel type) is read from the **first event in a session**, and a minimized event can be that first event; stripping these would silently null out the whole session's attribution. Full `$referrer` remains excluded — only `$referring_domain` and the bare campaign-param keys survive minimization.
-- **Config version 2 attribution** — on a config version 2 event only, `$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`, whenever the event carries them (see "Config version 2 attribution on `$feature_flag_called`"). A minimized config version 1 event keeps the allowlist it has today and strips these names like any other property, even when a super property or caller property uses one of them. A config version 2 flag can report `has_experiment` as `false` while one of its experiment rules assigns a variant, because no experiment links to that rule yet, so a minimized event can be the only flag-called record of the rule and the variant. Ingestion also relies on `$feature_flag_config_version` to tell these events apart from config version 1 events.
+- **Config version 2 attribution** — on a config version 2 event only, `$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant_key`, whenever the event carries them (see "Config version 2 attribution on `$feature_flag_called`"). A minimized config version 1 event keeps the allowlist it has today and strips these names like any other property, even when a super property or caller property uses one of them. A config version 2 flag can report `has_experiment` as `false` while one of its experiment rules assigns a variant, because no experiment links to that rule yet, so a minimized event can be the only flag-called record of the rule and the variant. Ingestion also relies on `$feature_flag_config_version` to tell these events apart from config version 1 events.
 
 Everything else — including super properties, custom event properties passed by the caller, and other enriched context tags — SHALL be stripped from a minimized event.
 
@@ -325,7 +325,7 @@ The gate SHALL persist alongside cached flag/local-evaluation definition state (
   | $feature_flag_reason_code    | experiment_split                     |
   | $feature_flag_rule_id        | 3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13 |
   | $feature_flag_rule_type      | experiment                           |
-  | $feature_flag_variant        | test                                 |
+  | $feature_flag_variant_key    | test                                 |
 - **AND** the enqueued event properties should not include "team"
 - **AND** the enqueued event properties should not include "$feature_flag_reason"
 
@@ -355,13 +355,13 @@ When the evaluation details that supplied a read's value come from a config vers
 | `$feature_flag_reason_code` | `reason.code` | whenever the record has a reason code |
 | `$feature_flag_rule_id` | `metadata.rule_id` | by the table below |
 | `$feature_flag_rule_type` | `metadata.rule_type` | by the table below |
-| `$feature_flag_variant` | `metadata.variant_key` | by the table below |
+| `$feature_flag_variant_key` | `metadata.variant_key` | by the table below |
 
 `$feature_flag_config_version` is the flag's config version. It is distinct from `$feature_flag_version`, the version of the flag's row. `$feature_flag_reason_code` is the machine-readable reason code, and it replaces `$feature_flag_reason`, the human-readable description of the reason: a config version 2 event SHALL NOT carry `$feature_flag_reason`. Config version 1 events keep `$feature_flag_reason` where the SDK sends it today.
 
 The rule fields depend on the reason code:
 
-| Reason code | `$feature_flag_rule_id` and `$feature_flag_rule_type` | `$feature_flag_variant` |
+| Reason code | `$feature_flag_rule_id` and `$feature_flag_rule_type` | `$feature_flag_variant_key` |
 | --- | --- | --- |
 | `experiment_split` with rule type `experiment`, a rule ID and a variant key | sent | sent |
 | `experiment_split` with any of those three missing (a malformed split, see `experiment-exposure`) | not sent | not sent |
@@ -373,9 +373,9 @@ The rule fields depend on the reason code:
 
 In this table a rule ID counts as present only when it is a string in the hyphenated 8-4-4-4-12 hexadecimal UUID form, the form the event schemas require. A rule ID in any other form counts as missing, so its event omits the rule pair. The SDK SHALL take these values only from the record that supplied the value. It SHALL NOT send a field that the table marks "not sent", even when the record carries it.
 
-A config version 2 record whose reason code is missing or is not one this table names (for example a code a newer server adds) is still a config version 2 result. Its `$feature_flag_called` event SHALL carry `$feature_flag_config_version` 2 and, when the record has a reason code, that code unchanged in `$feature_flag_reason_code`. It SHALL carry no `$feature_flag_rule_id`, `$feature_flag_rule_type` or `$feature_flag_variant`, and the read SHALL NOT emit `$experiment_exposure`. The SDK SHALL NOT map the code to another code. Contract 9.0.0 ([posthog-sdk-test-harness#101](https://github.com/PostHog/posthog-sdk-test-harness/pull/101)) accepts these events.
+A config version 2 record whose reason code is missing or is not one this table names (for example a code a newer server adds) is still a config version 2 result. Its `$feature_flag_called` event SHALL carry `$feature_flag_config_version` 2 and, when the record has a reason code, that code unchanged in `$feature_flag_reason_code`. It SHALL carry no `$feature_flag_rule_id`, `$feature_flag_rule_type` or `$feature_flag_variant_key`, and the read SHALL NOT emit `$experiment_exposure`. The SDK SHALL NOT map the code to another code. Contract 9.0.0 ([posthog-sdk-test-harness#101](https://github.com/PostHog/posthog-sdk-test-harness/pull/101)) accepts these events.
 
-`$feature_flag_rule_id` and `$feature_flag_rule_type` SHALL be sent together or not at all. A record whose rule fields do not form one of the pairs above is invalid producer output: its event keeps `$feature_flag_config_version` and `$feature_flag_reason_code`, omits both rule fields and `$feature_flag_variant`, and the value the read returns does not change. The SDK SHALL NOT fill in a missing rule field from the value, the flag key, another flag's record or an earlier result. A rule ID without its rule type, or a pair that names the wrong kind of rule, would look like real attribution in flag analytics; dropping it leaves the reason code to show the gap.
+`$feature_flag_rule_id` and `$feature_flag_rule_type` SHALL be sent together or not at all. A record whose rule fields do not form one of the pairs above is invalid producer output: its event keeps `$feature_flag_config_version` and `$feature_flag_reason_code`, omits both rule fields and `$feature_flag_variant_key`, and the value the read returns does not change. The SDK SHALL NOT fill in a missing rule field from the value, the flag key, another flag's record or an earlier result. A rule ID without its rule type, or a pair that names the wrong kind of rule, would look like real attribution in flag analytics; dropping it leaves the reason code to show the gap.
 
 A config version 2 `$feature_flag_called` event SHALL NOT carry `$feature_flag_experiment_id`, a holdout ID, `$feature_flag_forced_variant`, or an assignment seed anywhere in the event.
 
@@ -394,7 +394,7 @@ The SDK SHALL NOT add any of these properties for a config version 1 record, a r
   | $feature_flag_reason_code    | experiment_split                     |
   | $feature_flag_rule_id        | 3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13 |
   | $feature_flag_rule_type      | experiment                           |
-  | $feature_flag_variant        | test                                 |
+  | $feature_flag_variant_key    | test                                 |
 - **AND** it has no `$feature_flag_reason`
 
 #### Scenario: A config version 2 event carries the reason code, not the description
@@ -407,52 +407,52 @@ The SDK SHALL NOT add any of these properties for a config version 1 record, a r
 - **GIVEN** the record for "checkout-flow" has value false, reason code `holdout`, config version 2, rule type `experiment` and rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13"
 - **WHEN** a read of "checkout-flow" emits `$feature_flag_called`
 - **THEN** the event has `$feature_flag_reason_code` "holdout", `$feature_flag_rule_type` "experiment" and `$feature_flag_rule_id` "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13"
-- **AND** it has no `$feature_flag_variant`
+- **AND** it has no `$feature_flag_variant_key`
 
 #### Scenario: A terminal rollout exclusion names the rule but no variant
 - **GIVEN** the record for "checkout-flow" has value false, reason code `rollout_miss`, config version 2, rule type `experiment` and rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13"
 - **WHEN** a read of "checkout-flow" emits `$feature_flag_called`
 - **THEN** the event has `$feature_flag_reason_code` "rollout_miss" and `$feature_flag_rule_id` "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13"
-- **AND** it has no `$feature_flag_variant`
+- **AND** it has no `$feature_flag_variant_key`
 
 #### Scenario: A paused experiment names the rule but no variant
 - **GIVEN** the record for "checkout-flow" has value false, reason code `experiment_paused`, config version 2, rule type `experiment` and rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13"
 - **WHEN** a read of "checkout-flow" emits `$feature_flag_called`
 - **THEN** the event has `$feature_flag_reason_code` "experiment_paused" and `$feature_flag_rule_id` "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13"
-- **AND** it has no `$feature_flag_variant`
+- **AND** it has no `$feature_flag_variant_key`
 
 #### Scenario: Targeted and percentage matches have no variant
 - **GIVEN** the record for "beta-ui" has value true, reason code `targeting_match`, config version 2, rule type `targeted_release` and rule id "c41f9e07-2d6b-4a83-b5e1-7f0a3c8d2e96"
 - **AND** the record for "new-nav" has value true, reason code `targeting_match`, config version 2, rule type `percentage_rollout` and rule id "5a7e3b90-6c1d-4f2e-8b4a-9d0c1e2f3a45"
 - **WHEN** reads of "beta-ui" and "new-nav" emit `$feature_flag_called`
 - **THEN** each event has `$feature_flag_reason_code` "targeting_match" and its record's rule type and rule id
-- **AND** neither event has `$feature_flag_variant`
+- **AND** neither event has `$feature_flag_variant_key`
 
 #### Scenario: A no-rule match carries no rule identity
 - **GIVEN** the record for "beta-ui" has value false, reason code `no_rule_match` and config version 2
 - **WHEN** a read of "beta-ui" emits `$feature_flag_called`
 - **THEN** the event has `$feature_flag_config_version` 2 and `$feature_flag_reason_code` "no_rule_match"
-- **AND** it has none of `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`
+- **AND** it has none of `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant_key`
 
 #### Scenario: A failed record carries no rule identity
 - **GIVEN** the record for "beta-ui" has `failed` true, reason code `dependency_error` and config version 2
 - **WHEN** a read of "beta-ui" emits `$feature_flag_called`
 - **THEN** the event has `$feature_flag_config_version` 2 and `$feature_flag_reason_code` "dependency_error"
-- **AND** it has none of `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`
+- **AND** it has none of `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant_key`
 
 #### Scenario: An unknown reason code is sent unchanged without rule identity
 - **GIVEN** the record for "beta-ui" has value true, reason code "future_reason", config version 2, rule type `targeted_release` and rule id "c41f9e07-2d6b-4a83-b5e1-7f0a3c8d2e96"
 - **WHEN** a read of "beta-ui" emits `$feature_flag_called`
 - **THEN** the read returns true
 - **AND** the event has `$feature_flag_config_version` 2 and `$feature_flag_reason_code` "future_reason"
-- **AND** it has none of `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`
+- **AND** it has none of `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant_key`
 - **AND** no `$experiment_exposure` event is enqueued
 
 #### Scenario: A record without a reason code keeps its config version
 - **GIVEN** the record for "beta-ui" has value true, config version 2 and no reason
 - **WHEN** a read of "beta-ui" emits `$feature_flag_called`
 - **THEN** the event has `$feature_flag_config_version` 2
-- **AND** it has none of `$feature_flag_reason_code`, `$feature_flag_reason`, `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`
+- **AND** it has none of `$feature_flag_reason_code`, `$feature_flag_reason`, `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant_key`
 - **AND** no `$experiment_exposure` event is enqueued
 
 #### Scenario: A rule ID without a rule type is not sent
@@ -460,20 +460,20 @@ The SDK SHALL NOT add any of these properties for a config version 1 record, a r
 - **WHEN** a read of "beta-ui" emits `$feature_flag_called`
 - **THEN** the read returns true
 - **AND** the event has `$feature_flag_config_version` 2 and `$feature_flag_reason_code` "targeting_match"
-- **AND** it has none of `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`
+- **AND** it has none of `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant_key`
 
 #### Scenario: A targeting match that names an experiment rule is not attributed
 - **GIVEN** the record for "checkout-flow" has value true, reason code `targeting_match`, config version 2, rule type `experiment` and rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13"
 - **WHEN** a read of "checkout-flow" emits `$feature_flag_called`
 - **THEN** the event has `$feature_flag_config_version` 2 and `$feature_flag_reason_code` "targeting_match"
-- **AND** it has none of `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`
+- **AND** it has none of `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant_key`
 - **AND** no `$experiment_exposure` event is enqueued
 
 #### Scenario: A forbidden field in the record is not sent
 - **GIVEN** the record for "checkout-flow" has reason code `holdout`, config version 2, rule type `experiment`, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and also a variant key "test"
 - **WHEN** a read of "checkout-flow" emits `$feature_flag_called`
 - **THEN** the event has `$feature_flag_rule_id` "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13"
-- **AND** it has no `$feature_flag_variant`
+- **AND** it has no `$feature_flag_variant_key`
 
 #### Scenario: A number value is reported with its legacy rendering
 - **GIVEN** the record for "search-ranking" has the number value 25, reason code `targeting_match`, config version 2, rule type `targeted_release` and rule id "c41f9e07-2d6b-4a83-b5e1-7f0a3c8d2e96"
@@ -483,7 +483,7 @@ The SDK SHALL NOT add any of these properties for a config version 1 record, a r
 #### Scenario: Config version 1 events do not change
 - **GIVEN** the record for "legacy-layout" has value "compact", reason code `condition_match` with description "Matched condition set 1", config version 1 and variant key "compact"
 - **WHEN** a read of "legacy-layout" emits `$feature_flag_called`
-- **THEN** the event has none of `$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant`
+- **THEN** the event has none of `$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant_key`
 - **AND** in an SDK that sends `$feature_flag_reason`, the event has `$feature_flag_reason` "Matched condition set 1"
 
 ### Requirement: Config version 2 dedupe key
@@ -509,13 +509,13 @@ As a result, a repeated read of the same outcome emits no second event, while ea
 - **GIVEN** a read for distinct id "user-123" emitted `$feature_flag_called` for "pricing-page" with value true, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "control"
 - **WHEN** a later evaluation assigns "user-123" variant key "test" in the same rule, still with value true
 - **AND** "pricing-page" is read again
-- **THEN** a second `$feature_flag_called` event is enqueued with `$feature_flag_variant` "test"
+- **THEN** a second `$feature_flag_called` event is enqueued with `$feature_flag_variant_key` "test"
 
 #### Scenario: A holdout after a variant of the same rule emits a new event
 - **GIVEN** a read for distinct id "user-123" emitted `$feature_flag_called` for "checkout-flow" with value false, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "control"
 - **WHEN** a later evaluation puts "user-123" in the holdout of the same rule, with value false
 - **AND** "checkout-flow" is read again
-- **THEN** a second `$feature_flag_called` event is enqueued with `$feature_flag_reason_code` "holdout" and no `$feature_flag_variant`
+- **THEN** a second `$feature_flag_called` event is enqueued with `$feature_flag_reason_code` "holdout" and no `$feature_flag_variant_key`
 
 #### Scenario: A paused experiment after a holdout of the same rule emits a new event
 - **GIVEN** a read for distinct id "user-123" emitted `$feature_flag_called` for "checkout-flow" with value false, reason code `holdout`, rule type `experiment` and rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13"
@@ -534,3 +534,56 @@ As a result, a repeated read of the same outcome emits no second event, while ea
 - **WHEN** "beta-ui" becomes a config version 2 flag whose record for "user-123" has value true, reason code `targeting_match`, rule type `targeted_release` and rule id "c41f9e07-2d6b-4a83-b5e1-7f0a3c8d2e96"
 - **AND** "beta-ui" is read again
 - **THEN** a second `$feature_flag_called` event is enqueued with `$feature_flag_config_version` 2
+
+### Requirement: Failed direct getter evaluations report evaluation_failed
+
+When a direct single-flag getter has no successfully evaluated value for its context because its detailed remote record is marked `failed: true`, a `$feature_flag_called` event emitted for that read SHALL include `evaluation_failed` in `$feature_flag_error`. A present-but-failed record MUST NOT be classified as `flag_missing` merely because it supplies no value. This per-flag classification SHALL NOT depend on the response-wide `errorsWhileComputingFlags` bit; existing response-level errors remain independently reportable.
+
+For a failed direct read without a successful fallback, `$feature_flag_response` SHALL use the platform's documented missing response sentinel, meaning the null, false, or omitted response field it uses when no value is available. It MUST NOT use a caller default or treat a failed placeholder as an evaluated value. This also applies to failed config version 2 records instead of the ordinary evaluated-value rendering. Their diagnostic config-version and reason metadata SHALL remain governed by the existing attribution rules.
+
+The SDK SHALL preserve its existing dedupe behavior and feature flag event controls. This requirement MUST NOT cause an event when the read's event decision is false. A successfully evaluated value from the source actually used for the read MUST NOT acquire `evaluation_failed` solely because an unused remote record or another key failed. Snapshot missing/unresolved access rules remain governed by `evaluate-flags`.
+
+#### Scenario: A present failed flag is not reported as missing (@both)
+- **GIVEN** a fresh SDK instance has no successful fallback for "checkout"
+- **AND** remote evaluation returns "checkout" with enabled false and failed true
+- **AND** the read's feature flag event decision is true
+- **WHEN** get feature flag result "checkout" is called
+- **AND** the public flush completes delivery to an isolated mock ingestion service
+- **THEN** the received "$feature_flag_called" event for "checkout" reports "evaluation_failed" in "$feature_flag_error"
+- **AND** it does not report "flag_missing"
+- **AND** "$feature_flag_response" uses the platform's documented missing response sentinel
+
+#### Scenario: Failed flag diagnostics coexist with response-wide errors (@both)
+- **GIVEN** a fresh SDK instance has no successful fallback for "checkout"
+- **AND** remote evaluation returns "checkout" with failed true and reports errorsWhileComputingFlags true
+- **AND** the read's feature flag event decision is true
+- **WHEN** get feature flag result "checkout" is called
+- **AND** the public flush completes delivery to an isolated mock ingestion service
+- **THEN** the received "$feature_flag_called" event for "checkout" reports "evaluation_failed"
+- **AND** "$feature_flag_error" also contains "errors_while_computing_flags"
+
+#### Scenario: A healthy sibling does not inherit another flag's failure (@both)
+- **GIVEN** remote evaluation returns "checkout" with failed true and "beta-ui" with enabled false and failed false
+- **AND** the read's feature flag event decision is true
+- **WHEN** get feature flag result "beta-ui" is called
+- **AND** the public flush completes delivery to an isolated mock ingestion service
+- **THEN** the received "$feature_flag_called" event for "beta-ui" reports response false
+- **AND** it does not report "evaluation_failed"
+
+#### Scenario: Event suppression also applies to failed direct getter reads (@both)
+- **GIVEN** remote evaluation returns "checkout" with failed true and no successful fallback supplies a value
+- **AND** the read's feature flag event decision is false
+- **WHEN** get feature flag result "checkout" is called
+- **AND** the public flush completes for an isolated mock ingestion service
+- **THEN** no "$feature_flag_called" event for "checkout" is received
+
+#### Scenario: Failed remote fallback reports evaluation_failed after inconclusive local evaluation (@server)
+- **GIVEN** local evaluation for "checkout" is inconclusive and remote fallback is enabled
+- **AND** the fallback returns "checkout" with enabled false and failed true
+- **AND** no successful fallback supplies a value
+- **AND** the read's feature flag event decision is true
+- **WHEN** get feature flag result "checkout" is called for that evaluation context
+- **AND** the public flush completes delivery to an isolated mock ingestion service
+- **THEN** the received "$feature_flag_called" event for "checkout" reports "evaluation_failed" in "$feature_flag_error"
+- **AND** it does not report "flag_missing"
+- **AND** "$feature_flag_response" uses the platform's documented missing response sentinel

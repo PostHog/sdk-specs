@@ -31,9 +31,9 @@ Feature: Experiment Exposure
     Then exactly one event named "$feature_flag_called" should be enqueued for flag "checkout-flow"
     And exactly one event named "$experiment_exposure" should be enqueued for flag "checkout-flow"
     And the enqueued "$experiment_exposure" event properties should include:
-      | property              | value                                |
-      | $feature_flag_variant | test                                 |
-      | $feature_flag_rule_id | 3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13 |
+      | property                  | value                                |
+      | $feature_flag_variant_key | test                                 |
+      | $feature_flag_rule_id     | 3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13 |
 
   Scenario: A variant whose value is false is still exposed
     Given the SDK is initialized with token "test-token"
@@ -42,9 +42,9 @@ Feature: Experiment Exposure
     Then the returned feature flag value should be false
     And exactly one event named "$experiment_exposure" should be enqueued for flag "checkout-flow"
     And the enqueued "$experiment_exposure" event properties should include:
-      | property               | value   |
-      | $feature_flag_variant  | control |
-      | $feature_flag_response | false   |
+      | property                  | value   |
+      | $feature_flag_variant_key | control |
+      | $feature_flag_response    | false   |
 
   Scenario Outline: An outcome that assigns no variant emits no exposure
     Given the SDK is initialized with token "test-token"
@@ -101,7 +101,7 @@ Feature: Experiment Exposure
     And the record for "checkout-flow" has "metadata.has_experiment" false
     When get feature flag "checkout-flow" is called for distinct id "user-123"
     Then exactly one event named "$experiment_exposure" should be enqueued for flag "checkout-flow"
-    And the enqueued "$experiment_exposure" event property "$feature_flag_variant" should equal "test"
+    And the enqueued "$experiment_exposure" event property "$feature_flag_variant_key" should equal "test"
 
   # Typed reads
 
@@ -114,7 +114,7 @@ Feature: Experiment Exposure
     And exactly one event named "$feature_flag_called" should be enqueued for flag "checkout-flow"
     And the enqueued "$feature_flag_called" event property "$feature_flag_response" should equal "false"
     And exactly one event named "$experiment_exposure" should be enqueued for flag "checkout-flow"
-    And the enqueued "$experiment_exposure" event property "$feature_flag_variant" should equal "control"
+    And the enqueued "$experiment_exposure" event property "$feature_flag_variant_key" should equal "control"
 
   @typed_flag_values_capable
   Scenario: A typed read of the wrong type emits neither event and reserves nothing
@@ -129,7 +129,7 @@ Feature: Experiment Exposure
     And exactly one event named "$feature_flag_called" should be enqueued for flag "checkout-flow"
     And the enqueued "$feature_flag_called" event property "$feature_flag_response" should equal "blue"
     And exactly one event named "$experiment_exposure" should be enqueued for flag "checkout-flow"
-    And the enqueued "$experiment_exposure" event property "$feature_flag_variant" should equal "test"
+    And the enqueued "$experiment_exposure" event property "$feature_flag_variant_key" should equal "test"
 
   # Malformed splits
 
@@ -152,7 +152,7 @@ Feature: Experiment Exposure
       | $feature_flag_reason_code    | experiment_split |
     And the enqueued "$feature_flag_called" event properties should not include "$feature_flag_rule_id"
     And the enqueued "$feature_flag_called" event properties should not include "$feature_flag_rule_type"
-    And the enqueued "$feature_flag_called" event properties should not include "$feature_flag_variant"
+    And the enqueued "$feature_flag_called" event properties should not include "$feature_flag_variant_key"
 
     Examples:
       | gap                | rule_type            | rule_id                                | variant_key |
@@ -212,15 +212,15 @@ Feature: Experiment Exposure
     When get feature flag "checkout-flow" is called for distinct id "user-123"
     Then the enqueued "$experiment_exposure" event distinct id should be "user-123"
     And the enqueued "$experiment_exposure" event properties should include:
-      | property                 | value                                |
-      | $feature_flag            | checkout-flow                        |
-      | $feature_flag_response   | true                                 |
-      | $feature_flag_variant    | test                                 |
-      | $feature_flag_rule_id    | 3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13 |
-      | locally_evaluated        | false                                |
-      | $feature_flag_id         | 412                                  |
-      | $feature_flag_version    | 9                                    |
-      | $feature_flag_request_id | 7c0e5d1a-3b2f-4e6d-8a9c-0f1e2d3c4b5a |
+      | property                  | value                                |
+      | $feature_flag             | checkout-flow                        |
+      | $feature_flag_response    | true                                 |
+      | $feature_flag_variant_key | test                                 |
+      | $feature_flag_rule_id     | 3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13 |
+      | locally_evaluated         | false                                |
+      | $feature_flag_id          | 412                                  |
+      | $feature_flag_version     | 9                                    |
+      | $feature_flag_request_id  | 7c0e5d1a-3b2f-4e6d-8a9c-0f1e2d3c4b5a |
     And the enqueued "$experiment_exposure" event properties should not include "$feature_flag_config_version"
     And the enqueued "$experiment_exposure" event properties should not include "$feature_flag_reason_code"
     And the enqueued "$experiment_exposure" event properties should not include "$feature_flag_rule_type"
@@ -232,9 +232,9 @@ Feature: Experiment Exposure
     And the flags response for distinct id "user-123" has a complete experiment split for "search-ranking" with value 25, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "boosted"
     When get feature flag "search-ranking" is called for distinct id "user-123"
     Then the enqueued "$experiment_exposure" event properties should include:
-      | property               | value   |
-      | $feature_flag_response | true    |
-      | $feature_flag_variant  | boosted |
+      | property                  | value   |
+      | $feature_flag_response    | true    |
+      | $feature_flag_variant_key | boosted |
 
   Scenario: An unexpected experiment ID is not sent
     Given the SDK is initialized with token "test-token"
@@ -292,7 +292,7 @@ Feature: Experiment Exposure
     And feature flags are reloaded
     And get feature flag "pricing-page" is called for distinct id "user-123"
     Then two "$experiment_exposure" events should be enqueued for flag "pricing-page"
-    And the last enqueued "$experiment_exposure" event property "$feature_flag_variant" should equal "test"
+    And the last enqueued "$experiment_exposure" event property "$feature_flag_variant_key" should equal "test"
 
   Scenario: A new experiment rule is a new exposure
     Given the SDK is initialized with token "test-token"
@@ -359,7 +359,7 @@ Feature: Experiment Exposure
     When get feature flag payload "checkout-flow" is called for distinct id "user-123" with flag events turned on
     Then exactly one event named "$feature_flag_called" should be enqueued for flag "checkout-flow"
     And exactly one event named "$experiment_exposure" should be enqueued for flag "checkout-flow"
-    And the enqueued "$experiment_exposure" event property "$feature_flag_variant" should equal "test"
+    And the enqueued "$experiment_exposure" event property "$feature_flag_variant_key" should equal "test"
 
   @server @payload_flag_events_capable
   Scenario: A caller-supplied match value sends no exposure and reserves nothing
@@ -369,7 +369,7 @@ Feature: Experiment Exposure
     Then no event named "$experiment_exposure" should be enqueued
     When get feature flag "checkout-flow" is called for distinct id "user-123"
     Then exactly one event named "$experiment_exposure" should be enqueued for flag "checkout-flow"
-    And the enqueued "$experiment_exposure" event property "$feature_flag_variant" should equal "test"
+    And the enqueued "$experiment_exposure" event property "$feature_flag_variant_key" should equal "test"
 
   # Bootstrap and overrides
 
@@ -385,9 +385,9 @@ Feature: Experiment Exposure
     When the flags response arrives with a complete experiment split for "checkout-flow" with value true, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
     And get feature flag "checkout-flow" is called
     Then two "$feature_flag_called" events should be enqueued for flag "checkout-flow"
-    And the last enqueued "$feature_flag_called" event property "$feature_flag_variant" should equal "test"
+    And the last enqueued "$feature_flag_called" event property "$feature_flag_variant_key" should equal "test"
     And exactly one event named "$experiment_exposure" should be enqueued for flag "checkout-flow"
-    And the enqueued "$experiment_exposure" event property "$feature_flag_variant" should equal "test"
+    And the enqueued "$experiment_exposure" event property "$feature_flag_variant_key" should equal "test"
 
   @client
   Scenario: An override suppresses the exposure
@@ -397,7 +397,7 @@ Feature: Experiment Exposure
     When get feature flag "checkout-flow" is called
     Then no event named "$experiment_exposure" should be enqueued
     And the enqueued "$feature_flag_called" event properties should not include "$feature_flag_rule_id"
-    And the enqueued "$feature_flag_called" event properties should not include "$feature_flag_variant"
+    And the enqueued "$feature_flag_called" event properties should not include "$feature_flag_variant_key"
 
   # Local evaluation
 
@@ -408,9 +408,9 @@ Feature: Experiment Exposure
     When get feature flag "checkout-flow" is called for distinct id "user-123"
     Then exactly one event named "$experiment_exposure" should be enqueued for flag "checkout-flow"
     And the enqueued "$experiment_exposure" event properties should include:
-      | property              | value |
-      | locally_evaluated     | true  |
-      | $feature_flag_variant | test  |
+      | property                  | value |
+      | locally_evaluated         | true  |
+      | $feature_flag_variant_key | test  |
     And no remote feature flag evaluation request should have been sent
 
   @server
@@ -439,7 +439,7 @@ Feature: Experiment Exposure
     When get feature flag "checkout-flow" is called for distinct id "user-123"
     Then exactly one event named "$feature_flag_called" should be enqueued for flag "checkout-flow"
     And exactly one event named "$experiment_exposure" should be enqueued for flag "checkout-flow"
-    And the enqueued "$experiment_exposure" event property "$feature_flag_variant" should equal "test"
+    And the enqueued "$experiment_exposure" event property "$feature_flag_variant_key" should equal "test"
 
   Scenario: A flag-called event the queue rejects reserves no key and does not stop the exposure
     Given the SDK is initialized with token "test-token" and a capture queue that rejects the first "$feature_flag_called" event as full

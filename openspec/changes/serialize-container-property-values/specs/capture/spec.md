@@ -29,9 +29,9 @@ This is a serialization rule. It does not require an SDK's public property types
 - **THEN** one event named "Sequence Property" should be received
 - **AND** its custom property "steps" should equal JSON `[3,1,2]`
 
-#### Scenario: Nested set-like values are converted and their elements cleaned (@both)
+#### Scenario: Nested set-like values are converted alongside null-property cleanup (@both)
 - **GIVEN** an initialized SDK whose runtime has a built-in set-like type, with a valid distinct id and no property-changing hooks or filters
-- **WHEN** capture is called with event "Nested Set" and a custom property "outer" whose value is an object with member "inner" set to a set-like value containing only an object represented by JSON `{"keep":1,"drop":null}`
+- **WHEN** capture is called with event "Nested Set" and a custom property "outer" whose value is an array containing one object with member "inner" set to a set-like value containing only the string "a" and member "drop" set to null
 - **AND** the SDK is flushed
 - **THEN** one event named "Nested Set" should be received
-- **AND** its custom property "outer" should equal JSON `{"inner":[{"keep":1}]}`
+- **AND** its custom property "outer" should equal JSON `[{"inner":["a"]}]`

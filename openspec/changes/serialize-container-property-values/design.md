@@ -5,11 +5,10 @@ encoders disagree. Evidence, each repo read at `origin/main` on 2026-11-12:
 
 | SDK | SHA | Set-like value becomes | Where |
 |---|---|---|---|
-| posthog-js (core) | 3e624214 | `{}` | `packages/core/src/utils/string-utils.ts:27` `safeJsonStringify` handles bigint, function, symbol, Error and cycles only. Used for `/batch/` at `packages/core/src/posthog-core-stateless.ts:1615`. |
-| posthog-js (browser) | 3e624214 | `{}` | `packages/browser-common/src/utils/request-utils.ts:9` `jsonStringify` handles Error and bigint only. |
+| posthog-js (core) | e609837f | `{}` | `packages/core/src/utils/string-utils.ts:27` `safeJsonStringify` handles bigint, function, symbol, Error and cycles only. Used for `/batch/` at `packages/core/src/posthog-core-stateless.ts:1615`. |
+| posthog-js (browser) | e609837f | `{}` | Lost at capture time, before serialization: `packages/browser/src/posthog-core.ts:2031` calls `_copyAndTruncateStrings`, whose `deepCircularCopy` (`packages/browser-common/src/utils/general-utils.ts:123`) copies non-array objects through `each()`, which iterates own keys only (`general-utils.ts:35`). The serializer, `packages/browser-common/src/utils/request-utils.ts:9` `jsonStringify`, handles Error and bigint only. |
 | posthog-ruby | 669aabfa | the string `"#<Set: {1}>"` | `lib/posthog/transport.rb:157` `JSON.generate`. `lib/posthog/utils.rb:58` `isoify_dates` changes dates only. Output checked with Ruby 3.3.5. |
-| posthog-python | c60e7a62 | `set`, `list`, `tuple`: array. `frozenset`, `deque`: `None`. | `posthog/utils.py:92` sends `set`, `list`, `tuple` to `_clean_list`. Other unknown values reach `_coerce_unicode` (`posthog/utils.py:144`), which returns `None`. `posthog/test/test_utils.py:310` covers `tuple`. No test covers `set`. |
-| posthog-python, PR #1230 (open, not merged) | 140f7660 | `frozenset`, `deque`: array | `posthog/utils.py:92` |
+| posthog-python | 5378ece8 | `set`, `frozenset`, `list`, `tuple`, `deque`: array | `posthog/utils.py:92` sends them to `_clean_list`. Other unknown values reach `_coerce_unicode` (`posthog/utils.py:144`), which returns `None`. `frozenset` and `deque` were added in PostHog/posthog-python#1230 (merged 2026-11-12, not yet in a release). `posthog/test/test_utils.py:311` covers `tuple` and `:321` covers `frozenset` and `deque`. No test covers `set`. |
 | posthog-go | cbf49d41 | no set type in Go. Slices and arrays are arrays. | `event_properties_json.go:35` `json.Marshal` |
 | posthog-rs | efe85292 | whatever the caller's `Serialize` produces (serde serializes `HashSet` and `BTreeSet` as arrays) | `src/event.rs:152` `serde_json::to_value` |
 
@@ -48,9 +47,11 @@ become arrays diverges from it. The options:
   lands.
 
 **Recommendation: C.** Every non-array outcome today loses the data (`{}`, `null`) or sends a debug
-string nobody can query, so no caller can depend on the old output. The posthog-js behavior is a
-side effect of `JSON.stringify`, not a choice. The fix in each SDK is one branch in an existing
-replacer or clean step. The null-property precedent
+string that loses the elements as structured data, so callers are unlikely to depend on the old
+output. The posthog-js behavior is a side effect of generic object copying and `JSON.stringify`,
+not a choice. posthog-python already sends arrays on main. The fixes are small: posthog-ruby needs
+one conversion before `JSON.generate`, posthog-js core one branch in `safeJsonStringify`, and the
+posthog-js browser a change in `deepCircularCopy` as well as in `jsonStringify`. The null-property precedent
 (`openspec/changes/archive/2026-09-08-preserve-nullable-capture-api/`) also used SHALL with
 per-SDK rollout. B leaves two conforming SDKs with different output for the same input.
 
@@ -67,7 +68,5 @@ Drafted details, valid for B and C:
 ## Risks / Trade-offs
 
 - posthog-js and posthog-ruby output changes → follow-up changes, release notes.
-- Ruby 3.5+ may print `Set` differently, which does not matter for the rule but changes today's
-  debug string.
 - Unordered set output makes test fixtures order-sensitive → scenarios use one-element sets or
   compare without order.

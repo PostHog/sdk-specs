@@ -1,9 +1,8 @@
 ## Why
 
 Tool errors often repeat their arguments: `workspace 'prod' not found in org 'acme'`, or
-`strconv.Atoi: parsing "<value>"`. "Payload privacy" redacts credentials and personal data shapes (emails,
-card numbers, phone numbers) from `$mcp_error_message`, but not workspace names, identifiers, or
-configuration values, so those reach PostHog in failures. A host
+`strconv.Atoi: parsing "<value>"`. "Payload privacy" redacts only credentials from `$mcp_error_message`, not
+personal data, workspace names, identifiers, or configuration values, so those reach PostHog in failures. A host
 that turns parameter and response capture off to keep arguments out still sends them this way, and
 has no option to stop it. The Terraform MCP server hit this: its Terraform variable values reached
 PostHog through error messages with both payload options off.

@@ -56,7 +56,7 @@ getAllFlags(
 ### Surface variants
 
 - **posthog-js core / browser / react-native:** `getFeatureFlags()`
-- **iOS (4.0+), Android (4.0+), flutter (6.0+):** `getAllFeatureFlags()` returns a list of flag result objects (key, enabled, variant, payload), or `null` when flags are unavailable, instead of a key-to-value map. It never sends `$feature_flag_called`.
+- **iOS (4.0+), Android (4.0+), flutter (6.0+):** `getAllFeatureFlags()` returns a list of flag result objects (key, enabled, variant, payload), or `null` when flags are unavailable, instead of a key-to-value map. Each entry matches `getFeatureFlagResult` for that key, so an empty variant reads as disabled. It never sends `$feature_flag_called`.
 - **Node:** `getAllFlags(distinctId, options?)`
 - **Python:** `get_all_flags(distinct_id, *, ...)`
 - **Ruby:** `get_all_flags(distinct_id, groups: {}, person_properties: {}, group_properties: {}, only_evaluate_locally: false)`
@@ -161,3 +161,70 @@ The SDK SHALL implement the canonical `get-feature-flags` behavior described by 
   | beta-ui | true  |
 - **WHEN** get feature flags is called with tracking disabled
 - **THEN** no event named "$feature_flag_called" should be enqueued
+
+### Requirement: Flag result list reads an empty variant as disabled
+
+On SDKs where `getAllFeatureFlags()` returns a list of flag result objects (iOS 4.0+, Android 4.0+, Flutter 6.0+, KMP), each entry SHALL match what `get-feature-flag-result` returns for that key. A flag whose value is the empty string `""` SHALL stay in the list with `enabled: false` and `variant: ""`. SDKs that return a key → value map keep reporting `""`, as `get-feature-flag` does.
+
+#### Scenario: Flag result list reads an empty variant as disabled (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** cached feature flags are:
+  | key       | value |
+  | beta-ui   | true  |
+  | legacy-ui | ""    |
+- **WHEN** get all feature flag results is called
+- **THEN** the returned feature flag results should include:
+  | key       | enabled |
+  | beta-ui   | true    |
+  | legacy-ui | false   |
+- **AND** the returned feature flag result for "legacy-ui" should have variant equal to the JSON value ""
+
+### Requirement: Bulk flag values exclude failed remote decisions
+
+When a bulk flag getter, including the values returned by `get-feature-flags-and-payloads`, consumes a detailed `/flags` response, it SHALL omit values from records marked `failed: true`, rather than expose their enabled/variant placeholders. A key with no other successfully evaluated value for the same evaluation context SHALL be absent from the returned map or result list. Successfully evaluated siblings, including boolean false, SHALL remain available even when the response reports `errorsWhileComputingFlags`.
+
+When remote fallback supplements local evaluation, a failed remote record MUST NOT overwrite or delete a successful local decision for that key and the same evaluation context. This includes local true, false, and variant-string decisions. Successful remote records SHALL retain the API's existing merge precedence. These rules SHALL also apply when an SDK performs the same bulk local/remote value merge for automatic capture enrichment; this does not require an SDK to add such enrichment. The paired bulk API's payload handling follows "Combined bulk reads exclude failed remote values and payloads" in `get-feature-flags-and-payloads`.
+
+#### Scenario: Remote-only bulk lookup omits only failed values (@both)
+- **GIVEN** a fresh SDK instance has no successful local or cached fallback values
+- **AND** a detailed remote response reports errorsWhileComputingFlags true with these records:
+  | key        | enabled | variant | failed |
+  | checkout   | false   | null    | true   |
+  | beta-ui    | true    | null    | false  |
+  | disabled   | false   | null    | absent |
+  | experiment | true    | blue    | absent |
+- **WHEN** the bulk flag getter consumes that response
+- **THEN** "checkout" is absent from the returned flags
+- **AND** "beta-ui" is present with value true
+- **AND** "disabled" is present with value false
+- **AND** "experiment" is present with value "blue"
+
+#### Scenario: An all-failed response returns no bulk decisions (@both)
+- **GIVEN** a fresh SDK instance has no successful local or cached fallback values
+- **AND** every record in its detailed remote response is marked failed true
+- **WHEN** the bulk flag getter consumes that response
+- **THEN** the returned flag map or result list is empty
+
+#### Scenario: Failed fallback preserves local decisions (@server)
+- **GIVEN** local evaluation successfully resolves "enabled-local" to true, "disabled-local" to false, and "variant-local" to "blue" for one evaluation context
+- **AND** local evaluation for "checkout" is inconclusive and triggers remote fallback
+- **AND** the fallback response marks all four keys failed true with enabled false placeholders
+- **WHEN** the bulk flag getter combines the results
+- **THEN** "enabled-local" is present with value true
+- **AND** "disabled-local" is present with value false
+- **AND** "variant-local" is present with value "blue"
+- **AND** "checkout" is absent
+
+#### Scenario: Automatic capture enrichment does not attach failed placeholders (@server)
+- **GIVEN** the SDK supports automatic bulk flag enrichment during capture and it is enabled
+- **AND** local evaluation resolves "beta-ui" to true for the event's evaluation context
+- **AND** an inconclusive "checkout" triggers remote fallback
+- **AND** the fallback response marks both keys failed true with enabled false placeholders
+- **WHEN** a public capture call evaluates and enriches an event for that context
+- **AND** the public flush completes delivery to an isolated mock ingestion service
+- **THEN** the received event has "$feature/beta-ui" true
+- **AND** the received event has no "$feature/checkout" property

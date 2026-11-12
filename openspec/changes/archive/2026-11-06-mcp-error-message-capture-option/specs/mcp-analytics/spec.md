@@ -19,17 +19,29 @@ A failed call (an `isError` result or a thrown error) SHALL set `$mcp_is_error: 
 With the error message capture option off (see "Configuration"), `$mcp_error_message` and the
 `$exception` value SHALL be `Tool <name> returned an error`, with the call's `$mcp_tool_name`, and the
 SDK SHALL NOT send any part of the thrown message or the `isError` content in them. Tool errors often
-repeat their arguments, and "Payload privacy" redacts only credentials and personal data shapes from
-them, not resource names, identifiers, or configuration values, so this is how a host that turns
+repeat their arguments, and "Payload privacy" redacts only credentials from them, not
+personal data, resource names, identifiers, or configuration values, so this is how a host that turns
 parameter and response capture off keeps argument values out of failures too.
 `$mcp_is_error`, `$mcp_error_type`, the exception's type, and whether `$exception` is sent stay the
 same. `$mcp_response` stays under the response capture option, including the content of an `isError`
 result, so a host that wants no failure text turns both off.
 
-The SDK MAY set `$mcp_error_status` to an upstream HTTP status code. When it emits `$exception`, the
-event SHALL follow the `exception-event-metadata` capability, with `$exception_source:
-"mcp.tool_call"`, `mechanism.handled: true` (the framework turns the failure into a response to the
-client), and `mechanism.synthetic: true` for an `isError` result that carried no thrown error; the
+The SDK MAY set `$mcp_error_status` to the HTTP status behind a failed call. An SDK that derives it
+from a thrown error SHALL derive it this way, so the same failure groups the same in every language:
+
+- Walk the cause chain from the thrown error inward, visiting each error once and at most 50 errors:
+  in Python `__cause__`, else `__context__` unless `__suppress_context__` is set (the chain a
+  traceback prints); in JavaScript `cause`; elsewhere the platform's standard unwrapping.
+- On each error read `status_code`, `statusCode`, and `status`, in that order, first on the error and
+  then on its `response`. The first value that is an integer from 100 to 599 is the status; a boolean
+  or a numeric string is not one.
+- The first error in the chain that yields a status wins, so a status the tool raised itself beats
+  one from the error it wrapped. Without one the property is absent, and an `isError` result with no
+  thrown error has none. A value the caller sets explicitly wins over a derived one.
+
+When it emits `$exception`, the event SHALL follow the `exception-event-metadata` capability, with
+`$exception_source: "mcp.tool_call"`, `mechanism.handled: true` (the framework turns the failure into
+a response to the client), and `mechanism.synthetic: true` for an `isError` result that carried no thrown error; the
 exception's type SHALL be the thrown error's own type (`"Error"` for an `isError` result), never the
 explicit label, so error tracking groups by real types; and the event SHALL carry `$exception_level:
 "error"` and the call's `$session_id` and `$mcp_tool_name`. Failure analytics SHALL NOT depend on
@@ -52,3 +64,11 @@ explicit label, so error tracking groups by real types; and the event SHALL carr
 - **AND** its property "$mcp_error_message" should be the string "Tool lookup returned an error"
 - **AND** the "$exception" event's exception value should be "Tool lookup returned an error"
 - **AND** no sent event should contain "acme-prod"
+
+#### Scenario: A failed call carries the HTTP status of the error it wraps
+- **GIVEN** an MCP server instrumented by the SDK, deriving `$mcp_error_status`, with a tool "fetch_invoice" whose handler throws an error with message "invoice lookup failed" caused by an error whose `response` has status 503
+- **WHEN** an MCP client calls tool "fetch_invoice"
+- **AND** the SDK is flushed
+- **THEN** the "$mcp_tool_call" event's property "$mcp_error_status" should be the JSON number 503
+- **AND** its property "$mcp_error_message" should be "invoice lookup failed"
+

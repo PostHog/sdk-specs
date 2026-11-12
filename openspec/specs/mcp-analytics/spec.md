@@ -76,7 +76,6 @@ table is the one place defaults are stated.
 | tools list event | on | Sends `$mcp_tools_list` for each `tools/list`; off sends none and changes nothing else |
 | parameter capture | on | Sends `$mcp_parameters` |
 | response capture | on | Sends `$mcp_response` on `$mcp_tool_call`, including successful calls, where a wrong or empty result is the failure no error flag shows |
-| payload personal data | on | Applies the payload personal data pass of "Payload privacy" to `$mcp_parameters`, `$mcp_response`, `$mcp_error_message`, resource read URIs, and `$exception` values; off leaves them with the credential passes only, while intent and free-text properties keep the full personal data pass |
 | error message capture | on | Sends a failed call's text as `$mcp_error_message` and the `$exception` value; off sends `Tool <name> returned an error` in both and changes nothing else |
 | before-send hook | none | Modifies or drops each MCP event before capture |
 | missing-capability tool | off | Adds a virtual tool that emits `$mcp_missing_capability` |
@@ -107,9 +106,10 @@ means set whenever the SDK can determine the value. Events: "call" is `$mcp_tool
 | `$mcp_intent` | call, report | non-empty string, at most 2,048 characters | known |
 | `$mcp_intent_source` | call, report | `"context_parameter"`, `"inferred"`, or `"client_metadata"` | with `$mcp_intent` |
 | `$mcp_conversation_id` | call, report, `$exception`, `$mcp_input_required`, `$mcp_unknown_tool` | lowercase UUIDv7 | known, except on a call with a client conversation id |
+| `$mcp_session_source` | all | `"client_metadata"`, `"conversation"`, `"transport"`, or `"generated"` | should, from automatic instrumentation |
 | `$mcp_error_type` | failed call | string, low cardinality, at most 256 characters | failed calls |
 | `$mcp_error_message` | failed call | string, at most 2,048 characters | failed calls |
-| `$mcp_error_status` | failed call | JSON number, an HTTP status code | may |
+| `$mcp_error_status` | failed call | JSON number, an integer HTTP status code from 100 to 599 | may |
 | `$mcp_server_build` | all | string, 1 to 256 characters, an immutable build id (a commit SHA or image digest); rejected at configuration when out of range, never truncated or shrunk | may |
 | `$mcp_input_keys` | call | array of at most 20 entries: recorded top-level argument names, declared ones (the schema's and accepted aliases) sorted, then others sorted, then one `"[redacted]"` entry if room remains and a name was not recorded or exceeded 64 characters; injected names the tool does not declare are excluded | may |
 | `$mcp_input_aliases_used` | call | array of at most 20 sorted `"<alias>:<canonical>"` strings, each name at most 64 characters, one for each argument the agent sent only under an alias, naming the first alias present in the server's order | may |
@@ -127,9 +127,7 @@ means set whenever the SDK can determine the value. Events: "call" is `$mcp_tool
 
 Length limits count characters, keep the start of the string, include any truncation marker, and apply
 before the byte bound of "Event size bounds".
-
 ## Requirements
-
 ### Requirement: Observer-only instrumentation
 
 An SDK SHALL let a server be instrumented with one call taking the MCP server and a configured PostHog
@@ -248,17 +246,29 @@ A failed call (an `isError` result or a thrown error) SHALL set `$mcp_is_error: 
 With the error message capture option off (see "Configuration"), `$mcp_error_message` and the
 `$exception` value SHALL be `Tool <name> returned an error`, with the call's `$mcp_tool_name`, and the
 SDK SHALL NOT send any part of the thrown message or the `isError` content in them. Tool errors often
-repeat their arguments, and "Payload privacy" redacts only credentials and personal data shapes from
-them, not resource names, identifiers, or configuration values, so this is how a host that turns
+repeat their arguments, and "Payload privacy" redacts only credentials from them, not
+personal data, resource names, identifiers, or configuration values, so this is how a host that turns
 parameter and response capture off keeps argument values out of failures too.
 `$mcp_is_error`, `$mcp_error_type`, the exception's type, and whether `$exception` is sent stay the
 same. `$mcp_response` stays under the response capture option, including the content of an `isError`
 result, so a host that wants no failure text turns both off.
 
-The SDK MAY set `$mcp_error_status` to an upstream HTTP status code. When it emits `$exception`, the
-event SHALL follow the `exception-event-metadata` capability, with `$exception_source:
-"mcp.tool_call"`, `mechanism.handled: true` (the framework turns the failure into a response to the
-client), and `mechanism.synthetic: true` for an `isError` result that carried no thrown error; the
+The SDK MAY set `$mcp_error_status` to the HTTP status behind a failed call. An SDK that derives it
+from a thrown error SHALL derive it this way, so the same failure groups the same in every language:
+
+- Walk the cause chain from the thrown error inward, visiting each error once and at most 50 errors:
+  in Python `__cause__`, else `__context__` unless `__suppress_context__` is set (the chain a
+  traceback prints); in JavaScript `cause`; elsewhere the platform's standard unwrapping.
+- On each error read `status_code`, `statusCode`, and `status`, in that order, first on the error and
+  then on its `response`. The first value that is an integer from 100 to 599 is the status; a boolean
+  or a numeric string is not one.
+- The first error in the chain that yields a status wins, so a status the tool raised itself beats
+  one from the error it wrapped. Without one the property is absent, and an `isError` result with no
+  thrown error has none. A value the caller sets explicitly wins over a derived one.
+
+When it emits `$exception`, the event SHALL follow the `exception-event-metadata` capability, with
+`$exception_source: "mcp.tool_call"`, `mechanism.handled: true` (the framework turns the failure into
+a response to the client), and `mechanism.synthetic: true` for an `isError` result that carried no thrown error; the
 exception's type SHALL be the thrown error's own type (`"Error"` for an `isError` result), never the
 explicit label, so error tracking groups by real types; and the event SHALL carry `$exception_level:
 "error"` and the call's `$session_id` and `$mcp_tool_name`. Failure analytics SHALL NOT depend on
@@ -281,6 +291,13 @@ explicit label, so error tracking groups by real types; and the event SHALL carr
 - **AND** its property "$mcp_error_message" should be the string "Tool lookup returned an error"
 - **AND** the "$exception" event's exception value should be "Tool lookup returned an error"
 - **AND** no sent event should contain "acme-prod"
+
+#### Scenario: A failed call carries the HTTP status of the error it wraps
+- **GIVEN** an MCP server instrumented by the SDK, deriving `$mcp_error_status`, with a tool "fetch_invoice" whose handler throws an error with message "invoice lookup failed" caused by an error whose `response` has status 503
+- **WHEN** an MCP client calls tool "fetch_invoice"
+- **AND** the SDK is flushed
+- **THEN** the "$mcp_tool_call" event's property "$mcp_error_status" should be the JSON number 503
+- **AND** its property "$mcp_error_message" should be "invoice lookup failed"
 
 ### Requirement: Session identity
 
@@ -307,6 +324,15 @@ input's characters (ASCII, so bytes, UTF-16 units, and code points agree), seeds
 `0xcbf29ce4`, primes `0x1b3` and `0x193`, each step `lane = (lane XOR c) * prime mod 2^32`, and returns
 the two lanes as 8 lowercase hex digits each. Derivation is deterministic so replicas, restarts, and
 SDKs in different languages agree.
+
+Automatic instrumentation SHOULD set `$mcp_session_source` on every event to what produced its
+`$session_id`: `"client_metadata"` for a client conversation id (rule 1), `"conversation"` for a
+conversation handle (rule 2), `"transport"` for a transport session id or a replayed PostHog session
+token (rule 3), and `"generated"` for an id the SDK generated itself, whether for a one-client
+connection (rule 3) or a single request (rule 4). An event the SDK sends outside a request, such as a
+server's custom event, takes the source of the session it carries. The manual API MAY set it. A server
+reads fragmentation from it directly: calls whose source is `"generated"` on a stateless HTTP server
+are grouped by nothing.
 
 A client conversation id is a value an MCP client puts in a `tools/call` request's `_meta` to name the
 conversation the call belongs to. This table lists every key the SDK reads. A request comes from a
@@ -383,6 +409,7 @@ is not a token.
 - **WHEN** the SDK is flushed
 - **THEN** the "$mcp_tool_call" event's "$session_id" should be "ses_2f5d35b7108d17c807766f2f769a1e8c"
 - **AND** it should have no "$mcp_conversation_id"
+- **AND** its "$mcp_session_source" should be "client_metadata"
 
 #### Scenario: A client conversation id wins over a conversation handle
 - **GIVEN** an MCP server instrumented by the SDK with conversation anchoring enabled, on a transport that carries no session
@@ -425,6 +452,7 @@ is not a token.
 - **THEN** the result's last content block should be a text block of the form `{"conversation_id":"<uuidv7>"}`
 - **WHEN** the SDK is flushed
 - **THEN** the "$mcp_tool_call" event's "$session_id" should not be "ses_0fdf126b8e2c1f9689ca12f3dd3383e6" or "ses_2f5d35b7108d17c807766f2f769a1e8c"
+- **AND** its "$mcp_session_source" should be "conversation"
 
 #### Scenario: A handle-free client's call gets no conversation_id block without its id
 - **GIVEN** an MCP server instrumented by the SDK with conversation anchoring enabled, on a transport that carries no session
@@ -634,30 +662,12 @@ sending, the SDK SHALL:
   once any trailing run of `=` is set aside, is not empty and has first and last 1,024 characters all
   from one alphabet: base64 with `\r` and `\n`, because MIME and PEM base64 break lines, or base64url;
 - redact email addresses, IP addresses, Luhn-valid card numbers, US social security numbers, and phone
-  numbers from `$mcp_intent` and every property "Property reference" marks sanitized as free text;
-- unless the payload personal data option is off, apply the payload personal data pass to:
-  - every string value and object key at any depth of `$mcp_parameters` and `$mcp_response`, text
-    blocks and their JSON text copies included;
-  - every number in them whose digits form a Luhn-valid card number, replaced by the string
-    `"[redacted]"`, which JSON text writes with its quotes so it stays valid JSON;
-  - `$mcp_error_message`, and `$mcp_resource_name` on a resource read, where it holds the URI;
-  - each exception's `value` in the `$exception` sibling, and the stack-frame source lines it sends
-    (such as `pre_context`, `context_line`, and `post_context`), each first cut to 2,048 characters.
+  numbers from `$mcp_intent` and every property "Property reference" marks sanitized as free text.
 
-  Other numbers and booleans are kept. The pass matches text as captured, so an address written as
-  `%40` or `\u0040` is not recognized.
-
-  The payload personal data pass is the personal data pass above, narrowed because payloads carry
-  identifiers that only look like personal data. It redacts email addresses, Luhn-valid card numbers,
-  US social security numbers, and IPv6 addresses as that pass does. It redacts an IPv4 address only
-  when the address is not loopback (`127.0.0.0/8`), private (`10.0.0.0/8`, `172.16.0.0/12`,
-  `192.168.0.0/16`), link-local (`169.254.0.0/16`), or `0.0.0.0`, and is not glued to a version: it
-  does not directly follow a letter, digit, or `.`, and is not directly followed by a digit or by `.`
-  and a digit. So `v1.2.3.4` and `1.2.3.4.5` are kept, and `ip:203.0.113.7`, `user@203.0.113.7`, and
-  `http://203.0.113.7/` are not; a version written `node:22.11.0.3` is redacted too, because it reads
-  exactly like `ip:203.0.113.7`. It redacts a phone number only when it starts with an international
-  prefix (`+`, `00`, or `011`) and a country code, or has its area code in parentheses, so
-  `415-555-0142` is kept and `+1 415 555 0142`, `0044 20 7946 0958`, and `(415) 555-0142` are not.
+The personal data pass SHALL NOT apply to `$mcp_parameters`, `$mcp_response`, `$mcp_error_message`, or
+`$exception` values. They carry what the server's own tools received and returned, data the host
+already holds, and the SDK relays it as captured, after the credential passes above. A host that must
+not send it turns off parameter or response capture, or edits events in the before-send hook.
 
 Object keys inside `$mcp_parameters` and `$mcp_response` are captured strings too, because a result
 keyed by data (a link check keyed by signed URL) carries the credential in the key. The key list is
@@ -666,8 +676,8 @@ binary passes, with the key limit of "Property reference" in place of the string
 other credential-shaped values below does not extend to keys, because entropy detectors read field names
 such as `Get_Organization_Memberships` as credentials. When cutting or redaction makes keys of one object
 equal, the SDK SHALL keep the entry whose key as received sorts first by Unicode code point.
-`$mcp_input_keys` SHALL count a name the PostHog token, URL, or payload personal data pass would
-change as a name that was not recorded.
+`$mcp_input_keys` SHALL count a name the PostHog token or URL pass would change as a name that was not
+recorded.
 
 These passes SHALL cost in proportion to the property limits, not to the payload. The SDK SHALL first
 apply the entry and nesting limits of "Property reference" and the key-based redaction. For each
@@ -680,12 +690,6 @@ recognized whole. A match split by the cut at the limit can be left raw in the s
 first redacts it, and a match no longer than the margin that is split by the cut at the margin lies past
 the end of the second result, so the common prefix holds neither. Scanning the whole payload first makes
 one large result cost hundreds of milliseconds.
-
-The personal data pass on payloads is one of the remaining passes of the cut above, so it costs in
-proportion to the property limits too, and a match that crosses a string's limit is redacted whole. It
-runs before the URL pass, because that pass percent-encodes `@` and would hide an address in a query.
-Turning the option off changes only payloads, error text, and exception values: intent and free-text
-properties keep the pass, and the credential passes still apply everywhere.
 
 The SDK SHOULD also redact other credential-shaped values (known key formats, long high-entropy
 tokens). It SHALL expose a before-send hook that can modify or drop each MCP event after this
@@ -736,42 +740,8 @@ drops its `$exception`.
 - **AND** the SDK is flushed
 - **THEN** the first text block in "$mcp_response" should be "[binary data redacted - not supported by PostHog MCP analytics]"
 
-#### Scenario: Personal data in arguments and results is redacted by default
-- **GIVEN** an MCP server instrumented by the SDK with a tool "lookup_customer" that returns the text "Customer ada@example.com last seen from 203.0.113.7"
-- **WHEN** an MCP client calls tool "lookup_customer" with arguments `{"email": "ada@example.com", "limit": 5}`
-- **AND** the SDK is flushed
-- **THEN** the "$mcp_parameters" should not contain "ada@example.com"
-- **AND** the "$mcp_parameters" arguments should have key "email" and "limit" equal to the number 5
-- **AND** the "$mcp_response" should not contain "ada@example.com"
-- **AND** the "$mcp_response" should not contain "203.0.113.7"
-
-#### Scenario: A personal key and a card number in a result are redacted and its JSON stays valid
-- **GIVEN** an MCP server instrumented by the SDK with a tool "list_accounts" that returns `structuredContent` `{"accounts":{"ada@example.com":{"plan":"pro"}},"card":4111111111111111,"count":3}` and the same JSON as a text block
-- **WHEN** an MCP client calls tool "list_accounts"
-- **AND** the SDK is flushed
-- **THEN** the "$mcp_response" should not contain "ada@example.com"
-- **AND** the "$mcp_response" should not contain "4111111111111111"
-- **AND** the first text block in "$mcp_response" should parse as JSON with "count" equal to 3
-
-#### Scenario: Identifiers that only look like personal data are kept in payloads
-- **GIVEN** an MCP server instrumented by the SDK with a tool "deploy_status" that returns the text "Order 415-555-0142 built with v22.11.0.3, db at 127.0.0.1:5432, client ip:203.0.113.7, support +1 415 555 0142"
-- **WHEN** an MCP client calls tool "deploy_status"
-- **AND** the SDK is flushed
-- **THEN** the "$mcp_response" should contain "Order 415-555-0142"
-- **AND** the "$mcp_response" should contain "v22.11.0.3"
-- **AND** the "$mcp_response" should contain "127.0.0.1:5432"
-- **AND** the "$mcp_response" should not contain "203.0.113.7"
-- **AND** the "$mcp_response" should not contain "+1 415 555 0142"
-
-#### Scenario: Personal data in error text and exceptions is redacted by default
-- **GIVEN** an MCP server instrumented by the SDK with a tool "lookup_customer" that fails with message "No account for ada@example.com"
-- **WHEN** an MCP client calls tool "lookup_customer"
-- **AND** the SDK is flushed
-- **THEN** the "$mcp_error_message" should not contain "ada@example.com"
-- **AND** the "$exception" event should not contain "ada@example.com"
-
-#### Scenario: Turning the option off keeps personal data in payloads but not in intent
-- **GIVEN** an MCP server instrumented by the SDK with the payload personal data option off and a tool "lookup_customer" that returns the text "Customer ada@example.com"
+#### Scenario: Personal data in tool payloads is relayed as captured
+- **GIVEN** an MCP server instrumented by the SDK with a tool "lookup_customer" that returns the text "Customer ada@example.com"
 - **WHEN** an MCP client calls tool "lookup_customer" with arguments `{"email": "ada@example.com", "context": "look up ada@example.com"}`
 - **AND** the SDK is flushed
 - **THEN** the "$mcp_parameters" should contain "ada@example.com"

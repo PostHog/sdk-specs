@@ -36,8 +36,6 @@ sessionReplayConfig: {
   maskAllTextInputs?: boolean
   maskAllTexts?: boolean
   maskAllImages?: boolean
-  screenshotMode?: boolean
-  screenshot?: boolean
 }
 
 // framework-native explicit masking controls
@@ -54,11 +52,11 @@ Modifier.postHogUnmask()
 1. **Default to masking sensitive UI.** Replay capture masks text input values by default. Native/mobile implementations also default to masking textual content and images, or at least password/sensitive inputs, unless the local replay configuration disables those categories.
 2. **Honor explicit mask markers.** Elements/views tagged with PostHog masking markers such as `ph-no-capture`, `postHogMask(...)`, `Modifier.postHogMask(...)`, or wrapper components are treated as masked even when broad category masking is disabled.
 3. **Honor explicit unmask markers where supported.** Platform-specific unmask controls such as iOS `postHogNoMask()` and Android `Modifier.postHogUnmask(...)` take precedence over automatic category masking and prevent that subtree/node from being redacted.
-4. **Apply masks before serialization/upload.** Browser replay passes masking/blocking options into the rrweb recorder before DOM/input events are serialized. Native screenshot replay computes mask rectangles from the current view/render tree and paints opaque masks over screenshots before image encoding. Native wireframe replay replaces sensitive text values with masked strings and omits or placeholders sensitive image content before wireframes are converted to dictionaries/payloads. Mask rectangle/element discovery MUST traverse the full matched subtree and include every element that matches a masking rule — not only the first match encountered, and not skipping nodes because a traversal shortcut (e.g. only descending into children that themselves have multiple children) happened to bypass them; a masked wrapper's own rect must be included alongside its matching descendants' rects.
+4. **Apply masks before serialization/upload.** Browser replay passes masking/blocking options into the rrweb recorder before DOM/input events are serialized. Native screenshot replay computes mask rectangles from the current view/render tree and paints opaque masks over screenshots before image encoding. Mask rectangle/element discovery MUST traverse the full matched subtree and include every element that matches a masking rule — not only the first match encountered, and not skipping nodes because a traversal shortcut (e.g. only descending into children that themselves have multiple children) happened to bypass them; a masked wrapper's own rect must be included alongside its matching descendants' rects.
 5. **Support remote and local masking configuration.** Browser replay merges client `session_recording` masking settings with remote replay masking config, with client-provided values taking precedence. Native/mobile SDKs expose local replay config for text/image masking; remote config may separately control whether replay runs, but masking categories are applied by the local replay capture path where implemented.
-6. **Preserve privacy in screenshot mode.** Screenshot-based recorders must discover sensitive rectangles synchronously with capture where possible and draw masks into the screenshot bitmap/canvas before converting it to base64/PNG/WebP. If a concurrent screen change makes mask rectangles unreliable, implementations should discard that snapshot rather than upload a potentially stale/unmasked image.
+6. **Preserve privacy in screenshots.** Native mobile replay always records screenshots; posthog-ios 4.0 and posthog-android 4.0 removed wireframe recording and its `screenshotMode` / `screenshot` options. Screenshot-based recorders must discover sensitive rectangles synchronously with capture where possible and draw masks into the screenshot bitmap/canvas before converting it to base64/PNG/WebP. If a concurrent screen change makes mask rectangles unreliable, implementations should discard that snapshot rather than upload a potentially stale/unmasked image.
 7. **Treat password and sensitive controls specially.** Password/secure text fields remain masked even when broad text masking is disabled. Native implementations inspect secure text traits/input types or obscured text widgets in addition to global masking settings.
-8. **Treat images conservatively when configured.** Mobile screenshot/wireframe implementations mask image views or render-image objects when image masking is enabled, while allowing platform-specific heuristics for safe bundled assets or symbols.
+8. **Treat images conservatively when configured.** Mobile screenshot implementations mask image views or render-image objects when image masking is enabled, while allowing platform-specific heuristics for safe bundled assets or symbols.
 9. **Apply mandatory replay network protections.** Browser network replay capture is opt-in for headers/bodies. Sensitive-header redaction (including authorization, cookies, API keys, and CSRF tokens), payload-size limits, and PostHog ingestion-path filtering apply regardless of custom masking and run before a custom callback. Existing host exclusions remain in force. A request dropped by mandatory filtering does not reach the callback. These cleaners protect callback inputs and are not reapplied to callback outputs; callbacks are responsible for sensitive data they add or restore.
 10. **Allow custom body scrubbing to replace default body scrubbing.** Without a custom callback, eligible request and response bodies pass through the default body-content scrubber. When a network capture masking callback (for example, `maskCapturedNetworkRequestFn` in posthog-js) is supplied, it replaces that scrubber: default keyword and other body-content heuristics run neither before nor after the callback. The callback is responsible for sanitizing retained bodies and can modify or drop the request; its inputs have already undergone mandatory cleaning and can contain absent bodies or size-limit replacement markers. The deprecated posthog-js `maskNetworkRequestFn` is a URL-only compatibility shim that also disables default body scrubbing when no modern callback is supplied; use the modern hook to sanitize bodies or disable body capture. The modern callback takes precedence when both hooks are supplied.
 11. **Fail closed for uncertain snapshots.** Mask tree discovery/parsing failures, missing contexts, invalid images, timeout/cancellation, or screen changes should skip the affected replay snapshot or emit no maskable payload rather than crash the app or send known-sensitive unredacted data.
@@ -77,14 +75,13 @@ Modifier.postHogUnmask()
 
 - recorder masking/blocking options supplied to the replay engine
 - mask rectangles collected for screenshot capture
-- masked wireframe text/image values
 - redacted network request/response headers and bodies
 - framework-specific marker state on views/layers/semantics nodes
 
 ### Lifecycle behavior
 
 - **Setup:** replay privacy configuration is installed when session replay starts or the replay recorder is initialized.
-- **Capture:** every DOM event, wireframe snapshot, screenshot, or replay network event is filtered/redacted before serialization.
+- **Capture:** every DOM event, screenshot, or replay network event is filtered/redacted before serialization.
 - **Remote-config update:** browser replay can update masking and network-capture options from remote config while preserving local overrides.
 - **View updates:** explicit mask/unmask modifiers update marker state as UI nodes mount, change, or unmount.
 - **Teardown:** stopping replay stops further capture; marker state on app views remains framework-owned unless removed by the modifier/component lifecycle.
@@ -245,14 +242,11 @@ If the network capture masking callback throws, the SDK MUST catch the exception
 
 ### Requirement: Android secure windows are recorded fully masked
 
-On Android, while a window captured by session replay is a **secure window** — its `WindowManager.LayoutParams` flags include `FLAG_SECURE` — the SDK SHALL record that window fully masked rather than skip it, in every replay mode the SDK supports.
+On Android, while a window captured by session replay is a **secure window** — its `WindowManager.LayoutParams` flags include `FLAG_SECURE` — the SDK SHALL record that window fully masked rather than skip it.
 
 This applies to every SDK whose Android session replay captures that window, including wrapper SDKs that render replay frames themselves (posthog-flutter) or delegate capture to posthog-android (posthog-react-native, posthog-kmp). posthog-kmp conforms once its pinned posthog-android version includes this behavior. posthog-unity captures its own Android frames and does not implement this requirement yet; its conformance is a named follow-up. It is not applicable on iOS, which has no window-level secure flag and masks sensitive inputs per field under the existing rules.
 
-Recording a secure window fully masked means:
-
-- In screenshot mode, the SDK SHALL record an opaque, solid black frame with the window's dimensions and MUST NOT record or upload any of the window's pixels.
-- In wireframe mode, the SDK SHALL record one masked node covering the window, filled solid black, and MUST NOT serialize the window's child views, text, or images.
+Recording a secure window fully masked means the SDK SHALL record an opaque, solid black frame with the window's dimensions and MUST NOT record or upload any of the window's pixels. posthog-android before 4.0 also had a wireframe mode, where it recorded one masked node covering the window instead; 4.0 removed wireframe recording.
 
 The SDK SHALL check the window's secure state when capture starts and again before the captured frame is recorded, and SHALL record the frame fully masked if the window was secure at either check.
 
@@ -260,30 +254,22 @@ The SDK MUST NOT record touch interactions that occur on a secure window. The to
 
 The SDK SHALL evaluate each window by its own flags. A window without `FLAG_SECURE`, such as a dialog shown over a secure activity, is captured under the normal masking rules.
 
-#### Scenario: Screenshot mode records a secure window as a masked frame
-- **GIVEN** Android session replay is recording in screenshot mode
+#### Scenario: A secure window is recorded as a masked frame
+- **GIVEN** Android session replay is recording
 - **AND** the captured window has `FLAG_SECURE`
 - **WHEN** a replay frame is captured
 - **THEN** the recorded frame is fully masked with the window's dimensions
 - **AND** the frame is solid black
 - **AND** no pixels from the window are recorded or uploaded
 
-#### Scenario: Wireframe mode records a secure window as one masked node
-- **GIVEN** Android session replay is recording in wireframe mode
-- **AND** the captured window has `FLAG_SECURE` and contains a text view showing "1234"
-- **WHEN** a replay snapshot is captured
-- **THEN** the recorded snapshot contains one masked node covering the window
-- **AND** the node is filled solid black
-- **AND** it contains no child views, images, or text "1234"
-
 #### Scenario: A window that becomes secure during capture is masked
-- **GIVEN** Android session replay is recording in screenshot mode
+- **GIVEN** Android session replay is recording
 - **AND** the captured window does not have `FLAG_SECURE` when capture starts
 - **WHEN** the window gains `FLAG_SECURE` before the captured frame is recorded
 - **THEN** the recorded frame is fully masked
 
 #### Scenario: A frame captured on a secure window stays masked after the flag clears
-- **GIVEN** Android session replay is recording in screenshot mode
+- **GIVEN** Android session replay is recording
 - **AND** the captured window has `FLAG_SECURE` when capture starts
 - **WHEN** the window loses `FLAG_SECURE` before the captured frame is recorded
 - **THEN** the recorded frame is fully masked

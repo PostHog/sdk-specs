@@ -130,7 +130,10 @@ own requirement governs it.
 
 The SDK SHALL attach the optional bundle only to *eligible SDK events*: events whose name starts
 with `$`, **excluding** `$feature_flag_called`, `$snapshot`, and, on the browser, `$$heatmap`.
-Custom events (names not starting with `$`) SHALL NOT carry any key of the optional bundle.
+The SDK SHALL NOT attach any key of the optional bundle to a custom event (a name not starting
+with `$`). This constrains only what the SDK attaches itself: it does not require the SDK to
+remove a same-named key that reaches the event by another route, whether supplied by the caller in
+the capture properties, registered as a super property, or set deliberately by `beforeSend`.
 Eligibility SHALL be decided on the event name as passed to capture, before `beforeSend` runs: an
 eligible event that `beforeSend` renames to a custom name still carries the bundle it was built
 with, and a custom event that `beforeSend` renames to a `$`-prefixed name does not gain it. The
@@ -143,7 +146,16 @@ Reference: posthog-js `origin/main` `928990ded` (posthog-js#5144, merged as `bd6
 from `sessionRecording.sdkDebugProperties` only when `includeDebugProperties` (not paused and
 eligible) or the key is required (`posthog-core.ts:2166-2175`); eligibility is tested on
 the name `capture()` was called with (`eventName` at build, `event_name` when arming the window,
-`:1959`), so a `before_send` rename does not change it. posthog-js is the only reference for the gate. Mobile SDKs port it, and the two rename cases above
+`:1959`), so a `before_send` rename does not change it. The gate only adds keys: at `origin/main`
+`0fd32143b`, `calculateEventProperties` starts from a copy of the caller's properties
+(`posthog-core.ts:2172`) and the merge loop writes a debug key only when it is included or
+required (`:2218-2222`); nothing deletes a same-named key the caller, `register`, or
+`before_send` put there. posthog-js separately hides its own persistence-backed replay state
+from event properties (`persistence-key-policy.ts:192-200`, cited under the key catalogue);
+that is a storage rule, not part of this gate. posthog-android `2e364df96` (posthog-android#833)
+does the same: `sdkDebugProperties` builds only the keys it attaches
+(`posthog/src/main/java/com/posthog/PostHog.kt:816-832`) and strips nothing. posthog-js is the
+only reference for the gate. Mobile SDKs port it, and the two rename cases above
 are the mobile contract: the eligibility decision made when the properties are built SHALL
 survive `beforeSend`, so a rename in either direction does not change it. posthog-js gets this by
 reading the original name directly; a mobile SDK needs its own way to carry the decision across
@@ -152,8 +164,9 @@ the hook.
 Covering test: posthog-js `packages/browser/src/__tests__/posthog-core-also.test.ts:102` ("keeps
 replay diagnosis on every event while throttling optional debug properties" — `custom_event`,
 `$feature_flag_called`, and `$$heatmap` get the required keys only; `$pageview` gets the full
-bundle). Planned (mobile): one test per scenario in this requirement, including both `beforeSend` rename
-scenarios.
+bundle). No posthog-js or mobile test captures a custom event with a caller-supplied optional-bundle
+key; that scenario is planned on every SDK. Planned (mobile): one test per scenario in this
+requirement, including both `beforeSend` rename scenarios.
 
 #### Scenario: An eligible SDK event carries the optional bundle
 - **GIVEN** the SDK is initialized with an active session
@@ -168,6 +181,14 @@ scenarios.
 - **THEN** the captured event's properties include `$recording_status`
 - **AND** they include neither `$sdk_debug_session_start`, `$sdk_debug_replay_flush_hold_reason`,
   `$sdk_debug_replay_pending_trigger_conditions`, nor `$sdk_debug_replay_capture_mode`
+
+#### Scenario: A caller-supplied optional-bundle key on a custom event is kept
+- **GIVEN** the SDK is initialized with an active session
+- **AND** no accepted event in the last 30 seconds carried the optional bundle
+- **WHEN** a custom event is captured with `$sdk_debug_session_start` set to `123` in its
+  capture properties
+- **THEN** the captured event's `$sdk_debug_session_start` is `123`
+- **AND** its properties include no other key of the optional bundle
 
 #### Scenario: A full-envelope feature-flag-called event carries the required keys only
 - **GIVEN** the SDK is initialized with an active session
@@ -605,11 +626,12 @@ and the key is omitted when none is pending.
 
 `$sdk_debug_replay_capture_mode` is **mobile-only** and **optional**. posthog-js has no analog —
 its required and optional lists contain no capture-mode key — so a mobile SDK SHALL classify it
-in the optional bundle, never in the required keys. Its value SHALL be `screenshot` when the
-platform's screenshot-recording mode is on, or when the host SDK name is `posthog-flutter` (the
-Flutter plugin always records screenshots through the native SDK); otherwise `wireframe`. No other
-value is defined. It derives from configuration, not from integration state, so it stays present
-on bundle-carrying events after replay is stopped or the integration is uninstalled, and a mobile
+in the optional bundle, never in the required keys. Its value SHALL be `screenshot`, because mobile
+session replay always records masked screenshots. posthog-ios and posthog-android before 4.0
+reported `wireframe` when their screenshot option was off and the host SDK was not
+`posthog-flutter`; 4.0 removed wireframe recording and that option. No other value is defined.
+It derives from configuration, not from integration state, so it stays present on
+bundle-carrying events after replay is stopped or the integration is uninstalled, and a mobile
 SDK whose platform ships the replay module SHALL include it in the no-integration fallback (see
 "Attach the disabled shape when replay is not configured"). It is not a point-in-time key and
 stays in the crash-context snapshot. `$sdk_debug_replay_throttle_delay_ms` (the configured
@@ -636,21 +658,23 @@ writes (`triggerMatching.ts:303`, `:415`, `:529`); the merge (`posthog-core.ts:2
 session-start source `sessionid.ts:25`. posthog-ios `origin/main` `88f4b6b56` — the integration's builder `debugProperties()`
 (`PostHog/Replay/PostHogReplayIntegration.swift:1899-1956`: status `:1918-1920`, hold reason
 `:1921-1923`, capture mode `:1927`, buffer length `:1930`, trigger statuses `:1945-1946`, pending
-conditions `:1948-1953`); `captureMode(config:)` (`:1862-1864`); the session start from the
-session manager's start snapshot (`PostHog/PostHogSDK.swift:633-635`). The required/optional tiers,
+conditions `:1948-1953`); the session start from the session manager's start snapshot
+(`PostHog/PostHogSDK.swift:633-635`). posthog-ios 4.0 (PostHog/posthog-ios#873) `adb99908d`
+hardcodes the value as `PostHogReplayIntegration.captureMode = "screenshot"`
+(`PostHog/Replay/PostHogReplayIntegration.swift:1658`). The required/optional tiers,
 the two removed keys, and the capture-mode classification are the contract mobile SDKs port; no
 mobile code is cited for them.
 
 Covering test: posthog-js `packages/browser/src/__tests__/posthog-core-also.test.ts:102` (the
 required/optional split, including the trigger statuses on every event and
 `$sdk_debug_replay_pending_trigger_conditions` / `$sdk_debug_session_start` only on
-bundle-carrying events). posthog-ios `PostHogTests/PostHogSDKTest.swift:441` ("reports screenshot capture mode for the
-flutter host"), and `PostHogTests/PostHogSessionReplayEventTriggersTest.swift:235` ("trigger status
-reflects pending state before either trigger resolves, then activation as each fires") at
-`88f4b6b56`; the merge order is covered by posthog-ios 4.0 (PostHog/posthog-ios#938)
+bundle-carrying events). posthog-ios `PostHogTests/PostHogSessionReplayEventTriggersTest.swift:235`
+("trigger status reflects pending state before either trigger resolves, then activation as each
+fires") at `88f4b6b56`; the `screenshot` value by posthog-ios 4.0 (PostHog/posthog-ios#873)
+`PostHogTests/PostHogSDKTest.swift:493` ("captures $recording_status on every event and the full
+replay debug bundle on the first eligible SDK event only", `:510`) at `adb99908d`; the merge order is covered by posthog-ios 4.0 (PostHog/posthog-ios#938)
 `PostHogTests/PostHogSDKTest.swift:1293` ("registered debug properties override the SDK's, and
-caller ones override both"). Planned (mobile): the required/optional split on a custom event, and the `wireframe`
-default. No test on either mobile SDK derives the session start from a caller-supplied UUIDv7
+caller ones override both"). Planned (mobile): the required/optional split on a custom event. No test on either mobile SDK derives the session start from a caller-supplied UUIDv7
 `$session_id` (iOS reads the manager's snapshot at `PostHog/PostHogSDK.swift:633-635`); that
 scenario remains planned.
 
@@ -754,23 +778,10 @@ posthog-ios `88f4b6b56` reads the manager's start snapshot unconditionally).
 - **AND** a second event is captured without `$recording_status`
 - **THEN** the second event's `$recording_status` is the SDK-computed value
 
-#### Scenario: Capture mode reflects the screenshot flag or the Flutter host name
-- **GIVEN** screenshot-recording mode is off
-- **AND** the host SDK name is `posthog-flutter`
+#### Scenario: Capture mode is always screenshot (mobile)
+- **GIVEN** a mobile SDK with the replay module available
 - **WHEN** an eligible SDK event that the window allows is captured
 - **THEN** `$sdk_debug_replay_capture_mode` is `screenshot`
-
-#### Scenario: Capture mode is screenshot when screenshot recording is on
-- **GIVEN** screenshot-recording mode is on
-- **AND** the host SDK name is not `posthog-flutter`
-- **WHEN** an eligible SDK event that the window allows is captured
-- **THEN** `$sdk_debug_replay_capture_mode` is `screenshot`
-
-#### Scenario: Capture mode is wireframe when both screenshot recording and the Flutter host are off
-- **GIVEN** screenshot-recording mode is off
-- **AND** the host SDK name is not `posthog-flutter`
-- **WHEN** an eligible SDK event that the window allows is captured
-- **THEN** `$sdk_debug_replay_capture_mode` is `wireframe`
 
 #### Scenario: Capture mode is never a required key (mobile)
 - **GIVEN** a mobile SDK with the replay module available

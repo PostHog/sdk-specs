@@ -252,3 +252,17 @@ Feature: Capture
       | property                | value |
       | $process_person_profile | false |
       | $is_identified          | false |
+
+  # The value "" is the empty string, a variant PostHog no longer accepts for new flags.
+  @client
+  Scenario: Empty variant flag is left out of active feature flags
+    Given the SDK is initialized with token "test-token"
+    And cached feature flags are:
+      | key       | value |
+      | beta-ui   | true  |
+      | legacy-ui | ""    |
+    When capture is called with event "Signed Up"
+    Then one event named "Signed Up" should be enqueued
+    And the enqueued event property "$active_feature_flags" should contain "beta-ui"
+    And the enqueued event property "$active_feature_flags" should not contain "legacy-ui"
+    And the enqueued event property "$feature/legacy-ui" should equal ""

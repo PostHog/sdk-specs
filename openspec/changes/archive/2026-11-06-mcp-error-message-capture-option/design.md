@@ -21,9 +21,9 @@ text. It is a switch on where the message comes from, not a change to what count
 
 ## Alternatives Considered
 
-- **Rely on the payload personal data pass.** It already runs on `$mcp_error_message` by default,
-  but argument values are not limited to personal data shapes (resource names, IDs, variable
-  values), and that pass lets them through.
+- **Rely on "Payload privacy".** It already runs on `$mcp_error_message`, but it redacts only
+  credentials there, and argument values are not limited to credentials (resource names, IDs,
+  variable values), so it lets them through.
 - **Drop `$mcp_error_message` with the option off.** Rejected because the property is listed for
   failed calls, and dashboards and error tracking expect a message.
 

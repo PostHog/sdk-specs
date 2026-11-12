@@ -189,6 +189,8 @@ The legacy option properties are the `$`-prefixed properties legacy capture read
 
 A server SDK with global default properties SHALL offer global default options with the same interface, and an SDK with a request-context layer for properties SHALL offer context options (for example `super_options` and `set_context_option` in posthog-python, `Config.DefaultEventOptions` and `RequestContext.Options` in posthog-go, `registerOptions()` and context `options` in posthog-node). An SDK with neither layer needs neither. posthog-ios and posthog-android keep `register()` super properties without public global options; posthog_flutter 6.0 adds `registerOptions()` / `unregisterOptions()` on every platform except web.
 
+SDK docs, migration guides and examples SHALL set these values through `options`. They MAY say once, where options are introduced, that legacy option properties still work and that an option overrides its legacy property, and MAY show a table that maps each option to the property it replaces and a before-and-after migration example. posthog-ios and posthog-android have no public global options, so their docs MAY show `register()` with a legacy option property as the way to set an option on every event.
+
 Legacy capture: SDKs validated and converted `$process_person_profile` and `$cookieless_mode` themselves and sent them as properties.
 
 #### Scenario: A caller option is sent as given and the legacy property is removed (@server)

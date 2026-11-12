@@ -64,7 +64,7 @@ sequence types, so every SDK can conform and no two conforming SDKs differ.
 - Elements go through the same cleanup as other values, so nested null-property omission and
   array-position rules still apply.
 
-### Pending: how strict the rule is
+### Strictness: option C (chosen 2026-11-12)
 
 posthog-js is the behavioral reference, and it turns a `Set` into `{}`. A rule that set-like
 values become arrays diverges from it. The options:
@@ -77,7 +77,7 @@ values become arrays diverges from it. The options:
 - **C. SHALL requirement plus scenarios** (drafted in `specs/capture/spec.md`), with follow-up
   changes for the SDKs that need a fix. They are non-conformant until each follow-up lands.
 
-**Recommendation: C.** With the three-category scope, every SDK can conform: six already do, and
+**Chosen: C.** With the three-category scope, every SDK can conform: six already do, and
 the rest need a small fix (posthog-php a medium one). Every non-array outcome today loses the
 elements as structured data (`{}`, `null`, a dropped key or event, or a debug string), so callers
 are unlikely to depend on it. The posthog-js behavior is a side effect of generic object copying

@@ -1,7 +1,3 @@
-> **DRAFT: decision pending.** The SHALL lines below are the recommended option (C in design.md),
-> not a final call. posthog-js does not conform to them today. Do not apply or archive until the
-> option is chosen.
-
 ## Why
 
 No spec says what a capture property value of a container type becomes on the wire. SDKs disagree,

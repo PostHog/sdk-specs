@@ -1,15 +1,15 @@
 ## 0. Decision
 
-- [ ] 0.1 Choose option A, B or C in design.md, then align the delta (C is drafted)
+- [x] 0.1 Choose option A, B or C in design.md (C chosen)
 
 ## 1. Spec delta
 
-- [ ] 1.1 Add **Capture serializes set-like and listed sequence property values as arrays** to `capture` with the per-runtime table and four scenarios
+- [x] 1.1 Add **Capture serializes set-like and listed sequence property values as arrays** to `capture` with the per-runtime table and four scenarios
 
 ## 2. Validation
 
-- [ ] 2.1 Run `openspec validate --specs --strict`
-- [ ] 2.2 Run `openspec archive` to sync the delta and archive the change
+- [x] 2.1 Run `openspec validate --specs --strict`
+- [x] 2.2 Run `openspec archive` to sync the delta and archive the change
 
 ## 3. Downstream follow-ups (separate changes, not this one)
 

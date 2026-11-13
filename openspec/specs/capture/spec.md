@@ -98,7 +98,7 @@ The following steps are the canonical flow for a single capture call. Client and
 4. **Enrich properties.** A new properties dictionary is constructed by merging in this order (later values win):
    - **Client:**
      1. Properties the SDK sets itself, such as SDK environment and feature flag properties, `$groups` from registered groups (the event's group wins per group type), `$is_identified` and `$process_person_profile`.
-     2. Super/registered properties.
+     2. Super/registered properties, except a registered `$process_person_profile` on identity events (see **Caller-supplied event properties take precedence**).
      3. Caller-supplied `properties`. These win over everything above, and `before_send` (step 6) can change the result (see **Caller-supplied event properties take precedence**).
    - **Server:** request-context properties, then caller-supplied `properties`, then SDK-stamped properties. Most server SDKs stamp `$lib` and `$lib_version` over the caller's values, and SDKs with SDK-level default properties (python `super_properties`, go `DefaultEventProperties`, dotnet `SuperProperties`, elixir `global_properties`) apply them after the caller's properties too. `$groups` comes from the `groups` option.
 5. **Attach envelope fields.** Assign `timestamp` (caller override or `now()`, serialized in ISO 8601 and normalized to its equivalent UTC instant regardless of the input's original timezone/offset, preserving sub-second precision when the input carries it), `uuid` (caller override or a freshly generated UUIDv7; server SDKs normalize it to canonical lowercase hyphenated form), `distinct_id`, and `event` to the message. Server SDKs additionally stamp `$lib` / `$lib_version` onto properties here if not already present.
@@ -400,6 +400,8 @@ On client SDKs, an event's properties SHALL be merged in this order, each layer 
 
 A registered or caller value for a key the SDK sets itself changes that event only. It SHALL NOT change the SDK's own state: a later event without that key carries the SDK's value again, and a caller `$process_person_profile` does not turn person processing on or off for the SDK.
 
+A registered `$process_person_profile`, and a `process_person_profile` option a wrapper SDK registers, SHALL NOT be sent with the identity events `$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`, `$set` and `$set_once`. With person processing off, PostHog drops the first four and ignores the person update in `$set` and `$set_once`, so a registered `false` would stop `identify`, `alias`, `group` and `setPersonProperties` from working. The SDK's own `$process_person_profile` is still set, and a value passed on the call or set in `before_send` still applies. posthog-ios 4.0, posthog-android 4.0 and posthog-flutter 6.0 do this. posthog-js and posthog-react-native still send the registered value.
+
 The project token is request routing, not an event property. Where an SDK carries it on the event (posthog-js stamps `token` on every event and takes the batch `api_key` from it), the SDK SHALL set the configured token on every event, and a registered or caller `token` SHALL NOT replace it.
 
 A group the caller passes for the event SHALL win over a registered group of the same type.
@@ -467,6 +469,21 @@ This requirement does not apply to server SDKs. Most server SDKs set `$lib` and 
   | property                | value |
   | $process_person_profile | false |
   | $is_identified          | false |
+
+#### Scenario: A registered personless setting does not reach identity events (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** registered properties are:
+  | property                | value |
+  | $process_person_profile | false |
+- **WHEN** identify is called with distinct id "user-123"
+- **THEN** one event named "$identify" should be enqueued
+- **AND** the enqueued "$identify" event properties should include:
+  | property                | value |
+  | $process_person_profile | true  |
 
 ### Requirement: Client-level GeoIP control with per-call override
 

@@ -253,6 +253,18 @@ Feature: Capture
       | $process_person_profile | false |
       | $is_identified          | false |
 
+  @client
+  Scenario: A registered personless setting does not reach identity events
+    Given the SDK is initialized with token "test-token"
+    And registered properties are:
+      | property                | value |
+      | $process_person_profile | false |
+    When identify is called with distinct id "user-123"
+    Then one event named "$identify" should be enqueued
+    And the enqueued "$identify" event properties should include:
+      | property                | value |
+      | $process_person_profile | true  |
+
   # The value "" is the empty string, a variant PostHog no longer accepts for new flags.
   @client
   Scenario: Empty variant flag is left out of active feature flags

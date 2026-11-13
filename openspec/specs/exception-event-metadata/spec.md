@@ -114,6 +114,9 @@ First-party integrations SHALL use the following canonical sources where applica
 | PHP exception handler | `php.exception_handler` |
 | PHP error handler | `php.error_handler` |
 | PHP shutdown handler | `php.shutdown_handler` |
+| ASP.NET Core request-context middleware | `aspnetcore.request_context_middleware` |
+| .NET AppDomain unhandled exception | `dotnet.appdomain_unhandled_exception` |
+| .NET TaskScheduler unobserved task exception | `dotnet.task_scheduler_unobserved_task_exception` |
 | Go HTTP recovery middleware | `go.http_recover_middleware` |
 | Go slog handler | `go.slog` |
 | iOS native crash reporter | `ios.crash_reporter` |

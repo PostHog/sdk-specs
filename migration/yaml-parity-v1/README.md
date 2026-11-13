@@ -45,7 +45,8 @@ The `/flags?v=4` read scenarios require `flags_response_v4` and `@sdk:server`. E
 one serves a single v4 response body and makes one remote read:
 
 - `remote-flags-v4-legacy-getter.feature`: the existing flag getter returns the
-  legacy rendering of the record.
+  legacy rendering of the record. A record with `failed: true` has no evaluated
+  value, so the getter may return `false` or no value.
 - `remote-flags-v4-legacy-payload.feature`: additionally requires
   `feature_flag_payloads`. The SDK's existing payload getter, called with the same
   arguments as the flag getter, returns the payload as a decoded JSON value.

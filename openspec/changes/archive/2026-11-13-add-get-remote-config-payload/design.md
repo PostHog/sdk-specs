@@ -1,13 +1,16 @@
 ## Divergence from the reference
 
-posthog-js is the reference, and two requirements describe behavior that posthog-node does not have. Both are recommendations (`SHOULD`), not mandatory rules. posthog-node has neither behavior and no test for or against it, and no change to posthog-js comes with this spec. As recommendations, they leave every shipped SDK conformant. The spec recommends both because a flag key that is not encoded can change the path or the query of the request, and because a caller cannot tell an error body from a payload.
+posthog-js is the reference, and three requirements describe behavior that posthog-node does not have. All three are recommendations (`SHOULD`), not mandatory rules. posthog-node has none of the three behaviors and no test for or against the first two. Its test for a flag with no payload mocks a response that PostHog does not send. No change to posthog-js comes with this spec. As recommendations, they leave every shipped SDK conformant. The spec recommends both because a flag key that is not encoded can change the path or the query of the request, and because a caller cannot tell an error body from a payload. It recommends the third because PostHog answers a flag that has no payload with an empty body.
 
 | Requirement | What the requirement says | posthog-js | Covering test in posthog-js |
 |---|---|---|---|
 | Flag key encoding | The SDK should percent-encode the flag key as one path segment. | The key goes into the path as is (`packages/node/src/client.ts:3232`). | No covering test. |
 | Failure status | A response with a status outside 200 to 299 should fail the call. The body should not be the payload. | No status check. A JSON error body is returned as the payload (`packages/node/src/client.ts:2187-2206`). | No covering test. |
+| Empty body | For a response with a status from 200 to 299 and an empty body, the SDK should return no result and should not report a failure. | `response.json()` rejects on an empty body, and nothing catches it (`packages/node/src/client.ts:2192`). | "should return empty object when no payload is available" (`packages/node/src/__tests__/posthog-node.spec.ts:3531`) mocks a `{}` response, which PostHog does not send for this case. |
 
-Both lines were read at posthog-js `origin/main` `9c9da5bf7a36842a0bea1b05dfd0bcfbe0714f92`. A plain key gives the same request in posthog-js and in an SDK that follows the recommendation. An SDK that does not follow a recommendation still conforms. "Existing SDK conformance" says which shipped SDKs follow each one.
+PostHog answers a remote config flag that has no payload with status 200 and an empty body. In PostHog/posthog at `786b3fefd40aa9153ff93f90fa7fb023735448d2`, `_remote_config_response` ends with `return Response(payloads.get("true") or None)` (`products/feature_flags/backend/api/feature_flag.py:6626`), and the Rust service documents "200 with an empty body and no Content-Type (NOT a JSON `null`)" (`rust/feature-flags/src/api/remote_config.rs:333`).
+
+The posthog-js lines were read at posthog-js `origin/main` `9c9da5bf7a36842a0bea1b05dfd0bcfbe0714f92`. A plain key gives the same request in posthog-js and in an SDK that follows the recommendation. An SDK that does not follow a recommendation still conforms. "Existing SDK conformance" says which shipped SDKs follow each one.
 
 ## Context
 
@@ -38,9 +41,10 @@ The method is not the client `/config` bootstrap. That feature belongs to the `r
 
 - **A new capability.** `README.md` says a new capability is a new sibling folder. The name `get-remote-config-payload` follows the SDK method name and does not collide with `remote-config`.
 - **Server SDKs only.** The request needs a secret key, which must never reach a client.
-- **The requirements follow posthog-node, with two recommendations beyond it.** Where another shipped SDK agrees, the requirement is firm. The flag key encoding and the failure status are recommendations that posthog-node does not follow (see "Divergence from the reference"). For the other points where the shipped SDKs disagree and posthog-node has no test, the requirement says only what all of the evidence supports, and the point is an open decision below.
+- **The requirements follow posthog-node, with three recommendations beyond it.** Where another shipped SDK agrees, the requirement is firm. The flag key encoding, the failure status and the empty body are recommendations that posthog-node does not follow (see "Divergence from the reference"). For the other points where the shipped SDKs disagree and posthog-node has no test, the requirement says only what all of the evidence supports, and the point is an open decision below.
 - **The recommended encoding keeps the flag key one path segment.** In that encoding, the RFC 3986 unreserved set is never encoded. `/`, `?`, `#`, `%`, a space and non-ASCII bytes are always encoded. The other characters that RFC 3986 permits in a path segment (the sub-delimiters, `:` and `@`) are optional, because path-segment builders differ: `Uri.EscapeDataString` in posthog-dotnet and `quote(key, safe='')` in the async client of posthog-python encode them, and the OkHttp and Rust `url` path-segment builders do not. Both forms name the same segment. A space becomes `%20`, never `+`, because the key is in a path.
 - **A failure status should be a failed request.** The recommended result is the same as for a request that does not complete. This matches posthog-python, posthog-go and posthog-dotnet. A caller cannot tell an error object from a payload otherwise.
+- **An empty body is a flag with no payload.** PostHog sends status 200 and an empty body for a flag that has no payload, so the recommended result is no result and no failure report.
 - **The second parse stays.** posthog-node comments that the endpoint answers with a JSON string that holds the payload's JSON text, and that a single-encoded body is possible but not expected (`client.ts:2193-2195`). The requirement keeps both. The rule differs from `get-feature-flag-payload`, which forbids a second decode of a payload string from `/flags`, because that payload arrives in a different response. A consequence of the rule is that a string payload such as `"123"` comes back as the number `123`. posthog-node and posthog-dotnet do the same.
 - **A string that is not JSON is returned, not dropped.** `get-feature-flag-payload` returns no payload for a malformed serialized payload. This endpoint is different: the body is already a JSON string, and posthog-node returns that string when the second parse fails (`client.ts:2200-2203`). The two rules apply to different sources.
 - **"No result" covers error returns.** Go, Rust and Elixir return an error next to the value. The spec defines no result so that an error return and an empty value both count, and does not name a single type.
@@ -54,7 +58,8 @@ The method is not the client `/config` bootstrap. That feature belongs to the `r
 |---|---|---|
 | 2026-11-13 | Flag key encoding | Recommendation. The SDK SHOULD percent-encode the flag key as one path segment. Requirement "Flag key encoding", with a scenario for `a/b?c#d e`. |
 | 2026-11-13 | Failure status | Recommendation. A response with a status outside 200 to 299 SHOULD be treated as a failed request, and the SDK SHOULD NOT return the body as the payload. Requirement "Failure status", with scenarios for 401, 404 and 500. |
-| 2026-11-13 | Strength of the two points and of the open points | Flag key encoding and failure status are recommendations, because posthog-node has neither behavior and no test for or against it. The points below stay open and loose. |
+| 2026-11-13 | Empty body | Recommendation. For a response with a status from 200 to 299 and an empty body, the SDK SHOULD return no result and SHOULD NOT report a failure. Requirement "Empty body", with one scenario. |
+| 2026-11-13 | Strength of the three points and of the open points | Flag key encoding, failure status and empty body are recommendations, because posthog-node has none of these behaviors. The points below stay open and loose. |
 
 ## Open decisions
 
@@ -90,7 +95,7 @@ If B is chosen, replace the last sentence of the requirement with: "The SDK SHAL
 
 ### OD2. A 2xx response whose body is not JSON
 
-posthog-node reads the body with `response.json()` (`client.ts:2192`) and nothing catches a parse error, so the call rejects. No test covers it. The spec does not define the result. The failure status requirement covers a status outside 200 to 299 only.
+posthog-node reads the body with `response.json()` (`client.ts:2192`) and nothing catches a parse error, so the call rejects. No test covers it. The spec does not define the result. The failure status requirement covers a status outside 200 to 299 only. This point covers a body that is not empty. "Empty body" covers an empty body.
 
 | SDK | Body that is not JSON | Evidence |
 |---|---|---|
@@ -136,7 +141,7 @@ posthog-node sends `User-Agent`, `Content-Type: application/json` and `Authoriza
 
 ## Existing SDK conformance
 
-The table says how each shipped SDK stands against the requirements. The spec does not change them. A row marked "No" is a gap to fix in that SDK, except in the rows "Flag key encoding" and "Failure status". Those two rows are recommendations. Their cells say if the SDK follows the recommendation, and a "No" there is not a conformance gap (see the lists after the table). All line numbers for these two rows were read at the SHAs below. "Not re-read" means an earlier read of the SDK reported the line, and it was not read again for this change.
+The table says how each shipped SDK stands against the requirements. The spec does not change them. A row marked "No" is a gap to fix in that SDK, except in the rows "Flag key encoding", "Empty body" and "Failure status". Those three rows are recommendations. Their cells say if the SDK follows the recommendation, and a "No" there is not a conformance gap (see the lists after the table). All line numbers for these two rows were read at the SHAs below. "Not re-read" means an earlier read of the SDK reported the line, and it was not read again for this change.
 
 | Requirement | posthog-node | posthog-python | posthog-ruby | posthog-go | posthog-dotnet |
 |---|---|---|---|---|---|
@@ -150,6 +155,7 @@ The table says how each shipped SDK stands against the requirements. The spec do
 | Blank secret key counts as missing | Yes (`client.ts:123-126`) | Not re-read | Not re-read | Not re-read | Not re-read |
 | Payload decoding | Yes (`client.ts:2192-2205`) | No. Decodes once, so a string body stays a string (`request.py:284`, `:418-425`) | No. Decodes once, and merges `:status` into a Hash payload (`feature_flags.rb:1954-1958`) | No. Returns a Go `string` decoded once. A body that is not a JSON string is a parse error (`posthog.go:2048-2052`) | Yes (`PostHogClient.cs:1027-1034`), returns a `JsonDocument` |
 | String that is not JSON | Yes (`client.ts:2200-2203`) | Yes, trivially | Yes, trivially | Yes for a string body | Yes (`PostHogClient.cs:1034`) |
+| Empty body (follows the recommendation) | No. `response.json()` rejects on an empty body, nothing catches it, and the call rejects (`client.ts:2192`) | No. `res.json()` is not guarded (`request.py:284`). The caller catches the error, logs it and returns `None` (`client.py:5173-5176`). `json.loads('')` raises, from a local run. The SDK call was not run | No. `JSON.parse` raises `JSON::ParserError` on an empty string (`feature_flags.rb:1954`, from a local run of `JSON.parse`), and the call returns the Hash `{error: 'Invalid JSON response', body:, status:}` (`:1960-1964`). A `nil` body was not checked | No. `json.Unmarshal` of an empty body returns an error (from a local run), and the call returns it (`posthog.go:2049-2051`) | No. `ReadFromJsonAsync` is not guarded (`PostHogApiClient.cs:233-235`). The caller catches the exception, logs an error and returns `null` (`PostHogClient.cs:1036-1039`). Not run |
 | Request failure | Yes. Emits `error`, returns `undefined` (`client.ts:3254-3256`) | Yes. Logs, returns `None` (`client.py:5173-5176`) | No. The exception reaches the caller (`feature_flags.rb:1975-1982`) | Yes. Returns an error (`posthog.go:2033-2036`) | Yes. Logs, returns `null`. An `ArgumentException` or `NullReferenceException` is not caught (`PostHogClient.cs:1036-1039`) |
 | Failure status (follows the recommendation) | No. No status check, a JSON error body is returned as the payload (`client.ts:2187-2206`) | Yes. Only status 200 is a success, other statuses raise, are caught and logged, and the call returns `None` (`request.py:282-323`, `client.py:5173-5176`). Status 201 to 299 would also fail, which the recommendation does not ask for, but the endpoint does not answer with them | No. Returns the body as a Hash with `:status` merged in (`feature_flags.rb:1952-1958`). A body that is not a Hash comes back without `:status` | Yes. Any status other than 200 is an error (`posthog.go:2039-2041`). The same note on 201 to 299 applies | Yes. `EnsureSuccessfulApiCall` throws, the caller logs and returns `null` (`PostHogApiClient.cs:231`, `PostHogClient.cs:1036-1039`) |
 | One request per call | Yes (`client.ts:3253`) | No. The session retries connect and read errors twice (`request.py:80-92`, `:118-121`, `:484`) | No. Retries a timeout or a reset up to the flag retry limit (`feature_flags.rb:1967-1974`) | Yes (`posthog.go:2033`) | Yes (`PostHogClient.cs:1020`). Handler retries not re-read |
@@ -161,13 +167,13 @@ Differences between the five SDKs that the table shows:
 
 - **Missing secret key.** Ruby sends the request. Node throws. The others log and return an empty value or an error.
 - **Return type.** Node returns the JSON value. Python and Ruby return one decode. Go returns a Go `string`. .NET returns a `JsonDocument`. The spec names the JSON value type. Python, Ruby and Go would need a change to return the second-parsed value. The existing docs for them differ too: the page `contents/docs/feature-flags/remote-config.mdx` in posthog.com (at `54978bc1`) says Python returns a JSON encoded string to parse, and Ruby returns a parsed object. The Python docs match the code only for a string body.
-- **Escaping.** The spec recommends an encoding. See "Shipped SDKs and the two recommendations".
-- **Failure.** Ruby raises on a request that does not complete. Node and Ruby return the body of a non-2xx response as the payload. The spec recommends that a failure status fails the call. See "Shipped SDKs and the two recommendations".
+- **Escaping.** The spec recommends an encoding. See "Shipped SDKs and the three recommendations".
+- **Failure.** Ruby raises on a request that does not complete. Node and Ruby return the body of a non-2xx response as the payload. The spec recommends that a failure status fails the call. See "Shipped SDKs and the three recommendations".
 - **Retries.** Python retries connect and read errors through its session. Ruby retries a timeout or a reset up to the flag retry limit, and a status in its retry list. Node, Go and .NET do not retry. The requirement "One request per call" holds for Node, Go and .NET only.
 
-## Shipped SDKs and the two recommendations
+## Shipped SDKs and the three recommendations
 
-Each line below was re-read with `git show origin/main:<path>` at the repository SHA shown. No shipped SDK is non-conformant on these two points. A shipped SDK can adopt a recommendation in a change of its own. This change modifies no SDK.
+Each line below was re-read with `git show origin/main:<path>` at the repository SHA shown. No shipped SDK is non-conformant on these three points. A shipped SDK can adopt a recommendation in a change of its own. This change modifies no SDK.
 
 Flag key encoding (the key should be percent-encoded as one path segment):
 
@@ -182,6 +188,10 @@ Failure status (a status outside 200 to 299 should fail the call, and the body s
 - posthog-node: does not follow the recommendation. `packages/node/src/client.ts:2187-2206` checks no status. The helper returns the response whatever its status (`:3253`) and the method returns its parsed body.
 - posthog-ruby: does not follow the recommendation. `lib/posthog/feature_flags.rb:1952-1958` parses the body and returns it as a Hash with `:status` merged in. It checks no status except the retry list and 304.
 - Follows the recommendation: posthog-python (`posthog/request.py:282-323`), posthog-go (`posthog.go:2039-2041`), posthog-dotnet (`src/PostHog/Api/PostHogApiClient.cs:231`).
+
+Empty body (a response with a status from 200 to 299 and an empty body should give no result and no failure report):
+
+- No shipped SDK follows the recommendation. The row "Empty body" of the table in "Existing SDK conformance" has each `file:line`.
 
 ## Reference mapping
 
@@ -200,6 +210,7 @@ The tests at `spec.ts:3531`, `:3541`, `:3554` and `:3565` replace `_requestRemot
 | Missing secret key | `client.ts:2183-2185` (throws), `:3228` (helper guard), `:123-126` (blank is missing) | `spec.ts:3506` "should throw error when personalApiKey is not provided" covers the throw only. The spec also allows a warning with no result, and no posthog-js behavior or test covers that. No covering test for a whitespace-only secret key. |
 | Payload decoding | `client.ts:2192` (decode), `:2196-2199` (second parse of a string), `:2205` (other values unchanged) | `spec.ts:3531` "should return empty object when no payload is available" (`{}`), `:3541` "should handle double-encoded JSON payload" (string body), `:3554` "should handle simple JSON payload" (object body). No covering test for an array in a string, a number in a string, or an array that holds a string. |
 | String that is not JSON | `client.ts:2200-2203` | No covering test. |
+| Empty body | `client.ts:2192` (`response.json()` is not guarded, so the call rejects on an empty body) | No covering test. `spec.ts:3531` "should return empty object when no payload is available" mocks a `{}` response, which PostHog does not send for a flag with no payload. |
 | Request failure | `client.ts:3252-3256` (the helper catches, emits `error`, returns `undefined`), `:2188-2190` (the method returns `undefined`) | No covering test. |
 | Failure status | `client.ts:2187-2206` (no status check), `:3253` (the helper returns the response whatever its status), `:2192` (`response.json()` reads the error body as the payload) | No covering test. |
 | One request per call | `client.ts:3253` (one `this.fetch` call, which is the platform fetch, not `fetchWithRetry`: `core.ts:1896`) | No covering test. `spec.ts:3597` uses `toHaveBeenCalledWith` and does not count calls. posthog-python and posthog-ruby retry ("Existing SDK conformance"). |
@@ -217,7 +228,7 @@ Points left out of the requirements (see "Open decisions"):
 | Host when the SDK has more than one | `client.ts:3232` (`this.host`) | `spec.ts:3598` checks the host `http://example.com` for the one configured host only. | OD4 |
 | A flag key that is empty, `.` or `..` | `client.ts:3232` (no guard) | No covering test. | OD5 |
 
-Requirements with no covering test in posthog-js: Public surface, Flag key encoding, No distinct id (partial only), Disabled client (the `disabled: true` case and the order), Missing secret key (the warning-and-empty path and the blank key), String that is not JSON, Request failure, Failure status, One request per call, No caching, No events. Payload decoding has no test for three of the six example rows.
+Requirements with no covering test in posthog-js: Public surface, Flag key encoding, No distinct id (partial only), Disabled client (the `disabled: true` case and the order), Missing secret key (the warning-and-empty path and the blank key), String that is not JSON, Empty body, Request failure, Failure status, One request per call, No caching, No events. Payload decoding has no test for three of the six example rows.
 
 ## Notes
 
@@ -255,5 +266,6 @@ Not covered: the client `/config` bootstrap (`remote-config`), caching and backg
 ## Risks / Trade-offs
 
 - The spec recommends two behaviors that posthog-node does not have: flag key encoding and failure status. They are recommendations, so the SDKs can differ. posthog-node, posthog-python (sync), posthog-ruby and posthog-go do not encode the key, and posthog-node and posthog-ruby return the body of a non-2xx response as the payload. A caller that moves between SDKs can see a different result for a key with reserved characters and for a failure status.
+- No shipped SDK follows the empty body recommendation. A read of a flag that has no payload rejects in posthog-node, logs an error in posthog-python and posthog-dotnet, returns an error in posthog-go, and returns an error Hash in posthog-ruby.
 - OD1 to OD5 are open. A port written to the spec alone can choose any behavior for them. If a later change picks a stricter rule for OD1 option B, OD2 or OD3, posthog-node can need a change.
 - No harness binding exists for the acceptance phrases. The feature file states this in its header, as `emails.feature` does, and carries no `@sdk:server` tag.

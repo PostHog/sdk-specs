@@ -155,6 +155,19 @@ When the body is a JSON string whose content is not valid JSON, the SDK SHALL re
   | `"{broken"`      | `{broken`     |
   | `""`             | ``            |
 
+### Requirement: Empty body
+
+The SDK SHOULD return no result for a response with a status from 200 to 299 and an empty body, and an SDK that does SHALL NOT report a failure for that response: no error value, no error event and no error log. An SDK that fails on an empty body still conforms. PostHog answers a flag that has no payload with status 200 and an empty body.
+
+#### Scenario: A flag with no payload gives no result
+- **GIVEN** an SDK that follows the empty body recommendation
+- **AND** a client with a secret key
+- **AND** the mock server answers the request with the status 200 and an empty body
+- **WHEN** the caller reads the payload of `test-flag`
+- **THEN** the SDK returns no result
+- **AND** the SDK does not report a failure
+- **AND** no exception reaches the caller
+
 ### Requirement: Request failure
 
 When the request does not complete, because of a connection error, a name lookup error, a TLS error or a timeout, the SDK SHALL NOT return a payload and SHALL return no result. It SHALL report the failure through a log line, an event on its error emitter, or an error value. It SHALL NOT raise an exception or reject to the caller. A failure does not change the result of later calls.
@@ -175,7 +188,7 @@ When the request does not complete, because of a connection error, a name lookup
 
 ### Requirement: Failure status
 
-The SDK SHOULD treat a response with a status outside 200 to 299 as a failed request, and an SDK that does SHALL handle it as in "Request failure". The SDK SHOULD NOT return the response body as the payload, even when the body is valid JSON. An SDK that returns the body still conforms. The result for a response with a status from 200 to 299 whose body is not JSON is not defined.
+The SDK SHOULD treat a response with a status outside 200 to 299 as a failed request, and an SDK that does SHALL handle it as in "Request failure". The SDK SHOULD NOT return the response body as the payload, even when the body is valid JSON. An SDK that returns the body still conforms. The result for a response with a status from 200 to 299 whose body is not empty and is not JSON is not defined. "Empty body" covers an empty body.
 
 #### Scenario Outline: A failure status gives no payload
 - **GIVEN** an SDK that follows the failure status recommendation

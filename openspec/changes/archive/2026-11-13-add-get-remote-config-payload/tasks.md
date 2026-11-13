@@ -3,19 +3,19 @@
 - [x] 1.1 Read the posthog-node method, its request helper and its tests, and map each requirement to a `file:line` and a covering test (`design.md`, "Reference mapping")
 - [x] 1.2 Read the same method in posthog-python, posthog-ruby, posthog-go and posthog-dotnet
 - [x] 1.3 List where the five SDKs differ and which points the evidence does not decide (`design.md`, "Open decisions" and "Existing SDK conformance")
-- [x] 1.4 Make flag key encoding and failure status recommendations (`design.md`, "Decided")
+- [x] 1.4 Make flag key encoding, failure status and empty body recommendations (`design.md`, "Decided")
 - [ ] 1.5 Decide OD1 to OD5 in `design.md` in a later change, or leave them undefined
 
 ## 2. Spec delta
 
 - [x] 2.1 Write the `get-remote-config-payload` delta
-- [x] 2.2 Add the flag key encoding and failure status recommendations to the delta, with scenarios
+- [x] 2.2 Add the flag key encoding, failure status and empty body recommendations to the delta, with scenarios
 - [ ] 2.3 Add the text of each open decision that a later change decides to the delta, with a scenario
 - [ ] 2.4 Review the delta: every requirement has at least one scenario, scenarios use WHEN/THEN, and a wrong implementation fails each scenario
 
 ## 3. Acceptance feature
 
-- [x] 3.1 Add `acceptance/public/get-remote-config-payload.feature` with server scenarios for the request, authentication, a disabled client, a missing secret key, decoding, failure, no caching, no events and local evaluation off
+- [x] 3.1 Add `acceptance/public/get-remote-config-payload.feature` with server scenarios for the request, authentication, a disabled client, a missing secret key, decoding, an empty body, failure, no caching, no events and local evaluation off
 - [ ] 3.2 Leave `@sdk:server` off until a harness binding exists and a real SDK adapter has run the scenarios end to end
 
 ## 4. Archive
@@ -33,9 +33,10 @@ Tracker: https://github.com/PostHog/posthog-android/issues/577. The repositories
 - [ ] 5.3 posthog-elixir: add the request to `lib/posthog/api.ex` next to `flag_definitions/4`, add the function to the public module with `{:ok, value} | {:error, error}` and a bang variant, use the existing `secret_key` option, decide the host first (OD4), update `public_api.snapshot`, add Mox tests, add a changeset with `sampo add`, run `mix format --check-formatted`, `mix credo --strict` and `mix test`.
 - [ ] 5.4 posthog-rs: add the method to the async client in `src/client/async_client.rs` and the blocking client in `src/client/blocking.rs`, return a `Result` with `Ok(None)` for a disabled client and an `Err` for a missing secret key, use the existing `secret_key` option, update `api/public-api.txt` with `scripts/check-public-api.sh`, add httpmock tests, add a changeset with `sampo add`. Read posthog-rs#350 and #359 first, because #359 adds a different `/config` request in the same area.
 - [ ] 5.5 posthog.com, `contents/docs/feature-flags/remote-config.mdx`: add Java, PHP, Elixir and Rust tabs to the `<MultiLanguage>` block in "Step 3: Use remote config flags", which has Node, Python, Go, Ruby and C# today. Fix the Python and Go comments to match each SDK's return value. Land it after the SDK releases.
-- [ ] 5.6 The five SDKs that already have the method: open one issue per gap listed in `design.md`, "Existing SDK conformance", and link it to PostHog/posthog-android#577. This change modifies none of these SDKs. The two recommendations add no gap. As an optional follow-up, a shipped SDK can adopt them (lines read at the SHAs in `design.md`, "Shipped SDKs and the two recommendations"):
+- [ ] 5.6 The five SDKs that already have the method: open one issue per gap listed in `design.md`, "Existing SDK conformance", and link it to PostHog/posthog-android#577. This change modifies none of these SDKs. The three recommendations add no gap. As an optional follow-up, a shipped SDK can adopt them (lines read at the SHAs in `design.md`, "Shipped SDKs and the two recommendations"):
   - [ ] 5.6.1 Optional. posthog-js, `packages/node/src/client.ts`: encode the flag key (`:3232`, key not encoded) and fail the call on a failure status (`:2187-2206`, no status check, a JSON error body is returned as the payload).
   - [ ] 5.6.2 Optional. posthog-python: encode the flag key on the sync path (`posthog/request.py:420`). The async path (`posthog/_async_request.py:184`) follows the recommendation. The failure status handling follows the recommendation too.
   - [ ] 5.6.3 Optional. posthog-ruby: encode the flag key (`lib/posthog/feature_flags.rb:1896`) and fail the call on a failure status (`:1952-1958`, returns a Hash with the body and `:status`).
   - [ ] 5.6.4 Optional. posthog-go: encode the flag key (`posthog.go:2004`, `url.JoinPath` with the raw key, a `/` splits the path). The failure status handling follows the recommendation (`posthog.go:2039-2041`).
-  - [ ] 5.6.5 posthog-dotnet: nothing to do. It follows both recommendations (`src/PostHog/Api/PostHogApiClient.cs:206` and `:231`).
+  - [ ] 5.6.5 posthog-dotnet: nothing to do for flag key encoding and failure status. It follows both recommendations (`src/PostHog/Api/PostHogApiClient.cs:206` and `:231`).
+  - [ ] 5.6.6 Optional. All five SDKs: return no result with no failure report for a 2xx response with an empty body (`design.md`, "Existing SDK conformance", row "Empty body").

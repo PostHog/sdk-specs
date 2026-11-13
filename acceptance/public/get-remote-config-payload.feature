@@ -2,7 +2,7 @@
 Feature: Get Remote Config Payload
   Canonical contract: openspec/specs/get-remote-config-payload/spec.md
   These scenarios require remote config payload harness bindings before integration selection.
-  Scenarios tagged @flag_key_encoding_capable or @failure_status_capable apply only to an SDK that follows the matching recommendation.
+  Scenarios tagged @flag_key_encoding_capable, @failure_status_capable or @empty_body_capable apply only to an SDK that follows the matching recommendation.
 
   Background:
     Given an isolated SDK instance
@@ -100,6 +100,17 @@ Feature: Get Remote Config Payload
       | "hello world"                     | "hello world"           |
       | "{broken"                         | "{broken"               |
       | ""                                | ""                      |
+
+  # Requirement: Empty body (a recommendation)
+
+  @empty_body_capable
+  Scenario: A flag with no payload gives no result
+    Given the SDK is initialized with token "test-token", host "http://example.com" and secret key "phs_test"
+    And the mock server will answer the next remote config request with status 200 and an empty body
+    When the caller reads the remote config payload of "test-flag"
+    Then the call should return no result
+    And the call should not report a failure
+    And the call should not raise an exception
 
   # Requirements: Failure status (a recommendation), One request per call
 

@@ -6,7 +6,7 @@
 
 It is responsible for:
 
-- choosing the correct endpoint (`/batch`, `/capture`, `/flags`, `/decide`, remote-config/local-evaluation endpoints, snapshot/replay endpoints)
+- choosing the correct endpoint (legacy `/batch` and `/capture`, capture v1 `/i/v1/analytics/events` and `/i/v1/ai/events`, `/flags`, `/decide`, remote-config/local-evaluation endpoints, snapshot/replay endpoints)
 - serializing request bodies
 - applying headers, timeouts, compression, and authentication
 - executing the request through the host platform's HTTP stack
@@ -34,7 +34,7 @@ Platform-specific implementations often split these into dedicated methods per e
 ## Behavior
 
 1. **Build endpoint URLs from host configuration.**
-   - Event ingestion commonly uses `/batch` or `/capture`.
+   - Event ingestion uses `/batch` or `/capture` on legacy capture, and `/i/v1/analytics/events` (analytics) and `/i/v1/ai/events` (AI) on capture v1 (posthog-python 8.0, posthog-go v2, posthog-rs 1.0 and posthog-node 6.0).
    - Feature flags use `/flags` or `/decide`-family endpoints.
    - Remote config / local evaluation may use asset/API endpoints distinct from the ingestion host.
 2. **Construct request bodies.**
@@ -42,8 +42,9 @@ Platform-specific implementations often split these into dedicated methods per e
 3. **Apply SDK headers and metadata.**
    - User-Agent / library identification
    - Content-Type / Accept
-   - optional Content-Encoding (gzip)
-   - authentication headers for privileged endpoints where required
+   - optional Content-Encoding (gzip on legacy capture; `gzip`, `deflate`, `br` or `zstd` on capture v1)
+   - authentication headers for privileged endpoints where required; on capture v1 the project token travels as `Authorization: Bearer <token>`, never in the body
+   - on capture v1, the per-request headers `PostHog-Sdk-Info`, `PostHog-Request-Id`, `PostHog-Attempt` and `PostHog-Request-Timestamp` (see `capture`, **Capture v1 request headers**)
 4. **Apply timeouts and request configuration.**
    - Each endpoint family may use different timeout or cache/revalidation settings.
 5. **Execute via platform HTTP stack.**
@@ -57,6 +58,7 @@ Platform-specific implementations often split these into dedicated methods per e
 7. **Translate HTTP failures into SDK-meaningful errors.**
    - Status codes and response bodies are surfaced so retry/caching layers can decide whether to retry, clear caches, or log errors.
    - Some transports parse `Retry-After` headers.
+   - On capture v1 a 2xx body carries a per-event `results` map the retry layer reads (see `capture`), and the transport never follows a cross-origin or non-307/308 redirect for a capture request (see **Capture v1 transport**).
 8. **Support endpoint-specific extras.**
    - gzip compression for batched event uploads
    - `$anon_distinct_id` / person/group properties for flag requests
@@ -102,9 +104,7 @@ Usually none directly, aside from transient request/response objects. Higher lay
 - **persistent-storage** may persist metadata returned by HTTP-backed components (for example cached flags/request ids).
 - **consent-gating** may prevent higher layers from calling the transport at all.
 - **wrapper setup/config** may act only as a pass-through surface. Flutter serializes host/API/batching/privacy config into platform setup payloads and then relies on native/browser transports to perform the actual requests.
-
 ## Requirements
-
 ### Requirement: Canonical http-client behavior
 
 The SDK SHALL implement the canonical `http-client` behavior described by this spec. Implementations MAY adapt method names, parameter casing, type syntax, and lifecycle hooks to platform idioms where this spec explicitly allows variation, but MUST preserve the observable outcomes in the scenarios below.
@@ -256,19 +256,79 @@ Retries SHALL use exponential backoff starting at 300ms before the first retry, 
   | key     | value |
   | beta-ui | true  |
 
+### Requirement: Capture v1 transport
+
+An SDK that delivers events through capture v1 SHALL build the capture URL as `{host}/i/v1/analytics/events` (and `{host}/i/v1/ai/events` for the AI lane), SHALL send the project token only as `Authorization: Bearer <token>`, and SHALL send the header set defined in `capture` (**Capture v1 request headers**) on every attempt.
+
+The SDK MAY compress the body with `gzip`, `deflate`, `br` or `zstd`, offering only the codecs its runtime provides, and SHALL then set `Content-Encoding` to exactly that token. It SHALL NOT use legacy encodings (`gzip-js`, `lz64`, `base64`) or a `?compression=` query parameter on capture v1. If local compression fails, the SDK MAY send the body uncompressed without `Content-Encoding`. Each delivery lane SHALL have its own compression setting; the analytics setting SHALL NOT change AI uploads. The default is the SDK's choice: posthog-python, posthog-go and posthog-rs default to no compression; posthog-node defaults to gzip, and client SDKs default to gzip as **Request body compression and opt-out** requires.
+
+For capture requests the transport SHALL follow a redirect only when the status is `307` or `308` and the target has the same origin (scheme, host and port) as the configured host, at most five times, resending the same method, headers and body. Any other redirect, a cross-origin target or a sixth hop is a terminal failure of that request. A caller-supplied HTTP client either keeps its own redirect policy or, where the SDK can intercept its redirects, gets this same rule applied to capture requests; both are compliant.
+
+Legacy capture: the token was sent as `api_key` in the body and most SDKs followed the HTTP library's default redirect policy, which can turn a `POST` into a `GET` or send the body to another host.
+
+#### Scenario: A compressed request declares exactly its encoding (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and compression "gzip" and flush threshold 1
+- **WHEN** capture is called with distinct id "user-123" and event "Compressed"
+- **AND** pending captures are flushed
+- **THEN** a received request header "Content-Encoding" should equal "gzip"
+- **AND** the first request body should decompress as gzip into a JSON object with an array "batch"
+- **AND** the first request path should not contain "compression="
+
+#### Scenario: An uncompressed request sends no Content-Encoding (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key", flush threshold 1, and compression disabled
+- **WHEN** capture is called with distinct id "user-123" and event "Plain"
+- **AND** pending captures are flushed
+- **THEN** the first request header "Content-Encoding" should be absent
+- **AND** the first request body should parse as a JSON object with an array "batch"
+
+#### Scenario: A same-origin 308 is followed with the same body (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** the mock answers the first request to "/i/v1/analytics/events" with status 308 and a Location of "/i/v1/analytics/events/" on the same origin
+- **WHEN** capture is called with distinct id "user-123" and event "Moved"
+- **AND** pending captures are flushed
+- **THEN** exactly 2 requests should have been received
+- **AND** the second request path should equal "/i/v1/analytics/events/"
+- **AND** the second request method should equal "POST"
+- **AND** the second request body should equal the first request body
+- **AND** the second request should authenticate with bearer token "phc_test_key"
+
+#### Scenario: A cross-origin or non-307/308 redirect is terminal (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** the mock answers the first request with status <status> and a Location of "<location>"
+- **WHEN** capture is called with distinct id "user-123" and event "Redirected"
+- **AND** pending captures are flushed
+- **AND** 2000 milliseconds elapse without a public SDK call
+- **THEN** exactly 1 request should have been received
+- **AND** no request should have been sent to "<location>"
+- **AND** the SDK should report the event "Redirected" as not delivered
+  Examples:
+  | status | location                                           |
+  | 301    | /i/v1/analytics/events/                            |
+  | 302    | /i/v1/analytics/events/                            |
+  | 307    | https://other.example.com/i/v1/analytics/events    |
+  | 308    | http://mock.posthog.test:8081/i/v1/analytics/events |
+
 ### Requirement: Request body compression and opt-out
 
-A client SDK that compresses outgoing request bodies SHALL use gzip, SHALL apply it by default, and SHALL expose a configuration option that turns compression off for the whole client. A client SDK MAY send uncompressed, or use another encoding the server advertises, when gzip is unavailable on the platform or the server's remote configuration does not advertise gzip. A compressed request SHALL declare gzip with the `Content-Encoding: gzip` header where the transport can set it. A browser transport that must keep a CORS-simple request MAY send the gzip body without a declaration and rely on the server detecting gzip bodies, as posthog-js does.
+A client SDK that compresses outgoing request bodies SHALL use gzip, SHALL apply it by default, and SHALL expose a configuration option that turns compression off for the whole client, except a delivery lane that has its own compression setting (`capture-ai`, **AI lane configuration is scoped to the AI lane**). A client SDK MAY send uncompressed, or use another encoding the server advertises, when gzip is unavailable on the platform or the server's remote configuration does not advertise gzip. A compressed request SHALL declare gzip with the `Content-Encoding: gzip` header where the transport can set it. A browser transport that must keep a CORS-simple request MAY send the gzip body without a declaration and rely on the server detecting gzip bodies, as posthog-js does.
 
 The option MAY be an extensible encoding enum (`compression`, with a gzip default and a "none" member) or a boolean switch, named in the SDK's own style (for example `disable_compression`). New configuration surfaces SHOULD use the enum shape so further encodings can be added without another option. Whichever shape a client SDK ships, the default SHALL leave gzip enabled, so an app that sets nothing keeps the current behavior.
 
 Server SDKs MAY default to no compression, MAY offer other encodings, and MAY expose compression as a positive or negative boolean or as an enum. The rules below apply to every SDK that compresses request bodies.
 
-When compression is turned off, every request the SDK would otherwise have compressed SHALL carry the uncompressed body, plain JSON for JSON endpoints, and SHALL omit any gzip declaration. A browser unload beacon that must avoid a CORS preflight MAY instead send a CORS-simple body without gzip, such as base64 form data. Endpoints the SDK never compressed are unaffected. The set of compressed endpoints is SDK-specific and is not fixed by this requirement.
+When compression is turned off, every request the SDK would otherwise have compressed SHALL carry the uncompressed body, plain JSON for JSON endpoints, and SHALL omit any gzip declaration. A browser unload beacon that must avoid a CORS preflight MAY instead send a CORS-simple body without gzip, such as base64 form data. Endpoints the SDK never compressed are unaffected, and so is a delivery lane that has its own compression setting. The set of compressed endpoints is SDK-specific and is not fixed by this requirement.
 
 A client SDK's opt-out SHALL be reachable through configuration. An SDK that reserves `Content-Encoding` against caller-supplied custom headers SHALL NOT treat overriding that header as the way to disable compression.
 
-When compression fails locally — for example a gzip encoder that throws — the SDK MAY send the uncompressed body instead of dropping the request. The SDK SHALL NOT silently downgrade to an uncompressed body and resend after a server rejects a compressed request; a server rejection is surfaced to the retry layer like any other failure, and opting out stays an explicit application decision.
+When compression fails locally, for example when a gzip encoder throws, the SDK MAY send the uncompressed body instead of dropping the request. The SDK SHALL NOT silently downgrade to an uncompressed body and resend after a server rejects a compressed request; a server rejection is surfaced to the retry layer like any other failure, and opting out stays an explicit application decision.
 
 #### Scenario: Compression is on by default (@client)
 - **GIVEN** a fresh SDK acceptance test harness
@@ -294,7 +354,7 @@ When compression fails locally — for example a gzip encoder that throws — th
 
 #### Scenario: Opting out covers every endpoint the SDK compresses (@client)
 - **GIVEN** the SDK is initialized with token "test-token" and compression turned off
-- **WHEN** the SDK sends requests to each endpoint whose body it compresses by default
+- **WHEN** the SDK sends requests to each endpoint whose body it compresses by default, other than a delivery lane that has its own compression setting
 - **THEN** none of those requests should declare gzip
 - **AND** each request body should parse as plain JSON
 

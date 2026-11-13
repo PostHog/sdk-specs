@@ -1,0 +1,818 @@
+## Narrative alignment
+
+When syncing this delta into the canonical `capture` spec:
+
+- In Purpose, name both delivery wires: legacy capture (`/batch/` or `/capture/`) and capture v1 (`/i/v1/analytics/events`, with `/i/v1/ai/events` for AI events, see `capture-ai`).
+- In Behavior step 4 (**Server**), replace the merge order with the capture v1 order: the call's properties and options win; the ambient request context, then the SDK-level default properties, then the values the SDK adds itself (`$is_server`, `$geoip_disable`, system context, feature flag properties, OpenTelemetry trace ids where derived) fill only keys the layers above left unset. A built-in integration's library label fills before the ambient context, and the SDK's own `$lib` and `$lib_version` fill last. Note that on legacy capture the SDK also stamps `$lib` and `$lib_version` over the caller's values, and that posthog-python 7.x and posthog-go 1.x applied their default properties after the caller's properties.
+- In Behavior step 5, say that on capture v1 the SDK fills `$lib` and `$lib_version` from its own identity as a pair, after every other layer, only where the event does not already name its library. Keep the legacy sentence.
+- In Behavior step 6, add that on capture v1 the legacy option properties are hoisted into `options` after the hook returns, that the message the hook returns is sent as it is (a new message without `options` either sends none or keeps the pre-hook options, and an empty `options` map always clears them), and that SDK docs tell callers to keep `options` in a rebuilt message and to change settings through `options`, and, on an SDK that keeps the pre-hook options, to return an empty `options` map to clear them.
+- In Behavior step 7 (**Server**), say that a capture v1 SDK keeps one queue, flush cycle and retry state per delivery lane (analytics and AI).
+- In Error handling, replace "invalid distinct id (server)" with the capture v1 rule: an empty or whitespace-only distinct id is treated as missing (a personless event with a generated id, or the SDK's existing error), and the event is never sent without a `distinct_id`.
+- Leave the client bullets and the existing requirements unchanged except where this delta modifies them.
+
+## ADDED Requirements
+
+### Requirement: Capture v1 wire contract
+
+An SDK that delivers events through capture v1 SHALL send analytics events with `POST {host}/i/v1/analytics/events` and SHALL NOT use `/batch`, `/capture`, `/e`, `/track` or `/i/v0/e`. The request body SHALL be a JSON object `{"created_at": <RFC 3339 string>, "historical_migration"?: <boolean>, "batch": [<event>, ...]}`, with at least one event, and `historical_migration` present only when true. Historical-migration events and live events SHALL NOT share a request.
+
+Each event SHALL be a JSON object with the fields `event`, `uuid`, `distinct_id` and `timestamp` as JSON strings, `properties` as a JSON object, `options` as a JSON object (an empty object when the event has no options; an SDK MAY omit an empty `options`, which capture reads as empty), and `session_id` and `window_id` as JSON strings only when present. The SDK SHALL NOT send any other top-level event field; a top-level `$set` or `$set_once` the SDK's API accepts is placed inside `properties`. The SDK SHALL NOT send `api_key`, `sent_at` or `offset` in the body.
+
+Session replay stays outside capture v1. Client SDKs keep sending `$snapshot` data to `/s/` with `api_key` in the body, and these rules do not apply to it.
+
+Capture v1 rejects the whole request with `400 request_parsing_error` when the body is not valid JSON, a required field is missing, or a required string field (`created_at`, `event`, `uuid`, `distinct_id`, `timestamp`) has another JSON type. The optional `session_id` and `window_id` may be absent or `null`; any other non-string value rejects the request the same way. It checks `properties` and `options` per event: a `properties` value that is not an object, or an invalid option, drops only that event (`malformed_event_properties`, `invalid_options`) and the rest of the request is processed. The SDK SHALL therefore guarantee these types on the wire, including after `before_send`: an event whose hook leaves `distinct_id` or `event` non-string, or whose serialization fails, is dropped locally and reported through the SDK's error surface or a log line, and never sent.
+
+Legacy capture: the body carried `api_key` and `sent_at`, `uuid` and `timestamp` were optional, and a non-string `distinct_id` was converted to text.
+
+#### Scenario: Analytics events go to the capture v1 endpoint only (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **WHEN** capture is called with distinct id "user-123" and event "Signed Up"
+- **AND** pending captures are flushed
+- **THEN** exactly 1 capture request should have been received
+- **AND** every capture request path should be "/i/v1/analytics/events"
+- **AND** no capture request should use "/batch", "/capture", "/e", "/track" or "/i/v0/e"
+
+#### Scenario: The body carries the batch envelope and typed event fields (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **WHEN** capture is called with distinct id "user-123", event "Signed Up", and properties:
+  | property | value |
+  | plan     | pro   |
+- **AND** pending captures are flushed
+- **THEN** the first request body should contain a string "created_at" and an array "batch" with exactly 1 event
+- **AND** the first request body should omit these root fields:
+  | field                |
+  | api_key              |
+  | sent_at              |
+  | historical_migration |
+- **AND** the first received event should have string fields "event", "uuid", "distinct_id" and "timestamp"
+- **AND** the first received event field "properties" should be an object containing "plan" equal to "pro"
+- **AND** the first received event field "options" should be absent or an object
+
+#### Scenario: Historical migration is a request flag (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key", flush threshold 1, and historical migration enabled
+- **WHEN** capture is called with distinct id "user-123" and event "Imported"
+- **AND** pending captures are flushed
+- **THEN** the first request body should contain historical_migration equal to true
+
+#### Scenario: A hook that leaves a non-string distinct id drops only that event (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 2
+- **AND** before-send replaces the distinct id of events named "Broken" with the number 42
+- **WHEN** capture is called with distinct id "user-123" and event "Broken"
+- **AND** capture is called with distinct id "user-123" and event "Fine"
+- **AND** pending captures are flushed
+- **THEN** exactly 1 capture request should have been received
+- **AND** the request should contain only the event "Fine"
+- **AND** the SDK should report the event "Broken" as dropped locally
+
+### Requirement: Capture v1 request headers
+
+An SDK that delivers events through capture v1 SHALL send these headers on every capture request:
+
+- `Authorization: Bearer <project token>`. The token is never placed in the body.
+- `Content-Type: application/json`.
+- `User-Agent`, equal to the `PostHog-Sdk-Info` value.
+- `PostHog-Sdk-Info: <library>/<version>`, where `<library>` is the SDK's own canonical `$lib` name (`posthog-python`, `posthog-go`, `posthog-rs`, `posthog-node`, `posthog-ios`, `posthog-android`, `posthog-flutter`) and `<version>` is the package version actually shipped. The header names the SDK that sent the request. Capture uses it to fill `$lib` and `$lib_version` only on an event that does not name its own library (see **Events name their own library**), so a built-in integration labels its own events through `$lib` rather than relabeling the client. A wrapper SDK whose events a native SDK delivers (posthog-flutter on iOS, macOS and Android, KMP, and the React Native plugin, which uses `posthog-react-native`) configures the native SDK with its own library name and version, as `$lib` did on legacy capture. posthog-flutter on Windows and Linux has its own transport and sends `posthog-flutter` directly.
+- `PostHog-Request-Id`: a UUID minted once per batch and kept across every retry of that batch.
+- `PostHog-Attempt`: `1` on the first attempt, incremented by one on each retry of the same batch.
+- A client SDK with a durable disk queue MAY mint a new `PostHog-Request-Id` and restart `PostHog-Attempt` at `1` when the events in a resend change (events captured during a backoff join it) or after the app restarts, because it keeps the retry identity in memory.
+- `PostHog-Request-Timestamp`: the send time of this attempt as an RFC 3339 string with an explicit offset and at least three fractional-second digits (see **Timestamps on capture v1**), taken from the same clock as the event timestamps and stamped again on every attempt.
+- `Content-Encoding` only when the body is compressed, with one of `gzip`, `deflate`, `br` or `zstd`.
+
+Every header value SHALL be visible ASCII. The body's `created_at` SHALL be set once per batch and kept across retries. Capture uses `PostHog-Request-Timestamp` to correct for client clock skew, so a retry that resends a stale timestamp shifts every event in the request by the retry delay; the SDK SHALL NOT let an HTTP library retry a capture request on its behalf.
+
+#### Scenario: The first attempt carries the required headers (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **WHEN** capture is called with distinct id "user-123" and event "Signed Up"
+- **AND** pending captures are flushed
+- **THEN** the first request should authenticate with bearer token "phc_test_key"
+- **AND** the first request header "Content-Type" should start with "application/json"
+- **AND** the first request header "PostHog-Sdk-Info" should match "<library>/<version>" for the SDK under test
+- **AND** the first request header "User-Agent" should equal the "PostHog-Sdk-Info" header
+- **AND** the first request header "PostHog-Request-Id" should be a valid UUID
+- **AND** the first request header "PostHog-Attempt" should be integer 1
+- **AND** the first request header "PostHog-Request-Timestamp" should be an RFC 3339 timestamp with an explicit offset and at least 3 fractional-second digits
+
+#### Scenario: A retry keeps the request id and restamps the attempt and timestamp (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** the mock serves these ordered analytics responses:
+  | status | body                                   |
+  | 503    | {"error":"service_unavailable"}        |
+  | 200    | {"results":{"*":{"result":"ok"}}}      |
+- **WHEN** capture is called with distinct id "user-123" and event "Signed Up"
+- **AND** pending captures are flushed
+- **THEN** at least 2 capture request should have been received
+- **AND** all recorded request IDs should equal the nonempty first request ID
+- **AND** all recorded request attempts should be consecutive integers starting at one
+- **AND** the first two request headers "PostHog-Request-Timestamp" should be nonempty and different
+- **AND** the first two request bodies should have the same "created_at"
+
+### Requirement: Per-event results drive what is resent and what is reported
+
+An SDK that delivers events through capture v1 SHALL read the `results` object of a 2xx response, keyed by the event `uuid` in canonical lowercase hyphenated form, and treat each entry as the verdict for that event:
+
+- `ok` and `warning` mean the event was stored; the SDK SHALL NOT resend it or report it as a failure. `details` on an `ok` or `warning` entry (for example `person_processing_disabled`) is informational.
+- `drop` means capture refused the event; the SDK SHALL NOT resend it and SHALL report it through its error surface with the `details` tag as an opaque string.
+- `retry` means capture could not store the event this time; the SDK SHALL resend only the `retry` events, in their original relative order, as a new attempt of the same batch, and SHALL report an event still `retry` after the last attempt as exhausted.
+- An entry whose `result` value the SDK does not recognize, and an event whose uuid is absent from `results`, SHALL be treated as delivered.
+- A 2xx whose body is not JSON, or whose `results` is missing, `null` or not an object, cannot be read. It is a terminal failure of the whole batch: the SDK SHALL NOT resend the batch and SHALL report its events as lost through its error surface. `{"results": {}}` can be read, and every event in that batch counts as delivered.
+
+The SDK SHALL NOT hard-code the set of `details` tags. When a `results` entry carries `duplicates_dropped: n`, the request repeated that uuid: the first event with that uuid in the request takes the entry's `result` and `details`, and the SDK SHALL report exactly the next `n` events with that uuid as `drop` with the reason `duplicate_event_uuid`, never retrying them. The SDK SHALL NOT guard, split, rewrite or deduplicate repeated uuids before sending.
+
+When no error handler is registered, the SDK SHALL log one aggregate line per batch that lost events, carrying the count, the cause and the endpoint, and never event content. A client SDK, which has no error handler, MAY log that line only in debug mode, because it can repeat on every flush during an outage; in debug mode it SHALL log it. On a client SDK this line replaces per-event reporting, and its cause is the `details` tag or the status. A 2xx whose body cannot be read counts as lost in this line, on client SDKs too.
+
+Legacy capture: a 2xx meant the whole request was accepted and there was no per-event verdict.
+
+#### Scenario: Only retry verdicts are resent (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 3
+- **AND** the mock serves these ordered analytics responses:
+  | status | body                                                                                                                                    |
+  | 200    | {"results":{"<uuid 0>":{"result":"ok"},"<uuid 1>":{"result":"drop","details":"event_name_too_long"},"<uuid 2>":{"result":"retry","details":"not_persisted"}}} |
+  | 200    | {"results":{"<uuid 2>":{"result":"ok"}}}                                                                                                |
+- **WHEN** capture is called sequentially 3 times with zero-based top-level index substitution:
+  """application/json
+  {"distinct_id":"user-123","event":"event-{index}"}
+  """
+- **AND** pending captures are flushed
+- **THEN** at least 2 capture request should have been received
+- **AND** the second request should retain first-response retry UUIDs and omit its terminal UUIDs
+- **AND** the SDK should report event "event-1" as dropped with details "event_name_too_long"
+- **AND** the SDK should not report event "event-0" or "event-2" as failed
+
+#### Scenario: Duplicate copies are reported, not resent (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 3
+- **AND** the mock serves these ordered analytics responses:
+  | status | body                                                                 |
+  | 200    | {"results":{"0199c3e8-4c7b-7e2e-9f21-2b6d5a1c9e04":{"result":"ok","duplicates_dropped":2}}} |
+- **WHEN** capture is called sequentially 3 times with the same uuid "0199c3e8-4c7b-7e2e-9f21-2b6d5a1c9e04" and events "first", "second" and "third"
+- **AND** pending captures are flushed
+- **THEN** exactly 1 capture request should have been received
+- **AND** the first request should contain 3 events with uuid "0199c3e8-4c7b-7e2e-9f21-2b6d5a1c9e04"
+- **AND** the SDK should report events "second" and "third" as dropped with details "duplicate_event_uuid"
+- **AND** the SDK should not report event "first" as failed
+
+#### Scenario: Unknown verdicts and absent uuids count as delivered (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 2
+- **AND** the mock serves these ordered analytics responses:
+  | status | body                                                   |
+  | 200    | {"results":{"<uuid 0>":{"result":"accepted_later"}}}   |
+- **WHEN** capture is called sequentially 2 times with zero-based top-level index substitution:
+  """application/json
+  {"distinct_id":"user-123","event":"event-{index}"}
+  """
+- **AND** pending captures are flushed
+- **THEN** exactly 1 capture request should have been received
+- **AND** the SDK should not report any event as failed
+
+### Requirement: Per-event options replace the legacy option properties
+
+An SDK that delivers events through capture v1 SHALL accept an `options` object on every event-producing call (capture, AI capture, exception capture, identify or person-property calls, alias and group identify), SHALL send it as the event's `options` with every key and value as given, and SHALL NOT validate, convert or filter option values, except for the conversion its encoder needs (for example a client SDK's JSON sanitizer that writes dates and URLs as strings and drops values JSON cannot hold, or the Flutter platform channel codec). Capture reads options leniently and drops an event whose value it cannot read with `details: invalid_options`, which the SDK reports like any other drop. Keys the SDK does not know SHALL pass through unchanged. A non-object `options` value on a dynamically typed SDK SHALL be logged as an error and the event sent without caller options. posthog-flutter on the web delivers through posthog-js, which is on legacy capture, so there it maps options to the legacy option properties.
+
+The legacy option properties are the `$`-prefixed properties legacy capture reads as settings: `$process_person_profile`, `$cookieless_mode`, `$ignore_sent_at` and `$product_tour_id`. In the wire builder, after the last `before_send` hook and once per event, the SDK SHALL remove each of them from `properties` and SHALL copy its value into the matching option (`process_person_profile`, `cookieless_mode`, `disable_skew_correction`, `product_tour_id`) only when that option is absent or `null`. An option set by any layer therefore wins over a legacy property set by any layer, except on a server SDK's identify-style event, whose own legacy property moves into the option when the call submits it (see **Distinct ids and identity fallbacks on capture v1**). On a client SDK, the personless `process_person_profile: false` that the SDK sets itself is an SDK value: it fills only when no layer set the option or `$process_person_profile` (see **Caller-supplied event properties take precedence**), so a caller or registered `$process_person_profile: true` keeps person processing on. SDK-internal code (personless defaults, built-in AI and MCP integrations) SHALL set options directly and never write a legacy option property. Capture v1 takes these settings from `options`.
+
+A server SDK with global default properties SHALL offer global default options with the same interface, and an SDK with a request-context layer for properties SHALL offer context options (for example `super_options` and `set_context_option` in posthog-python, `Config.DefaultEventOptions` and `RequestContext.Options` in posthog-go, `registerOptions()` and context `options` in posthog-node). An SDK with neither layer needs neither. posthog-ios and posthog-android keep `register()` super properties without public global options; posthog_flutter 6.0 adds `registerOptions()` / `unregisterOptions()` on every platform except web.
+
+SDK docs, migration guides and examples SHALL set these values through `options`. They MAY say once, where options are introduced, that legacy option properties still work and that an option overrides its legacy property, and MAY show a table that maps each option to the property it replaces and a before-and-after migration example. posthog-ios and posthog-android have no public global options, so their docs MAY show `register()` with a legacy option property as the way to set an option on every event.
+
+Legacy capture: SDKs validated and converted `$process_person_profile` and `$cookieless_mode` themselves and sent them as properties.
+
+#### Scenario: A caller option is sent as given and the legacy property is removed (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **WHEN** capture is called with JSON arguments:
+  """application/json
+  {"distinct_id":"user-123","event":"Signed Up","properties":{"$cookieless_mode":true},"options":{"process_person_profile":"no","custom_flag":7}}
+  """
+- **AND** pending captures are flushed
+- **THEN** the first received event option "process_person_profile" should equal JSON "no"
+- **AND** the first received event option "custom_flag" should equal JSON 7
+- **AND** the first received event option "cookieless_mode" should equal JSON true
+- **AND** the first received event property "$cookieless_mode" should be absent
+
+#### Scenario: An option beats its legacy property (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **WHEN** capture is called with JSON arguments:
+  """application/json
+  {"distinct_id":"user-123","event":"Signed Up","properties":{"$process_person_profile":true},"options":{"process_person_profile":false}}
+  """
+- **AND** pending captures are flushed
+- **THEN** the first received event option "process_person_profile" should equal JSON false
+- **AND** the first received event property "$process_person_profile" should be absent
+
+#### Scenario: Unset options are omitted (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **WHEN** capture is called with distinct id "user-123" and event "Signed Up"
+- **AND** pending captures are flushed
+- **THEN** the first received event field "options" should be absent or an object
+- **AND** the first received event option "process_person_profile" should be absent
+- **AND** the first received event option "cookieless_mode" should be absent
+- **AND** the first received event option "disable_skew_correction" should be absent
+- **AND** the first received event option "product_tour_id" should be absent
+
+#### Scenario: Hoisting runs after before_send (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** before-send deletes the property "$process_person_profile"
+- **WHEN** capture is called with JSON arguments:
+  """application/json
+  {"distinct_id":"user-123","event":"Signed Up","properties":{"$process_person_profile":false}}
+  """
+- **AND** pending captures are flushed
+- **THEN** the first received event option "process_person_profile" should be absent
+- **AND** the first received event property "$process_person_profile" should be absent
+
+### Requirement: Server SDKs build every event in one layer order
+
+A server SDK that delivers events through capture v1 SHALL build each event in this order, for every event type its public API produces (capture, AI capture, exception capture, identify or person-property events, alias and group identify). Steps 4 and 5 apply to every SDK on capture v1, client SDKs included; a client SDK builds steps 1 to 3 as **Caller-supplied event properties take precedence** describes:
+
+1. **Identity resolves first.** The distinct id comes from the call, then the ambient request context, then a generated personless id (or the SDK's existing error for a missing id). A context session id becomes `$session_id` unless the event has its own.
+2. **The call's own values.** The call's `properties` and `options`, and typed call values (`groups`, a typed `$set` or `$set_once`), which win key by key over the same key in `properties`. On an identify-style event this step also sets `process_person_profile` from the call alone: the call's option, else its `$process_person_profile` property moved into the option, else `true` unless step 1 generated a personless id (see **Distinct ids and identity fallbacks on capture v1**).
+3. **Fill-only defaults**, each layer filling only what the layers above left unset: a built-in integration's library label (`$lib` with `$lib_version`, see **Events name their own library**), then the ambient request context, then the SDK-level default properties and options, then the values the SDK adds itself (`$is_server`, `$geoip_disable` from the client setting, system context, the `$feature/<key>` and `$active_feature_flags` properties derived from a flags snapshot or `send_feature_flags`, `$release_id`, the `process_person_profile: false` option for a personless event, `$trace_id` with `$span_id` from an active OpenTelemetry span, added as a pair only when no layer set either key, and last the SDK's own `$lib` and `$lib_version`, filled as a pair by the rule in **Events name their own library**). A property is unset only when its key is missing, so a `null` property blocks the fill; an option is unset when it is missing or `null`. `$lib` and `$lib_version` merge key by key like other properties. An SDK MAY also treat a `$lib` or `$lib_version` that is not a non-empty string as unset while merging layers; the SDK's own pair fill always does. `$set`, `$set_once`, `$groups` and `$group_set` fill one level deep when both values are objects.
+4. **`before_send`** runs on an isolated copy of the assembled event, including `options`, and has the final say. On an identify-style event whose option is set, the SDK removes any `$process_person_profile` property first, so the hook sees one value. The SDK SHALL NOT add or re-add any value after the hook, with two allowances: it MAY re-impose the uuid it generated before the hook, because a hook must not resend an SDK-generated uuid (see **Event uuid is sent in canonical form**), and it MAY treat a returned event whose `options` is absent as keeping the pre-hook options, while an empty `options` map still clears them. Where a minimized `$feature_flag_called` event is built, its allowlist SHALL be applied after step 3 and before step 4, and SHALL keep the legacy option properties, `$session_id` and `$window_id`.
+5. **Hoisting**, once, in the wire builder: the legacy option properties move into `options`, `$session_id` and `$window_id` move to their top-level fields. `$lib` and `$lib_version` stay in `properties`.
+
+In a wrapper whose events a native SDK delivers (posthog-flutter on iOS, macOS and Android), the wrapper's hook runs first, then the native SDK adds its own values, then the native SDK's `before_send` runs and has the final say. The wrapper's hooks do not run on every event type (see `before-send-hook`).
+
+A per-call argument such as `disable_geoip` belongs to step 2, so it beats a context or global `$geoip_disable`, while a `$geoip_disable` in the same call's `properties` still wins over it (see **Client-level GeoIP control with per-call override**); the client-level setting belongs to step 3, so a context or global value beats it. A built-in AI or MCP integration SHALL set `process_person_profile: false` at step 2 when it substitutes a trace or session id for a missing user id. Adding groups to an event SHALL NOT turn person processing on.
+
+Legacy capture: posthog-python 7.x merged `super_properties` over the call's properties and posthog-go 1.x merged `DefaultEventProperties` over the call's properties; both reversed in their capture v1 majors.
+
+#### Scenario: The call wins over context, global and SDK values (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** the SDK-level default properties carry "plan" equal to "free" and "$is_server" equal to false
+- **AND** the ambient request context, where the SDK has one, carries "plan" equal to "team"
+- **WHEN** capture is called with distinct id "user-123", event "Signed Up", and properties:
+  | property | value |
+  | plan     | pro   |
+- **AND** pending captures are flushed
+- **THEN** the first received event property "plan" should equal JSON "pro"
+- **AND** the first received event property "$is_server" should equal JSON false
+
+#### Scenario: Lower layers fill only unset keys and a null property blocks the fill (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** the SDK-level default properties carry "plan" equal to "free" and "region" equal to "eu"
+- **WHEN** capture is called with JSON arguments:
+  """application/json
+  {"distinct_id":"user-123","event":"Signed Up","properties":{"plan":null}}
+  """
+- **AND** pending captures are flushed
+- **THEN** the first received event property "plan" should be absent or equal JSON null
+- **AND** the first received event property "region" should equal JSON "eu"
+
+#### Scenario: A global option fills an unset option and a null option does not block it (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** the SDK-level default options carry "cookieless_mode" equal to true
+- **WHEN** capture is called with JSON arguments:
+  """application/json
+  {"distinct_id":"user-123","event":"Signed Up","options":{"cookieless_mode":null}}
+  """
+- **AND** pending captures are flushed
+- **THEN** the first received event option "cookieless_mode" should equal JSON true
+
+#### Scenario: Nested person and group properties fill one level deep (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** the SDK-level default properties carry "$set" equal to JSON `{"tier":"gold","source":"default"}`
+- **WHEN** capture is called with JSON arguments:
+  """application/json
+  {"distinct_id":"user-123","event":"Signed Up","properties":{"$set":{"source":"call"}}}
+  """
+- **AND** pending captures are flushed
+- **THEN** the first received event property "$set" should equal JSON `{"tier":"gold","source":"call"}`
+
+#### Scenario: before_send sees the filled event and can remove a default (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** the SDK-level default properties carry "plan" equal to "free"
+- **AND** before-send records the event it receives and deletes the property "$is_server"
+- **WHEN** capture is called with distinct id "user-123" and event "Signed Up"
+- **AND** pending captures are flushed
+- **THEN** the event before-send received should have property "plan" equal to "free" and property "$is_server" equal to true
+- **AND** the first received event property "$is_server" should be absent
+- **AND** the first received event property "plan" should equal JSON "free"
+
+#### Scenario: Groups never force person processing (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **WHEN** capture is called with JSON arguments:
+  """application/json
+  {"distinct_id":"user-123","event":"Signed Up","groups":{"company":"acme"}}
+  """
+- **AND** pending captures are flushed
+- **THEN** the first received event property "$groups" should equal JSON `{"company":"acme"}`
+- **AND** the first received event option "process_person_profile" should be absent
+
+### Requirement: Events name their own library
+
+Every SDK that delivers events through capture v1 SHALL send `$lib` and `$lib_version` in `properties`, and the wire builder SHALL NOT remove them. `$lib` names the library that produced the event and `$lib_version` its version; `PostHog-Sdk-Info` names the SDK that sent the request. For the SDK's own fill and for capture's fallback, `$lib` and `$lib_version` count as set only when they are non-empty strings.
+
+Every SDK SHALL fill the pair from its own identity after every other layer and before `before_send`: a server SDK as the last fill-only layer (step 3 of **Server SDKs build every event in one layer order**), a client SDK after the layers of **Caller-supplied event properties take precedence**. The fill:
+
+- When `$lib` is not set, the SDK SHALL set both `$lib` and `$lib_version`, replacing a `$lib_version` set without `$lib`, and a `$lib` that is `null`, empty or not a string.
+- When `$lib` is the SDK's own library name and `$lib_version` is not set, the SDK SHALL set `$lib_version`.
+- Otherwise the SDK SHALL leave both as they are. It SHALL NOT add its own `$lib_version` to another library's `$lib`.
+
+A built-in integration or wrapper (MCP instrumentation, AI wrappers, framework middleware) MAY label the events it captures with its own `$lib` and `$lib_version`. It SHALL set both, as the first fill-only layer of step 3, so a `$lib` in the call's `properties` wins over its label. Built-in integrations SHALL NOT change the client's `PostHog-Sdk-Info` value, except an MCP integration that labels a dedicated client (`mcp-analytics`, **Library identity**).
+
+`before_send` sees the filled values and MAY change or remove them; the SDK sends what the hook returns.
+
+Capture keeps the event's values. When the event's `$lib` is not set, capture sets both properties from `PostHog-Sdk-Info`. When `$lib` equals the header's library and `$lib_version` is not set, capture sets `$lib_version` from the header. Otherwise capture stores both as sent. Capture fills nothing when the header value does not split at its last `/` into a library and a version that are both non-empty after trimming, or when it is longer than 200 bytes.
+
+Legacy capture: server SDKs stamped `$lib` and `$lib_version` over the caller's values, and some integrations relabeled the client.
+
+#### Scenario: A caller-set library identity reaches the wire (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **WHEN** capture is called with distinct id "user-123", event "Signed Up", and properties:
+  | property     | value      |
+  | $lib         | custom-lib |
+  | $lib_version | 9.9.9      |
+- **AND** pending captures are flushed
+- **THEN** the first received event property "$lib" should equal "custom-lib"
+- **AND** the first received event property "$lib_version" should equal "9.9.9"
+- **AND** the first request header "PostHog-Sdk-Info" should match "<library>/<version>" for the SDK under test
+
+#### Scenario: Another library's $lib does not get the SDK's version (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **WHEN** capture is called with distinct id "user-123", event "Signed Up", and properties:
+  | property | value      |
+  | $lib     | custom-lib |
+- **AND** pending captures are flushed
+- **THEN** the first received event property "$lib" should equal "custom-lib"
+- **AND** the first received event property "$lib_version" should be absent
+
+#### Scenario: The SDK fills its own identity when the event names none (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **WHEN** capture is called with distinct id "user-123", event "Signed Up", and properties:
+  | property     | value |
+  | $lib         |       |
+  | $lib_version | 9.9.9 |
+- **AND** pending captures are flushed
+- **THEN** the first received event properties "$lib" and "$lib_version" should match "<library>/<version>" for the SDK under test
+
+#### Scenario: Another library's $lib does not get the SDK's version (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **WHEN** capture is called with event "Signed Up" and properties:
+  | property | value      |
+  | $lib     | custom-lib |
+- **THEN** one event named "Signed Up" should be enqueued
+- **AND** the enqueued event properties should include:
+  | property | value      |
+  | $lib     | custom-lib |
+- **AND** the enqueued "Signed Up" event should omit "$lib_version"
+
+### Requirement: Session and window ids are lifted only as strings
+
+An SDK that delivers events through capture v1 SHALL remove `$session_id` and `$window_id` from `properties` in the wire builder. A value whose JSON form is a string, including the empty string, SHALL be sent as the top-level `session_id` or `window_id` field. A `null` value SHALL be dropped silently. Any other value SHALL be dropped with a warning that names the key and the JSON type and never the value, because capture rejects the whole request when either field is not a string.
+
+#### Scenario: A string session id is lifted and a numeric one is dropped with a warning (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 2
+- **WHEN** capture is called with JSON arguments:
+  """application/json
+  {"distinct_id":"user-123","event":"With Session","properties":{"$session_id":"session-123"}}
+  """
+- **AND** capture is called with JSON arguments:
+  """application/json
+  {"distinct_id":"user-123","event":"Bad Session","properties":{"$session_id":123}}
+  """
+- **AND** pending captures are flushed
+- **THEN** the received event "With Session" should have top-level "session_id" equal to "session-123"
+- **AND** the received event "With Session" should have property "$session_id" absent
+- **AND** the received event "Bad Session" should have top-level "session_id" absent
+- **AND** the received event "Bad Session" should have property "$session_id" absent
+- **AND** the SDK should record a warning that names "$session_id" and the JSON type "number" and does not contain "123"
+
+### Requirement: Distinct ids and identity fallbacks on capture v1
+
+An SDK that delivers events through capture v1 SHALL treat an empty or whitespace-only caller `distinct_id` as missing. A missing id keeps the SDK's existing behavior: a generated personless id (UUIDv7, with `process_person_profile: false` set as an option) or a clear error returned to the caller. The SDK SHALL never send an event without a `distinct_id` key.
+
+The SDK SHALL NOT shorten, hash or reject distinct ids by length or by placeholder value: capture v1 drops an event whose `distinct_id` is over 200 UTF-8 bytes (`distinct_id_too_large`) and accepts placeholder values such as `anonymous` without a person profile, and reports both in that event's `results` entry. A `$groupidentify` event's `distinct_id` SHALL be the caller's id when given, else the request-context id where the SDK has one, else `$<group type>_<group key>`, and never a random value. An `alias` call SHALL never take its target from the request context. A server SDK SHALL default identify-style events (`$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`, `$set` and `$set_once`) to person processing when the call submits them, before any layer fills and before `before_send`: a non-`null` `process_person_profile` option on the call stands; otherwise a non-`null` `$process_person_profile` property on the call moves into the option and leaves the properties; otherwise the option is `true`, unless the SDK generated the event's distinct id, which keeps the personless `false`. A `null` option or property counts as unset. So global, context and registered layers do not set `process_person_profile` on an identify-style event whose distinct id the SDK did not generate; they reach it like any other event for every other property and option, and `$groupidentify` never takes the context session id. Once the option is set, the SDK SHALL remove any `$process_person_profile` property from the event before `before_send`, so the hook sees one value; the hook can still change the option and has the final say. The default applies to the event name the call submitted, so a hook that builds an identify-style event, or renames an event to one, sets the option itself, and SDK docs SHALL say so. When the final `process_person_profile` on `$identify`, `$create_alias`, `$merge_dangerously` or `$groupidentify` is `false`, capture still accepts it and reports it `ok`, but ingestion drops it (ingestion warning `invalid_event_when_process_person_profile_is_false`), so the identify, alias, merge or group update never takes effect; a `$set` or `$set_once` event is kept without its person update. SDK docs and migration guides SHALL describe this default, and SHALL tell apps that want an identify-style event personless to set `process_person_profile: false` on the call or in `before_send`, or to turn person processing off for the project. On a client SDK, global and registered layers still reach these events like any other event, and a `process_person_profile: true` call option, or one set in `before_send`, keeps them. Client SDKs have no request context: they send `$groupidentify` with the current distinct id, and with the session id like any other event.
+
+Legacy capture: distinct ids over 200 characters were shortened and the event kept; posthog-python 6.x used a random id for `$groupidentify` without a caller id.
+
+#### Scenario: A whitespace distinct id becomes a personless event (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** the SDK generates a personless id for a missing distinct id
+- **WHEN** capture is called with distinct id "   " and event "Anonymous Action"
+- **AND** pending captures are flushed
+- **THEN** the first received event field "distinct_id" should be a nonempty string that is not "   "
+- **AND** the first received event option "process_person_profile" should equal JSON false
+
+#### Scenario: Group identify falls back to the type and key id (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **WHEN** group identify is called for group type "company" and key "acme" with no distinct id and properties:
+  | property | value |
+  | name     | Acme  |
+- **AND** pending captures are flushed
+- **THEN** the first received event field "event" should equal "$groupidentify"
+- **AND** the first received event field "distinct_id" should equal "$company_acme"
+- **AND** the first received event field "session_id" should be absent
+
+#### Scenario: A long distinct id is sent unchanged (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **WHEN** capture is called with a distinct id of 250 ASCII characters and event "Long Id"
+- **AND** pending captures are flushed
+- **THEN** the first received event field "distinct_id" should have length 250
+
+#### Scenario: A layered personless option does not reach an identify-style event (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** the SDK-level default options carry "process_person_profile" equal to false
+- **WHEN** group identify is called with JSON arguments:
+  """application/json
+  {"group_type":"company","group_key":"acme","distinct_id":"user-123"}
+  """
+- **AND** pending captures are flushed
+- **THEN** the first received event field "event" should equal "$groupidentify"
+- **AND** the first received event option "process_person_profile" should equal JSON true
+
+#### Scenario: A layered legacy personless property does not reach an identify-style event (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** the SDK-level default properties carry "$process_person_profile" equal to false
+- **WHEN** capture is called with JSON arguments:
+  """application/json
+  {"distinct_id":"user-123","event":"$set","properties":{"$set":{"plan":"pro"}}}
+  """
+- **AND** pending captures are flushed
+- **THEN** the first received event option "process_person_profile" should equal JSON true
+- **AND** the first received event property "$process_person_profile" should be absent
+
+#### Scenario: A call option sets person processing on an identify-style event (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **WHEN** group identify is called with JSON arguments:
+  """application/json
+  {"group_type":"company","group_key":"acme","distinct_id":"user-123","options":{"process_person_profile":false}}
+  """
+- **AND** pending captures are flushed
+- **THEN** the first received event option "process_person_profile" should equal JSON false
+
+#### Scenario: A call's legacy property becomes the option on an identify-style event (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** the SDK-level default options carry "process_person_profile" equal to true
+- **WHEN** capture is called with JSON arguments:
+  """application/json
+  {"distinct_id":"user-123","event":"$identify","properties":{"$process_person_profile":false}}
+  """
+- **AND** pending captures are flushed
+- **THEN** the first received event option "process_person_profile" should equal JSON false
+- **AND** the first received event property "$process_person_profile" should be absent
+
+#### Scenario: An identify-style event with a generated distinct id stays personless (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** the SDK generates a personless id for a missing distinct id
+- **WHEN** capture is called with distinct id "   " and event "$set"
+- **AND** pending captures are flushed
+- **THEN** the first received event option "process_person_profile" should equal JSON false
+
+#### Scenario: Other events keep a layered personless option (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** the SDK-level default options carry "process_person_profile" equal to false
+- **WHEN** capture is called with distinct id "user-123" and event "Signed Up"
+- **AND** pending captures are flushed
+- **THEN** the first received event option "process_person_profile" should equal JSON false
+
+#### Scenario: before_send sees one person processing value on an identify-style event (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** the SDK-level default properties carry "$process_person_profile" equal to false
+- **AND** before-send deletes the event options
+- **WHEN** capture is called with distinct id "user-123" and event "$identify"
+- **AND** pending captures are flushed
+- **THEN** the first received event option "process_person_profile" should be absent
+- **AND** the first received event property "$process_person_profile" should be absent
+
+### Requirement: Timestamps on capture v1
+
+An SDK that delivers events through capture v1 SHALL stamp a missing event `timestamp` once, when the event is captured or enqueued, from the same clock as `PostHog-Request-Timestamp`, and SHALL NOT change it afterwards (not on retry, not after a restart). Every timestamp on the wire (`timestamp`, `created_at`, `PostHog-Request-Timestamp`) SHALL be RFC 3339 with an explicit offset (`Z` or `±HH:MM`) and at least three fractional-second digits, written even when they are zero (`2025-01-01T00:00:00.000Z`, never `2025-01-01T00:00:00Z`). Finer digits from the caller or the clock SHALL be kept, up to nine (3, 6 and 9 digits are all valid), and SHALL NOT be trimmed below three. A client SDK MAY write the timestamps it stamps itself with exactly three digits (milliseconds). The SDK SHALL NOT correct clock skew locally, SHALL NOT reject or clamp a future timestamp, and SHALL NOT send an `offset` field. An unparseable caller timestamp SHALL be replaced with the current time and logged with a warning that names the rule and never the value. A naive caller timestamp follows the SDK's documented zone rule.
+
+Legacy capture: `timestamp` was optional and some SDKs sent an `offset`; posthog-rs rejected future timestamps.
+
+#### Scenario: A caller timestamp keeps its sub-millisecond precision and offset semantics (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **WHEN** capture is called with JSON arguments:
+  """application/json
+  {"distinct_id":"user-123","event":"Precise","timestamp":"2025-01-02T08:34:05.123456+05:30"}
+  """
+- **AND** pending captures are flushed
+- **THEN** every event in the first capture request should have UTC timestamp "2025-01-02T03:04:05.123456Z"
+
+#### Scenario: A generated timestamp has at least millisecond precision (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00.250Z"
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **WHEN** capture is called with distinct id "user-123" and event "Stamped"
+- **AND** pending captures are flushed
+- **THEN** every event in the first capture request should have UTC timestamp "2025-01-01T00:00:00.250Z"
+
+#### Scenario: Whole-second timestamps keep three zero digits (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 2
+- **WHEN** capture is called with distinct id "user-123" and event "Stamped"
+- **AND** capture is called with JSON arguments:
+  """application/json
+  {"distinct_id":"user-123","event":"Caller","timestamp":"2025-01-02T03:04:05Z"}
+  """
+- **AND** pending captures are flushed
+- **THEN** exactly 1 capture request should have been received
+- **AND** the first received event field "timestamp" should be the instant "2025-01-01T00:00:00Z" with at least 3 fractional-second digits
+- **AND** the second received event field "timestamp" should be the instant "2025-01-02T03:04:05Z" with at least 3 fractional-second digits
+- **AND** the request body field "created_at" should be the instant "2025-01-01T00:00:00Z" with at least 3 fractional-second digits
+- **AND** the first request header "PostHog-Request-Timestamp" should be the instant "2025-01-01T00:00:00Z" with at least 3 fractional-second digits
+
+#### Scenario: A retry resends the original event timestamp (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **AND** the mock serves these ordered analytics responses:
+  | status | body                                   |
+  | 503    | {"error":"service_unavailable"}        |
+  | 200    | {"results":{"*":{"result":"ok"}}}      |
+- **WHEN** capture is called with distinct id "user-123" and event "Retried"
+- **AND** pending captures are flushed
+- **THEN** at least 2 capture request should have been received
+- **AND** the present event "timestamp" lists in requests zero and one should be identical
+- **AND** the present event "uuid" lists in requests zero and one should be identical
+
+### Requirement: Each event is serialized on its own and the body is strict JSON
+
+An SDK that delivers events through capture v1 SHALL serialize each event independently, so that one event the encoder cannot write never costs its batch, and SHALL send a body a strict JSON parser accepts: no bare `NaN`, `Infinity` or `-Infinity` tokens and no duplicate keys. An event whose serialization fails SHALL be dropped alone and reported through the SDK's local-drop path. A non-finite number inside `properties` SHALL be sent as JSON `null` and the event kept (posthog-node, posthog-rs, posthog-python, and posthog-go from v2). The SDK SHALL NOT add a per-value check to events that hold no non-finite number: an encoder that already writes `null` needs nothing, and an encoder that rejects non-finite numbers SHALL encode each event strictly first and rewrite its non-finite numbers to `null` only when that encoding fails (posthog-python, posthog-go). A client SDK MAY drop the non-finite property instead and keep the event (posthog-ios, posthog-android, posthog-flutter on Windows and Linux).
+
+A missing, `null`, empty or non-string event name SHALL be dropped locally: never sent, never converted and never raised to the caller as an error. A non-string property or option key with a natural string form (number, boolean, symbol) MAY be converted as the language's JSON encoder does; a key the encoder cannot write drops only that key.
+
+Legacy capture: whole-batch serialization let one bad value lose every event in the batch.
+
+#### Scenario: An unserializable event does not cost its neighbors (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 2
+- **WHEN** capture is called with distinct id "user-123", event "Bad", and a property value the SDK's JSON encoder cannot write
+- **AND** capture is called with distinct id "user-123" and event "Good"
+- **AND** pending captures are flushed
+- **THEN** exactly 1 capture request should have been received
+- **AND** the request should contain only the event "Good"
+- **AND** the request body should parse under a strict JSON parser
+
+#### Scenario: An empty event name is dropped locally (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **AND** the SDK is initialized with token "phc_test_key" and flush threshold 1
+- **WHEN** capture is called with distinct id "user-123" and event ""
+- **AND** pending captures are flushed
+- **THEN** the capture call should not throw
+- **AND** no capture request should have been received
+
+### Requirement: The client fails open on a missing or personal API key
+
+Constructing an SDK client that delivers events through capture v1 SHALL never throw or fail because of the project token. An empty or whitespace-only token, or a token that starts with `phx_` (a personal API key, which capture always rejects), SHALL produce a disabled client that accepts every call, sends nothing, returns flag defaults and logs one message, so a secret key never reaches the wire. The SDK SHALL log that message whether or not debug mode is on, client SDKs included, at any level that is always on (an error, or a warning on posthog-android). Any other malformed token SHALL be sent as given, and capture's `401` SHALL reach the error surface. A server SDK SHALL offer an explicit way to build a disabled client for tests. A built-in integration SHALL NOT raise or return a constructor error over an analytics-only setup problem; it logs one error and turns its own capture off.
+
+#### Scenario: A personal API key disables the client without throwing (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **WHEN** the SDK is initialized with token "phx_secret_personal_key" and flush threshold 1
+- **AND** capture is called with distinct id "user-123" and event "Signed Up"
+- **AND** pending captures are flushed
+- **THEN** the initialization should not throw
+- **AND** no capture request should have been received
+- **AND** the SDK should record one error log about the personal API key that does not contain "phx_secret_personal_key"
+
+#### Scenario: A blank token disables the client (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the mock PostHog server is reset
+- **WHEN** the SDK is initialized with token "   " and flush threshold 1
+- **AND** capture is called with distinct id "user-123" and event "Signed Up"
+- **AND** pending captures are flushed
+- **THEN** the initialization should not throw
+- **AND** no capture request should have been received
+
+## MODIFIED Requirements
+
+### Requirement: Caller-supplied event properties take precedence
+
+On client SDKs, an event's properties SHALL be merged in this order, each layer overwriting the one before:
+
+1. Properties the SDK sets itself.
+2. Registered (super) properties.
+3. The properties the caller passes on the event.
+
+On capture v1, `$lib` and `$lib_version` are the one exception: the SDK fills its own pair after these layers and before `before_send`, as **Events name their own library** describes.
+
+`before_send` (Behavior step 6) then runs over the assembled message and can change any of them.
+
+A registered or caller value for a key the SDK sets itself changes that event only. It SHALL NOT change the SDK's own state: a later event without that key carries the SDK's value again, and a caller `process_person_profile` option (on legacy capture, the `$process_person_profile` property) does not turn person processing on or off for the SDK.
+
+The project token is request routing, not an event property. Where an SDK carries it on the event (posthog-js stamps `token` on every event and takes the batch `api_key` from it), the SDK SHALL set the configured token on every event, and a registered or caller `token` SHALL NOT replace it.
+
+A group the caller passes for the event SHALL win over a registered group of the same type.
+
+This requirement does not apply to server SDKs. Server SDKs that deliver through capture v1 follow **Server SDKs build every event in one layer order**: the call's values win, including a caller's `$lib` and `$lib_version`, and the SDK's own identity fills only what the event leaves unset. Server SDKs still on legacy capture set `$lib` and `$lib_version` after the caller's properties, and python 7.x, go 1.x, dotnet and elixir apply their SDK-level default properties after the caller's properties as well.
+
+#### Scenario: Caller property overrides an SDK context property (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **WHEN** capture is called with event "Signed Up" and properties:
+  | property  | value      |
+  | $app_name | custom-app |
+- **THEN** one event named "Signed Up" should be enqueued
+- **AND** the enqueued event properties should include:
+  | property  | value      |
+  | $app_name | custom-app |
+
+#### Scenario: Registered property overrides an SDK-set property (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and person profiles mode "never"
+- **AND** registered properties are:
+  | property       | value |
+  | $is_identified | true  |
+- **WHEN** capture is called with event "Signed Up"
+- **THEN** one event named "Signed Up" should be enqueued
+- **AND** the enqueued event properties should include:
+  | property       | value |
+  | $is_identified | true  |
+
+#### Scenario: Caller property overrides an SDK-set property (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and person profiles mode "never"
+- **WHEN** capture is called with event "Signed Up" and properties:
+  | property                | value |
+  | $process_person_profile | true  |
+  | $is_identified          | true  |
+- **THEN** one event named "Signed Up" should be enqueued
+- **AND** the enqueued event properties should include:
+  | property                | value |
+  | $process_person_profile | true  |
+  | $is_identified          | true  |
+
+#### Scenario: Caller property changes that event only (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and person profiles mode "never"
+- **WHEN** capture is called with event "Signed Up" and properties:
+  | property                | value |
+  | $process_person_profile | true  |
+  | $is_identified          | true  |
+- **AND** capture is called with event "Viewed Dashboard"
+- **THEN** one event named "Viewed Dashboard" should be enqueued
+- **AND** the enqueued "Viewed Dashboard" event properties should include:
+  | property                | value |
+  | $process_person_profile | false |
+  | $is_identified          | false |
+
+### Requirement: Client-level GeoIP control with per-call override
+
+A server SDK SHALL expose a client-level GeoIP option (`disableGeoip`, `disable_geoip`, or the
+platform's casing) that controls whether the events it sends ask the backend to skip GeoIP
+enrichment. That option SHOULD default to disabling enrichment: server SDKs send events from
+their own network, so enriching them would attribute every event to the server's location.
+posthog-php and posthog-rs currently default to enabling enrichment. Changing a shipped default
+is a breaking change, so each SDK makes it, if at all, in its next major release. Client SDKs
+SHALL NOT require the option: they run in the end user's network context, where GeoIP
+enrichment is the intended behavior.
+
+Event-producing APIs that accept options (at least `capture`, `identify`, `alias`, and
+`group_identify`) SHALL accept the same option per call. A per-call value that is not set
+(omitted or null) SHALL inherit the client-level setting and SHALL NOT be read as `false`. An
+explicitly set per-call value SHALL override the client-level setting in both directions: an
+explicit `false` SHALL re-enable GeoIP enrichment for that call even when the client-level
+setting disables it.
+
+An SDK whose shipped per-call option can't represent "not set", such as posthog-go's
+non-nullable `DisableGeoIP` message field, conforms by keeping the client-level setting
+authoritative for that API until a major release lets it tell an unset value from an explicit
+one. It SHALL NOT read the zero value as an explicit `false`. Scenarios that need an explicit
+per-call override on an event API are tagged `@geoip_per_call_unset_capable`.
+
+An explicitly set per-call value is a value of that event: the SDK SHALL send it as
+`$geoip_disable` with that value, `true` or `false`, so a per-call `false` beats a
+`$geoip_disable: true` from the request context or the SDK-level default properties. A
+`$geoip_disable` in the same call's properties still wins over it (see **Server SDKs build every
+event in one layer order**). When no per-call value is set and the client-level setting disables
+GeoIP, the SDK SHALL mark the event with `$geoip_disable: true` among the event's ordinary
+properties. The SDK SHALL stamp the marker before `before_send` runs, so a hook can inspect,
+replace, or remove it. The marker SHALL NOT be copied into `$set`, `$set_once`, or `$group_set`,
+because it is event context rather than a person or group property. When no per-call value is set
+and the client-level setting does not disable GeoIP, the SDK SHALL omit the marker and SHALL NOT
+remove a `$geoip_disable` property the caller supplied in the call's properties.
+
+A remote feature-flag evaluation request SHALL carry the same effective value as the
+`geoip_disable` field of its request body, resolved from the per-call option where the flag API
+exposes one and otherwise from the client-level setting.
+
+`$geoip_disable` is a processing-control sentinel in the sense of the
+`feature-flag-called-tracker` minimal-event allowlist, so a minimized `$feature_flag_called`
+event SHALL retain it when the SDK stamped it.
+
+#### Scenario: The client-level setting marks an ordinary event (@server)
+- **GIVEN** the client is constructed with the GeoIP option set to disable enrichment
+- **WHEN** capture is called with event "Save" and no per-call GeoIP option
+- **THEN** the enqueued "Save" event should have property "$geoip_disable" equal to true
+
+#### Scenario: An explicit per-call false re-enables enrichment for one call (@server @geoip_per_call_unset_capable)
+- **GIVEN** the client is constructed with the GeoIP option set to disable enrichment
+- **WHEN** capture is called with event "Save" and the per-call GeoIP option set to false
+- **THEN** the enqueued "Save" event should have property "$geoip_disable" equal to false
+- **WHEN** capture is called with event "Save Again" and no per-call GeoIP option
+- **THEN** the enqueued "Save Again" event should have property "$geoip_disable" equal to true
+
+#### Scenario: An omitted per-call value inherits an enabled client setting (@server)
+- **GIVEN** the client is constructed with the GeoIP option set to allow enrichment
+- **WHEN** capture is called with event "Save" and no per-call GeoIP option
+- **THEN** the enqueued "Save" event should omit "$geoip_disable"
+
+#### Scenario: A caller-supplied marker survives an enabled client setting (@server)
+- **GIVEN** the client is constructed with the GeoIP option set to allow enrichment
+- **WHEN** capture is called with event "Save" and properties:
+  | property        | value |
+  | $geoip_disable  | true  |
+- **THEN** the enqueued "Save" event should have property "$geoip_disable" equal to true
+
+#### Scenario: Group identify carries the marker outside $group_set (@server)
+- **GIVEN** the client is constructed with the GeoIP option set to disable enrichment
+- **WHEN** group identify is called for group type "company" and key "acme" with properties:
+  | property | value |
+  | name     | Acme  |
+- **THEN** the enqueued "$groupidentify" event should have property "$geoip_disable" equal to true
+- **AND** the enqueued "$groupidentify" event "$group_set" should omit "$geoip_disable"
+
+#### Scenario: A flag evaluation request carries the effective value (@server)
+- **GIVEN** the client is constructed with the GeoIP option set to disable enrichment
+- **WHEN** a remote feature-flag evaluation request is made with no per-call GeoIP option
+- **THEN** the request body field "geoip_disable" should be true
+- **WHEN** a remote feature-flag evaluation request is made with the per-call GeoIP option set to false
+- **THEN** the request body field "geoip_disable" should be false

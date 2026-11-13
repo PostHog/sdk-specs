@@ -261,9 +261,7 @@ Feature: Capture
       | $process_person_profile | false |
     When identify is called with distinct id "user-123"
     Then one event named "$identify" should be enqueued
-    And the enqueued "$identify" event properties should include:
-      | property                | value |
-      | $process_person_profile | true  |
+    And the enqueued "$identify" event should not include property "$process_person_profile"
 
   # The value "" is the empty string, a variant PostHog no longer accepts for new flags.
   @client

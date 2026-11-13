@@ -400,7 +400,7 @@ On client SDKs, an event's properties SHALL be merged in this order, each layer 
 
 A registered or caller value for a key the SDK sets itself changes that event only. It SHALL NOT change the SDK's own state: a later event without that key carries the SDK's value again, and a caller `$process_person_profile` does not turn person processing on or off for the SDK.
 
-A registered `$process_person_profile`, and a `process_person_profile` option a wrapper SDK registers, SHALL NOT be sent with the identity events `$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`, `$set` and `$set_once`. With person processing off, PostHog drops the first four and ignores the person update in `$set` and `$set_once`, so a registered `false` would stop `identify`, `alias`, `group` and `setPersonProperties` from working. The SDK's own `$process_person_profile` is still set, and a value passed on the call or set in `before_send` still applies. posthog-ios 4.0, posthog-android 4.0 and posthog-flutter 6.0 do this. posthog-js and posthog-react-native still send the registered value.
+A registered `$process_person_profile`, and a `process_person_profile` option a wrapper SDK registers, SHALL NOT be sent with the identity events `$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`, `$set` and `$set_once`. With person processing off, PostHog drops the first four and ignores the person update in `$set` and `$set_once`, so a registered `false` would stop `identify`, `alias`, `group` and `setPersonProperties` from working. A value passed on the call or set in `before_send` still applies. posthog-ios 4.0, posthog-android 4.0 and posthog-flutter 6.0 do this. posthog-js and posthog-react-native still send the registered value.
 
 The project token is request routing, not an event property. Where an SDK carries it on the event (posthog-js stamps `token` on every event and takes the batch `api_key` from it), the SDK SHALL set the configured token on every event, and a registered or caller `token` SHALL NOT replace it.
 
@@ -481,9 +481,7 @@ This requirement does not apply to server SDKs. Most server SDKs set `$lib` and 
   | $process_person_profile | false |
 - **WHEN** identify is called with distinct id "user-123"
 - **THEN** one event named "$identify" should be enqueued
-- **AND** the enqueued "$identify" event properties should include:
-  | property                | value |
-  | $process_person_profile | true  |
+- **AND** the enqueued "$identify" event should not include property "$process_person_profile"
 
 ### Requirement: Client-level GeoIP control with per-call override
 

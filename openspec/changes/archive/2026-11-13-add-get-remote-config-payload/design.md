@@ -1,10 +1,15 @@
 ## Divergence from the reference
 
-posthog-js is the reference, and three requirements describe behavior that posthog-node does not have. All three are recommendations (`SHOULD`), not mandatory rules. posthog-node has none of the three behaviors and no test for or against the first two. Its test for a flag with no payload mocks a response that PostHog does not send. No change to posthog-js comes with this spec. As recommendations, they leave every shipped SDK conformant. The spec recommends both because a flag key that is not encoded can change the path or the query of the request, and because a caller cannot tell an error body from a payload. It recommends the third because PostHog answers a flag that has no payload with an empty body.
+posthog-js is the reference, and four requirements describe behavior that posthog-node does not have. One is mandatory: "Flag key containment". Three are recommendations (`SHOULD`): the exact flag key encoding, the failure status and the empty body. posthog-node has none of the four behaviors and no test for or against the first three. Its test for a flag with no payload mocks a response that PostHog does not send. No change to posthog-js comes with this spec.
+
+Containment is mandatory because the request carries the secret key. With a raw key such as `../../../users/@me/#`, an HTTP client resolves the dot segments and drops the fragment, so the request goes to another API route with the `Authorization` header and without the `token` query. An application that passes an untrusted flag key then exposes other routes to the secret key. The shipped SDKs that do not contain the key do not conform ("Existing SDK conformance").
+
+The three recommendations leave every shipped SDK conformant on those points. The spec recommends the exact encoding so that SDKs send the same request for the same key, the failure status because a caller cannot tell an error body from a payload, and the empty body because PostHog answers a flag that has no payload with an empty body.
 
 | Requirement | What the requirement says | posthog-js | Covering test in posthog-js |
 |---|---|---|---|
-| Flag key encoding | The SDK should percent-encode the flag key as one path segment. | The key goes into the path as is (`packages/node/src/client.ts:3232`). | No covering test. |
+| Flag key containment | The flag key cannot change the path outside its one segment, the query, or the fragment of the request. Mandatory. | The key goes into the path as is (`packages/node/src/client.ts:3232`). | No covering test. |
+| Flag key encoding | The SDK should use the exact percent-encoding of "Flag key encoding". | The key goes into the path as is (`packages/node/src/client.ts:3232`). | No covering test. |
 | Failure status | A response with a status outside 200 to 299 should fail the call. The body should not be the payload. | No status check. A JSON error body is returned as the payload (`packages/node/src/client.ts:2187-2206`). | No covering test. |
 | Empty body | For a response with a status from 200 to 299 and an empty body, the SDK should return no result and should not report a failure. | `response.json()` rejects on an empty body, and nothing catches it (`packages/node/src/client.ts:2192`). | "should return empty object when no payload is available" (`packages/node/src/__tests__/posthog-node.spec.ts:3531`) mocks a `{}` response, which PostHog does not send for this case. |
 
@@ -41,7 +46,8 @@ The method is not the client `/config` bootstrap. That feature belongs to the `r
 
 - **A new capability.** `README.md` says a new capability is a new sibling folder. The name `get-remote-config-payload` follows the SDK method name and does not collide with `remote-config`.
 - **Server SDKs only.** The request needs a secret key, which must never reach a client.
-- **The requirements follow posthog-node, with three recommendations beyond it.** Where another shipped SDK agrees, the requirement is firm. The flag key encoding, the failure status and the empty body are recommendations that posthog-node does not follow (see "Divergence from the reference"). For the other points where the shipped SDKs disagree and posthog-node has no test, the requirement says only what all of the evidence supports, and the point is an open decision below.
+- **The requirements follow posthog-node, with one mandatory rule and three recommendations beyond it.** Where another shipped SDK agrees, the requirement is firm. Flag key containment is mandatory, and the exact flag key encoding, the failure status and the empty body are recommendations. posthog-node follows none of them (see "Divergence from the reference"). For the other points where the shipped SDKs disagree and posthog-node has no test, the requirement says only what all of the evidence supports, and the point is an open decision below.
+- **A flag key cannot leave the remote config route.** The request carries the secret key, so the rule is mandatory. An SDK encodes the key as one path segment, or refuses it. Percent-encoding does not change `.` and `..`, so an SDK that encodes also refuses or contains those two keys. The four new ports encode the key as one segment and refuse a key that is empty, `.` or `..`, so they conform.
 - **The recommended encoding keeps the flag key one path segment.** In that encoding, the RFC 3986 unreserved set is never encoded. `/`, `?`, `#`, `%`, a space and non-ASCII bytes are always encoded. The other characters that RFC 3986 permits in a path segment (the sub-delimiters, `:` and `@`) are optional, because path-segment builders differ: `Uri.EscapeDataString` in posthog-dotnet and `quote(key, safe='')` in the async client of posthog-python encode them, and the OkHttp and Rust `url` path-segment builders do not. Both forms name the same segment. A space becomes `%20`, never `+`, because the key is in a path.
 - **A failure status should be a failed request.** The recommended result is the same as for a request that does not complete. This matches posthog-python, posthog-go and posthog-dotnet. A caller cannot tell an error object from a payload otherwise.
 - **An empty body is a flag with no payload.** PostHog sends status 200 and an empty body for a flag that has no payload, so the recommended result is no result and no failure report.
@@ -56,10 +62,11 @@ The method is not the client `/config` bootstrap. That feature belongs to the `r
 
 | Date | Point | Decision |
 |---|---|---|
+| 2026-11-13 | Flag key containment | Mandatory. The flag key SHALL NOT change the path outside its one segment, the query, or the fragment of the request. Requirement "Flag key containment", with a scenario for `../../../users/@me/#`. |
 | 2026-11-13 | Flag key encoding | Recommendation. The SDK SHOULD percent-encode the flag key as one path segment. Requirement "Flag key encoding", with a scenario for `a/b?c#d e`. |
 | 2026-11-13 | Failure status | Recommendation. A response with a status outside 200 to 299 SHOULD be treated as a failed request, and the SDK SHOULD NOT return the body as the payload. Requirement "Failure status", with scenarios for 401, 404 and 500. |
 | 2026-11-13 | Empty body | Recommendation. For a response with a status from 200 to 299 and an empty body, the SDK SHOULD return no result and SHOULD NOT report a failure. Requirement "Empty body", with one scenario. |
-| 2026-11-13 | Strength of the three points and of the open points | Flag key encoding, failure status and empty body are recommendations, because posthog-node has none of these behaviors. The points below stay open and loose. |
+| 2026-11-13 | Strength of the three points and of the open points | Flag key encoding, failure status and empty body are recommendations, because posthog-node has none of these behaviors. Flag key containment is mandatory, because the request carries the secret key. The points below stay open and loose. |
 
 ## Open decisions
 
@@ -133,7 +140,7 @@ The four new ports use the host that the SDK already uses for the local evaluati
 
 posthog-node has no guard (`client.ts:3232`). No test covers it. Percent-encoding does not change `.`, so a key of `..` is still a dot segment. URL builders in OkHttp and the Rust `url` crate drop or rewrite those segments, and the request then goes to a different endpoint. posthog-go removes a segment for `..` (reported, from a local run of `url.JoinPath`).
 
-The four new ports refuse such a key with no request and report it as each SDK reports a failure. The spec does not define the request or the result for this key. The "Flag key encoding" requirement says so. The repo's specs use `SHOULD` for guidance that an SDK can skip (63 uses in `openspec/specs` at the sdk-specs SHA above), so a `SHOULD` is possible later: "An SDK SHOULD refuse a flag key that is empty, `.` or `..` and send no request." This change keeps the point undefined.
+The four new ports refuse such a key with no request and report it as each SDK reports a failure. The spec does not define the result for this key. "Flag key containment" forbids a request to a path of another form, so only the result is open. The repo's specs use `SHOULD` for guidance that an SDK can skip (63 uses in `openspec/specs` at the sdk-specs SHA above), so a `SHOULD` is possible later: "An SDK SHOULD refuse a flag key that is empty, `.` or `..` and send no request." This change keeps the result undefined.
 
 ### Headers are not an open decision
 
@@ -147,6 +154,7 @@ The table says how each shipped SDK stands against the requirements. The spec do
 |---|---|---|---|---|---|
 | Public surface | Yes (`client.ts:2177`) | Yes (`client.py:5131`) | Yes (`client.rb:571`) | Yes (`posthog.go:2003`, interface line not re-read) | Yes (`PostHogClient.cs:1006`) |
 | Request | Yes (`client.ts:3232-3235`) | Yes (`request.py:420`) | Yes (`feature_flags.rb:1896-1898`) | Yes when `AppHost` is not set (`posthog.go:2004`, `config.go:355-360`) | Yes (`PostHogApiClient.cs:206-209`) |
+| Flag key containment | No. The raw key goes into the path (`client.ts:3232`) | No on the sync path: the raw key goes into the path (`request.py:420`). No on the async path for `.` and `..`: `quote(key, safe='')` contains `/`, `?` and `#` (`_async_request.py:184`), but a key of `..` gives the path `/api/projects/@current/remote_config` (from a local run with httpx 0.28.1) | No. The raw key goes into the path (`feature_flags.rb:1896`) | No. `url.JoinPath` with the raw key (`posthog.go:2004`). `?`, `#` and a space come out escaped, a `/` splits the path, and `..` removes a segment. The key `../../../users/@me/#` gives the path `/api/users/@me/%23/remote_config` (from a local run with go1.27.3) | No for `.` and `..`. `Uri.EscapeDataString` contains `/`, `?` and `#` (`PostHogApiClient.cs:206`), but a key of `..` gives the path `/api/projects/@current/remote_config` (from a local run with .NET 9.0.0) |
 | Flag key encoding (follows the recommendation) | No. The key is not encoded (`client.ts:3232`) | No on the sync path (`request.py:420`). Yes on the async path (`_async_request.py:184`, `quote(key, safe='')`) | No. The key is not encoded (`feature_flags.rb:1896`) | No. `url.JoinPath` with the raw key. `?`, `#` and a space come out escaped, but a `/` splits the path (`posthog.go:2004`; the behavior of `/` is reported from a local run) | Yes (`PostHogApiClient.cs:206`, `Uri.EscapeDataString`) |
 | Authentication | Yes (`client.ts:3239`) | Yes (`request.py:477`) | Yes (`feature_flags.rb:1900`) | Yes (`posthog.go:2029`) | Yes (`PostHogApiClient.cs:220-227`) |
 | No distinct id | Yes | Yes | Yes | Yes | Yes |
@@ -167,7 +175,7 @@ Differences between the five SDKs that the table shows:
 
 - **Missing secret key.** Ruby sends the request. Node throws. The others log and return an empty value or an error.
 - **Return type.** Node returns the JSON value. Python and Ruby return one decode. Go returns a Go `string`. .NET returns a `JsonDocument`. The spec names the JSON value type. Python, Ruby and Go would need a change to return the second-parsed value. The existing docs for them differ too: the page `contents/docs/feature-flags/remote-config.mdx` in posthog.com (at `54978bc1`) says Python returns a JSON encoded string to parse, and Ruby returns a parsed object. The Python docs match the code only for a string body.
-- **Escaping.** The spec recommends an encoding. See "Shipped SDKs and the three recommendations".
+- **Escaping.** Containment is mandatory, and no shipped SDK meets it for every key (row "Flag key containment"). The exact encoding is a recommendation. See "Shipped SDKs and the three recommendations".
 - **Failure.** Ruby raises on a request that does not complete. Node and Ruby return the body of a non-2xx response as the payload. The spec recommends that a failure status fails the call. See "Shipped SDKs and the three recommendations".
 - **Retries.** Python retries connect and read errors through its session. Ruby retries a timeout or a reset up to the flag retry limit, and a status in its retry list. Node, Go and .NET do not retry. The requirement "One request per call" holds for Node, Go and .NET only.
 
@@ -193,6 +201,8 @@ Empty body (a response with a status from 200 to 299 and an empty body should gi
 
 - No shipped SDK follows the recommendation. The row "Empty body" of the table in "Existing SDK conformance" has each `file:line`.
 
+Flag key containment is mandatory and is not one of the three recommendations. The row "Flag key containment" of the table in "Existing SDK conformance" has the gap of each shipped SDK.
+
 ## Reference mapping
 
 References are posthog-js at `9c9da5bf7a36842a0bea1b05dfd0bcfbe0714f92`. `client.ts` is `packages/node/src/client.ts`. `spec.ts` is `packages/node/src/__tests__/posthog-node.spec.ts`. `core.ts` is `packages/core/src/posthog-core-stateless.ts`.
@@ -203,6 +213,7 @@ The tests at `spec.ts:3531`, `:3541`, `:3554` and `:3565` replace `_requestRemot
 | --- | --- | --- |
 | Public surface | `client.ts:2177` (one argument), `:2173-2175` (doc) | No covering test. Every test calls the method with one argument (for example `spec.ts:3536`), but none checks the signature. |
 | Request | `client.ts:3232` (URL), `:3235` (`GET`) | `spec.ts:3589` "should include project API key in the remote config URL" covers method, path and `token` with the exact URL. It does not check that the request has no body. |
+| Flag key containment | `client.ts:3232` (the key is put into the path as is, so a key can change the path, start a query or start a fragment) | No covering test. |
 | Flag key encoding | `client.ts:3232` (the key is put into the path as is; only the project token goes through `encodeURIComponent`) | No covering test. `spec.ts:3589` uses the key `test-flag`, which has no reserved character. |
 | Authentication | `client.ts:3239` (Bearer), `:123-126` and `:271` (key normalised, `secretKey` before `personalApiKey`), `packages/node/src/types.ts:265-269` | `spec.ts:3589` covers the `Authorization: Bearer TEST_PERSONAL_API_KEY` header and, by the exact URL, that the key is not in the URL. No covering test for the `secretKey` option (the tests use `personalApiKey`). |
 | No distinct id | `client.ts:2177` (signature), `:3227-3262` (the request has none) | Partial. `spec.ts:3589` asserts the exact URL, so no extra query parameter. No covering test for an ambient context being ignored. |
@@ -228,7 +239,7 @@ Points left out of the requirements (see "Open decisions"):
 | Host when the SDK has more than one | `client.ts:3232` (`this.host`) | `spec.ts:3598` checks the host `http://example.com` for the one configured host only. | OD4 |
 | A flag key that is empty, `.` or `..` | `client.ts:3232` (no guard) | No covering test. | OD5 |
 
-Requirements with no covering test in posthog-js: Public surface, Flag key encoding, No distinct id (partial only), Disabled client (the `disabled: true` case and the order), Missing secret key (the warning-and-empty path and the blank key), String that is not JSON, Empty body, Request failure, Failure status, One request per call, No caching, No events. Payload decoding has no test for three of the six example rows.
+Requirements with no covering test in posthog-js: Public surface, Flag key containment, Flag key encoding, No distinct id (partial only), Disabled client (the `disabled: true` case and the order), Missing secret key (the warning-and-empty path and the blank key), String that is not JSON, Empty body, Request failure, Failure status, One request per call, No caching, No events. Payload decoding has no test for three of the six example rows.
 
 ## Notes
 
@@ -265,6 +276,7 @@ Not covered: the client `/config` bootstrap (`remote-config`), caching and backg
 
 ## Risks / Trade-offs
 
+- Flag key containment is mandatory, and no shipped SDK meets it for every key. posthog-node, posthog-python (sync), posthog-ruby and posthog-go put the raw key into the path. posthog-dotnet and the async path of posthog-python do not contain `.` and `..`. Each one does not conform until it changes.
 - The spec recommends two behaviors that posthog-node does not have: flag key encoding and failure status. They are recommendations, so the SDKs can differ. posthog-node, posthog-python (sync), posthog-ruby and posthog-go do not encode the key, and posthog-node and posthog-ruby return the body of a non-2xx response as the payload. A caller that moves between SDKs can see a different result for a key with reserved characters and for a failure status.
 - No shipped SDK follows the empty body recommendation. A read of a flag that has no payload rejects in posthog-node, logs an error in posthog-python and posthog-dotnet, returns an error in posthog-go, and returns an error Hash in posthog-ruby.
 - OD1 to OD5 are open. A port written to the spec alone can choose any behavior for them. If a later change picks a stricter rule for OD1 option B, OD2 or OD3, posthog-node can need a change.

@@ -13,7 +13,7 @@ In this spec, a payload is the JSON value that PostHog holds for the flag. No re
 
 ### Requirement: Request
 
-The SDK SHALL send `GET {host}/api/projects/@current/feature_flags/{flag key}/remote_config?token={project token}`. `{host}` is the client's configured host. `{flag key}` is the flag key. "Flag key encoding" recommends how the SDK encodes it. The query holds the `token` parameter and no other parameter. The request has no body.
+The SDK SHALL send `GET {host}/api/projects/@current/feature_flags/{flag key}/remote_config?token={project token}`. `{host}` is the client's configured host. `{flag key}` is the flag key as one path segment. "Flag key containment" requires that, and "Flag key encoding" recommends the exact encoding. The query holds the `token` parameter and no other parameter. The request has no body.
 
 #### Scenario: A plain key reaches the remote config route
 - **GIVEN** a client with project token `TEST_API_KEY`, host `http://example.com` and a secret key
@@ -21,9 +21,31 @@ The SDK SHALL send `GET {host}/api/projects/@current/feature_flags/{flag key}/re
 - **THEN** the mock server receives one `GET http://example.com/api/projects/@current/feature_flags/test-flag/remote_config?token=TEST_API_KEY`
 - **AND** the request has no body
 
+### Requirement: Flag key containment
+
+The flag key SHALL NOT change the path outside its one segment, the query, or the fragment of the request. For every flag key, the path of a request that the SDK sends SHALL be `/api/projects/@current/feature_flags/{one segment}/remote_config`, and its query SHALL be `token={project token}`. The SDK SHALL meet this in one of two ways: it encodes the key so that it stays one path segment, or it refuses the key and sends no request. A refused key gives no result, and the SDK reports it as it reports a failure in "Request failure".
+
+Percent-encoding does not change `.` and `..`, and an HTTP client resolves them as dot segments. An SDK that encodes the key SHALL also refuse a key that is `.` or `..`, or contain it in another way. The result for a flag key that is empty, `.` or `..` is not defined, but a request to a path of another form is not permitted.
+
+#### Scenario Outline: A flag key does not leave the remote config route
+- **GIVEN** a client with project token `TEST_API_KEY`, host `http://example.com` and a secret key
+- **WHEN** the caller reads the payload of the flag key <key>
+- **THEN** the mock server receives no request or one request
+- **AND** the path as sent of every received request is `/api/projects/@current/feature_flags/`, then one path segment, then `/remote_config`
+- **AND** the query of every received request is `token=TEST_API_KEY`
+
+**Examples:**
+  | key                    |
+  | `../../../users/@me/#` |
+  | `a/b`                  |
+  | `a?b`                  |
+  | `a#b`                  |
+  | `..`                   |
+  | `.`                    |
+
 ### Requirement: Flag key encoding
 
-The SDK SHOULD percent-encode the flag key so that it stays one path segment, and an SDK that does SHALL use the encoding below. An SDK that does not encode the key still conforms. The encoding writes `/`, `?`, `#`, `%`, a space, and every byte of the key's UTF-8 form outside the ASCII range, as `%` and two uppercase hexadecimal digits. It writes a space as `%20`. It leaves a letter, a digit, `-`, `.`, `_` and `~` as they are. It can encode any other character that RFC 3986 permits in a path segment (for example `@`, `:`, `=` or `+`). With this encoding, a key that has `/`, `?`, `#` or `%` does not change the path or the query of the request. This requirement does not define the request for a flag key that is empty, `.` or `..`.
+The SDK SHOULD percent-encode the flag key so that it stays one path segment, and an SDK that does SHALL use the encoding below. An SDK that does not use this exact encoding still conforms if it meets "Flag key containment". The encoding writes `/`, `?`, `#`, `%`, a space, and every byte of the key's UTF-8 form outside the ASCII range, as `%` and two uppercase hexadecimal digits. It writes a space as `%20`. It leaves a letter, a digit, `-`, `.`, `_` and `~` as they are. It can encode any other character that RFC 3986 permits in a path segment (for example `@`, `:`, `=` or `+`). With this encoding, a key that has `/`, `?`, `#` or `%` does not change the path or the query of the request. "Flag key containment" covers a flag key that is empty, `.` or `..`.
 
 #### Scenario Outline: A key with reserved characters stays one path segment
 - **GIVEN** an SDK that follows the flag key encoding recommendation

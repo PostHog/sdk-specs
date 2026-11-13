@@ -111,6 +111,8 @@ First-party integrations SHALL use the following canonical sources where applica
 | Rails request middleware | `rails.middleware` |
 | Rails error reporter | `rails.error_reporter` |
 | Rails Active Job | `rails.active_job` |
+| Rails ActionController::Live streaming | `rails.live` |
+| Rails streaming template rendering | `rails.streaming_template` |
 | PHP exception handler | `php.exception_handler` |
 | PHP error handler | `php.error_handler` |
 | PHP shutdown handler | `php.shutdown_handler` |
@@ -128,6 +130,15 @@ A maintained integration not listed here SHALL use the same lowercase `<technolo
 - **WHEN** the middleware captures the exception
 - **THEN** the outermost exception should have `mechanism.type` equal to `middleware`
 - **AND** `$exception_source` should equal `django.middleware`
+
+#### Scenario: Streaming boundary after the response has started keeps the middleware category (@both)
+- **GIVEN** a Rails `ActionController::Live` response fails after the headers have been sent
+- **WHEN** the streaming integration captures the exception
+- **THEN** the outermost exception should have `mechanism.type` equal to `middleware`
+- **AND** the outermost exception should have `mechanism.handled` equal to `false`
+- **AND** `$exception_source` should equal `rails.live`
+- **WHEN** a streaming template body instead fails while rendering
+- **THEN** `$exception_source` should equal `rails.streaming_template`
 
 #### Scenario: Generic manual capture omits a concrete source (@both)
 - **WHEN** the public exception API captures a caught exception without integration context

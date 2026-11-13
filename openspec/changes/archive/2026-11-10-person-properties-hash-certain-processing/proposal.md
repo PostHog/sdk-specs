@@ -1,0 +1,39 @@
+## Why
+
+Client SDKs skip a `$set` whose `distinct_id`, `$set` and `$set_once` match the previous update, using a cached person-properties hash. An update PostHog doesn't apply to the person still recorded that hash, so the next valid update with the same properties was dropped as a duplicate:
+
+1. `setPersonProperties({plan: "pro"})` sent with `process_person_profile: false` (as an option or the legacy `$process_person_profile` property). PostHog doesn't update the person, but the SDK records the hash.
+2. The same call without the setting. The SDK matches the hash and drops it, so the person never gets `plan: "pro"`.
+
+[posthog-ios#1050](https://github.com/PostHog/posthog-ios/pull/1050) fixed this on iOS and [posthog-android#965](https://github.com/PostHog/posthog-android/pull/965) on Android. No spec states the rule, and the two first landed with different answers for a definite `false`: iOS cleared the stored hash, Android kept it. Both now use the iOS rule.
+
+The rule only reads whether the setting is missing or a Boolean `true`. Deciding that a value is surely personless would need the SDK to mirror how PostHog parses false spellings (`"false"`, `"off"`, `0`, …). That table lives on the server and can change, and an SDK that disagrees with it would keep a hash for an update PostHog applied, then drop the next valid one. Treating every other value as "may be personless" can't drift. The cost is at most one redundant `$set` after a personless update.
+
+## What Changes
+
+- Add a `set-person-properties` requirement, **The person-properties hash only tracks updates that surely process the person**: the SDK reads the person-processing setting as it is sent (a non-null `process_person_profile` option, else the legacy `$process_person_profile` property). Only a missing setting or a Boolean `true` checks and records the hash. Any other value never matches the hash, is always sent, and clears the stored hash.
+- The requirement covers `$set` updates from `identify(...)` as well, since they share the cache.
+- Narrative: step 5 of `set-person-properties` Behavior and the `identify` hash notes point at the requirement.
+- `capture`, **Caller-supplied event properties take precedence**: a registered `$process_person_profile`, or a `process_person_profile` option a wrapper SDK registers, isn't sent with `$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`, `$set` or `$set_once`. With person processing off, PostHog drops the first four and ignores the person update in the last two, so a registered `false` would stop `identify`, `alias`, `group` and `setPersonProperties` from working. A value passed on the call or set in `before_send` still applies. One new scenario, mirrored in `acceptance/public/capture.feature`, and a note in capture Behavior step 4.
+
+## Capabilities
+
+### New Capabilities
+
+None.
+
+### Modified Capabilities
+
+- `set-person-properties`: new requirement with three scenarios, plus a narrative note under Behavior step 5.
+- `identify`: narrative pointer only, in the client-side flow and state notes. No requirement changes.
+- `capture`: **Caller-supplied event properties take precedence** keeps registered person-processing settings off identity events, with one new scenario, plus a note in Behavior step 4.
+
+## Impact
+
+- **posthog-ios** 4.0: [#1050](https://github.com/PostHog/posthog-ios/pull/1050) (the hash) and [#1067](https://github.com/PostHog/posthog-ios/pull/1067) (registered settings off identity events), both on `chore/v4-remove-deprecated`.
+- **posthog-android** 4.0: [#965](https://github.com/PostHog/posthog-android/pull/965) (the hash) and [#979](https://github.com/PostHog/posthog-android/pull/979) (registered settings off identity events) on `chore/v4-remove-deprecated`, and [#967](https://github.com/PostHog/posthog-android/pull/967) on `main`, which reads the update after `beforeSend` and records the hash only once it is queued.
+- **Flutter on iOS and Android** inherits the behaviour from the native SDKs.
+- **Flutter on Windows and Linux** doesn't: the Dart core keeps its own hash (`posthog_flutter/lib/src/core/posthog_core.dart`, `_cachedPersonProperties`). [posthog-flutter#716](https://github.com/PostHog/posthog-flutter/pull/716) applies the rule there, reading the setting from the event as queued, and [#730](https://github.com/PostHog/posthog-flutter/pull/730) keeps registered settings off identity events. Both are on `chore/v6-posthog-ios-4`, part of the 6.0 release ([#637](https://github.com/PostHog/posthog-flutter/pull/637)).
+- **posthog-js and React Native** still send a registered `$process_person_profile` with identity events. For the hash, React Native doesn't inherit the native behaviour either: `setPersonProperties` and the `$set` hash live in the JS core (`packages/core/src/posthog-core.ts`, `_cachedPersonProperties`). Only replay, crash and push events go through the native SDKs.
+- **Not audited here**: other SDKs that keep a person-properties hash. See the PR description.
+- `acceptance/public/set-person-properties.feature` is unchanged: the shared harness has no step for capture options on `set person properties`.

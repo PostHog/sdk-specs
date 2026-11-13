@@ -14,6 +14,10 @@ The canonical PostHog tracing headers are:
 | `X-POSTHOG-DISTINCT-ID` | Current frontend distinct id | Request context `distinctId`; used as event `distinct_id` only when no explicit capture id or stronger authenticated application context is supplied |
 | `X-POSTHOG-SESSION-ID` | Current frontend session id | Request context `sessionId`; emitted as event property `$session_id` |
 
+A client SDK MAY also propagate the W3C `traceparent` header, under its own separate opt-in
+target list, so the application's backend can continue a trace from the browser request. That
+header is consumed by the application's tracing backend, not by a PostHog SDK.
+
 HTTP header names are case-insensitive. SDKs MAY preserve their platform's conventional casing on
 write, but server-side readers MUST accept any framework-normalized casing.
 
@@ -40,6 +44,9 @@ There is no single cross-SDK method name. Canonical public surfaces are:
   hostnames for which the SDK should inject PostHog tracing headers. Hostnames are matched exactly
   after normalization; ports, schemes, paths, and wildcard subdomains are not part of the canonical
   match.
+- **Client traceparent targets:** a separate option equivalent to `trace_propagation_targets`
+  holding the origins or hostnames that receive a W3C `traceparent`. It is independent of the
+  tracing-header allow-list and unset by default.
 - **Client interceptor installation:** platforms that cannot patch global HTTP primitives safely MAY
   require the application to install an SDK-provided HTTP interceptor/wrapper (for example OkHttp)
   or enable URLSession swizzling/wrapping.
@@ -392,3 +399,47 @@ The SDK SHALL keep tracing dependencies optional, preserve application providers
 #### Scenario: application samples out the request
 - **WHEN** the application chooses not to record a request span
 - **THEN** context enrichment does not change that sampling decision or create a replacement span
+
+### Requirement: Client-side W3C traceparent propagation
+
+A client SDK MAY propagate a W3C `traceparent` header on outgoing application requests, so the application's backend can continue a trace from the browser request. It SHALL be a separate opt-in from the PostHog tracing headers: its own target list, unset by default, usable with or without the tracing-header allow-list, and never inferred from it. An unexpected header fails CORS preflight, so each host SHALL opt in explicitly.
+
+#### Scenario: propagation is off unless its own targets are set
+- **GIVEN** tracing headers are enabled for "api.example.com" and traceparent propagation is not configured
+- **WHEN** the application sends a request to "https://api.example.com/v1/work"
+- **THEN** the request includes the PostHog tracing headers
+- **AND** the request does not include a `traceparent` header
+
+### Requirement: Traceparent target matching
+
+Traceparent targets SHALL match exactly: a scheme-qualified entry matches that origin only, a bare entry matches that hostname, and nothing matches by suffix, subdomain, or path. An unlisted target SHALL NOT gain the header. Changes to the target list SHALL apply to later requests without reinstalling the interception, and the capability's fail-open rule applies unchanged.
+
+#### Scenario: an unlisted target is untouched
+- **GIVEN** traceparent propagation is enabled for "api.example.com"
+- **WHEN** the application sends a request to "https://other.example/v1/work"
+- **THEN** the request does not include a `traceparent` header
+
+#### Scenario: a scheme-qualified entry matches that origin only
+- **GIVEN** traceparent propagation is enabled for "https://api.example.com"
+- **WHEN** the application sends a request to "http://api.example.com/v1/work"
+- **THEN** the request does not include a `traceparent` header
+
+### Requirement: Traceparent header generation
+
+For each matching request the SDK SHALL generate a fresh, cryptographically random `traceparent` of the form `00-<32 hex digit trace id>-<16 hex digit span id>-01`, and SHALL NOT replace a `traceparent` the application already set. The propagated span id parents the server's root span; the SDK records no span of its own. An SDK that implements `traces` MAY propagate its active span's context instead, keeping this format and the target gate.
+
+#### Scenario: a listed target receives a sampled traceparent
+- **GIVEN** traceparent propagation is enabled for "api.example.com"
+- **WHEN** the application sends a request to "https://api.example.com/v1/work"
+- **THEN** the request includes a `traceparent` header of the form `00-<32 hex digits>-<16 hex digits>-01`
+
+#### Scenario: each request gets its own ids
+- **GIVEN** traceparent propagation is enabled for "api.example.com"
+- **WHEN** the application sends two requests to "https://api.example.com/v1/work"
+- **THEN** the two requests carry different trace ids and different span ids
+
+#### Scenario: an application traceparent is preserved
+- **GIVEN** traceparent propagation is enabled for "api.example.com"
+- **AND** the application sets its own `traceparent` on the request
+- **WHEN** the request is sent to "https://api.example.com/v1/work"
+- **THEN** the request carries the application's `traceparent` unchanged

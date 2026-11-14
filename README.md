@@ -116,6 +116,7 @@ capability-driven selection.
 | Session Manager | [`openspec/specs/session-manager/spec.md`](openspec/specs/session-manager/spec.md) | internal behavior | Canonical |
 | Session Replay Debug Properties | [`openspec/specs/session-replay-debug-properties/spec.md`](openspec/specs/session-replay-debug-properties/spec.md) | internal behavior | Canonical |
 | Session Replay Ingestion Controls | [`openspec/specs/session-replay-ingestion-controls/spec.md`](openspec/specs/session-replay-ingestion-controls/spec.md) | internal behavior | Canonical |
+| Session Replay Trigger Groups | [`openspec/specs/session-replay-trigger-groups/spec.md`](openspec/specs/session-replay-trigger-groups/spec.md) | internal behavior | Canonical |
 | Session Replay Privacy | [`openspec/specs/session-replay-privacy/spec.md`](openspec/specs/session-replay-privacy/spec.md) | internal behavior | Canonical |
 | Surveys | [`openspec/specs/surveys/spec.md`](openspec/specs/surveys/spec.md) | internal behavior | Canonical |
 

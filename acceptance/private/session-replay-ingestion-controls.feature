@@ -159,6 +159,8 @@ Feature: Session Replay Ingestion Controls
     Then session recording should resume
 
   # Minimum-duration buffering gate
+  # These scenarios cover the V1 `minimumDurationMilliseconds` gate. Under trigger groups the minimum
+  # is the effective group minimum; see session-replay-trigger-groups.feature.
 
   Scenario: Replay data is withheld below the minimum duration
     Given the SDK is initialized with token "test-token" and session replay enabled and otherwise eligible
@@ -242,3 +244,13 @@ Feature: Session Replay Ingestion Controls
     When the managed and native layers resolve whether to record the current session
     Then both layers should use the same session id
     And both layers should reach the same sampling decision
+
+  @hybrid
+  Scenario: Managed layer owns trigger groups in a hybrid SDK
+    Given a hybrid SDK whose managed layer captures analytics and whose native layer owns replay
+    And session replay is enabled
+    And the remote config selects trigger groups with one group whose event leg is "$pageview" and whose minimum duration is 2000 milliseconds
+    When the client captures an event named "$pageview" on the managed layer
+    Then the managed layer should activate the group and start recording in the native layer
+    And the native layer should apply no V1 linked flag, sampling, or trigger gate for that host
+    And the native layer should hold the session's replay data until 2000 milliseconds of activity, the minimum the managed layer handed it

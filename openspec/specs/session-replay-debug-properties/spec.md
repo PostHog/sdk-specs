@@ -119,14 +119,19 @@ the four required keys.
 The *optional replay debug bundle* SHALL be every replay debug key that is not a required key (the
 required keys are listed in "Attach debug properties to every captured event except
 `$snapshot`"). On mobile it is `$sdk_debug_session_start`, `$sdk_debug_replay_flush_hold_reason`,
-`$sdk_debug_replay_pending_trigger_conditions`, and the mobile-only
-`$sdk_debug_replay_capture_mode`. On the browser it is `$sdk_debug_session_start`,
+`$sdk_debug_replay_pending_trigger_conditions`, the mobile-only
+`$sdk_debug_replay_capture_mode`, and, when the SDK implements trigger groups
+(`session-replay-trigger-groups`), `$sdk_debug_replay_trigger_groups_count`,
+`$sdk_debug_replay_matched_recording_trigger_groups`, and
+`$sdk_debug_replay_remote_trigger_matching_config`. On the browser it is `$sdk_debug_session_start`,
 `$sdk_debug_replay_flush_hold_reason`, `$sdk_debug_replay_pending_trigger_conditions`,
 `$sdk_debug_replay_internal_buffer_size`, `$sdk_debug_rrweb_attached`,
 `$sdk_debug_rrweb_start_attempted`, `$sdk_debug_replay_stale_config`,
 `$sdk_debug_replay_trigger_groups_count`, `$sdk_debug_replay_matched_recording_trigger_groups`, and
-`$sdk_debug_replay_remote_trigger_matching_config`. The queue-depth key is in neither tier; its
-own requirement governs it.
+`$sdk_debug_replay_remote_trigger_matching_config`. The three trigger-group keys are not
+browser-only: every SDK that implements trigger groups attaches them in the optional tier, with the
+values `session-replay-trigger-groups` specifies, and an SDK that does not implement trigger groups
+omits them. The queue-depth key is in neither tier; its own requirement governs it.
 
 The SDK SHALL attach the optional bundle only to *eligible SDK events*: events whose name starts
 with `$`, **excluding** `$feature_flag_called`, `$snapshot`, and, on the browser, `$$heatmap`.
@@ -621,8 +626,22 @@ puts them on every event. Mobile SDKs SHALL compute trigger status fresh on ever
 from current integration state. Either way the trigger keys reach events only through the debug
 merge and MUST NOT be attached as registered super properties.
 `$sdk_debug_replay_pending_trigger_conditions` (optional) SHALL list whichever configured trigger
-kinds are not yet satisfied; on mobile the possible kinds are `event_trigger` and `linked_flag`,
-and the key is omitted when none is pending.
+kinds are not yet satisfied; on mobile the V1 kinds are `event_trigger` and `linked_flag`,
+and the key is omitted when none is pending. When the remote config selects trigger groups
+(`session-replay-trigger-groups`), each pending group SHALL contribute one entry of the form
+`trigger group "<name>": <condition>` per unsatisfied condition, exactly as posthog-js writes it
+(`V2TriggerGroupStrategy.getPendingTriggerConditions`,
+`packages/browser/src/extensions/replay/external/recording-strategies.ts:649-658` at posthog-js
+`origin/main` `480395c443`), on mobile as well as on the browser; a bare `trigger_groups` entry is
+not a conforming value. In the same configuration `$sdk_debug_replay_remote_trigger_matching_config`
+(optional) SHALL be `v2_trigger_groups` and `$sdk_debug_replay_trigger_groups_count` (optional)
+SHALL be the number of configured groups (`recording-strategies.ts:379-382`);
+`$sdk_debug_replay_matched_recording_trigger_groups` is specified in
+`session-replay-trigger-groups`. Covering test for the pending text: posthog-js
+`packages/browser/src/__tests__/extensions/replay/lazy-sessionrecording.test.ts:8763` ("describes
+pending conditions within trigger groups"); for the config and count keys `:8829` ("registers
+session properties when trigger group matches and is sampled"). No mobile test covers the
+trigger-group values yet; they are planned.
 
 `$sdk_debug_replay_capture_mode` is **mobile-only** and **optional**. posthog-js has no analog —
 its required and optional lists contain no capture-mode key — so a mobile SDK SHALL classify it
@@ -761,6 +780,16 @@ posthog-ios `88f4b6b56` reads the manager's start snapshot unconditionally).
 - **THEN** the event's properties do not include `$sdk_debug_replay_pending_trigger_conditions`
 - **WHEN** an eligible SDK event that the window allows is captured
 - **THEN** `$sdk_debug_replay_pending_trigger_conditions` lists the unsatisfied trigger kinds
+
+#### Scenario: Pending trigger-group conditions name the group
+- **GIVEN** the remote config selects trigger groups with one group named "checkout" whose event
+  leg has not matched
+- **WHEN** an eligible SDK event that the window allows is captured
+- **THEN** `$sdk_debug_replay_remote_trigger_matching_config` is `v2_trigger_groups`
+- **AND** `$sdk_debug_replay_trigger_groups_count` is `1`
+- **AND** `$sdk_debug_replay_pending_trigger_conditions` contains an entry starting with
+  `trigger group "checkout": `
+- **AND** it does not contain a bare `trigger_groups` entry
 
 #### Scenario: A registered property overrides the SDK-computed debug value
 - **GIVEN** a super property named `$recording_status` is registered
@@ -1093,12 +1122,14 @@ interaction-hold `flush_hold_reason` values, and their presence while `$recordin
 `$sdk_debug_recording_script_not_loaded`, `$sdk_debug_replay_url_trigger_status` (mobile has no
 URL-trigger concept), `$sdk_debug_replay_rrweb_error`, and `$sdk_debug_replay_flushed_size`; the
 browser-only optional keys `$sdk_debug_replay_stale_config`,
-`$sdk_debug_replay_matched_recording_trigger_groups`,
-`$sdk_debug_replay_remote_trigger_matching_config`, `$sdk_debug_replay_trigger_groups_count`,
 `$sdk_debug_replay_internal_buffer_size`, `$sdk_debug_rrweb_attached`, and
 `$sdk_debug_rrweb_start_attempted` (`packages/browser/src/posthog-core.ts:190-200`,
 `session-recording.ts:51-61`, `lazy-loaded-session-recorder.ts:2767-2781` at posthog-js
-`origin/main` `928990ded`); the browser-only `$sdk_debug_extensions_init_method` /
+`origin/main` `928990ded`); the trigger-group keys `$sdk_debug_replay_trigger_groups_count`,
+`$sdk_debug_replay_matched_recording_trigger_groups`, and
+`$sdk_debug_replay_remote_trigger_matching_config`, which are governed by
+`session-replay-trigger-groups` and are not required of an SDK that does not implement trigger
+groups; the browser-only `$sdk_debug_extensions_init_method` /
 `$sdk_debug_extensions_init_time_ms` keys (`event` exposure,
 `persistence-key-policy.ts:189-190`) — these describe the browser's own lazy-extension-loading
 path, which mobile SDKs do not have, and are not part of either tier; the browser-only drop
@@ -1130,11 +1161,13 @@ to them.
 - **THEN** the absence of the four replay drop counters, of a browser-only interaction-hold
   value, of `$sdk_debug_recording_script_not_loaded`, `$sdk_debug_replay_url_trigger_status`,
   `$sdk_debug_replay_rrweb_error`, `$sdk_debug_replay_flushed_size`,
-  `$sdk_debug_replay_stale_config`, `$sdk_debug_replay_matched_recording_trigger_groups`,
-  `$sdk_debug_replay_remote_trigger_matching_config`, `$sdk_debug_replay_trigger_groups_count`,
-  `$sdk_debug_replay_internal_buffer_size`, `$sdk_debug_rrweb_attached`,
-  `$sdk_debug_rrweb_start_attempted`, `$sdk_debug_extensions_init_method`, or
-  `$sdk_debug_extensions_init_time_ms` on a mobile event is not a violation of this spec
+  `$sdk_debug_replay_stale_config`, `$sdk_debug_replay_internal_buffer_size`,
+  `$sdk_debug_rrweb_attached`, `$sdk_debug_rrweb_start_attempted`,
+  `$sdk_debug_extensions_init_method`, or `$sdk_debug_extensions_init_time_ms` on a mobile event
+  is not a violation of this spec
+- **AND** on an SDK that does not implement trigger groups, the absence of
+  `$sdk_debug_replay_trigger_groups_count`, `$sdk_debug_replay_matched_recording_trigger_groups`,
+  and `$sdk_debug_replay_remote_trigger_matching_config` is not a violation of this spec
 
 #### Scenario: Removed keys are not required by this spec
 - **GIVEN** an SDK conforming to this spec

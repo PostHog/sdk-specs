@@ -123,7 +123,7 @@ Feature: Native server remote flag getters
       """
     And the first flags request field "geoip_disable" should equal JSON false
 
-  Scenario: Omitted GeoIP settings default to enabled in flag requests
+  Scenario: Omitted GeoIP settings use the native privacy default in flag requests
     When the SDK is initialized with token "phc_test_key" and no additional configuration
     And get feature flag is called with JSON arguments:
       """application/json
@@ -132,7 +132,7 @@ Feature: Native server remote flag getters
         "key": "any-flag"
       }
       """
-    And the first flags request field "geoip_disable" should equal JSON false
+    And the first flags request should use the native GeoIP default
 
   Scenario: Remote flag requests evaluate only the requested key
     When the SDK is initialized with token "phc_test_key" and no additional configuration

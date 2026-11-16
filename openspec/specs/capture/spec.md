@@ -98,7 +98,7 @@ The following steps are the canonical flow for a single capture call. Client and
 4. **Enrich properties.** A new properties dictionary is constructed by merging in this order (later values win):
    - **Client:**
      1. Properties the SDK sets itself, such as SDK environment and feature flag properties, `$groups` from registered groups (the event's group wins per group type), `$is_identified`, and person processing (on capture v1 the `process_person_profile` option; on legacy capture the `$process_person_profile` property).
-     2. Super/registered properties.
+     2. Super/registered properties, except a registered `$process_person_profile` on identity events (see **Caller-supplied event properties take precedence**).
      3. Caller-supplied `properties`. These win over everything above, and `before_send` (step 6) can change the result (see **Caller-supplied event properties take precedence**).
    - **Server, capture v1:** the call's `properties` and `options` win. The ambient request context, then the SDK-level default properties and options, then the values the SDK adds itself (`$is_server`, `$geoip_disable` from the client setting, system context, the `$feature/<key>` and `$active_feature_flags` properties derived from a flags snapshot or `send_feature_flags`, `$release_id`, and `$trace_id` with `$span_id` where the SDK derives them) fill only the keys the layers above left unset. A built-in integration's library label fills before the ambient context, and the SDK's own `$lib` and `$lib_version` fill last (see **Events name their own library**). `$groups` comes from the `groups` option, merged key by key over a `$groups` property. See **Server SDKs build every event in one layer order**.
    - **Server, legacy capture:** request-context properties, then caller-supplied `properties`, then SDK-stamped properties. Server SDKs on legacy capture stamp `$lib` and `$lib_version` over the caller's values, and posthog-python 7.x, posthog-go 1.x, dotnet (`SuperProperties`) and elixir (`global_properties`) apply their SDK-level default properties after the caller's properties too.
@@ -403,6 +403,8 @@ On capture v1, `$lib` and `$lib_version` are the one exception: the SDK fills it
 
 A registered or caller value for a key the SDK sets itself changes that event only. It SHALL NOT change the SDK's own state: a later event without that key carries the SDK's value again, and a caller `process_person_profile` option (on legacy capture, the `$process_person_profile` property) does not turn person processing on or off for the SDK.
 
+A registered `$process_person_profile`, and a `process_person_profile` option a wrapper SDK registers, SHALL NOT be sent with the identity events `$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`, `$set` and `$set_once`. With person processing off, PostHog drops the first four and ignores the person update in `$set` and `$set_once`, so a registered `false` would stop `identify`, `alias`, `group` and `setPersonProperties` from working. A value passed on the call or set in `before_send` still applies. posthog-ios 4.0, posthog-android 4.0 and posthog-flutter 6.0 do this. posthog-js and posthog-react-native still send the registered value.
+
 The project token is request routing, not an event property. Where an SDK carries it on the event (posthog-js stamps `token` on every event and takes the batch `api_key` from it), the SDK SHALL set the configured token on every event, and a registered or caller `token` SHALL NOT replace it.
 
 A group the caller passes for the event SHALL win over a registered group of the same type.
@@ -470,6 +472,19 @@ This requirement does not apply to server SDKs. Server SDKs that deliver through
   | property                | value |
   | $process_person_profile | false |
   | $is_identified          | false |
+
+#### Scenario: A registered personless setting does not reach identity events (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** registered properties are:
+  | property                | value |
+  | $process_person_profile | false |
+- **WHEN** identify is called with distinct id "user-123"
+- **THEN** one event named "$identify" should be enqueued
+- **AND** the enqueued "$identify" event should not include property "$process_person_profile"
 
 ### Requirement: Client-level GeoIP control with per-call override
 
@@ -1341,3 +1356,60 @@ Known gap: posthog-js core and react-native list every cached flag key in `$acti
 - **AND** the enqueued event property "$active_feature_flags" should contain "beta-ui"
 - **AND** the enqueued event property "$active_feature_flags" should not contain "legacy-ui"
 - **AND** the enqueued event property "$feature/legacy-ui" should equal ""
+
+### Requirement: Capture serializes set-like and listed sequence property values as arrays
+
+When the SDK serializes a captured event for wire delivery or a disk-backed event queue, a custom property value in one of the following categories SHALL serialize as a JSON array of its elements. The SDK MUST NOT serialize such a value as an empty object, as JSON `null`, or as a string representation of the container, and MUST NOT drop the property or the event because of it.
+
+1. **Set-like values**: the runtime's built-in set types. The order of the serialized elements is not specified.
+2. **Listed ordered sequences**: the finite built-in sequence types listed below for each runtime, other than the native array or list. The serialized elements SHALL keep the sequence's iteration order.
+
+| Runtime | Set-like types | Listed ordered sequences |
+| --- | --- | --- |
+| Python | `set`, `frozenset` | `tuple`, `collections.deque` |
+| JavaScript / TypeScript | `Set` | none |
+| Ruby | `Set` | none |
+| Swift / Objective-C | `Set`, `NSSet` | none |
+| Kotlin / Java | `Set` implementations | `java.util.Queue` and `java.util.Deque` implementations that are not a `List` |
+| C# (.NET, Unity) | `ISet<T>` implementations, including `HashSet<T>`, `SortedSet<T>` and `ImmutableHashSet<T>` | `Queue<T>`, `LinkedList<T>` |
+| Dart | `Set` | `Queue` |
+| Elixir | `MapSet` | none |
+| PHP | none | `SplFixedArray`, `SplDoublyLinkedList` and `SplQueue` (not `SplStack`) |
+| Rust | `HashSet`, `BTreeSet` | `VecDeque` |
+| GDScript (Godot) | none | `PackedInt32Array`, `PackedInt64Array`, `PackedFloat32Array`, `PackedFloat64Array`, `PackedStringArray` |
+| Go, C++ (Unreal) | none | none |
+
+A runtime that is not listed SHALL apply category 1 to its built-in set types and MAY treat category 2 as empty until the table lists it.
+
+Each element SHALL be serialized as an array element, so nested values follow the same rules as other property values, including the null-valued object property rule. The rule SHALL apply recursively, including to category values nested in objects or arrays.
+
+This is a serialization rule. It does not require an SDK's public property types to accept these values. It does not define the serialization of keyed containers other than plain objects/maps (for example JavaScript `Map`), byte containers (for example Python `bytes`, JavaScript `Uint8Array`, Swift `Data`, Godot `PackedByteArray`), lazy or one-shot iterables (for example generators, iterators, Python `range`, Dart lazy `Iterable`, Kotlin `Sequence`), order-defined collections not in the table (for example .NET `Stack<T>`), or containers that the runtime represents as plain tuples (for example Erlang `:queue` and `:gb_sets`).
+
+#### Scenario: A one-element set-like property value serializes as an array (@both)
+- **GIVEN** an initialized SDK whose runtime has a set-like type in the table, with a valid distinct id and no property-changing hooks or filters
+- **WHEN** capture is called with event "Set Property" and a custom property "tags" whose value is that set-like type containing only the string "a"
+- **AND** the SDK is flushed
+- **THEN** one event named "Set Property" should be received
+- **AND** its custom property "tags" should equal JSON `["a"]`
+
+#### Scenario: A multi-element set-like property value keeps every element (@both)
+- **GIVEN** an initialized SDK whose runtime has a set-like type in the table, with a valid distinct id and no property-changing hooks or filters
+- **WHEN** capture is called with event "Set Property" and a custom property "tags" whose value is that set-like type containing the strings "a", "b" and "c"
+- **AND** the SDK is flushed
+- **THEN** one event named "Set Property" should be received
+- **AND** its custom property "tags" should be a JSON array with exactly the elements "a", "b" and "c" in any order
+
+#### Scenario: A listed ordered sequence property value keeps its order (@both)
+- **GIVEN** an initialized SDK whose runtime has a listed ordered sequence type in the table, with a valid distinct id and no property-changing hooks or filters
+- **WHEN** capture is called with event "Sequence Property" and a custom property "steps" whose value is that sequence type containing 3, 1 and 2 in that order
+- **AND** the SDK is flushed
+- **THEN** one event named "Sequence Property" should be received
+- **AND** its custom property "steps" should equal JSON `[3,1,2]`
+
+#### Scenario: Nested set-like values are converted alongside null-property cleanup (@both)
+- **GIVEN** an initialized SDK whose runtime has a set-like type in the table, with a valid distinct id and no property-changing hooks or filters
+- **WHEN** capture is called with event "Nested Set" and a custom property "outer" whose value is an array containing one object with member "inner" set to that set-like type containing only the string "a" and member "drop" set to null
+- **AND** the SDK is flushed
+- **THEN** one event named "Nested Set" should be received
+- **AND** its custom property "outer" should equal JSON `[{"inner":["a"]}]`
+

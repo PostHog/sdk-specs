@@ -6,6 +6,44 @@ Feature: AI Scorers
   Background:
     Given an isolated SDK instance
 
+  # Requirement: Versioned composite scorer management
+
+  Scenario: A composite retains an old source version
+    Given an input scorer with versions 1 and 2
+    When the caller creates a numeric composite pinned to version 1
+    Then its composition and input metadata identify version 1 and its original config
+    And latest-version metadata may identify version 2 without changing the pin
+
+  Scenario: A new composite version has an explicit formula
+    Given a composite scorer at version 1
+    When the caller creates a version with config, a complete composition, and base_version 1
+    Then one version-creation request carries those fields without automatic replay
+    And historical version retrieval retains the old composition
+
+  Scenario: Dependency listing preserves filters
+    When the caller lists composites with an input definition UUID, tags, and an offset
+    Then the request carries calculation, input_definition_id, tags, and offset together
+
+  Scenario: Older scorer responses remain readable
+    When a reported scorer or version response omits composite fields
+    Then its calculation is reported and its composition is null
+    And a scorer has empty input metadata and zero dependents
+
+  # Requirement: Read-scoped formula validation
+
+  Scenario: Formula validation does not save
+    When the caller validates a formula with an explicit empty output config
+    Then one validation request includes the empty config
+    And no create or new-version request is sent
+
+  Scenario: Syntax-only validation preserves omission
+    When the caller validates a formula without config
+    Then the request omits config and a valid response returns true
+
+  Scenario: Access failures remain observable
+    When the service denies access to a pinned input during formula validation
+    Then the caller receives the structured permission error
+
   # Requirement: Scorer management surface and stable identity
 
   Scenario: Same-name scorers remain independent

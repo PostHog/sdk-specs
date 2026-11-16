@@ -185,10 +185,28 @@ Feature: Feature Flag Called Tracker
     Examples:
       | outcome                       | flag          | value | failed | reason_code        | rule_type          | rule_id                                | sent_reason_code |
       | no rule match                 | beta-ui       | false | absent | "no_rule_match"    | absent             | absent                                 | no_rule_match    |
-      | failed record                 | beta-ui       | false | true   | "dependency_error" | absent             | absent                                 | dependency_error |
       | unknown reason code           | beta-ui       | true  | absent | "future_reason"    | "targeted_release" | "c41f9e07-2d6b-4a83-b5e1-7f0a3c8d2e96" | future_reason    |
       | rule id without rule type     | beta-ui       | true  | absent | "targeting_match"  | absent             | "c41f9e07-2d6b-4a83-b5e1-7f0a3c8d2e96" | targeting_match  |
       | targeting match on experiment | checkout-flow | true  | absent | "targeting_match"  | "experiment"       | "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" | targeting_match  |
+
+  @both
+  Scenario: A failed record carries no rule identity
+    Given the SDK is initialized with token "test-token"
+    And the flags response for distinct id "user-123" has a record for "beta-ui" with:
+      | field                   | value              |
+      | value                   | false              |
+      | failed                  | true               |
+      | reason.code             | "dependency_error" |
+      | metadata.config_version | 2                  |
+      | metadata.rule_type      | absent             |
+      | metadata.rule_id        | absent             |
+    When get feature flag "beta-ui" is called for distinct id "user-123"
+    Then the enqueued event property "$feature_flag_config_version" should equal "2"
+    And the enqueued event property "$feature_flag_reason_code" should equal "dependency_error"
+    And the enqueued event properties should not include "$feature_flag_rule_id"
+    And the enqueued event properties should not include "$feature_flag_rule_type"
+    And the enqueued event properties should not include "$feature_flag_variant_key"
+    And no event named "$experiment_exposure" should be enqueued
 
   @both
   Scenario: A record without a reason code keeps its config version

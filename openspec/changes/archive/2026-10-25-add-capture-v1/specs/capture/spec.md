@@ -764,7 +764,9 @@ An explicitly set per-call value is a value of that event: the SDK SHALL send it
 `$geoip_disable` in the same call's properties still wins over it (see **Server SDKs build every
 event in one layer order**). When no per-call value is set and the client-level setting disables
 GeoIP, the SDK SHALL mark the event with `$geoip_disable: true` among the event's ordinary
-properties. The SDK SHALL stamp the marker before `before_send` runs, so a hook can inspect,
+properties. On a server SDK on capture v1, the marker fills like the SDK's other values: a
+`$geoip_disable` the event's properties, the request context or the SDK-level default properties
+already set, `false` or `null` included, wins over it. The SDK SHALL stamp the marker before `before_send` runs, so a hook can inspect,
 replace, or remove it. The marker SHALL NOT be copied into `$set`, `$set_once`, or `$group_set`,
 because it is event context rather than a person or group property. When no per-call value is set
 and the client-level setting does not disable GeoIP, the SDK SHALL omit the marker and SHALL NOT

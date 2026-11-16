@@ -1,14 +1,26 @@
 # posthog-python — SDK Compliance
 
 **Repo:** [PostHog/posthog-python](https://github.com/PostHog/posthog-python)
-**Audited commit:** `509c8525fd51b52baa0ec959abe72c35aea20219` ([commit](https://github.com/PostHog/posthog-python/commit/509c8525fd51b52baa0ec959abe72c35aea20219)) — audited on 2026-10-12
-**Audited against sdk-specs commit:** `513d94c`
-**Summary:** 13 ✅ · 16 🟡 · 5 ❌ · 30 ➖ · 0 ❓ (64 rows)
+**Audited commit:** `dca2207591b1a4e2b6c9f85b3d7a1e4c8f0b6d35` ([tree](https://github.com/PostHog/posthog-python/commits/main)) — audited on 2026-11-02
+**Audited against sdk-specs commit:** `be25182`
+**Summary:** 17 ✅ · 16 🟡 · 5 ❌ · 30 ➖ · 0 ❓ (68 rows)
 
-**Previous audit:** 2026-08-17 at `95c7f6e0` (62 rows, 14 ✅ · 12 🟡 · 7 ❌ · 29 ➖ · 0 ❓). This run adds the two
-contracts the file was missing (**Session Replay Debug Properties**, **MCP Analytics**) and re-verifies
-the rows the sdk-specs delta since `0ea0aba` lands on. Note ids are stable across audits: a gap in the
-sequence means a note was withdrawn when its row became ✅.
+**Previous audit:** 2026-10-12 at `509c8525` (64 rows, 13 ✅ · 16 🟡 · 5 ❌ · 30 ➖ · 0 ❓).
+
+**Scope of this run — targeted re-audit.** The repo advanced from `509c8525` to `dca22075` (+19,800
+lines across `posthog/`, excluding tests), and sdk-specs advanced from `513d94c` to `be25182` (20
+commits touching `openspec/specs/`). This run re-derived: (a) the **four new contracts** the spec
+surface gained — Emails, AI Datasets, AI Scorers, Offline Evaluations, all server-scope, and all four
+naming posthog-python as a reference implementation; (b) every row the spec delta lands on
+(HTTP Client/#81, Retry Queue/#132, Shutdown/#135, Capture Exception/#124, Flag Definition Loader/#88,
+Get Feature Flag family/#109, Evaluate Flags/#111, MCP Analytics/#141 #142 #150 #157); and (c) every
+pre-existing ❌ and 🟡 row. Rows not in those three sets carry forward from 2026-10-12 and are marked
+as such here rather than silently restated as fresh evidence. Note ids are stable across audits: a gap
+in the sequence means a note was withdrawn when its row became ✅.
+
+**Headline: posthog-python is the only SDK in this matrix that passes all four new contracts.** The
+`emails` and `ai.evaluations` surfaces are the reference implementations the specs were written from,
+and each was checked against the spec rather than assumed — see [n21]–[n24] for what was verified.
 
 | # | Contract | Status | Note |
 |---|----------|--------|------|
@@ -76,6 +88,10 @@ sequence means a note was withdrawn when its row became ✅.
 | 62 | Bootstrap | ➖ | client-side cold-start flag/identity hydration from server-rendered values (`Applicability: client`); acceptance file (`bootstrap.feature`) is `@client`-only; no local-storage/cold-start problem exists server-side |
 | 63 | Session Replay Debug Properties | ➖ | `client` applicability; the spec states server SDKs observe no session timeline and attach none of these keys; Python has no replay subsystem |
 | 64 | MCP Analytics | 🟡 | [n20] |
+| 65 | Emails | ✅ | [n21] |
+| 66 | AI Datasets | ✅ | [n22] |
+| 67 | AI Scorers | ✅ | [n23] |
+| 68 | Offline Evaluations | ✅ | [n24] |
 
 ## Notes
 
@@ -105,11 +121,28 @@ there.
 - **Backwards compatibility:** Backward-compatible — adding an optional context-fallback default for `distinct_id` on the legacy flag APIs, and adding Flask/FastAPI middleware, are both purely additive.
 - **Remediation:** Make `distinct_id` optional (falling back to `contexts.py`'s ambient value, else no-op) on `feature_enabled`/`get_feature_flag`/`get_all_flags`; add Flask/FastAPI middleware modules alongside the existing Django/Celery ones.
 
+**Re-verified 2026-11-02 at `dca22075` — one of the two gaps is closed.** Gap (2) is withdrawn:
+`posthog/integrations/` now carries `flask.py`, `asgi.py` and `drf.py` alongside `django.py` and
+`celery.py`, all sharing a new `posthog/integrations/_tracing_headers.py` that holds
+`_sanitize_tracing_header_value()` and `_read_tracing_header(..., "X-POSTHOG-DISTINCT-ID")`, so header
+extraction and sanitization are no longer Django-only. Gap (1) **stands**: `Client.get_feature_flag`
+(`client.py:4295-4298`), `feature_enabled` (`:3976-3979`) and `get_all_flags` still take `distinct_id`
+as a mandatory positional argument with no context fallback and no empty/no-op path, unlike
+`evaluate_flags()`. The row stays 🟡 on that one remaining gap.
+
 ### n4 — Capture (🟡 Partial)
 - **Spec requires:** `both` applicability. Enrich events with `distinct_id`/timestamp/uuid/`$lib`+`$lib_version`/super-properties/`$groups`; honor an opt-out state so that capture is dropped silently with no network call (acceptance scenario "Capture honors opt-out state" is tagged `@both`); support a `before_send` hook that can mutate/drop events. Two requirements are new since the last audit: **Environment-sourced release identifier** (`POSTHOG_RELEASE_ID` read once at construction, trimmed, blank-as-unset, stamped on the shared event path before `before_send`, explicit/super/context values win, kept out of `$set`/`$set_once`/`$group_set`, **and retained on a minimized `$feature_flag_called` event**) and **Caller-supplied event properties take precedence**, whose server paragraph explicitly records python's `super_properties`-after-caller order as conformant.
 - **SDK currently:** The two new requirements are almost entirely met. `posthog/release_id.py::_resolve_release_id()` reads `POSTHOG_RELEASE_ID` once, trims it and maps blank to `None`; `client.py:969` / `async_client.py:152` resolve it at construction; `client.py:2436-2439` stamps it in the shared `_enqueue()` with `setdefault`, after the `super_properties` merge and before `before_send` — so caller, super-property and context values win, every shared-path event type (`$exception`, `$create_alias`, `$groupidentify`, `$set`) carries it, and a hook can delete it. **The one gap is the minimized flag-called event:** `$release_id` is not in `_MINIMAL_FLAG_CALLED_EVENT_PROPERTIES` (`client.py:309-341`), and the allowlist filter at `client.py:2449-2452` runs *after* the release-id stamp, so a minimized `$feature_flag_called` strips the property the capture spec says it SHALL retain. The merge-order requirement is satisfied as written for a server SDK. Unchanged from the last audit: `grep -rn "opt_out\|opt_in\|is_opted_out" posthog/client.py posthog/__init__.py` → zero matches; there is still no dynamic runtime opt-out API, only the constructor-time `disabled` kill switch.
 - **Backwards compatibility:** Backward-compatible — adding `$release_id` to the allowlist frozenset is a one-line additive change, and adding `opt_in()`/`opt_out()`/`is_opted_out()` methods is purely additive.
 - **Remediation:** Add `"$release_id"` to `_MINIMAL_FLAG_CALLED_EVENT_PROPERTIES` (it is a static, low-cardinality runtime identity property, exactly the category the allowlist already keeps `$lib`/`$os` for); separately, add a dynamic `opt_out_capturing()`/`opt_in_capturing()`/`is_opted_out()` API distinct from the static `disabled` switch.
+
+**Re-verified 2026-11-02 at `dca22075` — unchanged.** `$release_id` is still absent from
+`_MINIMAL_FLAG_CALLED_EVENT_PROPERTIES` (`client.py:318-349`, the frozenset now ends at
+`$python_version`), while the stamp still runs at `client.py:2594-2597` ahead of the allowlist filter,
+so a minimized `$feature_flag_called` still strips it. `grep -rn "opt_out\|opt_in\|is_opted_out"
+posthog/client.py posthog/__init__.py` still returns zero matches. #143 ("one property precedence for
+client SDKs") narrowed the precedence requirement to client SDKs and does not change this row;
+#127 (client-side rate-limiter clock bound) is likewise client-scoped.
 
 ### n5 — Capture Exception (withdrawn — row is now ✅)
 Withdrawn this run on new spec text, not new code. The previous note's sole finding was that
@@ -159,6 +192,17 @@ questions around `mechanism`, `$exception_source` and reserved-key precedence re
 - **Backwards compatibility:** Needs deprecation path — the callback-deferral behavior is intentional (avoids a deadlock) and shouldn't silently change; document it as a known, accepted deviation rather than "fixing" it away, since doing so risks reintroducing the deadlock it was designed to prevent.
 - **Remediation:** Document the callback-deferral edge case explicitly in the public API docs as an accepted platform-specific variation; no code change recommended given the deadlock risk. (Downgraded from being the sole open item — all other Shutdown requirements are confirmed compliant on re-verification.)
 
+**Re-verified 2026-11-02 at `dca22075` — new spec text, verdict unchanged.** sdk-specs
+[#135](https://github.com/PostHog/sdk-specs/pull/135) added "Shutdown stops work when its timeout
+elapses", whose rules are conditioned on "Where `shutdown` takes or defaults to a timeout".
+`Client.shutdown()` (`client.py:3360`) still takes no timeout and its own docstring states "Event
+draining has no timeout", so the requirement's precondition is not met for the event drain — only the
+trace drain has a budget (two 30-second windows). The requirement's two acceptance scenarios are
+tagged `@both` and call `shutdown` *with* a timeout, which this SDK cannot express. **This needs a
+human reading:** either the spec's conditional phrasing makes the scenarios inapplicable to a
+no-timeout surface, or the `@both` tag makes a timeout parameter mandatory for server SDKs. The row
+stays 🟡 on the pre-existing finding rather than being downgraded on an ambiguity.
+
 ### n12 — Before Send Hook (🟡 Partial)
 - **Spec requires:** `both` applicability, acceptance `@both`. A `beforeSend(event) -> event | null` hook run after event assembly and before enqueue; can mutate or drop (`null`/`None` return); spec explicitly frames multi-hook chaining as an optional capability ("Some SDKs allow multiple hooks... Support hook chaining **when configured as an array**"), stopping the chain on drop; hook exceptions must not crash the caller.
 - **SDK currently:** Single choke point `_enqueue()` (`posthog/client.py`), fed by `capture`, `set`/`set_once`, `group_identify`, `alias`, `capture_exception`, `capture_ai`, and `$feature_flag_called` emission — covers all event types. `before_send` executes after `clean(msg)` and property assembly; returning `None` drops the event (logged); a mutated dict is re-cleaned and used; hook exceptions are caught, logged, and fall back to the original message — confirmed via `posthog/test/test_before_send.py`. Deviation: only a single callable is supported (`_set_before_send()`; `BeforeSendCallback = Callable[[dict], Optional[dict]]`, `types.py`) — no `List[BeforeSendFn]` chaining, so the optional "some SDKs" chaining behavior is unimplemented. None of the acceptance scenarios test chaining, so the acceptance suite itself passes; this is a narrower gap than a hard `SHALL`.
@@ -189,11 +233,35 @@ questions around `mechanism`, `$exception_source` and reserved-key precedence re
 - **Backwards compatibility:** Needs deprecation path — converting to a true requeue-for-next-flush model changes `on_error` callback timing and consumer-thread blocking semantics (currently blocks synchronously through multiple attempts × capped backoff), an observable behavior change for existing integrations that time or depend on current `on_error`/blocking timing.
 - **Remediation:** If pursued, introduce a requeue-on-exhaustion path as an opt-in mode (e.g. a new constructor flag) rather than changing the default synchronous-retry-then-drop behavior, to avoid silently changing blocking/timing semantics for existing integrations.
 
+**New gap 2026-11-02 — ingestion retry backoff is not jittered.** sdk-specs
+[#132](https://github.com/PostHog/sdk-specs/pull/132) added "Ingestion retry backoff is jittered"
+(SHOULD-tier). `capture_v1._backoff()` (`capture_v1.py:424-439`) computes
+`min(2**attempt_index, _MAX_BACKOFF_SECONDS)` and sleeps `max(configured, clamped_retry_after)` —
+correct exponential progression, correct `Retry-After`-as-floor, correct shared ceiling, but **no
+randomness anywhere**: `grep -n "jitter\|random" posthog/consumer.py posthog/_async_consumer.py
+posthog/request.py` returns nothing. Every client refused during an outage therefore returns on the
+same schedule. Backward-compatible: multiplying the computed delay by a factor drawn from `[0.75,
+1.25]` before the `Retry-After` floor is applied changes no public surface and keeps the ceiling,
+since the spec explicitly requires jitter to scale the computed delay rather than replace it.
+
 ### n17 — Evaluate Flags (🟡 Partial, downgraded from ✅ on new spec text)
 - **Spec requires:** The snapshot API's "Evaluation identity, inputs, and data sources" requirement obliges an SDK with a successful local-definition refresh lifecycle to retain **negative knowledge**: remember that a requested key was absent from both the loaded definitions and a clean remote fallback, in a finite-capacity in-memory store cleared on each successful definitions refresh, and coordinate concurrent probes for the same key so one missing key does not re-probe `/flags` on every call.
 - **SDK currently:** The snapshot itself is strong and the rest of the capability is met: `posthog/feature_flag_evaluations.py` gives a frozen point-in-time result with `is_enabled(key, default_value=False)`, `get_flag`, `get_flag_payload`, `keys()`, `only(keys)` (which drops unknown keys with a logged diagnostic, `:149-159`), `only_accessed()`, lazy `$feature_flag_called` via `_record_access`, and `flag_missing` error bookkeeping (`:259-266`); `Client.evaluate_flags()` falls back to the ambient context distinct id and returns an empty no-op snapshot with no `/flags` request when no identity resolves (see [n3]). What is missing is the negative-knowledge machinery: `grep -rniE 'missing_key|negative_knowledge|unknown_key|in_flight'` over non-test source returns no store, no definitions generation counter and no in-flight probe map. A key that exists in neither the local definitions nor a clean remote response is re-probed on every call for the lifetime of the process.
 - **Backwards compatibility:** Backward-compatible — a bounded in-memory missing-key set keyed by definitions generation, plus a per-key in-flight map, is additive and changes no public surface; it only removes repeated network calls.
 - **Remediation:** Add a capacity-bounded missing-key store cleared whenever `poller`/`flag_definition_cache` completes a successful definitions refresh, consult it before the remote probe, and coordinate concurrent probes for the same key through a per-key lock. This is the same gap recorded for posthog-php, posthog-ruby, posthog-go and posthog-dotnet — python is the fifth server SDK checked and the fifth to lack it.
+
+**Second gap added 2026-11-02 — snapshot reads take no feature-flag-event option.** sdk-specs
+[#111](https://github.com/PostHog/sdk-specs/pull/111) added "Snapshot feature flag event control":
+the snapshot's enablement and value accessors SHALL accept an optional per-read
+`send_feature_flag_events`, while the payload accessor, key enumeration and in-memory filters SHALL
+NOT. `FeatureFlagEvaluations.is_enabled(key, default_value=False)` and `get_flag(key)`
+(`feature_flag_evaluations.py:98`, `:116`) take no such argument, so a caller cannot suppress
+`$feature_flag_called` for a single snapshot read the way the single-flag getters already allow via
+`send_feature_flag_events`. `get_flag_payload`, `keys()` and `only()` correctly take no option, which
+is the other half of the requirement. Backward-compatible: a keyword-only argument defaulting to the
+client-level behavior is additive. The negative-knowledge gap below is unchanged — and note that
+**posthog-java now implements it**, so python is no longer one of a uniform set (see
+[posthog-java.md#n27](posthog-java.md)).
 
 ### n18 — HTTP Client (🟡 Partial, downgraded from ✅ on new spec text)
 - **Spec requires:** Since PR [#110](https://github.com/PostHog/sdk-specs/pull/110): a flag evaluation request retries transient transport conditions (network error, reset, timeout, DNS/socket/TLS failure) and 502/504, but **a connection refused by the destination (`ECONNREFUSED`) is not transient — the SDK SHALL NOT retry it and SHALL surface it as the flag error immediately** ("exactly 1 feature flag request should be sent").
@@ -201,14 +269,116 @@ questions around `mechanism`, `$exception_source` and reserved-key precedence re
 - **Backwards compatibility:** Backward-compatible — narrowing the caught exception is a behavior change only for the refused-connection case the spec now names, and it strictly reduces requests and latency.
 - **Remediation:** Before retrying a `requests.exceptions.ConnectionError`, walk `exc.__cause__`/`args` for a `urllib3` `NewConnectionError` wrapping an OS `ConnectionRefusedError` (errno `ECONNREFUSED`) and re-raise immediately in that case; keep the retry for DNS, TLS, reset and timeout failures.
 
+**Re-verified 2026-11-02 at `dca22075` — unchanged, and the new compression requirement is met.**
+`request.py:356` still catches `requests.exceptions.ConnectionError` wholesale on the flags retry
+path, so a refused connection is still retried; the row stays 🟡 for that reason alone. sdk-specs
+[#81](https://github.com/PostHog/sdk-specs/pull/81) ("Request body compression and its opt-out") adds
+no gap: it lets server SDKs default to no compression and expose the control as a boolean or an enum,
+and posthog-python ships both — a `gzip` boolean on the legacy `/batch/` path (`request.py:233-264`,
+setting `Content-Encoding: gzip` and falling back to the uncompressed body with a warning when the
+encoder raises, which the requirement explicitly permits) and a `CaptureCompression` enum
+(`capture_compression.py`, members `none`/`gzip`/`deflate`/`zstd`) on the v1 path. Nothing downgrades
+to uncompressed-and-resend after a server rejection.
+
 ### n19 — Local Feature Flag Evaluator (🟡 Partial, downgraded from ✅ on new spec text)
 - **Spec requires:** Two requirements added since the last audit. **Experiment holdouts** (PR [#76](https://github.com/PostHog/sdk-specs/pull/76)): a flag configured with a holdout must evaluate the holdout before its release conditions so the local answer matches the backend. **Group keys are rendered for bucketing like the flags service** (PR [#89](https://github.com/PostHog/sdk-specs/pull/89)): a group key is rendered with the service's canonical representation — a JSON string contributes its unquoted contents, a JSON number its canonical JSON encoding — and a key of any **other** type is treated as unresolved context: the condition is inconclusive, remote evaluation stays eligible, the key is *not* rendered with a host-specific spelling, and nothing crashes.
 - **SDK currently:** **Holdouts are implemented, and this is the first server SDK in this matrix where they are** — `posthog/feature_flags.py:124-156` hashes `holdout-<value>` with the service's `-` separator (the comment calls out that the separator is the whole point), reads `filters.holdout`'s `exclusion_percentage`/`id`, and `match_feature_flag_properties` evaluates it *before* the condition loop (`:405-408`), returning the `holdout-<id>` variant. The group-key rule is where it falls short: `client.py:3584-3598` passes `group_key = groups[group_name]` straight through as `bucketing_value`, and `_hash()` (`feature_flags.py:117-119`) interpolates it into an f-string. A string or `int` key therefore renders correctly (`42` → `"42"`, matching the canonical JSON number encoding and so bucketing identically to remote evaluation), but an unsupported type is rendered with Python's own spelling rather than being treated as unresolved: a boolean group key `True` buckets on the literal `"True"` — a host-specific spelling no other SDK or the service would produce — instead of making the condition inconclusive and leaving remote evaluation eligible. Nothing crashes, which is the other half of the requirement, and the SDK has a correct canonical JSON renderer already (`_json_value_to_string`, `feature_flags.py:587-601`) — it is simply not on this path.
 - **Backwards compatibility:** Backward-compatible — today's behavior for a non-string, non-numeric group key is a silent disagreement with the backend, so changing it to inconclusive-plus-remote-fallback corrects a wrong answer rather than removing a relied-on one.
 - **Remediation:** In `client.py`'s group branch, render `group_key` through the existing canonical JSON renderer when it is a string or a number, and raise `InconclusiveMatchError` for any other type (including `bool`, which must be checked before `int` in Python) so the flag falls back to `/flags`.
 
+**Re-verified 2026-11-02 at `dca22075` — unchanged.** `client.py:3928-3938` still passes
+`group_key = groups[group_name]` directly as `bucketing_value`, and `_hash()`
+(`feature_flags.py:151-156`) still interpolates it into an f-string, so a group key that is neither a
+string nor a number is rendered with Python's own spelling instead of leaving the condition
+inconclusive. `resolve_bucketing_value()` (`feature_flags.py:446-466`) was added since the last audit
+but handles only the `device_id` bucketing identifier and is not on the group branch. Holdouts remain
+implemented and correct.
+
 ### n20 — MCP Analytics (🟡 Partial, new row)
 - **Spec requires:** The spec's applicability table names `posthog.mcp` (inside `posthog`) as one of three in-scope packages. Every `$mcp_tool_call` carries `$mcp_tool_name`, `$mcp_is_error`, `$mcp_duration_ms`, `$mcp_source: "posthog_mcp_analytics"`, `$session_id` and a request-start `timestamp`; events serialize to at most 102,400 bytes with a normative shrink order; `$lib` is `posthog-<runtime>-mcp`; automatic instrumentation **SHOULD** emit `$mcp_input_required` and `$mcp_unknown_tool`, and the rule that no `$mcp_tool_call` is sent for an `input_required` round, a task handle, or an unknown tool **applies to every SDK**; and where the SDK emits an `$exception` side-car it SHALL follow `exception-event-metadata` with `$exception_source: "mcp.tool_call"`, `mechanism.handled: true`, and `mechanism.synthetic: true` only for an `isError` result that carried no thrown error.
 - **SDK currently:** A substantial first implementation — `posthog/mcp/` is ~40 modules covering FastMCP, low-level and v2 instrumentation, injected `context`/`llm_model`/`conversation_id` arguments, session identity and token handling, transport identity, sanitization, truncation, and the `send_feedback`/`get_more_tools` virtual tools. The required vocabulary is in place (`constants.py:63` `$mcp_tool_call`, `POSTHOG_MCP_ANALYTICS_SOURCE = "posthog_mcp_analytics"`, `POSTHOG_MCP_LIB_NAME = "posthog-python-mcp"`, `INACTIVITY_TIMEOUT_IN_MINUTES = 30`, and the full `$mcp_*` property set), and the event size bound is implemented at the spec's exact value (`_truncation.py:28`, `MAX_EVENT_BYTES = 102_400`). Two gaps. (1) **Neither SHOULD-tier optional event ships:** `PostHogMCPAnalyticsEvent` (`constants.py:49-66`) declares `$mcp_custom`, `$mcp_feedback`, `$mcp_initialize`, `$mcp_missing_capability`, `$mcp_prompt_get`, `$mcp_prompts_list`, `$mcp_resource_read`, `$mcp_resources_list`, `$mcp_tool_call` and `$mcp_tools_list` — there is no `$mcp_unknown_tool` and no `$mcp_input_required`, and `grep -rn input_required posthog/mcp` returns one unrelated docstring (`_instrument_v2.py:394`). This is the same gap posthog-js and posthog-go carry. (2) **The `$exception` side-car omits its capture-boundary metadata:** `_exceptions.py` builds `{"$exception_list": [...], "$exception_level": "error"}` with `mechanism` fixed at `{"type": "generic", "handled": True}` and never sets `$exception_source: "mcp.tool_call"`; `synthetic` is never set at all, so the spec's distinction between a thrown error and an `isError` result with no thrown error is not expressed. `$exception_level: "error"` is correct.
 - **Backwards compatibility:** Backward-compatible — both gaps are additive: new event names alongside the existing ones, and extra keys on an event the SDK already builds. No existing property changes meaning.
 - **Remediation:** (1) Emit `$mcp_unknown_tool` for a call naming a tool the server has not registered (the ownership probe in `_instrumentation.py:962-983` already answers the "is this one of yours?" question for virtual tools and is the natural place to reuse), and `$mcp_input_required` per `input_required` round, declaring the matching `@mcp_unknown_tool_capable` / `@mcp_input_required_capable` acceptance tags; confirm on the same change that an unknown tool is not reported as a failed `$mcp_tool_call`, which is forbidden for every SDK regardless of capability tags. (2) In `_exceptions.py`, set `$exception_source: "mcp.tool_call"` and set `mechanism.synthetic` to `True` only on the `CallToolResult`/`isError` branch (`_is_call_tool_result`), leaving it unset on the thrown-error branch.
+
+### n21 — Emails (✅ Pass, new row)
+- **Spec requires:** Server SDKs only. An `emails` surface on the client with `send` and `get`; the
+  `secretKey`/`appHost`/timeout/retry client options with a 15-second and 2-retry default; the exact
+  two HTTP paths; a per-call idempotency key defaulting to a UUID v4 and reused across every attempt
+  of one call; and the normative response → error-name table.
+- **SDK currently:** `posthog/emails.py` (942 lines) implements the contract as written, and this is
+  one of the spec's two named reference surfaces. `_SEND_PATH = "/api/projects/@current/messaging/send/email/"`
+  and `_STATUS_PATH = "/api/projects/@current/messaging/emails/{message_id}/"` (`:114-115`) match
+  exactly; the send body is built as `{"template": {...}, "to", "message_data", "identifiers":
+  {"distinct_id"}}` (`:247-250`); `idempotency_key` defaults to `str(uuid4())` and is validated to 1–255
+  visible ASCII characters (`:229-235`) and carried on every attempt via `_headers()` (`:452-458`);
+  client options are `secret_key`, `app_host`, `email_request_timeout_seconds=15`,
+  `email_request_max_retries=2` (`client.py:724-735`), exactly the spec's names and defaults. The
+  error-name mapper (`:285-319`) reproduces the spec table row for row, including the two 409
+  branches (`template_outdated` → `validation_error`, otherwise `concurrent_idempotent_requests`), the
+  two 422 branches (`idempotency_key_reused` → `invalid_idempotent_request`, otherwise
+  `validation_error`), and the two 429 branches (`quota_limited` → `monthly_quota_exceeded`, otherwise
+  `rate_limit_exceeded`). A `Retry-After` longer than 30 seconds raises immediately rather than
+  sleeping. Both sync (`Emails`) and async (`AsyncEmails`) surfaces exist, with a standalone client
+  that captures no events, as the spec's MAY allows.
+- **Backwards compatibility:** n/a — Pass.
+
+### n22 — AI Datasets (✅ Pass, new row)
+- **Spec requires:** Server SDKs *that implement* AI dataset management. Reference surface
+  `OfflineEvaluations.datasets` / `AsyncOfflineEvaluations.datasets`; the documented operation set with
+  its per-operation default limits and page caps; stable item identity with immutable versions and
+  `base_version` optimistic concurrency; revision-pinned snapshots; explicit pagination.
+- **SDK currently:** `posthog/ai/evaluations/_datasets.py` + `_async_datasets.py` + `_dataset_types.py`
+  (990 lines, all added since the last audit) are the spec's reference implementation and match it on
+  the details that are cheapest to get wrong. Defaults line up operation by operation: `list`
+  `limit=50` capped at 100 (`:93`, `:104`), `list_revisions` `limit=50` capped at 100 (`:166-170`),
+  `list_items` `limit=25` capped at 25 (`:188-198`), `list_item_versions` `limit=25` capped at 100
+  (`:343-347`). `snapshot()` (`:359-402`) pins a revision and pages `list_revisions` forward through
+  `next_offset`; `Snapshot.iter_items(page_size=25)` (`:420-436`) iterates lazily off the same pinned
+  revision. `EvaluationItem.from_dataset_item` (`_types.py:142-181`) refuses an archived item, copies
+  input/expected output/metadata, defaults `case_key` to `client_item_id or id`, and never substitutes
+  source output or provenance — exactly the "convert dataset cases into independent executions"
+  requirement.
+- **Backwards compatibility:** n/a — Pass.
+
+### n23 — AI Scorers (✅ Pass, new row)
+- **Spec requires:** Server SDKs *that implement* AI scorer management. `scorers` with
+  create/get/list/update/create_version/get_version/list_versions; `list` defaulting to `limit=100`,
+  `offset=0`, `tag_match="any"`; definition **offsets** and version **cursors** kept distinct;
+  `base_version` as an optional concurrency guard on version creation; detached, validated return
+  values.
+- **SDK currently:** `posthog/ai/evaluations/_scorers.py` (585 lines) implements all seven operations
+  on both sync and async surfaces. `list(limit=100, offset=0, …, tag_match="any")` (`:316-343`) matches
+  the spec's defaults exactly, and the offset/cursor split is real rather than nominal: scorer pages
+  carry `next_offset` derived from the server's `next` link (`:124`, `_next_offset`) while version
+  pages carry `next_cursor` (`:132`) and `list_versions(scorer_id, limit=50, cursor=None)`
+  (`:411-419`, `:575-583`) sends `cursor`, never `offset`. `create_version` takes an optional
+  `base_version` validated as a positive integer and sends it only when supplied (`:192-199`), which is
+  the spec's "optional concurrency guard". The three `kind` configurations are modeled as typed
+  structures in `_scorer_types.py`.
+- **Backwards compatibility:** n/a — Pass.
+
+### n24 — Offline Evaluations (✅ Pass, new row)
+- **Spec requires:** Server SDKs *that implement* offline evaluation uploads. Acknowledged
+  project-bound client with `timeout=15`/`max_retries=3` defaults; immutable execution declarations
+  restorable exactly; bounded, independently replayable upload chunks; partial bulk failure exposing
+  exact recoverable work; and — added by [#149](https://github.com/PostHog/sdk-specs/pull/149), the
+  newest requirement in this capability — per-item `model_version` with experiment fallback, which
+  must survive serialization and replay and must be rejected locally when two results declare
+  conflicting models for one item UUID.
+- **SDK currently:** `posthog/ai/evaluations/_client.py` + `_types.py` + `_serialization.py` implement
+  the capability, and the #149 requirement specifically is met end to end. `EvaluationItem.__init__`
+  takes `model_version` and runs it through the shared `_identifier()` validator alongside `case_key`
+  and the dataset identifiers (`_types.py:107`, `:111-118`), so an empty string, a non-string, or a
+  >255-character value fails locally before any I/O, and a valid value is stored verbatim in the
+  item's immutable encoded JSON — which is also what `to_dict()`/`from_dict()` round-trip, so a saved
+  declaration restores its model with its original execution UUID. `from_dataset_item` accepts
+  `model_version` and documents that omitting it inherits the experiment default "never dataset
+  metadata or source traces" (`:160-165`). `_chunks()` (`_client.py:98-135`) validates the **whole**
+  finite submission before sending any chunk — rejecting a duplicate item/scorer-version pair and
+  raising "Conflicting declarations for the same item UUID" when two results carry different encoded
+  declarations for one item — and then repeats each item declaration in every chunk its results land
+  in, accounting for the repeated bytes in the size budget, so each chunk is independently replayable
+  after a lost acknowledgment. `BulkUploadError` exposes `failed_chunk` and `pending_results`
+  (`_types.py:347-367`), and `pending_results` is sliced from the original prepared sequence
+  (`_client.py:263`), so retried work preserves its model declarations unchanged.
+- **Backwards compatibility:** n/a — Pass.

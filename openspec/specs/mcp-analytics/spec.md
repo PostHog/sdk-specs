@@ -71,6 +71,7 @@ table is the one place defaults are stated.
 | intent fallback | none | Server callback that supplies intent when the agent does not (`$mcp_intent_source: "inferred"`) |
 | conversation anchoring | on | Injects `conversation_id`, mints handles, and derives `$session_id` from them; a handle-free client's listing gets no `conversation_id` and its calls get no minted handle (see "Session identity") |
 | identify | none | Resolves `distinct_id`, `$set`, and `$groups` per request |
+| session resolver | none | Server callback that returns each request's session, ahead of every other source (see "Session identity"); anything but a non-empty string, or a throw, falls through to them. Automatic instrumentation only; an SDK MAY leave it out |
 | exception autocapture | on | Emits `$exception` next to failed calls |
 | error classifier | none | Server callback that, for a failed tool call, returns an explicit error type, whether the failure is expected, both, or nothing |
 | initialize event | on | Sends `$mcp_initialize` for each legacy `initialize`; off sends none and changes nothing else |
@@ -107,7 +108,7 @@ means set whenever the SDK can determine the value. Events: "call" is `$mcp_tool
 | `$mcp_intent` | call, report | non-empty string, at most 2,048 characters | known |
 | `$mcp_intent_source` | call, report | `"context_parameter"`, `"inferred"`, or `"client_metadata"` | with `$mcp_intent` |
 | `$mcp_conversation_id` | call, report, `$exception`, `$mcp_input_required`, `$mcp_unknown_tool` | lowercase UUIDv7 | known, except on a call with a client conversation id |
-| `$mcp_session_source` | all | `"client_metadata"`, `"conversation"`, `"transport"`, or `"generated"` | should, from automatic instrumentation |
+| `$mcp_session_source` | all | `"host"`, `"client_metadata"`, `"conversation"`, `"transport"`, or `"generated"` | should, from automatic instrumentation |
 | `$mcp_error_type` | failed call | string, low cardinality, at most 256 characters | failed calls |
 | `$mcp_error_message` | failed call | string, at most 2,048 characters | failed calls |
 | `$mcp_error_status` | failed call | JSON number, an integer HTTP status code from 100 to 599 | may |
@@ -340,8 +341,13 @@ NOT depend on `$exception`, which can be disabled.
 ### Requirement: Session identity
 
 Every MCP event SHALL carry a non-empty `$session_id` that groups one agent conversation as far as the
-transport allows, and never groups requests from different clients. It comes from whoever groups the
-client's calls, first match wins:
+transport allows. A server that configured a session resolver (see "Configuration") decides this
+itself: when the resolver returns a non-empty string for a request, the SDK derives `$session_id` from
+that string as below, and the numbered rules do not apply. The server knows what a session means for
+its product, and the resolver receives the request, so it can still return a client conversation id
+itself; whatever it returns, including one value for many clients, is its choice. The numbered rules
+never group requests from different clients. The session comes from whoever groups the client's calls,
+first match wins:
 
 1. The client: a client conversation id (see below) in the tool call's `_meta`.
 2. The agent: a conversation handle (see below), echoed by the agent or minted for this call and
@@ -361,16 +367,24 @@ A derived `$session_id` is `"ses_" + H(x) + H(x + "::salt")`. `H` runs two 32-bi
 input's characters (ASCII, so bytes, UTF-16 units, and code points agree), seeds `0x84222325` and
 `0xcbf29ce4`, primes `0x1b3` and `0x193`, each step `lane = (lane XOR c) * prime mod 2^32`, and returns
 the two lanes as 8 lowercase hex digits each. Derivation is deterministic so replicas, restarts, and
-SDKs in different languages agree.
+SDKs in different languages agree. A resolver value SHOULD be ASCII for the same reason: the SDKs read a
+string's characters differently past ASCII.
 
 Automatic instrumentation SHOULD set `$mcp_session_source` on every event to what produced its
-`$session_id`: `"client_metadata"` for a client conversation id (rule 1), `"conversation"` for a
+`$session_id`: `"host"` for a session resolver, `"client_metadata"` for a client conversation id (rule 1), `"conversation"` for a
 conversation handle (rule 2), `"transport"` for a transport session id or a replayed PostHog session
 token (rule 3), and `"generated"` for an id the SDK generated itself, whether for a one-client
 connection (rule 3) or a single request (rule 4). An event the SDK sends outside a request, such as a
 server's custom event, takes the source of the session it carries. The manual API MAY set it. A server
 reads fragmentation from it directly: calls whose source is `"generated"` on a stateless HTTP server
 are grouped by nothing.
+
+A custom event the server captures while a tool call runs, from its handler or from work the handler
+started, SHALL carry the `$session_id` and `$mcp_session_source` that call resolved when it arrived,
+even when other requests reach the same server instance meanwhile. It SHOULD carry the identity resolved
+for that call (see "Person identity"), and SHALL NOT carry one resolved for a request in another session.
+A custom event captured outside any call carries the session the server instance last held, which is
+never one a session resolver, a client conversation id, or a handle produced.
 
 A client conversation id is a value an MCP client puts in a `tools/call` request's `_meta` to name the
 conversation the call belongs to. This table lists every key the SDK reads. A request comes from a
@@ -419,7 +433,10 @@ result's content a text block whose text is the JSON object `{"conversation_id":
 without `$ref`, `oneOf`, `anyOf`, or `allOf` at its root that does not already declare
 `_mcp_instructions`, on which it declares `_mcp_instructions` as an optional property. A handle that is
 not delivered (no result, or a result that cannot carry content, such as `input_required` or a task
-handle) SHALL NOT be used for `$session_id` or `$mcp_conversation_id`.
+handle) SHALL NOT be used for `$session_id` or `$mcp_conversation_id`. A session resolver does not
+change anchoring: handles are still advertised, minted, and recorded in `$mcp_conversation_id`, though
+they no longer set `$session_id` when the resolver answers. A server that does not want them turns
+anchoring off.
 
 A legacy stateless HTTP server handles each request on a fresh instance, so the SDK MAY carry the
 client's session in the `Mcp-Session-Id` of the `initialize` response, which the client replays: a
@@ -496,6 +513,22 @@ is not a token.
 - **GIVEN** an MCP server instrumented by the SDK with conversation anchoring enabled, on a transport that carries no session
 - **WHEN** an MCP client with `User-Agent` "openai-mcp/1.0.0 (ChatGPT)" calls tool "search_docs" without `_meta` "openai/session"
 - **THEN** the result should contain no `conversation_id` text block
+
+#### Scenario: A session resolver outranks a client conversation id
+- **GIVEN** an MCP server instrumented by the SDK with conversation anchoring disabled and a session resolver that returns "tenant-42" for every request
+- **WHEN** an MCP client with `User-Agent` "openai-mcp/1.0.0 (ChatGPT)" calls tool "search_docs" with `_meta` {"openai/session": "v1/conv-example-0001"}
+- **AND** the SDK is flushed
+- **THEN** the "$mcp_tool_call" event's "$session_id" should be "ses_49f24de273ad14bdc3c6e16273c81fd9"
+- **AND** its "$mcp_session_source" should be "host"
+
+#### Scenario: A custom event captured during a call keeps that call's session while another call runs
+- **GIVEN** an MCP server instrumented by the SDK with conversation anchoring disabled, served over stateless HTTP by one instance shared by every client, whose tool "search_docs" waits for a signal and then captures custom event "docs_searched"
+- **WHEN** an MCP client calls tool "search_docs" with `Mcp-Session-Id` set to the PostHog session token `{"sid":"ses_first"}`
+- **AND** while that call waits, another MCP client calls tool "search_docs" with no session, and that call is signalled and finishes
+- **AND** the first call is signalled and finishes
+- **AND** the SDK is flushed
+- **THEN** each "docs_searched" event should have the "$session_id" of the "$mcp_tool_call" event of the same call
+- **AND** the first call's "docs_searched" event's "$session_id" should be "ses_first"
 
 #### Scenario: Session ids derive identically across SDKs
 - **GIVEN** a conversation handle "0190f0e8-7a6b-7c3d-9e4f-5a6b7c8d9e0f"

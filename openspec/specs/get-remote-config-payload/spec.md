@@ -43,6 +43,11 @@ The SDK SHALL send `GET {host}/api/projects/@current/feature_flags/{flag key}/re
 - **THEN** the mock server receives one `GET http://example.com/api/projects/@current/feature_flags/test-flag/remote_config?token=TEST_API_KEY`
 - **AND** the request has no body
 
+#### Scenario: A host with a path keeps that path in front of the route
+- **GIVEN** a client with project token `TEST_API_KEY`, host `http://example.com/posthog` and a secret key
+- **WHEN** the caller reads the payload of `test-flag`
+- **THEN** the mock server receives one `GET http://example.com/posthog/api/projects/@current/feature_flags/test-flag/remote_config?token=TEST_API_KEY`
+
 ### Requirement: Flag key containment
 
 The flag key SHALL NOT change the path outside its one segment, the query, or the fragment of the request. For every flag key, the path of a request that the SDK sends SHALL be the path of the configured host, followed by `/api/projects/@current/feature_flags/{one segment}/remote_config`, and its query SHALL be `token={project token}`. The SDK SHALL meet this in one of two ways: it encodes the key so that it stays one path segment, or it refuses the key and sends no request. A refused key gives no result, and the SDK reports it as it reports a failure in "Request failure".
@@ -64,6 +69,13 @@ Percent-encoding does not change `.` and `..`, and an HTTP client resolves them 
   | `a#b`                  |
   | `..`                   |
   | `.`                    |
+
+#### Scenario: A flag key does not leave the route of a host with a path
+- **GIVEN** a client with project token `TEST_API_KEY`, host `http://example.com/posthog` and a secret key
+- **WHEN** the caller reads the payload of the flag key `../../../users/@me/#`
+- **THEN** the mock server receives no request or one request
+- **AND** the path as sent of every received request is `/posthog/api/projects/@current/feature_flags/`, then one path segment, then `/remote_config`
+- **AND** the query of every received request is `token=TEST_API_KEY`
 
 ### Requirement: Flag key encoding
 

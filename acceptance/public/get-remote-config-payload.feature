@@ -20,6 +20,12 @@ Feature: Get Remote Config Payload
     And the request should have no body
     And the returned payload should equal JSON {"foo":"bar"}
 
+  Scenario: A host with a path keeps that path in front of the route
+    Given the SDK is initialized with token "TEST_API_KEY", host "http://example.com/posthog" and secret key "phs_test"
+    And the mock server will answer the next remote config request with the body {}
+    When the caller reads the remote config payload of "test-flag"
+    Then the mock server should receive 1 request "GET http://example.com/posthog/api/projects/@current/feature_flags/test-flag/remote_config?token=TEST_API_KEY"
+
   # Requirement: Flag key containment
 
   Scenario Outline: A flag key does not leave the remote config route
@@ -38,6 +44,14 @@ Feature: Get Remote Config Payload
       | "a#b"                  |
       | ".."                   |
       | "."                    |
+
+  Scenario: A flag key does not leave the route of a host with a path
+    Given the SDK is initialized with token "TEST_API_KEY", host "http://example.com/posthog" and secret key "phs_test"
+    And the mock server will answer every request with the body {}
+    When the caller reads the remote config payload of "../../../users/@me/#"
+    Then the mock server should receive at most 1 request
+    And every received request should have a path as sent that is "/posthog/api/projects/@current/feature_flags/", then one path segment, then "/remote_config"
+    And every received request should have the query "token=TEST_API_KEY"
 
   # Requirement: Flag key encoding (a recommendation)
 

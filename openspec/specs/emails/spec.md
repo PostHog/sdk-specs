@@ -8,7 +8,7 @@ Send one transactional email, such as a password reset or a receipt, to one reci
 
 Server SDKs only. Both operations need a secret key (a project secret API key), which must never reach a client. The reference surfaces are `posthog.emails` in posthog-node and `client.emails`, `Emails` and `AsyncEmails` in posthog-python's `posthog.emails`. Other SDKs can use native names, async conventions, and error channels, as the requirements allow.
 
-Not covered: local templates (template data on a code send, the content hash, the upload by key), `cc`, `bcc`, custom headers, tags and attachments, which the send API does not accept yet.
+Not covered: local templates (template data on a code send, the content hash, the upload by key), `cc`, `bcc`, tags and attachments, which the send API does not accept yet.
 
 ## Public surface
 
@@ -17,7 +17,7 @@ Names below use posthog-node spelling, then posthog-python spelling.
 | Operation | Inputs and defaults | Result |
 |---|---|---|
 | `send`, template form | Required `to`, `templateId` / `template_id`; optional `templateData` / `template_data`, `distinctId` / `distinct_id`, `idempotencyKey` / `idempotency_key` (default: a UUID v4 for the call), `maxRetries` (default: the client's) | Send result: `id`, `replayed`, `warnings` |
-| `send`, code form | Required `to`, `templateKey` / `template_key`, `subject`, and `html`, `text` or both; optional `from` / `from_`, `replyTo` / `reply_to`, `captureEngagement` / `capture_engagement` (default: true), plus the same `distinctId`, `idempotencyKey` and `maxRetries` | Send result: `id`, `replayed`, `warnings` |
+| `send`, code form | Required `to`, `templateKey` / `template_key`, `subject`, and `html`, `text` or both; optional `from` / `from_`, `replyTo` / `reply_to`, `captureEngagement` / `capture_engagement` (default: true), `headers`, plus the same `distinctId`, `idempotencyKey` and `maxRetries` | Send result: `id`, `replayed`, `warnings` |
 | `get` | Message ID from a send result | Status record: `id`, `status`, `createdAt` / `created_at`, `statusAt` / `status_at`, `reason` |
 
 | Client option | posthog-node | posthog-python | Default |
@@ -33,7 +33,7 @@ Names below use posthog-node spelling, then posthog-python spelling.
 | Operation | Request | Success |
 |---|---|---|
 | `send`, template form | `POST {app host}/api/projects/@current/messaging/send/email/` with `{"template_id", "to", "message_data", "distinct_id"}` | `2xx` with `{"message_id", "replayed", "warnings"}` |
-| `send`, code form | the same route, with `{"template_key", "subject", "html" and/or "text", "to", "capture_engagement", "from", "reply_to", "distinct_id"}` | `2xx` with `{"message_id", "replayed", "warnings"}` |
+| `send`, code form | the same route, with `{"template_key", "subject", "html" and/or "text", "to", "capture_engagement", "from", "reply_to", "headers", "distinct_id"}` | `2xx` with `{"message_id", "replayed", "warnings"}` |
 | `get` | `GET {app host}/api/projects/@current/messaging/emails/{message_id}/` | `200` with `{"id", "status", "created_at", "status_at", "reason"}` |
 
 The status is one of `queued`, `sent`, `failed`, `delivered`, `bounced`, or `complained` today, and new statuses can appear.
@@ -130,7 +130,7 @@ For a client host that is not PostHog Cloud and no caller-set app host, the SDK 
 
 The template form SHALL hold `template_id` (the template ID in lowercase), `to`, `message_data` (the template data, or an empty object), and `distinct_id` only when the caller passed a distinct ID.
 
-The code form SHALL hold `template_key`, `subject`, `to`, `capture_engagement`, and `html`, `text` or both. It SHALL hold `from`, `reply_to` and `distinct_id` only when the caller passed them. A reply-to given as one address SHALL be sent as a one-item list, and an empty reply-to list SHALL be left out of the body.
+The code form SHALL hold `template_key`, `subject`, `to`, `capture_engagement`, and `html`, `text` or both. It SHALL hold `from`, `reply_to`, `headers` and `distinct_id` only when the caller passed them. A reply-to given as one address SHALL be sent as a one-item list, and an empty reply-to list SHALL be left out of the body.
 
 #### Scenario: The template and its data reach the send route
 - **WHEN** the caller sends to `user@example.com` with template ID `0190F6D2-7C1E-7B3A-9F5E-1C2D3E4F5A6B`, template data `{"name": "Ada"}` and distinct ID `user_123`
@@ -148,6 +148,10 @@ The code form SHALL hold `template_key`, `subject`, `to`, `capture_engagement`, 
 - **WHEN** the caller sends a code-form email with an empty reply-to list
 - **THEN** the body has no `reply_to`
 
+#### Scenario: Headers reach the body as given
+- **WHEN** the caller sends a code-form email with headers `{"List-Unsubscribe": "<https://example.com/unsubscribe?u=1>", "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"}`
+- **THEN** the body holds `"headers": {"List-Unsubscribe": "<https://example.com/unsubscribe?u=1>", "List-Unsubscribe-Post": "List-Unsubscribe=One-Click"}`
+
 ### Requirement: Send request headers
 
 A send SHALL carry `Content-Type: application/json`, `Accept: application/json`, the `Idempotency-Key`, and the SDK's user agent. The SDK SHALL NOT take the distinct ID from a request context.
@@ -159,9 +163,11 @@ A send SHALL carry `Content-Type: application/json`, `Accept: application/json`,
 
 ### Requirement: Send code form
 
-The code form SHALL take a required template key and subject, with `html`, `text` or both, and SHALL take an optional sender address, an optional reply-to of one address or a list of addresses, and an optional capture-engagement flag that defaults to true. The template key names the email so PostHog can group its metrics, logs and status under it; it is not a template stored in PostHog. PostHog sends the content as given and does not store it.
+The code form SHALL take a required template key and subject, with `html`, `text` or both, and SHALL take an optional sender address, an optional reply-to of one address or a list of addresses, an optional capture-engagement flag that defaults to true, and optional headers, a mapping of header names to values. The template key names the email so PostHog can group its metrics, logs and status under it; it is not a template stored in PostHog. PostHog sends the content as given and does not store it.
 
-The shared send inputs — the recipient, the distinct ID, the idempotency key and the per-send retry limit — apply to both forms.
+The SDK SHALL check only that headers is a mapping, and SHALL send it as given. PostHog's allowlist decides which header names and values a send takes, and refuses the rest, so the SDK SHALL NOT check them.
+
+The shared send inputs (the recipient, the distinct ID, the idempotency key and the per-send retry limit) apply to both forms.
 
 One call SHALL carry exactly one form. The SDK SHALL refuse, before any request, a call that names neither form, a call that names both, and a call that sets a field belonging to the other form, such as template data on a code send or a subject on a template send. Capture engagement belongs to the code form only: a template made in PostHog follows the project's engagement setting.
 
@@ -176,6 +182,11 @@ One call SHALL carry exactly one form. The SDK SHALL refuse, before any request,
 
 #### Scenario: A template send refuses a code-form field
 - **WHEN** the caller sends an email with a template ID and a subject
+- **THEN** the SDK reports an argument error
+- **AND** no request is made
+
+#### Scenario: A template send refuses headers
+- **WHEN** the caller sends an email with a template ID and headers
 - **THEN** the SDK reports an argument error
 - **AND** no request is made
 

@@ -190,6 +190,11 @@ One call SHALL carry exactly one form. The SDK SHALL refuse, before any request,
 - **THEN** the SDK reports an argument error
 - **AND** no request is made
 
+#### Scenario: Headers that are not a mapping send nothing
+- **WHEN** the caller sends a code-form email with headers `List-Unsubscribe: <https://example.com/unsubscribe?u=1>` as a string
+- **THEN** the SDK reports an argument error
+- **AND** no request is made
+
 ### Requirement: Argument checks
 
 Before any request, the SDK SHALL check that `to` is one nonempty string, a distinct ID is a nonempty string, an idempotency key is 1 to 255 visible ASCII characters, and a retry limit is a nonnegative integer.

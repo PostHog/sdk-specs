@@ -56,3 +56,8 @@ One call SHALL carry exactly one form. The SDK SHALL refuse, before any request,
 - **WHEN** the caller sends an email with a template ID and headers
 - **THEN** the SDK reports an argument error
 - **AND** no request is made
+
+#### Scenario: Headers that are not a mapping send nothing
+- **WHEN** the caller sends a code-form email with headers `List-Unsubscribe: <https://example.com/unsubscribe?u=1>` as a string
+- **THEN** the SDK reports an argument error
+- **AND** no request is made

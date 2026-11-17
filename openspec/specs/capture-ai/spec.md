@@ -73,9 +73,9 @@ through `Config.Callback`.
 
 ```rust
 fn capture_ai(&self, event: Event)
-fn capture_ai_batch(&self, events: Vec<Event>, historical_migration: bool)
+fn capture_ai_batch(&self, events: Vec<Event>)
 async fn capture_ai_immediate(&self, event: Event) -> Result<CaptureSummary, Error>
-async fn capture_ai_batch_immediate(&self, events: Vec<Event>, historical_migration: bool) -> Result<CaptureSummary, Error>
+async fn capture_ai_batch_immediate(&self, events: Vec<Event>) -> Result<CaptureSummary, Error>
 ```
 
 The blocking client has the same names, synchronous. The queued methods are
@@ -85,8 +85,9 @@ fire-and-forget; the immediate variants return the per-event summary.
 
 `capture_ai` mirrors the host SDK's public `capture` surface: the same
 parameters (every future `capture` parameter implicitly joins `capture_ai`),
-and an immediate/awaitable variant exactly where the host SDK has one for
-`capture` — no more, no less.
+except a request-level historical migration flag, which capture ignores for AI
+events (posthog-rs's AI batch methods take none), and an immediate/awaitable
+variant exactly where the host SDK has one for `capture` — no more, no less.
 
 ## Configuration
 

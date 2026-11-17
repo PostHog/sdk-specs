@@ -21,7 +21,7 @@ alike. It does not cover LLM analytics (tokens, cost, prompts), which belong to 
 |-----|---------|
 | posthog-js | `@posthog/mcp` |
 | posthog-python | `posthog.mcp` (inside `posthog`) |
-| posthog-go | `posthogmcp` (manual API), `posthogmcpsdk` (go-sdk adapter) |
+| posthog-go | `posthogmcp` (manual API), `posthogmcpsdk` (go-sdk adapter), `posthogmcpgo` (mcp-go adapter) |
 | posthog-rs | `posthog::mcp` (inside `posthog`, feature `mcp`, rmcp adapter) |
 | posthog-ruby | not yet |
 
@@ -832,7 +832,8 @@ drops its `$exception`.
 Every MCP event's properties, `$set` and `$groups` included, SHALL serialize to at most 102,400 bytes
 of compact UTF-8 JSON, without ever dropping the event or a required property of "Tool call event". The
 bound covers the properties the MCP instrumentation builds; values the client adds afterwards from its
-global or context layers (`capture`) are outside it, and capture's own event size limit applies to them. The
+global or context layers (`capture`) are outside it, and capture's own event size limit applies to them. An SDK
+MAY fit the event to the bound again after its request context adds properties (posthog-rs does). The
 SDK SHALL shrink `$mcp_response` and `$mcp_parameters` first and other optional properties after them.
 To shrink is to truncate string values to a smaller cap of the SDK's choosing, keeping their start, and
 to drop the property only when it still does not fit; the order is normative, the caps are not;

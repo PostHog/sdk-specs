@@ -137,7 +137,7 @@ Feature: Capture Exception
       And the first received event's exception at index 1 mechanism should omit "handled"
       And the first received event's exception at index 2 mechanism should omit "handled"
 
-    @sdk:server
+    @sdk:server @requires:null_property_omission
     Scenario: Server exception capture drops null-valued custom object properties on the wire
       When capture exception is called with JSON arguments:
         """application/json
@@ -213,6 +213,7 @@ Feature: Capture Exception
         | handled  | true     |
         | area     | checkout |
 
+    @requires:null_property_omission
     Scenario: Exception capture drops null-valued custom properties on the wire
       Given capture has a valid distinct id and no property-changing hooks or filters
       And a valid handled exception

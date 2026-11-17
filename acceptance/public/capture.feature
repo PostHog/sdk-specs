@@ -42,7 +42,7 @@ Feature: Capture
       | $lib     | any   |
     And the enqueued event should include an event uuid
 
-  @both
+  @both @requires:null_property_omission
   Scenario: Queued capture drops null-valued properties and preserves array positions
     Given the SDK is initialized with token "test-token"
     And capture has a valid distinct id and no property-changing hooks or filters
@@ -58,7 +58,7 @@ Feature: Capture
       """
     And the absent custom property "missing" should remain absent
 
-  @both
+  @both @requires:null_property_omission
   Scenario: Immediate capture drops null-valued properties and preserves array positions
     Given the SDK is initialized with token "test-token"
     And the SDK supports immediate delivery
@@ -75,7 +75,7 @@ Feature: Capture
       {"nested":{},"items":["1",null,2,{},[null]]}
       """
 
-  @both
+  @both @requires:null_property_omission
   Scenario: All-null custom properties do not drop the event
     Given the SDK is initialized with token "test-token"
     And capture has a valid distinct id and no property-changing hooks or filters
@@ -91,7 +91,7 @@ Feature: Capture
       """
     And it should retain its normal SDK metadata
 
-  @both
+  @both @requires:null_property_omission
   Scenario: Null object properties introduced by before-send are omitted
     Given the SDK is initialized with token "test-token"
     And the SDK supports before-send with a valid distinct id
@@ -107,7 +107,7 @@ Feature: Capture
       {"hookItems":[null,{}]}
       """
 
-  @both
+  @both @requires:null_property_omission
   Scenario: JavaScript null and undefined object properties are omitted
     Given a JavaScript SDK is initialized with token "test-token"
     And capture has a valid distinct id and no property-changing hooks or filters
@@ -122,7 +122,7 @@ Feature: Capture
       {"items":["1",null,2]}
       """
 
-  @both
+  @both @requires:null_property_omission
   Scenario: Existing nullable capture inputs remain supported
     Given the SDK's existing public capture API accepts null or undefined property values
     And an existing caller supplies those values using the supported public property types
@@ -131,7 +131,7 @@ Feature: Capture
     And capture should not reject the call or require caller-side filtering solely because of those values
     And serializing the captured event should omit null/undefined-valued object members while preserving array positions
 
-  @both
+  @both @requires:null_property_omission
   Scenario: Disk-backed event serialization omits null object properties
     Given the SDK is initialized with token "test-token"
     And the SDK has disk-backed event persistence, a valid distinct id, and no property-changing hooks or filters
@@ -152,7 +152,7 @@ Feature: Capture
       {"nested":{},"items":["1",null,2,{}]}
       """
 
-  @both
+  @both @requires:null_property_omission
   Scenario: JavaScript disk serialization omits undefined object members without compacting arrays
     Given a JavaScript SDK is initialized with token "test-token"
     And the SDK has disk-backed event persistence, a valid distinct id, and no property-changing hooks or filters
@@ -207,12 +207,12 @@ Feature: Capture
   Scenario: Caller property overrides an SDK context property
     Given the SDK is initialized with token "test-token"
     When capture is called with event "Signed Up" and properties:
-      | property | value      |
-      | $lib     | custom-lib |
+      | property  | value      |
+      | $app_name | custom-app |
     Then one event named "Signed Up" should be enqueued
     And the enqueued event properties should include:
-      | property | value      |
-      | $lib     | custom-lib |
+      | property  | value      |
+      | $app_name | custom-app |
 
   @client
   Scenario: Registered property overrides an SDK-set property

@@ -23,7 +23,7 @@ The SDK SHALL send `GET {host}/api/projects/@current/feature_flags/{flag key}/re
 
 ### Requirement: Flag key containment
 
-The flag key SHALL NOT change the path outside its one segment, the query, or the fragment of the request. For every flag key, the path of a request that the SDK sends SHALL be `/api/projects/@current/feature_flags/{one segment}/remote_config`, and its query SHALL be `token={project token}`. The SDK SHALL meet this in one of two ways: it encodes the key so that it stays one path segment, or it refuses the key and sends no request. A refused key gives no result, and the SDK reports it as it reports a failure in "Request failure".
+The flag key SHALL NOT change the path outside its one segment, the query, or the fragment of the request. For every flag key, the path of a request that the SDK sends SHALL be the path of the configured host, followed by `/api/projects/@current/feature_flags/{one segment}/remote_config`, and its query SHALL be `token={project token}`. The SDK SHALL meet this in one of two ways: it encodes the key so that it stays one path segment, or it refuses the key and sends no request. A refused key gives no result, and the SDK reports it as it reports a failure in "Request failure".
 
 Percent-encoding does not change `.` and `..`, and an HTTP client resolves them as dot segments. An SDK that encodes the key SHALL also refuse a key that is `.` or `..`, or contain it in another way. The result for a flag key that is empty, `.` or `..` is not defined, but a request to a path of another form is not permitted.
 
@@ -31,7 +31,7 @@ Percent-encoding does not change `.` and `..`, and an HTTP client resolves them 
 - **GIVEN** a client with project token `TEST_API_KEY`, host `http://example.com` and a secret key
 - **WHEN** the caller reads the payload of the flag key <key>
 - **THEN** the mock server receives no request or one request
-- **AND** the path as sent of every received request is `/api/projects/@current/feature_flags/`, then one path segment, then `/remote_config`
+- **AND** the path as sent of every received request is the path of the configured host, then `/api/projects/@current/feature_flags/`, then one path segment, then `/remote_config`
 - **AND** the query of every received request is `token=TEST_API_KEY`
 
 **Examples:**

@@ -27,7 +27,7 @@ Feature: Get Remote Config Payload
     And the mock server will answer every request with the body {}
     When the caller reads the remote config payload of <key>
     Then the mock server should receive at most 1 request
-    And every received request should have a path as sent that is "/api/projects/@current/feature_flags/", then one path segment, then "/remote_config"
+    And every received request should have a path as sent that is the path of the configured host, then "/api/projects/@current/feature_flags/", then one path segment, then "/remote_config"
     And every received request should have the query "token=TEST_API_KEY"
 
     Examples:

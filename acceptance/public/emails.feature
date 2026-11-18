@@ -18,6 +18,16 @@ Feature: Emails
     And the request body should equal JSON {"template_id":"0190f6d2-7c1e-7b3a-9f5e-1c2d3e4f5a6b","to":"user@example.com","message_data":{"name":"Ada"},"distinct_id":"user_123"}
     And the send result should have ID "msg_1" and replayed false
 
+  # Requirements: Send request, Send code form
+
+  Scenario: A code-form send posts the rendered content to the app host
+    Given the SDK is initialized with token "test-token", host "https://us.i.posthog.com" and secret key "phs_test"
+    And the mock server will accept the next email send with message ID "msg_1"
+    When the caller sends to "user@example.com" with template key "password-reset", subject "Reset your password", HTML "<p>Hi</p>" and distinct ID "user_123"
+    Then the mock server should receive 1 email send request to "https://us.posthog.com/api/projects/@current/messaging/send/email/"
+    And the request body should equal JSON {"template_key":"password-reset","subject":"Reset your password","html":"<p>Hi</p>","capture_engagement":true,"to":"user@example.com","distinct_id":"user_123"}
+    And the send result should have ID "msg_1" and replayed false
+
   # Requirement: Custom host refusal
 
   Scenario: A custom host without an app host never receives the secret key

@@ -64,7 +64,7 @@ Probe coordination SHALL have the same scope as the SDK's negative-knowledge sto
 
 Waiting for overlapping probes SHALL be bounded by one finite deadline per evaluation that does not depend on any probe's network timeout or retry policy. The deadline starts when the evaluation first coordinates its missing keys and covers every overlapping probe it waits for, including probes for other keys it later finds in flight. When the deadline expires, the waiting evaluation SHALL stop waiting and proceed as if no probe for that key were in flight, subject to the one-request limit, and it MUST NOT continue to be registered as a waiter. If the probe owner ends without completing, or the coordination mechanism itself fails or does not respond, waiting evaluations SHALL be released and proceed the same way. A request made after such a release MAY duplicate the in-flight probe. While a probe is in flight, an evaluation that only waits SHALL NOT block any other key.
 
-When probes for the same key overlap within one definitions generation, positive evidence SHALL win. After a current-generation response returns a key, a clean omission of that key from another probe in the same generation SHALL NOT establish negative knowledge for it, whichever probe began first. The SDK MAY track returned keys in a finite-capacity store; eviction from it removes this protection for the evicted key only.
+When probes for the same key overlap within one definitions generation, positive evidence SHALL win. A clean omission from a probe that was already in flight when another current-generation response returned the key SHALL NOT establish negative knowledge for it. A probe that begins after that positive response MAY establish negative knowledge from its own clean omission, for example after the flag is deleted. The SDK MAY track returned keys in a finite-capacity store. If eviction means the SDK can no longer tell whether a key was returned while a probe was in flight, it SHALL NOT establish negative knowledge from that probe.
 
 After a probe settles without establishing negative knowledge, whether because the key was returned, the response was not clean, or a clean omission could not be retained, the evaluations that waited for it SHALL be able to begin their own fallbacks concurrently. They MUST NOT be made to wait for each other's fallbacks for the settled key. They SHALL still coordinate on any other unknown missing key they have not yet settled.
 
@@ -161,6 +161,7 @@ When local-only mode is true, the SDK SHALL NOT make a remote evaluation request
 - **AND** no valid negative knowledge is retained for "deleted-flag"
 - **AND** the clean remote response omits "deleted-flag" and establishes negative knowledge before any waiting evaluation is released
 - **WHEN** multiple evaluations in the same SDK instance concurrently request "deleted-flag"
+- **AND** that knowledge is still retained and valid when each waiting evaluation decides whether to fall back
 - **THEN** they make one direct remote existence probe for "deleted-flag"
 - **AND** every evaluation omits "deleted-flag" from its snapshot
 
@@ -233,12 +234,18 @@ When local-only mode is true, the SDK SHALL NOT make a remote evaluation request
 - **THEN** no negative knowledge is retained for "new-flag"
 - **AND** a later evaluation requesting "new-flag" is not suppressed by the older omission
 
+#### Scenario: A probe that starts after a returned key may record its omission
+- **GIVEN** a current-generation response returned "retired-flag"
+- **AND** no probe for "retired-flag" was in flight at that time
+- **WHEN** a later probe for "retired-flag" begins and receives a clean omission
+- **THEN** negative knowledge for "retired-flag" may be retained
+
 #### Scenario: Probe coordination does not span processes or nodes
 - **GIVEN** two processes or runtime nodes each run an SDK instance with loaded definitions that do not contain "deleted-flag"
 - **AND** neither instance retains negative knowledge for "deleted-flag"
 - **WHEN** both instances concurrently evaluate "deleted-flag"
 - **THEN** each instance can begin its existence probe without waiting for the other instance's probe
-- **AND** within each instance, concurrent evaluations that are still waiting when that instance's probe establishes negative knowledge do not make their own requests
+- **AND** within each instance, a waiting evaluation with no other reason to fall back does not make its own request while that instance's negative knowledge for "deleted-flag" is still retained and valid
 
 #### Scenario: Local-only evaluation omits unresolved flags
 - **GIVEN** local evaluation resolves "local-flag" but cannot resolve "remote-flag"

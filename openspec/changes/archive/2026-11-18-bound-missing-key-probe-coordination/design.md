@@ -35,7 +35,7 @@ An evaluation can find a second key in flight after the first one settles. Givin
 
 ### Let positive evidence win between overlapping probes
 
-The bounded wait allows two probes for the same key in the same definitions generation. If the newer one returns a newly created flag before the older one cleanly omits it, the older omission must not hide the flag until the next refresh. The SDK remembers keys returned in the current generation and ignores later omissions of them. A finite store is enough because eviction only removes the protection for that key.
+The bounded wait allows two probes for the same key in the same definitions generation. If the newer one returns a newly created flag before the older one cleanly omits it, the older omission must not hide the flag until the next refresh. The SDK remembers when each key was returned in the current generation. It ignores an omission from a probe that was already in flight when the key was returned. A probe that starts later can still record an omission, so a deleted flag stops being probed. When the bounded history has evicted entries newer than a probe's start, the SDK can't tell what that probe overlapped, so it doesn't record the probe's omissions.
 
 ### Release settled waiters together
 

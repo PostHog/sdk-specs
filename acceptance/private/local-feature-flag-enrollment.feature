@@ -123,6 +123,23 @@ Feature: Local feature flag enrollment
     Then the public flag getter should return JSON false
     And exactly 1 requests containing /flags should have been received
 
+  Scenario: Listed known-absent enrollment key resolves locally
+    Given the definitions service serves this typed document:
+      """application/json
+      {"definitions":{"flags":[{"id":1,"key":"beta-feature","active":true,"filters":{"feature_enrollment":true,"groups":[{"properties":[],"rollout_percentage":100}]}}]}}
+      """
+    And the SDK is initialized for native local evaluation with JSON arguments:
+      """application/json
+      {"project_token":"phc_test_key","config":{"secret_key":"phx_test_key"}}
+      """
+    And person property key "$feature_enrollment/beta-feature" is listed as known absent
+    When get feature flag is called with JSON arguments:
+      """application/json
+      {"key":"beta-feature","distinct_id":"user-123"}
+      """
+    Then the public flag getter should return JSON true
+    And no remote flag evaluation path should have been requested
+
   @case:<case_id>
   Scenario Outline: Enrollment and continuity bypass unsupported release conditions
     Given the definitions service serves this typed document:

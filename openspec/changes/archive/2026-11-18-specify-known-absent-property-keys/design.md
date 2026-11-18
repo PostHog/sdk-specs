@@ -1,0 +1,23 @@
+## Context and sources
+
+The flags service behavior comes from PostHog/posthog issue #88947 and PostHog/posthog#138239. This change copies its contract into the SDK spec so local evaluation matches it.
+
+## Decisions
+
+1. Place the `/flags` request contract in `local-feature-flag-evaluator` as a new requirement, "Remote fallback carries known-absent keys". The fields exist only so remote fallback agrees with local evaluation, and the existing spec already defers the "corresponding `/flags` request contract" to this capability. No spec in this repository describes the `/flags` request body as a whole, so a new capability would hold a single paragraph and need a README row. Revisit if more request fields need a shared home.
+2. Describe the SDK input abstractly: a set of person property keys, and per group type a set of group property keys, known to be absent for this evaluation. Per-language option names are left to SDK repositories.
+3. Make the input optional (`MAY`). SDKs without it keep today's behavior.
+4. The listing wins over a supplied value for the same key, matching the server, so a caller cannot get contradictory local and remote results.
+5. Use one result table for operators on a known-absent key: `is_not_set` and the negated operators match, and everything else does not, including `semver_neq` and the `is_date_*` operators. This mirrors the server. The table is stated once in the canonical operator inventory requirement, and the equality, string-search, and multi-contains requirements point to it.
+6. Known absence does not change cohort membership read from stored tables, holdouts read no properties, and flag dependencies honor it because they evaluate with the same listing.
+7. Ignore listed person keys that carry the person-metadata prefix `__posthog_person_metadata__`, so known absence never hides the persons-table `created_at` column.
+8. State the server limits (1000 strings per array, counted with duplicates and per group type, HTTP 400 naming the field) in the spec because an SDK that exceeds them fails the fallback request. The SDK-side advice to validate the limit before sending, and never to truncate, is an addition of this spec and not server behavior.
+9. Treat a listed enrollment property `$feature_enrollment/<flag key>` as known absent, not as missing context. The flags service removes it, treats the person as not enrolled, and continues through holdouts and release conditions as for any person without the enrollment property. The spec changes the "Unavailable enrollment context remains inconclusive" requirement so the inconclusive rule applies only when the property is omitted and not listed.
+
+## Validation
+
+The scenarios cover: a listed key with `is_not_set`, a listed key with `is_set`, a supplied value overridden by the listing, group-type scoping, an unlisted omitted key, a person-metadata key, negated operators, and the remote fallback request body. Gherkin scenarios in `acceptance/private/local-feature-flag-evaluator.feature` mirror them. Strict OpenSpec validation could not be run because the `openspec` CLI is not installed here; the files were checked by hand against the `define-local-eval-holdouts` archive and the synced canonical spec matches the delta text.
+
+## Risks
+
+An SDK that lists a key as absent when the person actually has the property produces results that differ from stored data. That is the caller's responsibility and is why the input is explicit.

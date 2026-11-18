@@ -97,6 +97,84 @@ Feature: Local Feature Flag Evaluator
     Then local evaluation should be inconclusive
     And remote evaluation should remain eligible
 
+  Scenario: Listed known-absent key matches is_not_set
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag definitions include a flag "profile-incomplete" matching person property "plan" with operator "is_not_set"
+    When local feature flag "profile-incomplete" is evaluated with person property key "plan" listed as known absent and no "plan" entry in the supplied person properties
+    Then the local evaluation result should be true
+    And the SDK should not require remote fallback
+
+  Scenario: Listed known-absent key does not match is_set
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag definitions include a flag "profile-complete" matching person property "plan" with operator "is_set"
+    When local feature flag "profile-complete" is evaluated with person property key "plan" listed as known absent
+    Then the local evaluation result should be false
+    And the SDK should not require remote fallback
+
+  Scenario: Listed known-absent key overrides a supplied value
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag definitions include a flag "profile-incomplete" matching person property "plan" with operator "is_not_set"
+    When local feature flag "profile-incomplete" is evaluated with person property "plan" set to "pro" and person property key "plan" listed as known absent
+    Then the local evaluation result should be true
+
+  Scenario: Group known-absent key applies only to its group type
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And remote feature flag evaluation is enabled
+    And local feature flag definitions include a flag "org-incomplete" matching group property "tier" of group type "organization" with operator "is_not_set"
+    When local feature flag "org-incomplete" is evaluated with group property key "tier" listed as known absent for group type "project" only
+    Then local evaluation should be inconclusive
+    And remote evaluation should remain eligible
+
+  Scenario: Omitted key that is not listed stays inconclusive
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And remote feature flag evaluation is enabled
+    And local feature flag definitions include a flag "profile-incomplete" matching person property "plan" with operator "is_not_set"
+    When local feature flag "profile-incomplete" is evaluated with person property key "region" listed as known absent and no "plan" entry in the supplied person properties
+    Then local evaluation should be inconclusive
+    And remote evaluation should remain eligible
+
+  Scenario: Person-metadata key is ignored
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag definitions include a flag matching the persons-table "created_at" field through a person-metadata filter
+    When the flag is evaluated with person property key "__posthog_person_metadata__created_at" listed as known absent
+    Then the persons-table "created_at" value should still be used for matching
+
+  Scenario Outline: Known-absent keys resolve operators without remote fallback
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And a local condition has operator <operator> and condition value <condition>
+    When it is evaluated with the required key listed as known absent
+    Then the criterion match result should be <matches>
+    And the SDK should not require remote fallback
+
+    Examples:
+      | operator              | condition                | matches |
+      | "is_not_set"          | omitted                  | true    |
+      | "is_set"              | omitted                  | false   |
+      | "exact"               | "pro"                    | false   |
+      | "is_not"              | "pro"                    | true    |
+      | "not_icontains"       | "pro"                    | true    |
+      | "not_icontains_multi" | ["pro"]                  | true    |
+      | "not_regex"           | "^pro"                   | true    |
+      | "not_between"         | [1, 2]                   | true    |
+      | "icontains"           | "pro"                    | false   |
+      | "gt"                  | "10"                     | false   |
+      | "semver_neq"          | "1.2.3"                  | false   |
+      | "is_date_before"      | "2025-01-01T10:00:00Z"   | false   |
+
+  Scenario: Remote fallback sends the listed person keys
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And remote feature flag evaluation is enabled
+    And local feature flag definitions include a flag that is inconclusive for another reason
+    When the flag is evaluated with person property key "plan" listed as known absent
+    Then the "/flags" request body should include "person_property_keys_known_absent" equal to ["plan"]
+
+  Scenario: Remote fallback sends the listed group keys by group type
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And remote feature flag evaluation is enabled
+    And local feature flag definitions include a flag that is inconclusive for another reason
+    When the flag is evaluated with group property key "tier" listed as known absent for group type "organization"
+    Then the "/flags" request body should include "group_property_keys_known_absent" equal to {"organization": ["tier"]}
+
   @server
   Scenario: The first matching condition wins without variant-priority sorting
     Given the SDK is initialized with token "test-token" and local evaluation enabled

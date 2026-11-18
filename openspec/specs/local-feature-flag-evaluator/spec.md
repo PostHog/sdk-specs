@@ -498,7 +498,7 @@ After every filter in a group matches, the evaluator SHALL apply that group's `r
 
 For a matching multivariate condition, a condition-level `variant` SHALL be used only when it names one of the flag's defined variants. If the override is absent or invalid, the evaluator SHALL select a variant with the normal deterministic variant hash. A matching non-multivariate condition SHALL return `true`.
 
-The flag-level `early_exit` selector SHALL default to `false`. When it is `true`, the evaluator SHALL return `false` immediately, with no variant or payload, only when every filter in the current group matched but that group's rollout excluded the effective bucketing identifier. A property, cohort, or dependency mismatch SHALL continue to the next group and SHALL NOT trigger `early_exit`. A locally inconclusive group SHALL also not itself trigger `early_exit`; the evaluator SHALL continue so another independently evaluable group can match. If no later group matches and at least one group was inconclusive, the flag SHALL remain inconclusive even when other groups definitively do not match.
+The flag-level `early_exit` selector SHALL default to `false`. When it is `true`, `early_exit` SHALL trigger only when every filter in the current group matched but that group's rollout excluded the effective bucketing identifier. Triggering `early_exit` SHALL stop condition evaluation: no later group SHALL be evaluated. If no earlier group was inconclusive, the evaluator SHALL return `false`, with no variant or payload. If an earlier group was inconclusive, the flag SHALL remain inconclusive rather than return `false`, so remote evaluation stays eligible. A property, cohort, or dependency mismatch SHALL continue to the next group and SHALL NOT trigger `early_exit`. A locally inconclusive group SHALL also not itself trigger `early_exit`; the evaluator SHALL continue so another independently evaluable group can match. If no later group matches and at least one group was inconclusive, the flag SHALL remain inconclusive even when other groups definitively do not match.
 
 #### Scenario: The first matching condition wins without variant-priority sorting (@server)
 - **GIVEN** a multivariate flag has a first condition that matches person property "plan" equal to "pro" with no variant override
@@ -546,6 +546,18 @@ The flag-level `early_exit` selector SHALL default to `false`. When it is `true`
 - **WHEN** the flag is evaluated locally with person property "plan" equal to "pro"
 - **THEN** the first condition should remain inconclusive and should not trigger `early_exit`
 - **AND** the local evaluation result should be true from the second condition
+
+#### Scenario: Early exit after an inconclusive condition stops evaluation and stays inconclusive (@server)
+- **GIVEN** a flag has `early_exit` enabled
+- **AND** its first condition requires person property "plan" equal to "pro" with rollout percentage `0.0`
+- **AND** its second condition matches person property "region" equal to "US" with rollout percentage `0.0`
+- **AND** its third condition is a catch-all with rollout percentage `100.0`
+- **WHEN** the flag is evaluated locally with person property "region" equal to "US" and no "plan" property
+- **THEN** the first condition should remain inconclusive
+- **AND** the second condition should trigger `early_exit`
+- **AND** the third condition should not be evaluated as a match
+- **AND** local evaluation should be inconclusive
+- **AND** remote evaluation should remain eligible
 
 #### Scenario: Inconclusive state is preserved when no later condition matches (@server)
 - **GIVEN** a flag's first condition cannot be resolved from the supplied local context

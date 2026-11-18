@@ -157,6 +157,21 @@ Feature: Local Feature Flag Evaluator
     And the local evaluation result should be true from the second condition
 
   @server
+  Scenario: Early exit after an inconclusive condition stops evaluation and stays inconclusive
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And remote feature flag evaluation is enabled
+    And local feature flag "mixed-beta" has early exit enabled
+    And its first condition requires person property "plan" equal to "pro" with rollout percentage 0.0
+    And its second condition matches person property "region" equal to "US" with rollout percentage 0.0
+    And its third condition is a catch-all with rollout percentage 100.0
+    When local feature flag "mixed-beta" is evaluated with person property "region" equal to "US" and no "plan" property
+    Then the first condition should remain inconclusive
+    And the second condition should trigger early exit
+    And the third condition should not be evaluated as a match
+    And local evaluation should be inconclusive
+    And remote evaluation should remain eligible
+
+  @server
   Scenario: Inconclusive state is preserved when no later condition matches
     Given the SDK is initialized with token "test-token" and local evaluation enabled
     And remote feature flag evaluation is enabled

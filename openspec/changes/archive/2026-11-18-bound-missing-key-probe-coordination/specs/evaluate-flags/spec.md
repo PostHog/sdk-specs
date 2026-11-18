@@ -24,6 +24,8 @@ When probes for the same key overlap within one definitions generation, positive
 
 After a probe settles without establishing negative knowledge, whether because the key was returned, the response was not clean, or a clean omission could not be retained, the evaluations that waited for it SHALL be able to begin their own fallbacks concurrently. They MUST NOT be made to wait for each other's fallbacks for the settled key. They SHALL still coordinate on any other unknown missing key they have not yet settled.
 
+As an exception, when a probe settles without establishing whether the key exists, because the response was not clean or the request failed, the SDK MAY let one waiting evaluation make a single shared retry probe while the others keep waiting within their existing deadlines. If that retry also does not establish whether the key exists, the remaining waiters SHALL proceed concurrently. The SDK MUST NOT chain further shared retries for the key within the same coordination round.
+
 When local-only mode is true, the SDK SHALL NOT make a remote evaluation request; flags that cannot be resolved locally, including requested keys with no local definition, SHALL be absent from the snapshot. When a non-empty request-time key list is supplied, any remote evaluation request and the resulting snapshot SHALL be scoped to those keys. An internal local evaluator MAY inspect additional definitions, but values outside the requested set SHALL be dropped before the snapshot is returned.
 
 #### Scenario: Omitted key list evaluates all available flags
@@ -195,6 +197,13 @@ When local-only mode is true, the SDK SHALL NOT make a remote evaluation request
 - **AND** no probe for "retired-flag" was in flight at that time
 - **WHEN** a later probe for "retired-flag" begins and receives a clean omission
 - **THEN** negative knowledge for "retired-flag" may be retained
+
+#### Scenario: An unclean probe allows at most one shared retry
+- **GIVEN** several evaluations are waiting for the in-flight probe for "missing-flag"
+- **WHEN** that probe completes with a response that reports errors while computing flags
+- **THEN** at most one waiting evaluation makes a shared retry probe while the others keep waiting within their deadlines
+- **WHEN** the retry also reports errors while computing flags
+- **THEN** the remaining waiting evaluations make their own fallbacks concurrently
 
 #### Scenario: Probe coordination does not span processes or nodes
 - **GIVEN** two processes or runtime nodes each run an SDK instance with loaded definitions that do not contain "deleted-flag"

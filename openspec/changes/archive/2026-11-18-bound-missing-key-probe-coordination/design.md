@@ -37,6 +37,10 @@ An evaluation can find a second key in flight after the first one settles. Givin
 
 The bounded wait allows two probes for the same key in the same definitions generation. If the newer one returns a newly created flag before the older one cleanly omits it, the older omission must not hide the flag until the next refresh. The SDK remembers when each key was returned in the current generation. It ignores an omission from a probe that was already in flight when the key was returned. A probe that starts later can still record an omission, so a deleted flag stops being probed. When the bounded history has evicted entries newer than a probe's start, the SDK can't tell what that probe overlapped, so it doesn't record the probe's omissions.
 
+### Allow one shared retry after an inconclusive probe
+
+When a probe fails or reports errors, nobody learns whether the key exists. Sending every waiter to `/flags` at once is a burst exactly when PostHog is unhealthy. Releasing waiters one at a time recreates the queue that caused the incident. One shared retry is the middle ground: it can still establish negative knowledge for everyone, it costs at most one extra request round trip within the existing deadline, and if it also fails the waiters proceed together.
+
 ### Release settled waiters together
 
 When a probe returns the key or is not clean, every waiter needs its own request anyway. Releasing them one at a time behind a lock adds one request round trip per waiter and recreates the queue this change removes. Waiters still coordinate on other unsettled keys, so the mixed-scope rule keeps its meaning.

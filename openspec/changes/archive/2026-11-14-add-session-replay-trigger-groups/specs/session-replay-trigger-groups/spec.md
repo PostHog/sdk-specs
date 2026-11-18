@@ -420,9 +420,11 @@ optional `operator`, and `value`. A `type: person` filter SHALL read the SDK's s
 properties (the properties set through identify / person-property APIs); any other type SHALL read
 the event's properties. `operator` SHALL default to `exact`. The supported operators SHALL be
 `exact`, `is_not`, `icontains`, `not_icontains`, `regex`, `not_regex`, `gt`, and `lt`; an unknown
-operator SHALL NOT match. When the property is missing or `null`, only the negative operators
-`is_not`, `not_icontains`, and `not_regex` SHALL match. A filter whose `value` is missing or
-`null` SHALL NOT match. Array values SHALL be compared element-wise: a filter value array matches
+operator SHALL NOT match. The SDK SHALL check the property's absence before anything else: when
+the property is missing or `null`, the filter SHALL match if its operator is one of the negative
+operators `is_not`, `not_icontains`, or `not_regex`, and SHALL NOT match otherwise, whatever the
+filter's `value`. Only for a present property SHALL an unknown operator, or a filter whose `value`
+is missing or `null`, fail to match. Array values SHALL be compared element-wise: a filter value array matches
 when any element matches, and an array property matches when any element matches; values are
 compared as strings.
 
@@ -431,8 +433,10 @@ This requirement applies to all replay-capable SDKs.
 Reference: posthog-js `origin/main` `480395c443`
 (`packages/browser-common/src/utils/property-utils.ts:30`: `NEGATIVE_OPERATORS`; `:36-72`:
 `matchTriggerPropertyFilters` — `every`, `type === 'person' ? personProperties :
-eventProperties`, default `exact`, missing or null handling, unknown operator returns false,
-missing filter value returns false, string-array normalization). Person properties come from
+eventProperties`, default `exact`; `:53-55` returns `NEGATIVE_OPERATORS.has(operator)` for a
+missing or null property before the operator lookup and the filter-value check; then unknown
+operator returns false, missing filter value returns false, string-array normalization). These
+lines are unchanged at `origin/main` `b4bbe65d55`. Person properties come from
 `$stored_person_properties` (`recording-strategies.ts:493`, `:677`).
 
 Covering test: posthog-js `packages/browser/src/__tests__/extensions/replay/triggerGroups.test.ts:152-353`
@@ -454,6 +458,13 @@ null property, default operator, array properties).
 - **WHEN** the filters are evaluated against an event with no "country" property
 - **THEN** the first group's filter should match
 - **AND** the second group's filter should not match
+
+#### Scenario: Absence is checked before the filter value
+- **GIVEN** a trigger group with a filter on event property "country" with operator `is_not` and no value
+- **WHEN** the filter is evaluated against an event with no "country" property
+- **THEN** the filter should match
+- **WHEN** the filter is evaluated against an event with property "country" set to "US"
+- **THEN** the filter should not match
 
 #### Scenario: Array values match any element
 - **GIVEN** a trigger group with a filter on event property "tags" equal to the list "beta", "vip"

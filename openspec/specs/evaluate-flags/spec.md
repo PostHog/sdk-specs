@@ -203,7 +203,7 @@ When local-only mode is true, the SDK SHALL NOT make a remote evaluation request
 
 #### Scenario: An omission that cannot establish negative knowledge does not suppress a waiter
 - **GIVEN** an evaluation is waiting for the in-flight probe for "new-flag"
-- **AND** another evaluation's fallback in the same definitions generation already returned "new-flag"
+- **AND** after that probe began and before it completed, another evaluation's fallback in the same definitions generation returned "new-flag"
 - **AND** a second evaluation is also waiting for that probe
 - **WHEN** the in-flight probe completes with a clean omission of "new-flag"
 - **THEN** each waiting evaluation makes its own fallback for its complete evaluation context
@@ -244,9 +244,9 @@ When local-only mode is true, the SDK SHALL NOT make a remote evaluation request
 
 #### Scenario: An unclean probe allows at most one shared retry
 - **GIVEN** several evaluations are waiting for the in-flight probe for "missing-flag"
-- **WHEN** that probe completes with a response that reports errors while computing flags
+- **WHEN** that probe completes with a response that reports errors while computing flags and omits "missing-flag"
 - **THEN** at most one waiting evaluation makes a shared retry probe while the others keep waiting within their deadlines
-- **WHEN** the retry also reports errors while computing flags
+- **WHEN** the retry also reports errors while computing flags and omits "missing-flag"
 - **THEN** the remaining waiting evaluations make their own fallbacks concurrently
 
 #### Scenario: Probe coordination does not span processes or nodes

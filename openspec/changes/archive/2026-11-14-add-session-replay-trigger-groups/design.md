@@ -34,14 +34,16 @@ and posthog-js tests for the untested requirements.
   (`:105`, `:262`, `:354`, `:381`) and the new spec references them without restating them.
 - **The version-selection rule lives in the new spec.** The ingestion-controls scope note points to
   it, so the rule is stated once.
-- **R3, local sample rate.** posthog-js folds its local `session_recording.sampleRate` into the
-  same `sampleRate` the V1 strategy reads (`session-recording.ts:267-275` → `_sampleRate`,
+- **R3, local sample rate caps V2 on mobile (decision D1, 2026-11-18).** Web has no local rate
+  under groups: posthog-js folds `session_recording.sampleRate` into the remote-config value the V1
+  strategy reads (`session-recording.ts:267-275` → `_sampleRate`,
   `lazy-loaded-session-recorder.ts:626-629`), and the V2 status function never reads it
-  (`triggerMatching.ts:799-861`), so web ignores the local rate under groups. posthog-ios caps the
-  group result with its local `sessionReplayConfig.sampleRate`
-  (`PostHogReplayIntegration.swift:495-500` at `23ffc5a905`). The spec states the web rule and
-  allows a mobile-only local cap as an explicit variation: it is an app-level knob, not a V1 remote
-  field, so it is not one of the fields R2 switches off.
+  (`triggerMatching.ts:799-861`). A mobile SDK with a local `sessionReplayConfig.sampleRate`
+  applies it as a cap after the group decision: the session records only when the groups permit it
+  and the local rate samples the session id in. The mobile half has no posthog-js reference; it is
+  a decision. posthog-ios (`PostHogReplayIntegration.swift:486-495` at `b3db5efb8a`) and
+  posthog-android (`PostHogRemoteConfig.kt:1459-1472` at `f1fb970362`) already do this. The local
+  rate is an app-level knob, not a V1 remote field, so R2 does not switch it off.
 - **R15, a `null` group rate is 0.** Web computes `null * 100 = 0` in `sampleOnProperty`
   (`sampling.ts:25`) and samples the group out. posthog-ios reads `NSNull` as no rate and samples
   in (`PostHogTriggerGroups.swift:99-106`); it changes. The UI always sends a number, so the case is
@@ -55,9 +57,10 @@ and posthog-js tests for the untested requirements.
   `posthog-core.ts:4509`, `:4526-4528`). `stop-session-recording/spec.md:59` ("resumed ... by
   config/remote-config-driven replay enablement") is not modified in this change; its wording
   conflicts with C6 and is flagged as a follow-up change on that spec.
-- **R25, hybrid split, decision-based (C2, C3).** The managed layer that owns event capture
-  evaluates the groups; the native SDK keeps only the V1 gates for that host; the managed layer
-  hands the effective minimum to native. No merged reference exhibits it, so the spec names the
+- **R25, hybrid split, decision-based (C2, C3, cross-SDK decision 4, D1).** The managed layer
+  that owns event capture evaluates the groups; the native SDK keeps only the V1 gates for that
+  host; the managed layer hands the effective minimum to native. Under V2 the managed layer hands
+  native only the local sample rate, never the remote V1 rate, and native applies it as the R3 cap. No merged reference exhibits it, so the spec names the
   hand-off and not its signature.
 - **Pending-conditions debug value.** Every V2 SDK writes
   `trigger group "<name>": <condition>` per pending group, as web does

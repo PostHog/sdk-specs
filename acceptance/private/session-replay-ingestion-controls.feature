@@ -252,5 +252,5 @@ Feature: Session Replay Ingestion Controls
     And the remote config selects trigger groups with one group whose event leg is "$pageview" and whose minimum duration is 2000 milliseconds
     When the client captures an event named "$pageview" on the managed layer
     Then the managed layer should activate the group and start recording in the native layer
-    And the native layer should apply no V1 linked flag, sampling, or trigger gate for that host
+    And the native layer should apply no V1 linked flag, remote sample rate, or trigger gate for that host
     And the native layer should hold the session's replay data until 2000 milliseconds of activity, the minimum the managed layer handed it

@@ -52,7 +52,7 @@ Reference shape: posthog-js `origin/main` `480395c443` `packages/browser-common/
 3. **Evaluate the legs.** Match captured events by name and property filters, URLs (web) or `$screen_name` (mobile) by regex, and the flag by the linked-flag rules. Combine a group's configured legs with AND (`all`) or OR (`any`). Group-level property filters gate every leg.
 4. **Persist activation per group and session.** Re-arm on a new session id.
 5. **Sample per group.** Decide once per session and group with a deterministic hash of `sessionId + groupId`. Re-decide on a new session or a changed rate.
-6. **Take the union.** Record when any activated group is sampled in. Buffer (web) or wait (mobile) while any group is pending. Otherwise do not record.
+6. **Take the union.** Record when any activated group is sampled in. Buffer (web) or wait (mobile) while any group is pending. Otherwise do not record. On mobile, a local sample rate then caps the result.
 7. **Apply the effective minimum.** Hold replay data below the lowest `minDurationMs` among activated groups, and re-check it on every flush.
 8. **Keep the shared gates.** Replay enablement, the URL blocklist, and the interaction hold apply as in `session-replay-ingestion-controls`. An explicit `stopSessionRecording()` holds until `startSessionRecording()`.
 9. **Report debug state.** Attach the trigger-group debug properties defined here and in `session-replay-debug-properties`.
@@ -188,41 +188,54 @@ V1 field alongside groups).
 
 ### Requirement: Local sample rate under trigger groups
 
-posthog-js SHALL NOT apply its local `session_recording.sampleRate` while trigger groups are
-selected; the per-group rates alone sample the session. A mobile SDK that exposes a local
-`sessionReplayConfig.sampleRate` MAY keep applying it as an additional cap on the group decision:
-a session the groups would record is then recorded only when the local rate also samples it in.
-This is an allowed mobile-only variation of an app-level knob, not an application of the V1 remote
-`sampleRate`, which "Ignore the V1 gating fields under trigger groups" forbids. An SDK that applies
-the cap SHALL document it and SHALL never use it to record a session the groups refused.
+A web SDK SHALL NOT apply a local sample rate while trigger groups are selected; the per-group
+rates alone sample the session. A mobile SDK that exposes a local `sessionReplayConfig.sampleRate`
+SHALL apply it as a cap after the group decision: a session SHALL record only when the trigger
+groups permit it (see "Union across groups") **and** the local rate samples the session id in, with
+the same session-id-keyed decision the V1 sampling requirement of `session-replay-ingestion-controls`
+uses. The local rate SHALL never record a session the groups refused. When no local rate is set,
+the group decision alone applies. The local rate is an app-level knob, not the V1 remote
+`sampleRate`, which "Ignore the V1 gating fields under trigger groups" still forbids.
 
-This requirement applies to all replay-capable SDKs; the cap is permitted only on SDKs with a local
-sample-rate option.
+This requirement applies to all replay-capable SDKs. The cap applies only to mobile SDKs with a
+local sample-rate option, and to hybrid SDKs over them (see "Hybrid SDKs").
 
-Reference: posthog-js `origin/main` `480395c443`
+Reference (web half): posthog-js `origin/main` `480395c443`
 (`packages/browser/src/extensions/replay/session-recording.ts:267-275` resolves
 `localSampleRate ?? remoteSampleRate` into the persisted config; `lazy-loaded-session-recorder.ts:626-629`
-exposes it as `_sampleRate`; the V2 status function `triggerMatching.ts:799-861` and the V2
-strategy `recording-strategies.ts:519-588` never read it). posthog-ios
-`feat/replay-v2-trigger-groups` `23ffc5a905` `PostHog/Replay/PostHogReplayIntegration.swift:495-500`
-caps the group result with the local rate ("The local rate still takes precedence under v2: it
-caps whatever the groups allow").
+exposes only that remote-config value as `_sampleRate`; the V2 status function
+`triggerMatching.ts:799-861` and the V2 strategy `recording-strategies.ts:519-588` never read it).
+These lines are unchanged at `origin/main` `b4bbe65d55`.
 
-Covering test: No posthog-js test on `origin/main` covers this; decision-based (source only; the
-mobile cap is the allowed variation recorded in this change's design).
+Mobile half: decision-based, with no posthog-js reference (web has no local rate under V2). It
+records cross-SDK decision D1. posthog-ios `feat/replay-v2-trigger-groups` `b3db5efb8a`
+`PostHog/Replay/PostHogReplayIntegration.swift:486-495` (`shouldRecordSession`: refuse when the
+groups do not permit the session, then sample the session id with the local rate) and
+posthog-android `feat/replay-v2-trigger-groups` `f1fb970362`
+`posthog/src/main/java/com/posthog/internal/PostHogRemoteConfig.kt:1459-1472`
+(`makeSamplingDecision`: the group decision first, then `localSampleRate`, with the remote rate
+dropped under groups) implement it.
 
-#### Scenario: posthog-js ignores the local sample rate under groups
+Covering test: No posthog-js test on `origin/main` covers the web half; decision-based (source
+only). The mobile half has no posthog-js analog; decision-based (D1).
+
+#### Scenario: A web SDK ignores the local sample rate under groups
 - **GIVEN** posthog-js is initialized with a local `session_recording.sampleRate` of 0.0
 - **AND** the remote config sets `version` to 2 and configures one trigger group with a sample rate of 1.0 and no conditions
 - **WHEN** the SDK resolves whether to record the current session
 - **THEN** session recording should be active
 
-#### Scenario: A mobile local sample rate may cap the group decision
+#### Scenario: A mobile local sample rate caps the group decision
 - **GIVEN** a mobile SDK initialized with a local replay sample rate of 0.0
 - **AND** the remote config sets `version` to 2 and configures one trigger group with a sample rate of 1.0 and no conditions
 - **WHEN** the SDK resolves whether to record the current session
-- **THEN** session recording may be inactive because the local rate sampled the session out
-- **AND** the SDK never records a session the groups did not sample in
+- **THEN** session recording should not be active
+
+#### Scenario: A mobile local sample rate never records a session the groups refused
+- **GIVEN** a mobile SDK initialized with a local replay sample rate of 1.0
+- **AND** the remote config sets `version` to 2 and configures one trigger group with a sample rate of 0.0 and no conditions
+- **WHEN** the SDK resolves whether to record the current session
+- **THEN** session recording should not be active
 
 ### Requirement: Trigger group shape
 
@@ -1043,7 +1056,11 @@ only the V1 gates of `session-replay-ingestion-controls` for that host and SHALL
 groups a second time. The managed layer SHALL hand the effective minimum duration (see "Effective
 minimum duration") to the native layer, which applies it as its minimum-duration release gate, so
 the one logical decision of the hybrid requirement in `session-replay-ingestion-controls` covers
-the group union and the effective minimum. Where the managed layer already routes capture through
+the group union and the effective minimum. Sampling is the exception to the V1 gates: while
+trigger groups are selected, the managed layer SHALL hand the native layer only the app's local sample rate, never the remote V1 `sampleRate`,
+and the native layer SHALL apply that local rate as the cap of "Local sample rate under trigger
+groups", after the group decision. With no local rate, the native layer SHALL apply no sample rate.
+Where the managed layer already routes capture through
 the native SDK's own pipeline (for example `posthog-flutter`), the native SDK owns the capture
 pipeline and evaluates the groups itself, and no hand-off is needed.
 
@@ -1054,10 +1071,16 @@ Reference: no merged reference on posthog-js `origin/main`; this requirement com
 cross-SDK contract decisions C2 (native keeps the V1 gates under React Native) and C3 (the
 managed layer hands the effective group minimum to native, which already holds and releases). The
 web arithmetic the managed layer reproduces is `recording-strategies.ts:404-422` and
-`lazy-loaded-session-recorder.ts:2499-2530` at `480395c443`.
+`lazy-loaded-session-recorder.ts:2499-2530` at `480395c443`. The sample-rate hand-off records
+cross-SDK decision 4 of 2026-11-14 (React Native under V2 sends only the local rate to native) and decision D1 (the local rate
+caps the group decision). The unmerged React Native branch `feat/rn-replay-v2-trigger-groups`
+`058369cbb` agrees: `packages/react-native/src/posthog-rn.ts:3327-3333` drops the remote
+`sampleRate` when trigger groups are cached ("Under v2, per-group sampling replaces the remote
+rate; forwarding it would gate recording twice"), and `:3347` and `:3393` pass
+`localSampleRateValid ?? remoteSampleRateValid` to native as `sdkReplayConfig.sampleRate`.
 
 Covering test: No posthog-js test on `origin/main` covers this; decision-based (contract C2 and
-C3; no merged reference implementation).
+C3, cross-SDK decision 4, decision D1; no merged reference implementation).
 
 #### Scenario: The managed layer owns trigger groups in a hybrid SDK
 - **GIVEN** a hybrid SDK whose managed layer captures analytics and whose native layer owns replay
@@ -1068,3 +1091,19 @@ C3; no merged reference implementation).
 - **THEN** the managed layer should evaluate the group and start native recording
 - **AND** the native layer should apply a minimum duration of 2000 milliseconds
 - **AND** the native layer should not evaluate the trigger groups itself
+
+#### Scenario: The managed layer hands native only the local sample rate
+- **GIVEN** a hybrid SDK whose managed layer captures analytics and whose native layer owns replay
+- **AND** session replay is enabled with a local replay sample rate of 0.0
+- **AND** the remote config sets `version` to 2, a V1 `sampleRate` of 1.0, and one trigger group with a sample rate of 1.0 and no conditions
+- **WHEN** the SDK resolves whether to record the current session
+- **THEN** the managed layer should hand the native layer a sample rate of 0.0
+- **AND** session recording should not be active
+
+#### Scenario: The managed layer never hands native the remote V1 sample rate
+- **GIVEN** a hybrid SDK whose managed layer captures analytics and whose native layer owns replay
+- **AND** session replay is enabled with no local replay sample rate
+- **AND** the remote config sets `version` to 2, a V1 `sampleRate` of 0.0, and one trigger group with a sample rate of 1.0 and no conditions
+- **WHEN** the SDK resolves whether to record the current session
+- **THEN** the managed layer should hand the native layer no sample rate
+- **AND** session recording should be active

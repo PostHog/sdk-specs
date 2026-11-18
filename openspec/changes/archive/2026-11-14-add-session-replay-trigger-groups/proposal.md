@@ -8,9 +8,9 @@ has evaluated them since `V2TriggerGroupStrategy` landed
 `origin/main` `480395c443`). Each group carries its own AND/OR legs, sample rate and minimum
 duration, and groups combine as a union, so V2 changes the combination model rather than adding a
 field to it. The mobile SDKs are picking it up now (posthog-ios on `feat/replay-v2-trigger-groups`
-`23ffc5a905`, posthog-android and posthog-react-native in flight), and three cross-SDK decisions
-already differ between the ports (local sample-rate cap, `null` group rate, the pending-conditions
-debug value).
+`23ffc5a905`, posthog-android and posthog-react-native in flight), and cross-SDK decisions had to
+settle where the ports differed (the mobile local sample-rate cap, `null` group rate, the
+pending-conditions debug value).
 
 `session-replay-ingestion-controls` covers V1 only. Its scope note (`spec.md:9`) calls V2 a
 "web-only extension ... specified separately" but names no spec, and its Purpose says mobile SDKs

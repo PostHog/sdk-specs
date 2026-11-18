@@ -29,6 +29,14 @@ Negative knowledge is held in memory per SDK instance. Coordinating across proce
 
 A waiter that gives up makes its own original-scope request. This can duplicate an in-flight probe, which is the same cost as an SDK without coordination. Waiting longer was rejected because a stalled probe would then stall application traffic. Failing the evaluation was rejected because it would turn a slow optional optimization into an error. The waiter also unregisters, so a stalled probe cannot collect an unbounded number of abandoned waiters.
 
+### Use one deadline per evaluation
+
+An evaluation can find a second key in flight after the first one settles. Giving each key its own wait would let one evaluation wait several times over. One deadline per evaluation keeps the total wait bounded by the same value.
+
+### Let positive evidence win between overlapping probes
+
+The bounded wait allows two probes for the same key in the same definitions generation. If the newer one returns a newly created flag before the older one cleanly omits it, the older omission must not hide the flag until the next refresh. The SDK remembers keys returned in the current generation and ignores later omissions of them. A finite store is enough because eviction only removes the protection for that key.
+
 ### Release settled waiters together
 
 When a probe returns the key or is not clean, every waiter needs its own request anyway. Releasing them one at a time behind a lock adds one request round trip per waiter and recreates the queue this change removes. Waiters still coordinate on other unsettled keys, so the mixed-scope rule keeps its meaning.

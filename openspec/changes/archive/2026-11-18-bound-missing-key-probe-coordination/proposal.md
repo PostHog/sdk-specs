@@ -7,10 +7,11 @@ The coordination exists to avoid duplicate requests. It must not become a single
 ## What Changes
 
 - Scope probe coordination to one SDK instance in one process or node, the same scope as the negative-knowledge store. Forbid locks and waits that span processes or nodes.
-- Require a finite wait. After it expires, the waiter proceeds with its own fallback and is no longer registered as a waiter.
+- Require one finite wait deadline per evaluation, covering every overlapping key. After it expires, the waiter proceeds with its own fallback and is no longer registered as a waiter.
 - Release waiters when the probe owner ends without completing or when the coordination mechanism fails.
 - Require waiters of a probe that returned the key or was not clean to begin their own fallbacks concurrently instead of one at a time.
-- Permit the duplicate requests these rules can cause.
+- Permit the duplicate requests these rules can cause, and make a returned key win over a clean omission from an overlapping probe in the same definitions generation.
+- Limit the no-duplicate rule to waiters that see the clean omission before they stop waiting.
 
 ## Capabilities
 

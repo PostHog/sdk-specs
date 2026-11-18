@@ -58,7 +58,13 @@ An SDK that has a successful local-definition refresh lifecycle SHALL retain neg
 
 Any current-generation remote response that explicitly returns a previously suppressed key SHALL immediately remove that key's negative knowledge, even when another unresolved key caused the fallback. A clean omission SHALL establish negative knowledge only for unknown missing keys that were assigned to that existence probe when it began. A key whose negative knowledge was already retained when a request began MAY be included in that request to preserve original scope, but an omission from that request SHALL NOT refresh or reinstall its negative knowledge. A failed remote response, a quota-limited response, or a response that reports errors while computing flags SHALL NOT establish negative knowledge. A later evaluation for the same identity and requested scope SHALL remain eligible to make a new direct fallback request, even when a general evaluated-result cache contains the inconclusive response. An SDK without a successful local-definition refresh lifecycle MAY continue probing on each call rather than retain knowledge that it cannot safely invalidate.
 
-Before negative knowledge is established, concurrent evaluations that overlap on the same unknown missing key SHALL coordinate while that key's existence probe is in flight. If the shared probe cleanly omits the key, an overlapping evaluation with no other reason to fall back SHALL NOT make a duplicate request. If the response returns the key, its value or payload SHALL NOT be reused for a waiter whose complete evaluation context differs. Evaluation-affecting context includes the distinct id, device id where supported, groups, person properties, group properties, GeoIP control, requested key scope, and any other input sent to remote evaluation. Such a waiter SHALL make its own fallback before producing its snapshot. An evaluated-result cache MAY satisfy a waiter only when its entry is safely reusable for that complete context. Evaluations with disjoint missing-key sets SHALL be able to begin their direct fallbacks independently. When one evaluation's missing-key set contains both a key with an in-flight probe and a different uncoordinated key, it SHALL wait for the overlapping probe to settle before deciding whether to make its at-most-one fallback with the caller's original requested scope. That later original-scope request MAY include a settled or suppressed key, but it is not a fallback caused solely by that key.
+Before negative knowledge is established, concurrent evaluations that overlap on the same unknown missing key SHALL coordinate while that key's existence probe is in flight. If the shared probe cleanly omits the key, an overlapping evaluation with no other reason to fall back SHALL NOT make a duplicate request. If the response returns the key, its value or payload SHALL NOT be reused for a waiter whose complete evaluation context differs. Evaluation-affecting context includes the distinct id, device id where supported, groups, person properties, group properties, GeoIP control, requested key scope, and any other input sent to remote evaluation. Such a waiter SHALL make its own fallback before producing its snapshot. An evaluated-result cache MAY satisfy a waiter only when its entry is safely reusable for that complete context. Evaluations with disjoint missing-key sets SHALL be able to begin their direct fallbacks independently. When one evaluation's missing-key set contains both a key with an in-flight probe and a different uncoordinated key, it SHALL wait for the overlapping probe to settle, or for its bounded wait to expire, before deciding whether to make its at-most-one fallback with the caller's original requested scope. That later original-scope request MAY include a settled or suppressed key, but it is not a fallback caused solely by that key.
+
+Probe coordination SHALL have the same scope as the SDK's negative-knowledge store: one SDK instance in one process or runtime node. The SDK MUST NOT make an evaluation wait for a probe owned by another process or node, and MUST NOT acquire a lock that spans processes or nodes for this coordination. Separate processes or nodes MAY each make their own existence probe for the same key.
+
+Waiting for an overlapping probe SHALL be bounded by a finite wait that does not depend on the probe's network timeout or retry policy. When the wait expires, the waiting evaluation SHALL stop waiting and proceed as if no probe for that key were in flight, subject to the one-request limit, and it MUST NOT continue to be registered as a waiter. If the probe owner ends without completing, or the coordination mechanism itself fails or does not respond, waiting evaluations SHALL be released and proceed the same way. A request made after such a release MAY duplicate the in-flight probe. While a probe is in flight, an evaluation that only waits SHALL NOT block any other key.
+
+After a probe settles without establishing negative knowledge, because the key was returned or the response was not clean, the evaluations that waited for it SHALL be able to begin their own fallbacks concurrently. They MUST NOT be made to wait for each other's fallbacks for the settled key. They SHALL still coordinate on any other unknown missing key they have not yet settled.
 
 When local-only mode is true, the SDK SHALL NOT make a remote evaluation request; flags that cannot be resolved locally, including requested keys with no local definition, SHALL be absent from the snapshot. When a non-empty request-time key list is supplied, any remote evaluation request and the resulting snapshot SHALL be scoped to those keys. An internal local evaluator MAY inspect additional definitions, but values outside the requested set SHALL be dropped before the snapshot is returned.
 
@@ -151,8 +157,8 @@ When local-only mode is true, the SDK SHALL NOT make a remote evaluation request
 #### Scenario: Concurrent clean omissions share one existence probe
 - **GIVEN** loaded local definitions do not contain requested key "deleted-flag"
 - **AND** no valid negative knowledge is retained for "deleted-flag"
-- **AND** the clean remote response omits "deleted-flag"
-- **WHEN** multiple evaluations concurrently request "deleted-flag"
+- **AND** the clean remote response omits "deleted-flag" before the coordination wait expires
+- **WHEN** multiple evaluations in the same SDK instance concurrently request "deleted-flag"
 - **THEN** they make one direct remote existence probe for "deleted-flag"
 - **AND** every evaluation omits "deleted-flag" from its snapshot
 
@@ -174,8 +180,35 @@ When local-only mode is true, the SDK SHALL NOT make a remote evaluation request
 - **GIVEN** an existence probe for "missing-a" is in flight
 - **AND** a second evaluation requests both "missing-a" and "missing-b"
 - **WHEN** the second evaluation coordinates its missing keys
-- **THEN** it waits for the "missing-a" probe to settle before starting another direct fallback
+- **THEN** it waits for the "missing-a" probe to settle, or for its bounded wait to expire, before starting another direct fallback
 - **AND** any fallback it subsequently makes uses the second caller's original requested scope
+
+#### Scenario: A stalled probe does not hold waiting evaluations indefinitely
+- **GIVEN** loaded local definitions do not contain requested key "deleted-flag"
+- **AND** an existence probe for "deleted-flag" is in flight and does not complete
+- **WHEN** a second evaluation requests "deleted-flag"
+- **THEN** it waits no longer than the SDK's finite coordination wait
+- **AND** it then makes its own direct fallback with its original requested scope
+- **AND** it is no longer registered as waiting for the stalled probe
+
+#### Scenario: An abandoned probe releases waiting evaluations
+- **GIVEN** an evaluation is waiting for the in-flight existence probe for "deleted-flag"
+- **WHEN** the evaluation that owns the probe ends without completing it
+- **THEN** the waiting evaluation proceeds without waiting for the coordination wait to expire
+
+#### Scenario: Waiters of a returned key fall back concurrently
+- **GIVEN** evaluations for distinct ids "user-1", "user-2", and "user-3" overlap on unknown key "remote-flag"
+- **AND** the shared probe for "user-1" returns "remote-flag"
+- **WHEN** the waiting evaluations for "user-2" and "user-3" resume
+- **THEN** both direct fallbacks can be in flight at the same time
+- **AND** neither waits for the other's response
+
+#### Scenario: Probe coordination does not span processes or nodes
+- **GIVEN** two processes or runtime nodes each run an SDK instance with loaded definitions that do not contain "deleted-flag"
+- **AND** neither instance retains negative knowledge for "deleted-flag"
+- **WHEN** both instances concurrently evaluate "deleted-flag"
+- **THEN** each instance can begin its existence probe without waiting for the other instance's probe
+- **AND** concurrent evaluations within each instance still share that instance's probe
 
 #### Scenario: Local-only evaluation omits unresolved flags
 - **GIVEN** local evaluation resolves "local-flag" but cannot resolve "remote-flag"

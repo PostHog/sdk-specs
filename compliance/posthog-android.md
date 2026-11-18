@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-android](https://github.com/PostHog/posthog-android)
 **Audited commit:** `c5e788bd603d3bdda77ac4d213538b9db637299a` ([commit](https://github.com/PostHog/posthog-android/commit/c5e788bd603d3bdda77ac4d213538b9db637299a)) — audited on 2026-10-19. **31 rows re-audited against posthog-android 4.0** at `aaa23d39af4424978bd2439028282e47417490b8` ([commit](https://github.com/PostHog/posthog-android/commit/aaa23d39af4424978bd2439028282e47417490b8), head of the 4.0 integration PR [PostHog/posthog-android#871](https://github.com/PostHog/posthog-android/pull/871)) on 2026-11-10 — see [posthog-android 4.0](#posthog-android-40-re-audit-2026-11-05)
 **Audited against sdk-specs commit:** `c72e367` (2026-10-19 rows); `752f899` plus the capture v1 text of [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79`, which includes [#147](https://github.com/PostHog/sdk-specs/pull/147) (merged into #146's branch as `6a9ed0f`), for the 31 4.0 rows; Capture also against #146's identity-call guide rule from `15501ca`
-**Summary:** 43 ✅ · 15 🟡 · 1 ❌ · 10 ➖ · 0 ❓ (69 rows; 2026-10-19 at `c5e788bd` scored 37/16/5/6/0; previous full audit 2026-08-10 at `8659a7b4` scored 31/16/9/3/0 on 59 rows)
+**Summary:** 42 ✅ · 16 🟡 · 1 ❌ · 10 ➖ · 0 ❓ (69 rows; 2026-10-19 at `c5e788bd` scored 37/16/5/6/0; previous full audit 2026-08-10 at `8659a7b4` scored 31/16/9/3/0 on 59 rows)
 
 **Why the 2026-10-19 run:** rotation priority 3 — the pointer was ten weeks old, and android carries the
 mobile reference for Session Replay Debug Properties. It was also the cheapest third slot available:
@@ -203,7 +203,7 @@ complete implementation of that contract outside the browser.
 | 53 | Retry Queue | ✅ | [n27] |
 | 54 | Screen | ✅ |  |
 | 55 | Session Manager | ✅ |  |
-| 56 | Session Replay Debug Properties | ✅ | [n17] |
+| 56 | Session Replay Debug Properties | 🟡 | [n17]; off-state shape open (posthog-android#992) |
 | 57 | Session Replay Ingestion Controls | 🟡 | [n18] |
 | 58 | Session Replay Privacy | ✅ | [n19] |
 | 59 | Set Group Properties For Flags | ✅ |  |
@@ -548,7 +548,7 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
 
 <a id="n17"></a>
 
-### n17 — Session Replay Debug Properties (✅ Pass; was 🟡)
+### n17 — Session Replay Debug Properties (🟡 Partial; was ✅)
 - **Spec requires:** `client`. Four required keys on every event except `$snapshot` and the minimal
   `$feature_flag_called` envelope (`session-replay-debug-properties/spec.md:30-58`). The optional bundle goes
   only on `$` events other than `$feature_flag_called` and `$snapshot`, decided before `beforeSend`
@@ -569,8 +569,31 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
     (`:3039`). `$snapshot` skips shared properties (`PostHog.kt:1420`).
   - **Crash case.** An event timestamped before the current session start gets no keys (`:1031-1033`).
     Android persists no crash-time snapshot, so that is the required outcome.
-- **Backwards compatibility:** No change needed.
-- **Remediation:** None.
+- **Gap (2026-11-18, sdk-specs change `drop-replay-debug-keys-when-replay-off`): the off-state shape.**
+  The new requirement "Attach only the disabled shape while replay is intentionally off" (`openspec/specs/session-replay-debug-properties/spec.md:1209`) says that while replay is intentionally off (`sessionReplay` false and
+  not started manually, an explicit stop, opt-out, or a cached remote config with `sessionRecording`
+  `false` or `quotaLimited` containing `mobile_recordings`) an event carries `$recording_status: disabled`
+  and none of the removal set, and the plugin bridge gets the gated map. At posthog-android
+  `origin/main` `1101d79b` the integration is always registered, so `sdkDebugProperties`
+  (`posthog/src/main/java/com/posthog/PostHog.kt:863-897`) merges `debugProperties()`
+  (`posthog-android/src/main/java/com/posthog/android/replay/PostHogReplayIntegration.kt:3394`) with
+  replay off, including `$sdk_debug_replay_capture_mode` (`:3440-3441`), and adds
+  `$sdk_debug_session_start` whenever the bundle is claimed (`PostHog.kt:890`). Fix in progress:
+  [PostHog/posthog-android#992](https://github.com/PostHog/posthog-android/pull/992) (open; closes this
+  gap when merged).
+- **Known divergence after #992: a `/config` with no `sessionRecording` key is remote off.** The spec
+  says a missing key, or no remote config yet, is not off remotely on mobile (`openspec/specs/session-replay-debug-properties/spec.md:1231-1232`).
+  `PostHogRemoteConfigResponse.sessionRecording` defaults to `false`
+  (`posthog/src/main/java/com/posthog/internal/PostHogRemoteConfigResponse.kt:10`), and a boolean
+  `false` turns replay off (`posthog/src/main/java/com/posthog/internal/PostHogRemoteConfig.kt:531-541`),
+  so Android cannot tell a missing key from `false`. The remote-off value is held in memory only, so
+  after a relaunch the keys stay until the first `/config` arrives, which matches the spec's
+  awaiting-config rule.
+- **Backwards compatibility:** Backward-compatible; the change only removes diagnostic keys from
+  events captured while replay is off.
+- **Remediation:** Land #992. Separately, decide whether Android should distinguish a missing
+  `sessionRecording` key from `false` (the response default), or whether the spec should accept that
+  reading.
 
 <a id="n18"></a>
 

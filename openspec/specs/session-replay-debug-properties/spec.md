@@ -12,7 +12,10 @@ browser's `$$heatmap`), at most once every 30 seconds per SDK instance. One queu
 outside both tiers and stays on every non-`$snapshot` event. `$snapshot` events carry none of
 these keys; the one exception is four cumulative replay drop counters that the browser attaches
 to `$snapshot` while they are above zero. On mobile a crash-time `$exception` reported on a later
-launch is stamped from a crash-context snapshot that always carries the full bundle.
+launch is stamped from a crash-context snapshot that carries the full bundle while replay is not
+intentionally off. While replay is intentionally off (off in local config, explicitly stopped,
+opted out, or off in the cached remote config), an event carries at most `$recording_status: disabled`
+and no other replay diagnostic key.
 
 It is distinct from `is-session-replay-active`, which is a getter the caller invokes; these
 properties are attached without any caller action. The mobile SDKs (`posthog-ios`,
@@ -45,9 +48,12 @@ its own requirement.
 The SDK SHALL attach each required key that is available to every captured event **except**
 `$snapshot`: custom events, `$feature_flag_called`, `$$heatmap`, and eligible SDK events inside a
 throttle window all carry them. A required key is *available* when the SDK's current replay state
-produces a value for it: a mobile SDK without a replay integration produces only
-`$recording_status: disabled` (see "Attach the disabled shape when replay is not configured"),
-and posthog-js without the session-recording extension produces none. `$snapshot` events (the
+produces a value for it: a mobile SDK without a replay integration produces only `$recording_status: disabled` (see "Attach the disabled shape when replay is not configured"),
+posthog-js without the session-recording extension produces none, and an SDK whose replay is
+intentionally off produces only `$recording_status: disabled` (see "Attach only the disabled shape while replay is intentionally off").
+While replay is intentionally off, no required key other than `$recording_status` is attached:
+the trigger statuses, `$sdk_debug_replay_internal_buffer_length`, and the browser-only required
+keys are all withheld. `$snapshot` events (the
 replay payload itself) SHALL carry neither the required keys, the optional bundle, nor the
 queue-depth key — they are already replay data, not a report about replay. The only replay debug
 keys a `$snapshot` event MAY carry are the browser's four drop counters (see "`$snapshot` events
@@ -61,7 +67,11 @@ Reference: posthog-js `origin/main` `928990ded` (posthog-js#5144) — `REQUIRED_
 (`packages/browser/src/posthog-core.ts:190-200`); `calculateEventProperties` copies a key when
 it is required or the optional bundle is allowed (`:2166-2175`), after the `$snapshot` early
 return (`:2133`); `$snapshot` is also listed in `EVENTS_WITHOUT_REPLAY_DEBUG_PROPERTIES` (`:201`).
-The minimal envelope is rebuilt from an explicit allowlist by `minimizeFlagCalledEventProperties`
+The off-state exception is posthog-js at `origin/main` `16e3f63b9`: the required list is
+`packages/browser/src/posthog-core.ts:193-202` and the merge `:2304-2313`; with no lazy recorder,
+`sdkDebugProperties` supplies only `{ $recording_status }` next to the session-persisted keys
+(`packages/browser/src/extensions/replay/session-recording.ts:487-499`). posthog-js does not yet
+meet the exception after a mid-session stop or remote-off (tracked in compliance n36). The minimal envelope is rebuilt from an explicit allowlist by `minimizeFlagCalledEventProperties`
 (`packages/core/src/featureFlagUtils.ts:263`, applied at `posthog-core.ts:1909-1911`).
 Mobile SDKs port the required-key split from this requirement; posthog-js is its only reference.
 Two behaviors it keeps are already in posthog-ios `origin/main` `88f4b6b56`: `$snapshot` is built with
@@ -72,7 +82,7 @@ debug-key block (`:666`, `:695-714`), and the minimal envelope is filtered to it
 Covering test: posthog-js `packages/browser/src/__tests__/posthog-core-also.test.ts:102` (the
 eight required keys on `custom_event`, `$feature_flag_called`, `$$heatmap`, and on in-window
 `$exception`, `$identify`, `$set`, `$pageview`, `$autocapture`; `$snapshot` carries none) and
-`:806` ("returns calculated properties" — a custom event carries `$recording_status: 'disabled'`);
+`:806` ("returns calculated properties" — a custom event carries `$recording_status: 'disabled'`; at `16e3f63b9` the test is `:835-850` and also shows no other replay key while the recorder is not started);
 `packages/browser/src/__tests__/__snapshots__/featureflags.test.ts.snap:72` (minimal envelope,
 no debug keys) and `:103` (full envelope, `$recording_status: "disabled"` at `:145`).
 posthog-ios `PostHogTests/PostHogSDKTest.swift:407` ("excludes $recording_status and $sdk_debug_*
@@ -88,7 +98,8 @@ the four required keys.
 - **THEN** the captured event's properties include `$recording_status`
 
 #### Scenario: Required keys come from an installed replay integration (mobile)
-- **GIVEN** a mobile SDK with its replay integration installed and buffering one snapshot
+- **GIVEN** a mobile SDK with its replay integration installed, replay not intentionally off, and
+  buffering one snapshot
 - **WHEN** a custom event is captured
 - **THEN** the event's properties include `$recording_status`,
   `$sdk_debug_replay_event_trigger_status`, `$sdk_debug_replay_linked_flag_trigger_status`, and
@@ -113,6 +124,13 @@ the four required keys.
 - **AND** minimal `$feature_flag_called` events are not configured
 - **WHEN** a feature flag call is captured
 - **THEN** the captured event's properties include `$recording_status`
+
+#### Scenario: Required keys other than the status are withheld while replay is intentionally off
+- **GIVEN** replay is intentionally off
+- **WHEN** a custom event is captured
+- **THEN** the captured event's properties include `$recording_status: disabled`
+- **AND** they include none of the trigger status keys and no
+  `$sdk_debug_replay_internal_buffer_length`
 
 ### Requirement: Attach the optional replay debug bundle only to eligible SDK events
 
@@ -225,7 +243,12 @@ queue). Time spent in `beforeSend` SHALL NOT shorten the window. An event that c
 but was not accepted — dropped by `beforeSend`, suppressed as a duplicate (for example a
 deduplicated `$set`), or not stored — SHALL NOT start the window, so the next eligible event
 carries the bundle. An event that did not carry the bundle SHALL NOT start or move the window,
-including when the interval elapses while it is in `beforeSend`. The window is measured on the
+including when the interval elapses while it is in `beforeSend`. An eligible event captured while
+replay is intentionally off carries no bundle, so it SHALL NOT claim, start, or move the window,
+and the first eligible event after replay is turned back on carries the bundle. posthog-js claims
+the window for such an event whenever its recording extension is installed (`origin/main`
+`04b89402b` `packages/browser/src/posthog-core.ts:2090-2093`); that is a known posthog-js gap, not
+a behavior to copy. The window is measured on the
 wall clock, not against the event's timestamp: a capture with an explicit past or future
 timestamp neither attaches the bundle outside the wall-clock rule nor holds the window shut. The
 window is per SDK instance, not per event name or per session. A timer (browser) and a stored
@@ -236,8 +259,10 @@ when the SDK instance is closed, so a re-setup of the shared instance starts wit
 A property build that does not represent an event being captured for sending — posthog-js's
 `calculateEventProperties` called directly (with or without `readOnly`), or the mobile
 crash-context snapshot — SHALL NOT start or move the window. The mobile crash-context snapshot
-SHALL always carry the full optional bundle regardless of eligibility or window, because it is
-the last known replay state a later-launch crash report is stamped with.
+SHALL carry the full optional bundle regardless of eligibility or window while replay is not
+intentionally off, because it is the last known replay state a later-launch crash report is
+stamped with. While replay is intentionally off it carries only `$recording_status: disabled`
+(see "Attach only the disabled shape while replay is intentionally off").
 
 Between building an event with the optional bundle and accepting or releasing it, the SDK SHOULD
 hold at most one outstanding claim on the window, so an eligible event captured from inside
@@ -270,7 +295,7 @@ the next `$pageview` carries it; eligible events inside the window get required 
 the replay diagnostic interval on %s" — property enrichment, `before_send` rejection, and
 snapshot capture). Planned (mobile): one test per scenario in this requirement: a burst of eligible events, the 29 s
 and 30 s boundaries, a slow `beforeSend`, a `beforeSend` drop, a deduplicated `$set`/`$identify`,
-a future-dated capture, a non-capture property build, the crash-context snapshot, a capture
+a future-dated capture, a non-capture property build, the crash-context snapshot (with replay on, and with replay off), a capture
 nested in `beforeSend`, a nested capture after `beforeSend` has outlasted the interval, and the
 `close()` reset. posthog-js has no test for the nested
 `before_send` case, where it diverges.
@@ -325,8 +350,9 @@ nested in `beforeSend`, a nested capture after `beforeSend` has outlasted the in
 - **THEN** the built properties include `$sdk_debug_session_start`
 - **AND** the next eligible SDK event captured for sending still carries the optional bundle
 
-#### Scenario: The crash-context snapshot always carries the full bundle (mobile)
-- **GIVEN** an eligible SDK event carrying the optional bundle was accepted less than 30 seconds
+#### Scenario: The crash-context snapshot always carries the full bundle while replay is on (mobile)
+- **GIVEN** replay is not intentionally off
+- **AND** an eligible SDK event carrying the optional bundle was accepted less than 30 seconds
   ago
 - **WHEN** the crash-context snapshot is refreshed (for example by a `register()` call or a
   `$recording_status` transition)
@@ -630,11 +656,12 @@ in the optional bundle, never in the required keys. Its value SHALL be `screensh
 session replay always records masked screenshots. posthog-ios and posthog-android before 4.0
 reported `wireframe` when their screenshot option was off and the host SDK was not
 `posthog-flutter`; 4.0 removed wireframe recording and that option. No other value is defined.
-It derives from configuration, not from integration state, so it stays present on
-bundle-carrying events after replay is stopped or the integration is uninstalled, and a mobile
-SDK whose platform ships the replay module SHALL include it in the no-integration fallback (see
-"Attach the disabled shape when replay is not configured"). It is not a point-in-time key and
-stays in the crash-context snapshot. `$sdk_debug_replay_throttle_delay_ms` (the configured
+It derives from configuration, not from integration state, but it is a replay diagnostic, so it
+is attached only while replay is not intentionally off (see "Attach only the disabled shape while replay is intentionally off"). It is absent on
+events captured after replay is stopped or the integration is uninstalled, and the no-integration
+fallback does not include it (see "Attach the disabled shape when replay is not configured"). It is
+not a point-in-time key and stays in the crash-context snapshot while replay is not intentionally
+off. `$sdk_debug_replay_throttle_delay_ms` (the configured
 mutation-throttle delay) MUST NOT be attached by any SDK.
 
 `$recording_status` and the `$sdk_debug_*` keys are properties the SDK sets itself, so they follow
@@ -687,7 +714,7 @@ scenario remains planned.
 - **AND** the event's properties do NOT include `$sdk_debug_current_session_duration`
 
 #### Scenario: Session and queue keys are present when a session exists (mobile)
-- **GIVEN** a mobile SDK is initialized with an active session
+- **GIVEN** a mobile SDK is initialized with session replay enabled and an active session
 - **AND** no accepted event in the last 30 seconds carried the optional bundle
 - **WHEN** an eligible SDK event is captured
 - **THEN** the event's properties include `$sdk_debug_session_start` and
@@ -695,20 +722,22 @@ scenario remains planned.
 - **AND** the event's properties do NOT include `$sdk_debug_retry_queue_size`,
   `$sdk_debug_current_session_duration`, or `$sdk_debug_replay_throttle_delay_ms`
 
-#### Scenario: Session keys are present without session replay (mobile)
+#### Scenario: The session start is absent without session replay (mobile)
 - **GIVEN** a mobile SDK is initialized without session replay configured
 - **AND** a session is active
 - **WHEN** an eligible SDK event that the window allows is captured
-- **THEN** the event's properties include `$sdk_debug_session_start`
-- **AND** the event's `$recording_status` is `disabled`
+- **THEN** the event's `$recording_status` is `disabled`
+- **AND** the event's properties include `$sdk_debug_pending_queue_size`
+- **AND** the event's properties do not include `$sdk_debug_session_start`
 
 Mobile SDKs source `$sdk_debug_session_start` from the SDK's own session manager, not from the
-replay recorder, so it is present on a bundle-carrying event whenever a session exists regardless
-of replay configuration. This is a deliberate divergence from posthog-js, where the key lives in
-the recorder's `sdkDebugProperties` getter and is absent until the recorder has loaded: on mobile
-the session is owned by the SDK, and a crash-time `$exception` captured without replay still
-benefits from the session's start. Consequently its presence is not a proxy for "replay is
-loaded" on mobile; `$recording_status` is.
+replay recorder, but they attach it only while replay is not intentionally off. This matches
+posthog-js, where the key lives in the recorder's `sdkDebugProperties` getter and is absent when no
+recorder runs (`lazy-loaded-session-recorder.ts:2822-2836`, key at `:2830`, at posthog-js
+`origin/main` `16e3f63b9`). An earlier version of this spec kept the key on replay-off events
+because the SDK owns the session; that rule is withdrawn, because the key has no diagnostic value
+when replay is off and it adds to every event's payload. Its presence says that replay is not
+intentionally off, not that replay is recording; `$recording_status` says that.
 
 #### Scenario: Session keys follow a caller-supplied session id (mobile)
 - **GIVEN** the session manager's session started at T
@@ -779,9 +808,15 @@ posthog-ios `88f4b6b56` reads the manager's start snapshot unconditionally).
 - **THEN** the second event's `$recording_status` is the SDK-computed value
 
 #### Scenario: Capture mode is always screenshot (mobile)
-- **GIVEN** a mobile SDK with the replay module available
+- **GIVEN** a mobile SDK with the replay module available and replay not intentionally off
 - **WHEN** an eligible SDK event that the window allows is captured
 - **THEN** `$sdk_debug_replay_capture_mode` is `screenshot`
+
+#### Scenario: Capture mode is absent while replay is intentionally off (mobile)
+- **GIVEN** a mobile SDK with the replay module available
+- **AND** replay is intentionally off
+- **WHEN** an eligible SDK event that the window allows is captured
+- **THEN** the event's properties do not include `$sdk_debug_replay_capture_mode`
 
 #### Scenario: Capture mode is never a required key (mobile)
 - **GIVEN** a mobile SDK with the replay module available
@@ -883,13 +918,12 @@ A mobile SDK SHALL attach `$recording_status: disabled` to every captured event 
 configured at all (no replay integration installed, or the platform module that provides it is
 absent) — an event captured under these conditions is exactly the case the OOM investigation
 that motivated this spec needed to distinguish from an active or buffering replay. In that state
-`$recording_status` is the only required key available: the trigger statuses and
-`$sdk_debug_replay_internal_buffer_length` come from the integration and are absent. The optional
-fallback bundle, attached only to an eligible SDK event the window allows, is
-`$sdk_debug_replay_capture_mode` when the platform ships the replay module and
-`$sdk_debug_session_start` when a session start is available; where the replay module itself is
-entirely absent (posthog-ios on macOS, tvOS, watchOS, visionOS), the capture-mode key is absent
-too.
+`$recording_status` is the only replay key the SDK attaches: the trigger statuses and
+`$sdk_debug_replay_internal_buffer_length` come from the integration and are absent, and so are
+`$sdk_debug_replay_capture_mode` and `$sdk_debug_session_start`. There is no fallback optional
+bundle. An eligible SDK event carries the same single replay key as a custom event, plus the
+queue-depth key that every event carries. This is the not-configured case of "Attach only the
+disabled shape while replay is intentionally off".
 
 This is a deliberate mobile divergence from posthog-js. The browser attaches no replay debug key
 when the session-recording extension is not instantiated — `calculateEventProperties` requires
@@ -897,27 +931,30 @@ when the session-recording extension is not instantiated — `calculateEventProp
 cookieless mode, where the extension is never created) carries no `$recording_status` at all.
 When the extension exists but the lazy recorder has not loaded, the browser attaches
 `{ $recording_status: <extension status> }` plus the session-persisted replay debug keys, each
-tier filtered as usual.
+tier filtered as usual, except while replay is intentionally off, when it attaches only
+`$recording_status: disabled`.
 
-Reference: posthog-js `origin/main` `928990ded` — `if (this.sessionRecording)` guards the merge
-(`packages/browser/src/posthog-core.ts:2166-2175`); the pre-load fallback is
+Reference: posthog-js `origin/main` `16e3f63b9` — `if (this.sessionRecording)` guards the merge
+(`packages/browser/src/posthog-core.ts:2304-2313`); the pre-load fallback is
 `SessionRecording.sdkDebugProperties`
 (`packages/browser/src/extensions/replay/session-recording.ts:487-499`, the
-`{ $recording_status: this.status }` arm at `:497`); the extension is created only when
-`ext.sessionRecording && !startInCookielessMode` (`posthog-core.ts:1180`). posthog-ios `origin/main` `88f4b6b56` — the no-integration fallback sets `$recording_status:
-disabled` and `$sdk_debug_replay_capture_mode` on iOS and only `$recording_status: disabled` on
-other Apple platforms (`PostHog/PostHogSDK.swift:703-713`); `$sdk_debug_session_start` comes from
-the session manager (`:633-635`, merged at `:714`). Splitting that fallback into required and
-optional keys is the contract mobile SDKs port.
+`{ $recording_status: this.status }` arm at `:497`, the session-persisted keys read first at
+`:489-496`); the extension is created only when `ext.sessionRecording && !startInCookielessMode`
+(`posthog-core.ts:1180` at `928990ded`; not re-read at `16e3f63b9`). posthog-ios `origin/main`
+`88f4b6b56` — the no-integration fallback sets `$recording_status: disabled` and
+`$sdk_debug_replay_capture_mode` on iOS and only `$recording_status: disabled` on other Apple
+platforms (`PostHog/PostHogSDK.swift:703-713`); `$sdk_debug_session_start` comes from the session
+manager (`:633-635`, merged at `:714`). This change removes both extra keys from that fallback.
+The contract mobile SDKs port is the single-key fallback.
 
-Covering test: posthog-js `packages/browser/src/__tests__/posthog-core-also.test.ts:806`
+Covering test: posthog-js `packages/browser/src/__tests__/posthog-core-also.test.ts:835-850`
 ("returns calculated properties" — the extension is present but not started, so a custom event
-carries `$recording_status: 'disabled'`); no posthog-js test asserts the no-extension case.
-posthog-ios `PostHogTests/PostHogSDKTest.swift:474` ("reports disabled recording status with no
-replay keys on non-iOS platforms") at `88f4b6b56`. Planned (mobile): with no integration installed, a
-custom event carries `$recording_status: disabled` only, and an eligible event the window allows
-adds capture mode and session start. Android's `PostHogTest.kt` "with no handler" is not yet in
-the repo.
+carries `$recording_status: 'disabled'` and no other replay key); no posthog-js test asserts the
+no-extension case. posthog-ios `PostHogTests/PostHogSDKTest.swift:474` ("reports disabled
+recording status with no replay keys on non-iOS platforms") at `88f4b6b56`. Planned (mobile): with
+no integration installed, a custom event and an eligible event the window allows both carry
+`$recording_status: disabled` and no other replay key. Android's `PostHogTest.kt` "with no
+handler" is not yet in the repo.
 
 #### Scenario: No replay integration installed still reports disabled
 - **GIVEN** a mobile SDK is initialized with no session replay integration installed
@@ -926,14 +963,14 @@ the repo.
 - **AND** the event's properties include neither `$sdk_debug_replay_capture_mode` nor
   `$sdk_debug_session_start`
 
-#### Scenario: No replay integration installed adds the fallback bundle to an eligible event (mobile)
+#### Scenario: No replay integration installed adds nothing to an eligible event (mobile)
 - **GIVEN** a mobile SDK is initialized with no session replay integration installed
 - **AND** no accepted event in the last 30 seconds carried the optional bundle
 - **WHEN** a `$screen` event is captured
 - **THEN** the event's `$recording_status` is `disabled`
-- **AND** the event's properties include `$sdk_debug_session_start`
-- **AND** the event's properties include `$sdk_debug_replay_capture_mode` if the platform ships
-  the replay module
+- **AND** the event's properties include neither `$sdk_debug_session_start` nor
+  `$sdk_debug_replay_capture_mode`
+- **AND** the event's properties include `$sdk_debug_pending_queue_size`
 
 #### Scenario: No session-recording extension attaches nothing (browser)
 - **GIVEN** posthog-js is initialized without the session-recording extension (not bundled, or
@@ -947,22 +984,36 @@ the repo.
 
 The SDK SHALL report `$recording_status: disabled` on events captured after session replay is
 stopped (an explicit `stopSessionRecording()`-equivalent call) or the replay integration is
-uninstalled, and SHALL NOT attach `$sdk_debug_replay_flush_hold_reason` on bundle-carrying events
-captured after either, even if a hold reason was present immediately before the stop/uninstall.
-A getter or property-attach path that runs after teardown but still surfaces a pre-teardown hold
-reason is a bug this requirement exists to rule out. On mobile the crash-context snapshot is
+uninstalled, and SHALL NOT attach any `$sdk_debug_replay_*` key, `$sdk_debug_session_start`, or other key of
+the removal set in "Attach only the disabled shape while replay is intentionally off" on events captured after either, even if a hold reason
+was present immediately before the stop/uninstall. An explicit stop and an uninstall both turn
+replay off locally, so that requirement governs which keys remain. A getter or property-attach
+path that runs after teardown but still surfaces a pre-teardown hold reason, or any other replay
+key, is a bug this requirement exists to rule out. On mobile the crash-context snapshot is
 refreshed on the same transition, so the crash reporter's copy is reset too.
+
+On the browser the lazy recorder stays loaded after a stop, so this requirement also covers the
+status: `$recording_status` SHALL read `disabled` after the stop, and the recorder's own keys SHALL
+NOT be attached. posthog-js does not yet meet this (tracked in compliance n36).
 
 Reference: posthog-js clears the hold reason on stop,
 `packages/browser/src/extensions/replay/external/lazy-loaded-session-recorder.ts:1522-1523` at
 posthog-js `origin/main` `928990ded`. posthog-ios `origin/main` `88f4b6b56` computes the hold reason fresh on every `debugProperties()`
 call (`PostHog/Replay/PostHogReplayIntegration.swift:1899-1923`).
 
+At posthog-js `origin/main` `16e3f63b9`, `stopRecording()` keeps the recorder
+(`packages/browser/src/extensions/replay/session-recording.ts:230-234`) and the `status` getter
+prefers it over `_recordingStatus` (`:101-106`), so the status is wrong after a stop and the full
+recorder key set (`lazy-loaded-session-recorder.ts:2822-2836`) still goes out.
+
 Covering test: `lazy-sessionrecording.test.ts` replay-stop tests (posthog-js's fix for the
-staleness this requirement generalizes). posthog-ios `PostHogTests/PostHogSessionReplayRemoteConfigBufferTest.swift:512` ("stopping
+staleness this requirement generalizes; none asserts `$recording_status` or the other keys after a
+stop, so a posthog-js test is planned). posthog-ios `PostHogTests/PostHogSessionReplayRemoteConfigBufferTest.swift:512` ("stopping
 recording reports disabled and clears the hold reason") and `:536` ("uninstalling the replay
 integration reports disabled and clears the hold reason"), both also asserting
-`$sdk_debug_replay_capture_mode` remains present (`:532`, `:555`), at `88f4b6b56`; Android's
+`$sdk_debug_replay_capture_mode` remains present (`:532`, `:555`), at `88f4b6b56`; those two
+assertions encode the behavior this requirement now reverses and become assertions that the key
+is absent; Android's
 `PostHogReplayIntegrationTest.kt` "stopped integration" is not yet in the repo.
 
 #### Scenario: Stopping recording clears the hold reason
@@ -979,13 +1030,20 @@ integration reports disabled and clears the hold reason"), both also asserting
 - **THEN** the event's `$recording_status` is `disabled`
 - **AND** `$sdk_debug_replay_flush_hold_reason` is absent
 
-#### Scenario: Config-derived keys remain present after stop/uninstall while status is disabled
+#### Scenario: No replay debug key remains after stop/uninstall
 - **GIVEN** the replay integration was active with `$sdk_debug_replay_capture_mode` present
 - **WHEN** recording is stopped, or the replay integration is uninstalled
 - **AND** an eligible SDK event that the window allows is captured
 - **THEN** the event's `$recording_status` is `disabled`
-- **AND** `$sdk_debug_replay_capture_mode` remains present, because it derives from the
-  platform config module rather than from integration install/active state
+- **AND** the event's properties include no `$sdk_debug_replay_*` key, including
+  `$sdk_debug_replay_capture_mode`, and no `$sdk_debug_session_start`
+
+#### Scenario: A started browser recorder reports disabled after a stop
+- **GIVEN** posthog-js has started its lazy recorder and the recorder reports `active`
+- **WHEN** the app stops session recording
+- **AND** a custom event is captured
+- **THEN** the event's `$recording_status` is `disabled`
+- **AND** the event's properties include none of the recorder's keys
 
 ### Requirement: Debug keys describe the SDK state when the event occurred
 
@@ -1000,8 +1058,10 @@ through `onEventContextChanged`), and otherwise SHALL attach none of these keys.
 attach the current process's live state to an event from a previous process; this rule takes
 precedence over the every-event rule for required keys.
 
-The persisted crash-context snapshot is a property build that is not a capture: it SHALL always
-carry the full optional bundle, SHALL never start or move the 30-second window, and SHALL be
+The persisted crash-context snapshot is a property build that is not a capture: it SHALL carry the
+full optional bundle while replay is not intentionally off, SHALL carry only
+`$recording_status: disabled` while it is (see "Attach only the disabled shape while replay is intentionally off"), SHALL never start or move the
+30-second window, and SHALL be
 refreshed on every `$recording_status` transition so it is the last known replay state at crash
 time. Point-in-time keys that would be stale by the next launch (the queue-depth key,
 `$sdk_debug_replay_internal_buffer_length`) SHALL be stripped from it.
@@ -1019,16 +1079,16 @@ the event's timestamp rather than "now" (`timestamp.getTime()` passed into
 (`PostHog/PostHogSDK.swift:660-663`); the crash-context snapshot is `notifyContextDidChange`
 (`:3262-3290`: `readOnlySession: true`, `pointInTimeDebugKeys` stripped), and the replay
 integration refreshes it whenever `$recording_status` can change
-(`PostHog/Replay/PostHogReplayIntegration.swift:373`). The rules that the snapshot always carries
-the full optional bundle and never starts or moves the window, and that the window runs on the
+(`PostHog/Replay/PostHogReplayIntegration.swift:373`). The rules that the snapshot carries
+the full optional bundle while replay is on and never starts or moves the window, and that the window runs on the
 wall clock, are the mobile contract; posthog-js has no analog.
 
 Covering test: posthog-ios `PostHogTests/PostHogSessionReplayRemoteConfigBufferTest.swift:580`
 ("crash context re-snapshots on recording transitions and omits point-in-time counters") at
 `88f4b6b56`; iOS's crash-report decode path in `PostHogErrorTrackingAutoCaptureIntegration` (the
 `customData` branch, `PostHog/ErrorTracking/PostHogErrorTrackingAutoCaptureIntegration.swift:255-259`)
-covers the persisted-snapshot arm. Planned (mobile): the crash-context snapshot always carries
-the bundle and never arms the window, and a far-future eligible capture does not suppress the
+covers the persisted-snapshot arm. Planned (mobile): the crash-context snapshot carries
+the bundle while replay is on, carries only the disabled status while replay is off, and never arms the window, and a far-future eligible capture does not suppress the
 bundle once the wall clock catches up. Planned — `PostHogTest.kt` "a previous-run exception
 carries none of the debug keys" and "a backdated event within the current session keeps the debug
 keys" on Android.
@@ -1043,10 +1103,18 @@ keys" on Android.
 
 #### Scenario: A persisted crash snapshot is attached verbatim
 - **GIVEN** the platform mirrored the debug map into its crash reporter at the time of the crash
+- **AND** replay was not intentionally off at that time
 - **WHEN** that crash report is captured on a later launch
 - **THEN** the event carries the mirrored map, not the current process's state
 - **AND** the mirrored map includes `$recording_status` and `$sdk_debug_session_start` but not
   the queue-depth key
+
+#### Scenario: A persisted crash snapshot taken while replay was off carries only the status
+- **GIVEN** the platform mirrored the debug map into its crash reporter at the time of the crash
+- **AND** replay was intentionally off at that time
+- **WHEN** that crash report is captured on a later launch
+- **THEN** the event carries the mirrored map, which includes `$recording_status: disabled`
+- **AND** the mirrored map includes no `$sdk_debug_replay_*` key and no `$sdk_debug_session_start`
 
 #### Scenario: A backdated event within the current session keeps the keys
 - **GIVEN** the current session started at T
@@ -1061,6 +1129,18 @@ getter specified by `is-session-replay-active`: a `$recording_status` of `active
 getter returns `true`, and `disabled` SHALL imply it returns `false`. While
 `$recording_status` is `buffering`, this spec makes no claim about the boolean getter's return
 value — that getter's own spec governs its `buffering`-equivalent behavior per platform.
+
+A running recorder is never intentionally off (see "Attach only the disabled shape while replay is
+intentionally off"). After a remote off, the SDK SHALL keep reporting the running recorder's state,
+with every key the other requirements of this capability call for, until the recorder stops. Only
+events captured after it stops carry the off shape. Otherwise an event could carry
+`$recording_status: disabled` while `isSessionReplayActive()` still returns `true`. The browser
+stops its recorder inside `onRemoteConfig` (posthog-js `origin/main` `53e5c0e35`
+`packages/browser/src/extensions/replay/session-recording.ts:340-343`), so it has no such interval.
+On mobile the recorder can keep running after the remote off arrives (posthog-android
+[#992](https://github.com/PostHog/posthog-android/pull/992) `e8809d38`
+`posthog/src/main/java/com/posthog/PostHog.kt:2612-2619`; covering test
+`posthog/src/test/java/com/posthog/PostHogTest.kt:4233`).
 
 The two mobile `buffering` hold causes reported via `$sdk_debug_replay_flush_hold_reason`
 (`awaiting_remote_config`, `below_minimum_duration`) correspond to the "Setup" resolution step
@@ -1082,6 +1162,16 @@ Reference: `is-session-replay-active` spec, `openspec/specs/is-session-replay-ac
 - **GIVEN** an SDK conforming to both this spec and `is-session-replay-active`
 - **WHEN** an event's `$recording_status` is `disabled`
 - **THEN** `isSessionReplayActive()` (or its platform equivalent) returns `false`
+
+#### Scenario: A running recorder keeps its keys after a remote off until it stops (mobile)
+- **GIVEN** a mobile SDK whose recorder is running and whose events carry `$recording_status: active`
+- **WHEN** a fetched remote config arrives with `sessionRecording` set to the boolean `false`
+- **AND** a custom event is captured before the recorder stops
+- **THEN** the event's `$recording_status` is not `disabled`
+- **AND** the event keeps the keys the other requirements call for
+- **WHEN** the recorder stops
+- **AND** another custom event is captured
+- **THEN** that event's `$recording_status` is `disabled` and it includes none of the removal set
 
 ### Requirement: Out of scope for this capability
 
@@ -1142,3 +1232,236 @@ to them.
 - **THEN** the absence of any rrweb performance counter key removed by posthog-js#5144, of
   `$sdk_debug_current_session_duration`, or of `$sdk_debug_replay_throttle_delay_ms` is not a
   violation of this spec
+
+### Requirement: Attach only the disabled shape while replay is intentionally off
+
+An SDK SHALL NOT attach any replay diagnostic key to a captured event while session replay is
+*intentionally off*. Replay is intentionally off when it is off locally or off remotely.
+
+Replay is *off locally* when any of these holds:
+
+- The SDK's own config turns replay off. Mobile: no replay integration is installed, or
+  `sessionReplay` is false and the app has not started replay manually. Browser:
+  `disable_session_recording` is true. A hybrid wrapper that builds its own debug map applies the
+  same test to its own config (React Native: replay is not enabled and has not been started
+  manually).
+- The app has explicitly stopped replay (`stopSessionRecording()` or its platform equivalent).
+- The user has opted out of capture. No event is captured while opted out, so this affects only
+  the mobile crash-context snapshot and a hybrid wrapper's debug map.
+
+Replay is *off remotely* when the SDK's cached remote config turns replay off: `sessionRecording`
+is the boolean `false`. On mobile, a remote config whose `quotaLimited` list contains
+`mobile_recordings` is off remotely too, because the mobile SDKs force `sessionRecording` to
+`false` in that case (posthog-ios `origin/main` `a0a71796c2` `PostHog/PostHogRemoteConfig.swift:373-375`,
+`:636-640`; posthog-android `origin/main` `1101d79b` `posthog/src/main/java/com/posthog/internal/PostHogRemoteConfig.kt:326`).
+The SDK SHALL read the cached config value, not derived replay-flag state. Derived state can be
+cleared on `reset()` while the cached config still enables replay (posthog-ios
+`PostHog/PostHogRemoteConfig.swift:1389-1393`, `:1403-1406`). No remote config yet is not off
+remotely: the SDK is awaiting config and keeps its keys. A `/config` response with no
+`sessionRecording` key is not off remotely either, but an SDK MAY treat it as off. The server always
+sends the key, as `false` or a config object (PostHog/posthog `c1fe8dcf295`
+`posthog/models/remote_config.py:305-326`), so the two readings differ only for a response the
+server does not produce. posthog-android treats it as off, because its decoder defaults the key to
+`false` (posthog-android `origin/main` `1101d79b`
+`posthog/src/main/java/com/posthog/internal/PostHogRemoteConfigResponse.kt:10`). posthog-js treats it
+like a failed fetch: it keeps the persisted config, and with none persisted it reports
+`missing_config` and does not record (posthog-js `origin/main` `53e5c0e35`
+`packages/browser/src/extensions/replay/session-recording.ts:326-339`).
+
+A running recorder is not off remotely. Replay becomes off remotely when the recorder stops (see
+"Reconciliation with `is-session-replay-active` and `session-replay-ingestion-controls`").
+
+Replay is **not** intentionally off, and every key the other requirements of this capability call
+for stays, when replay is enabled and is in any of these states: sampled out, waiting on a trigger
+(URL, event, or linked flag), awaiting its first remote config, buffering, or paused. These
+states are the observability this capability exists for.
+
+The gate SHALL read the SDK's replay state: enabled locally AND enabled remotely. It SHALL NOT
+read `$recording_status`. A sampled-out session reports `$recording_status: disabled` too, so a
+gate on that value would drop the diagnostics of a session that replay is still sampling.
+
+While replay is intentionally off, a captured event SHALL carry `$recording_status: disabled`
+wherever the SDK attaches that key (the required-key rule and the disabled-shape rule decide where),
+and SHALL carry none of the following (the *removal set*):
+
+- any `$sdk_debug_replay_*` key;
+- any `$sdk_debug_rrweb_*` key;
+- `$sdk_debug_recording_script_not_loaded`;
+- `$sdk_debug_session_start`.
+
+This covers the required keys, the optional bundle, and every replay diagnostic that the SDK keeps
+in session storage or registers as a session or super property. The gate filters at attach time.
+It SHALL NOT delete the stored keys, so that they come back when replay is turned on again and
+they are still valid.
+
+The gate removes keys and never adds one. Keys that are not replay diagnostics are untouched:
+`$sdk_debug_retry_queue_size` (browser), `$sdk_debug_pending_queue_size` (mobile),
+`$sdk_debug_error_capturing_properties`, and the browser's `$sdk_debug_extensions_init_method` and
+`$sdk_debug_extensions_init_time_ms`. The gate constrains what the SDK attaches itself. A caller
+who supplies or registers a key by name keeps the caller-wins rule in "Session, queue, hold-reason,
+trigger, and mode keys". The `$snapshot` drop counters are outside the gate: they exist only while
+the recorder runs, and their own requirement governs them.
+
+The SDK SHALL evaluate the gate every time it builds the debug map for an event. Turning replay
+off in mid-session gives the next event the off shape. That includes a browser whose lazy recorder
+stays loaded after the stop, where `$recording_status` SHALL read `disabled` and the recorder's own
+keys SHALL be left out. Turning replay on again gives the next event the normal shape. The gate and
+the keys it lets through SHALL come from one consistent snapshot of replay state (see "All debug
+keys on one event come from a single consistent snapshot").
+
+Every consumer of the debug map SHALL receive the gated map. On mobile that includes the
+crash-context snapshot and any API that hands the map to a wrapper SDK. A snapshot taken while
+replay is off carries `$recording_status: disabled` and nothing else from the gate's removal set,
+and it is refreshed when replay turns off or on.
+
+This is the same rule on every platform. posthog-js is the reference for the shape and the gate
+state. It does not yet meet this requirement after a mid-session stop or a mid-session remote-off
+(tracked in compliance n36).
+
+Reference: posthog-js `origin/main` `16e3f63b9` — `_isRecordingEnabled` is the remote `enabled`
+flag AND the client flag AND not opted out (`packages/browser/src/extensions/replay/session-recording.ts:139-144`).
+That getter is also false while no remote config is persisted, so the browser gate reads the
+persisted remote config's `enabled` value and not this getter alone: awaiting the first config
+(`AWAITING_CONFIG`, `:102-104`) is not off. Off at load, locally or remotely, leaves no lazy recorder,
+and `sdkDebugProperties` returns `{ $recording_status }` (`:497`) next to the session-persisted keys
+it reads first (`:489-496`; the key list is `:51-61`). `$sdk_debug_session_start` is emitted only
+by the recorder's getter (`lazy-loaded-session-recorder.ts:2822-2836`, key at `:2830`), so it is
+absent without a recorder. The required list is `REQUIRED_REPLAY_PROPERTIES`
+(`packages/browser/src/posthog-core.ts:193-202`), merged at `:2304-2313`; the queue-depth key is set
+outside that block (`:2314`). Sampled-out reports `disabled` (`triggerMatching.ts:780-782`) and a
+pending trigger reports `buffering` (`:772-774`), both under
+`packages/browser/src/extensions/replay/external/`. posthog-js does **not** yet meet this
+requirement mid-session. A local stop runs `startIfEnabledOrStop`, which sets `_recordingStatus`
+to `DISABLED` and calls `stopRecording()` (`session-recording.ts:166-169`), and `stopRecording()`
+keeps the lazy recorder (`:230-234`). The `status` getter prefers the recorder (`:101-106`), whose
+strategies hardcode `isRecordingEnabled: true` (`external/recording-strategies.ts:208`, `:391`), so
+the post-stop status and the recorder's keys are wrong. A remote `sessionRecording: false` persists
+the config and discards the recording, with no status change (`session-recording.ts:335-339`).
+The persisted session keys are also merged when no recorder exists (`:489-496`), so a page reload in
+the same session after a remote-off still attaches them.
+
+Covering test: posthog-js `packages/browser/src/__tests__/posthog-core-also.test.ts:835-850`
+("returns calculated properties" — with the extension present and not started, a custom event
+carries `$recording_status: 'disabled'` and `$sdk_debug_retry_queue_size`, and no other replay
+key); `packages/browser/src/__tests__/extensions/replay/sessionRecording-onRemoteConfig.test.ts:420-426`
+(`sessionRecording: false` from the server leaves status `disabled`) and `:428-454` (remote-off after
+a cached start discards the recording and persists `enabled: false`, without asserting the status
+or the keys); `packages/browser/src/__tests__/extensions/replay/lazy-sessionrecording.test.ts:565`
+and `:605-608` (client-disabled config does not load the script and `_isRecordingEnabled` is
+false). Planned (posthog-js): a stop and a remote-off on a started recorder, each followed by an
+event that carries `$recording_status: disabled` and none of the removal set, and a reload after
+remote-off that attaches no persisted replay key. Planned (mobile): one test per scenario in this
+requirement.
+
+#### Scenario: Replay off in local config sends only the disabled status (mobile)
+- **GIVEN** a mobile SDK whose config does not enable session replay and that has not started it
+  manually
+- **AND** a session is active
+- **WHEN** a custom event is captured
+- **AND** an eligible SDK event that the window allows is captured
+- **THEN** each event's `$recording_status` is `disabled`
+- **AND** neither event includes any `$sdk_debug_replay_*` key, `$sdk_debug_session_start`, or
+  `$sdk_debug_recording_script_not_loaded`
+- **AND** each event includes `$sdk_debug_pending_queue_size`
+
+#### Scenario: Replay off in local config sends only the disabled status (browser)
+- **GIVEN** posthog-js is initialized with `disable_session_recording` set to true
+- **AND** the session already holds session-persisted replay debug keys from earlier in the session
+- **WHEN** a `$pageview` event is captured
+- **THEN** the event's `$recording_status` is `disabled`
+- **AND** the event includes none of the persisted replay debug keys, no `$sdk_debug_rrweb_*` key,
+  and no `$sdk_debug_session_start`
+- **AND** the event includes `$sdk_debug_retry_queue_size`
+
+#### Scenario: An explicit stop mid-session switches the next event to the off shape
+- **GIVEN** replay is active and a custom event carried the required keys
+- **WHEN** the app stops session replay
+- **AND** another custom event is captured
+- **THEN** the second event's `$recording_status` is `disabled`
+- **AND** it includes none of the removal set, including the trigger status keys and
+  `$sdk_debug_replay_internal_buffer_length`
+- **AND** this holds on the browser even though its lazy recorder stays loaded after the stop
+
+#### Scenario: Remote config with `sessionRecording: false` switches events to the off shape
+- **GIVEN** replay is enabled locally and a cached remote config enabled it
+- **WHEN** a fetched remote config arrives with `sessionRecording` set to the boolean `false`
+- **AND** the recorder has stopped
+- **AND** a custom event is captured
+- **THEN** the event's `$recording_status` is `disabled`
+- **AND** the event includes none of the removal set
+
+#### Scenario: A quota-limited project is off remotely (mobile)
+- **GIVEN** a mobile SDK with replay enabled locally
+- **AND** the cached remote config's `quotaLimited` list contains `mobile_recordings`
+- **WHEN** a custom event is captured
+- **THEN** the event's `$recording_status` is `disabled`
+- **AND** the event includes none of the removal set
+
+#### Scenario: An event captured while replay is off does not use up the window
+- **GIVEN** replay is enabled locally and remotely and no 30-second window is open
+- **AND** the app stops session replay
+- **WHEN** an eligible SDK event is captured and accepted
+- **AND** the app starts session replay again within 30 seconds
+- **AND** another eligible SDK event is captured
+- **THEN** the first event's `$recording_status` is `disabled` and it includes none of the removal set
+- **AND** the second event carries the optional bundle
+
+#### Scenario: A sampled-out session keeps every key
+- **GIVEN** replay is enabled locally and remotely
+- **AND** the session was sampled out, so `$recording_status` is `disabled`
+- **WHEN** a custom event is captured
+- **THEN** the event includes the trigger status keys and `$sdk_debug_replay_internal_buffer_length`
+  that the other requirements call for
+
+#### Scenario: A pending linked flag keeps every key
+- **GIVEN** replay is enabled locally and remotely
+- **AND** a linked flag trigger is configured and has not matched
+- **WHEN** a custom event is captured
+- **THEN** `$sdk_debug_replay_linked_flag_trigger_status` is `trigger_pending`
+- **AND** the event includes the other required keys
+
+#### Scenario: A pending event trigger keeps every key
+- **GIVEN** replay is enabled locally and remotely
+- **AND** an event trigger is configured and has not matched
+- **WHEN** a custom event is captured
+- **THEN** `$sdk_debug_replay_event_trigger_status` is `trigger_pending`
+- **AND** the event includes the other required keys
+
+#### Scenario: Awaiting the first remote config keeps every key
+- **GIVEN** replay is enabled locally
+- **AND** the SDK has not yet received any remote config
+- **WHEN** an eligible SDK event that the window allows is captured
+- **THEN** the event keeps the keys that the replay state produces at that moment, including
+  `$sdk_debug_replay_flush_hold_reason` set to `awaiting_remote_config` on mobile
+- **AND** the SDK has not treated the missing config as remote-off
+
+#### Scenario: Turning replay on again restores the normal shape
+- **GIVEN** replay was stopped and a custom event carried only `$recording_status: disabled`
+- **WHEN** the app starts session replay again
+- **AND** another custom event is captured
+- **THEN** the second event carries the required keys of the current replay state
+- **AND** a replay debug key held in session storage is attached again only if it is still valid
+
+#### Scenario: Keys that are not replay diagnostics stay while replay is off
+- **GIVEN** replay is intentionally off
+- **WHEN** a custom event is captured
+- **THEN** the event includes the queue-depth key
+- **AND** the browser's `$sdk_debug_extensions_init_method` and `$sdk_debug_extensions_init_time_ms`
+  are unchanged where the SDK attaches them
+
+#### Scenario: The crash-context snapshot is gated (mobile)
+- **GIVEN** replay is intentionally off
+- **WHEN** the crash-context snapshot is refreshed
+- **THEN** the snapshot includes `$recording_status: disabled`
+- **AND** it includes no `$sdk_debug_replay_*` key and no `$sdk_debug_session_start`
+
+#### Scenario: A debug map handed to a wrapper SDK is gated
+- **GIVEN** replay is intentionally off
+- **WHEN** a wrapper SDK reads the replay debug map through the native SDK's bridge API
+- **THEN** the map includes `$recording_status: disabled` and none of the removal set
+
+#### Scenario: Replay diagnostics registered by the SDK do not reach events while replay is off
+- **GIVEN** a hybrid SDK registers replay diagnostics as session or super properties
+- **AND** replay is intentionally off
+- **WHEN** a custom event is captured
+- **THEN** the event includes none of those registered keys

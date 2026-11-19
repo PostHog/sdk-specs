@@ -316,8 +316,8 @@ in. Opting out and opting back in, and a `reset()` followed by an opt-in, are tr
 capture the consent event again.
 
 Suppression covers the consent event only. Everything else the opt-in path does — persisting the
-consent state, resuming capture, draining queued work, restarting subsystems such as session replay
-and surveys, and any initial pageview the SDK sends on opt-in — SHALL still run on a repeat call.
+consent state, resuming capture, draining queued work, and restarting subsystems such as session
+replay and surveys — SHALL still run on a repeat call.
 
 #### Scenario: Opting in twice captures one consent event
 - **GIVEN** a fresh SDK acceptance test harness

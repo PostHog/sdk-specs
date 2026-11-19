@@ -21,9 +21,8 @@ spec should state.
   so a repeated call across page loads captures nothing.
 - Opting out and opting back in, and `reset()` followed by opt-in, are transitions and SHALL capture
   the event again.
-- Everything else `optIn()` does — persisting consent, draining the queue, restarting replay and
-  surveys, and any initial pageview — SHALL still run on a repeat call. Suppression covers the
-  consent event only.
+- Everything else `optIn()` does — persisting consent, draining the queue, and restarting replay
+  and surveys — SHALL still run on a repeat call. Suppression covers the consent event only.
 
 ## Capabilities
 

@@ -10,5 +10,5 @@
 
 ## 3. Downstream follow-ups (separate changes, not this one)
 
-- [ ] 3.1 posthog-rs, posthog-ruby and `@posthog/ai` read `POSTHOG_PROJECT_TOKEN` first
+- [ ] 3.1 posthog-rails reads `POSTHOG_PROJECT_TOKEN` first, keeping `POSTHOG_API_KEY` as a deprecated fallback
 - [ ] 3.2 posthog-sdk-test-harness: step bindings for the environment-variable scenarios

@@ -5,9 +5,10 @@ names — an options object, a provider's props, a manifest or `Info.plist` key 
 about the environment variable an SDK reads when it is initialized without an explicit token. The
 SDKs that read one diverge: posthog-php's `PostHog::init()` and its Laravel package now read
 `POSTHOG_PROJECT_TOKEN` and fall back to `POSTHOG_API_KEY`
-([posthog-php#311](https://github.com/PostHog/posthog-php/pull/311)), and `@posthog/mcp` reads
-`POSTHOG_PROJECT_TOKEN`, while posthog-rs and the posthog-rails logs setup still read only
-`POSTHOG_API_KEY`. posthog-php#311 flags this as a gap in the spec rather than a divergence from it.
+([posthog-php#311](https://github.com/PostHog/posthog-php/pull/311)), and the `@posthog/convex`
+component reads `POSTHOG_PROJECT_TOKEN`, while posthog-rails (its logs setup and its install
+generator template) still reads only `POSTHOG_API_KEY`. posthog-php#311 flags this as a gap in the
+spec rather than a divergence from it.
 
 An app configuring two PostHog SDKs should not need two differently named variables for the same
 project token, and the name the spec already picked for the option is the name the variable should
@@ -35,8 +36,9 @@ _None._
 
 - **posthog-php**: already matches, as of #311 (`PostHog::ENV_PROJECT_TOKEN`, with
   `POSTHOG_API_KEY` deprecated).
-- **@posthog/mcp**: already reads `POSTHOG_PROJECT_TOKEN`.
-- **posthog-rs**, **posthog-ruby** (the Rails logs setup and the install generator template), and the
-  `@posthog/ai` integrations read `POSTHOG_API_KEY` and would add the new name with the old one as a
-  fallback. None has to drop the old name.
+- **@posthog/convex**: already reads `POSTHOG_PROJECT_TOKEN`, with no `POSTHOG_API_KEY` fallback to keep.
+- **posthog-rails** (the logs setup and the install generator template) reads `POSTHOG_API_KEY` and
+  would add the new name with the old one as a fallback. It does not have to drop the old name.
+- posthog-rs, `@posthog/ai` and `@posthog/mcp` mention a variable only in doc-comment examples and read
+  none, so they are unaffected.
 - SDKs that take the token only from code (posthog-js browser, the mobile SDKs) are unaffected.

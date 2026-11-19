@@ -37,6 +37,10 @@ An evaluation can find a second key in flight after the first one settles. Givin
 
 The bounded wait allows two probes for the same key in the same definitions generation. If the newer one returns a newly created flag before the older one cleanly omits it, the older omission must not hide the flag until the next refresh. The SDK remembers when each key was returned in the current generation. It ignores an omission from a probe that was already in flight when the key was returned. A probe that starts later can still record an omission, so a deleted flag stops being probed. When the bounded history has evicted entries newer than a probe's start, the SDK can't tell what that probe overlapped, so it doesn't record the probe's omissions.
 
+### Distinguish owner exit from coordinator failure
+
+When a probe's owner exits, the coordinator still works, so it may hand the probe to one waiter instead of releasing everyone. That keeps sharing the existence check, and the handoff can't extend any waiter's deadline. When the coordinator itself fails, nothing can hand anything off, so waiters stop relying on it as soon as the failure is detected. An undetected failure is still bounded by each evaluation's deadline.
+
 ### Coordinate only keys whose existence is unknown
 
 Every caller needs its own remote result for a key that exists, because values depend on the evaluation context. Coordinating on such a key only makes callers wait for a request whose answer they can't reuse. SDKs may therefore remember keys a current-generation response returned and let later callers request them directly. Positive knowledge follows the same lifetime as negative knowledge. A later clean omission from a request that started after the key was returned clears it, so a deleted flag moves to missing instead of staying present until the next refresh.

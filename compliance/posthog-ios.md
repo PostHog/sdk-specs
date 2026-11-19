@@ -645,7 +645,7 @@ Retry Queue.
   properties, then caller properties (`PostHog/PostHogSDK.swift:842-896`).
 - **Spec requires:** (a) `$sdk_debug_session_start` "MUST never describe" a different session than
   the event's own `$session_id`; for a caller-supplied id it comes from the UUIDv7 timestamp and is
-  omitted for a non-v7 id (`openspec/specs/session-replay-debug-properties/spec.md:550-561`, scenario
+  omitted for a non-v7 id (`openspec/specs/session-replay-debug-properties/spec.md:555-566`, scenario
   "Session keys are omitted for a non-UUIDv7 caller session id (mobile)" at `:704` on `752f899`). (b) An event
   timestamped before the current session's start carries the persisted snapshot or none of the keys
   (scenario "A previous-process crash carries no live debug state", `:1016-1022` on `752f899`).
@@ -657,19 +657,20 @@ Retry Queue.
   Crash and OOM reports still bypass `buildProperties` and use the persisted snapshot, so the crash
   arm of (b) is met; manual backdated captures are not.
 - **(d) Off-state shape (2026-11-18, sdk-specs change `drop-replay-debug-keys-when-replay-off`):** the
-  new requirement "Attach only the disabled shape while replay is intentionally off" (`openspec/specs/session-replay-debug-properties/spec.md:1209`) says that while replay is intentionally off (no integration, `sessionReplay`
+  new requirement "Attach only the disabled shape while replay is intentionally off" (`openspec/specs/session-replay-debug-properties/spec.md:1236`) says that while replay is intentionally off (no integration, `sessionReplay`
   false and not started manually, an explicit stop, opt-out, or a cached remote config with
   `sessionRecording == false` or `quotaLimited` containing `mobile_recordings`) an event carries
   `$recording_status: disabled` and none of the removal set. The crash-context snapshot and the API
   that hands the map to wrapper SDKs get the gated map. At posthog-ios `origin/main` `a0a71796c2`
   the no-integration fallback still adds `$sdk_debug_replay_capture_mode` and
   `$sdk_debug_session_start` (`PostHog/PostHogSDK.swift:816-823`; scenario
-  "No replay integration installed adds nothing to an eligible event (mobile)", `openspec/specs/session-replay-debug-properties/spec.md:961`), and the
+  "No replay integration installed adds nothing to an eligible event (mobile)", `openspec/specs/session-replay-debug-properties/spec.md:966`), and the
   integration's `debugProperties()` (`PostHog/Replay/PostHogReplayIntegration.swift:2050`) keeps
   capture mode (`:2081`) and the other replay keys after an explicit stop or a remote-off (scenarios
-  `openspec/specs/session-replay-debug-properties/spec.md:810`, `:1336`, `:1345`, `:1352`). Fix in progress:
-  [PostHog/posthog-ios#1090](https://github.com/PostHog/posthog-ios/pull/1090) (open; merges after
-  `feat/replay-v2-trigger-groups`, whose `explicitlyStopped` flag it reuses).
+  `openspec/specs/session-replay-debug-properties/spec.md:815`, `:1376`, `:1385`, `:1393`). Fix in progress:
+  [PostHog/posthog-ios#1090](https://github.com/PostHog/posthog-ios/pull/1090) (open). #1090 and
+  `feat/replay-v2-trigger-groups` can land in either order: both add an `explicitlyStopped` flag, and
+  the one that lands second drops its copy.
 - **Backwards compatibility:** Backward-compatible; internal property-build changes that only
   correct or remove diagnostic keys.
 - **Remediation:** (a) When `propSessionId` is set and differs from the manager's id, derive the

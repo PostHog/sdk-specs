@@ -570,7 +570,7 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
   - **Crash case.** An event timestamped before the current session start gets no keys (`:1031-1033`).
     Android persists no crash-time snapshot, so that is the required outcome.
 - **Gap (2026-11-18, sdk-specs change `drop-replay-debug-keys-when-replay-off`): the off-state shape.**
-  The new requirement "Attach only the disabled shape while replay is intentionally off" (`openspec/specs/session-replay-debug-properties/spec.md:1209`) says that while replay is intentionally off (`sessionReplay` false and
+  The new requirement "Attach only the disabled shape while replay is intentionally off" (`openspec/specs/session-replay-debug-properties/spec.md:1236`) says that while replay is intentionally off (`sessionReplay` false and
   not started manually, an explicit stop, opt-out, or a cached remote config with `sessionRecording`
   `false` or `quotaLimited` containing `mobile_recordings`) an event carries `$recording_status: disabled`
   and none of the removal set, and the plugin bridge gets the gated map. At posthog-android
@@ -581,19 +581,35 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
   `$sdk_debug_session_start` whenever the bundle is claimed (`PostHog.kt:890`). Fix in progress:
   [PostHog/posthog-android#992](https://github.com/PostHog/posthog-android/pull/992) (open; closes this
   gap when merged).
-- **Known divergence after #992: a `/config` with no `sessionRecording` key is remote off.** The spec
-  says a missing key, or no remote config yet, is not off remotely on mobile (`openspec/specs/session-replay-debug-properties/spec.md:1231-1232`).
+- **Allowed divergence: a `/config` with no `sessionRecording` key is remote off.** The spec lets an
+  SDK treat a missing key as off remotely (`openspec/specs/session-replay-debug-properties/spec.md:1259-1269`).
   `PostHogRemoteConfigResponse.sessionRecording` defaults to `false`
-  (`posthog/src/main/java/com/posthog/internal/PostHogRemoteConfigResponse.kt:10`), and a boolean
-  `false` turns replay off (`posthog/src/main/java/com/posthog/internal/PostHogRemoteConfig.kt:531-541`),
-  so Android cannot tell a missing key from `false`. The remote-off value is held in memory only, so
-  after a relaunch the keys stay until the first `/config` arrives, which matches the spec's
-  awaiting-config rule.
+  (`posthog/src/main/java/com/posthog/internal/PostHogRemoteConfigResponse.kt:10`), so Android cannot
+  tell a missing key from `false`. The server always sends the key, so this does not show up in
+  practice.
+- **Partial after #992: remote off does not survive a relaunch.** The spec says the gate SHALL read
+  the cached config value (`openspec/specs/session-replay-debug-properties/spec.md:1257`). On a boolean
+  `false`, `processSessionRecordingConfig` removes the cached replay config
+  (`posthog/src/main/java/com/posthog/internal/PostHogRemoteConfig.kt:542` at `origin/main` `1101d79b`),
+  and #992 keeps the off bit in memory only (`sessionRecordingRemotelyDisabled`, `:184-187` and
+  `:337-340` at [#992](https://github.com/PostHog/posthog-android/pull/992) `e8809d38`). After a
+  relaunch the SDK has no cached off value, so events keep the replay keys until the first `/config`
+  arrives.
+- **Partial after #992: the wrapper bridge reads the ungated map.** The spec says every consumer of
+  the debug map, including an API that hands it to a wrapper SDK, SHALL receive the gated map
+  (`openspec/specs/session-replay-debug-properties/spec.md:1312`, scenario `:1458`). The React Native
+  plugin calls `PostHogReplayIntegration.debugProperties()` directly (posthog-js `origin/main`
+  `53e5c0e35` `packages/react-native-plugin/android/src/main/java/com/posthogreactnativeplugin/PosthogReactNativePluginModule.kt:300`),
+  and that method is not gated
+  (`posthog-android/src/main/java/com/posthog/android/replay/PostHogReplayIntegration.kt:3394` at
+  `e8809d38`). React Native events are still correct, because posthog-js#5797 gates the map in JS.
 - **Backwards compatibility:** Backward-compatible; the change only removes diagnostic keys from
   events captured while replay is off.
-- **Remediation:** Land #992. Treating a missing `sessionRecording` key as `false` is a low-priority
-  Android follow-up: the server always sends the key, as `false` or a config object (PostHog/posthog
-  `c1fe8dcf295` `posthog/models/remote_config.py:305-326`).
+- **Remediation:** Land #992. Then two follow-ups: persist the remote-off value so the gate reads it
+  from the cache after a relaunch, and add a gated internal accessor for the debug map and move the
+  React Native bridge to it. The missing-key reading needs no change: the spec allows it, and the
+  server always sends the key, as `false` or a config object (PostHog/posthog `c1fe8dcf295`
+  `posthog/models/remote_config.py:305-326`).
 
 <a id="n18"></a>
 

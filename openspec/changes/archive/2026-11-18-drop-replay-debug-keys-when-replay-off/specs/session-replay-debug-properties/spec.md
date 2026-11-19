@@ -23,8 +23,20 @@ is the boolean `false`. On mobile, a remote config whose `quotaLimited` list con
 `:636-640`; posthog-android `origin/main` `1101d79b` `posthog/src/main/java/com/posthog/internal/PostHogRemoteConfig.kt:326`).
 The SDK SHALL read the cached config value, not derived replay-flag state. Derived state can be
 cleared on `reset()` while the cached config still enables replay (posthog-ios
-`PostHog/PostHogRemoteConfig.swift:1389-1393`, `:1403-1406`). A missing `sessionRecording` key, or
-no remote config yet, is not off remotely on mobile: the SDK is awaiting config and keeps its keys.
+`PostHog/PostHogRemoteConfig.swift:1389-1393`, `:1403-1406`). No remote config yet is not off
+remotely: the SDK is awaiting config and keeps its keys. A `/config` response with no
+`sessionRecording` key is not off remotely either, but an SDK MAY treat it as off. The server always
+sends the key, as `false` or a config object (PostHog/posthog `c1fe8dcf295`
+`posthog/models/remote_config.py:305-326`), so the two readings differ only for a response the
+server does not produce. posthog-android treats it as off, because its decoder defaults the key to
+`false` (posthog-android `origin/main` `1101d79b`
+`posthog/src/main/java/com/posthog/internal/PostHogRemoteConfigResponse.kt:10`). posthog-js treats it
+like a failed fetch: it keeps the persisted config, and with none persisted it reports
+`missing_config` and does not record (posthog-js `origin/main` `53e5c0e35`
+`packages/browser/src/extensions/replay/session-recording.ts:326-339`).
+
+A running recorder is not off remotely. Replay becomes off remotely when the recorder stops (see
+"Reconciliation with `is-session-replay-active` and `session-replay-ingestion-controls`").
 
 Replay is **not** intentionally off, and every key the other requirements of this capability call
 for stays, when replay is enabled and is in any of these states: sampled out, waiting on a trigger
@@ -140,6 +152,7 @@ requirement.
 #### Scenario: Remote config with `sessionRecording: false` switches events to the off shape
 - **GIVEN** replay is enabled locally and a cached remote config enabled it
 - **WHEN** a fetched remote config arrives with `sessionRecording` set to the boolean `false`
+- **AND** the recorder has stopped
 - **AND** a custom event is captured
 - **THEN** the event's `$recording_status` is `disabled`
 - **AND** the event includes none of the removal set
@@ -922,3 +935,54 @@ handler" is not yet in the repo.
 - **THEN** the event's properties include neither `$recording_status` nor any
   `$sdk_debug_replay_*` key
 - **AND** the event's properties include `$sdk_debug_retry_queue_size`
+
+### Requirement: Reconciliation with `is-session-replay-active` and `session-replay-ingestion-controls`
+
+The SDK SHALL keep `$recording_status` consistent with the boolean `isSessionReplayActive()`
+getter specified by `is-session-replay-active`: a `$recording_status` of `active` SHALL imply that
+getter returns `true`, and `disabled` SHALL imply it returns `false`. While
+`$recording_status` is `buffering`, this spec makes no claim about the boolean getter's return
+value — that getter's own spec governs its `buffering`-equivalent behavior per platform.
+
+A running recorder is never intentionally off (see "Attach only the disabled shape while replay is
+intentionally off"). After a remote off, the SDK SHALL keep reporting the running recorder's state,
+with every key the other requirements of this capability call for, until the recorder stops. Only
+events captured after it stops carry the off shape. Otherwise an event could carry
+`$recording_status: disabled` while `isSessionReplayActive()` still returns `true`. The browser
+stops its recorder inside `onRemoteConfig` (posthog-js `origin/main` `53e5c0e35`
+`packages/browser/src/extensions/replay/session-recording.ts:340-343`), so it has no such interval.
+On mobile the recorder can keep running after the remote off arrives (posthog-android
+[#992](https://github.com/PostHog/posthog-android/pull/992) `e8809d38`
+`posthog/src/main/java/com/posthog/PostHog.kt:2612-2619`; covering test
+`posthog/src/test/java/com/posthog/PostHogTest.kt:4233`).
+
+The two mobile `buffering` hold causes reported via `$sdk_debug_replay_flush_hold_reason`
+(`awaiting_remote_config`, `below_minimum_duration`) correspond to the "Setup" resolution step
+and the "Apply the minimum-duration gate" step specified in `session-replay-ingestion-controls`
+(`openspec/specs/session-replay-ingestion-controls/spec.md:73` and `:44` respectively); this
+spec's hold-reason values are the debug-observable surface of those two gates, not an
+independent gating mechanism.
+
+Reference: `is-session-replay-active` spec, `openspec/specs/is-session-replay-active/spec.md`;
+`session-replay-ingestion-controls` spec,
+`openspec/specs/session-replay-ingestion-controls/spec.md`.
+
+#### Scenario: Active recording status implies the boolean getter is true
+- **GIVEN** an SDK conforming to both this spec and `is-session-replay-active`
+- **WHEN** an event's `$recording_status` is `active`
+- **THEN** `isSessionReplayActive()` (or its platform equivalent) returns `true`
+
+#### Scenario: Disabled recording status implies the boolean getter is false
+- **GIVEN** an SDK conforming to both this spec and `is-session-replay-active`
+- **WHEN** an event's `$recording_status` is `disabled`
+- **THEN** `isSessionReplayActive()` (or its platform equivalent) returns `false`
+
+#### Scenario: A running recorder keeps its keys after a remote off until it stops (mobile)
+- **GIVEN** a mobile SDK whose recorder is running and whose events carry `$recording_status: active`
+- **WHEN** a fetched remote config arrives with `sessionRecording` set to the boolean `false`
+- **AND** a custom event is captured before the recorder stops
+- **THEN** the event's `$recording_status` is not `disabled`
+- **AND** the event keeps the keys the other requirements call for
+- **WHEN** the recorder stops
+- **AND** another custom event is captured
+- **THEN** that event's `$recording_status` is `disabled` and it includes none of the removal set

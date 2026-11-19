@@ -594,9 +594,9 @@ under the normal eligibility rules.
 
 ### Requirement: Survey targeting flag reads emit no usage event
 
-When the SDK reads a feature flag to decide whether a survey is eligible, and the flag key starts
-with `survey-targeting-`, the SDK SHALL suppress the feature flag usage event
-(`$feature_flag_called`) for that read. This applies to every eligibility read of such a key,
+The SDK SHALL suppress the feature flag usage event (`$feature_flag_called`) when it reads a
+feature flag to decide whether a survey is eligible and the flag key starts with
+`survey-targeting-`. This applies to every eligibility read of such a key,
 whichever field of the survey definition carried it — the linked flag, the targeting flag, the
 internal targeting flag, or an entry in `feature_flag_keys`.
 

@@ -865,9 +865,9 @@ Covering test: posthog-js `packages/browser/src/__tests__/extensions/replay/lazy
 
 ### Requirement: Event-leg activation releases the interaction hold
 
-On SDKs that implement the "Interaction hold for unconfirmed-activity recording epochs" of
-`session-replay-ingestion-controls`, a group activation caused by its event leg SHALL count as the
-"event trigger" that releases the hold and ships the held data. A group activation caused by its
+A group activation caused by its event leg SHALL count as the "event trigger" that releases the
+hold and ships the held data, on SDKs that implement the "Interaction hold for unconfirmed-activity
+recording epochs" of `session-replay-ingestion-controls`. A group activation caused by its
 URL leg or its flag leg SHALL NOT release the hold, because neither proves a human is present. The
 release SHALL happen even when the activating event arrives after the SDK stopped evaluating event
 legs for performance (see "Stop group evaluation after the first flush").
@@ -950,8 +950,8 @@ within trigger groups" — the pending text).
 
 ### Requirement: Stop group evaluation after the first flush (MAY)
 
-Once a session's replay data has been emitted for the first time, the SDK MAY stop evaluating
-event legs for the rest of that session, because the groups that could still activate can no
+An SDK SHALL NOT stop evaluating event legs before a session's replay data has been emitted for
+the first time; after that, it MAY stop evaluating them for the rest of that session, because the groups that could still activate can no
 longer change whether the session records. An SDK that does this SHALL still honor the interaction
 hold release (see "Event-leg activation releases the interaction hold") for a hold that begins
 after it stopped evaluating, and SHALL resume evaluation for a new session.
@@ -1049,9 +1049,9 @@ trigger match, and a rotation: No posthog-js test on `origin/main` covers this; 
 
 ### Requirement: Hybrid SDKs
 
-In a hybrid SDK composed of a managed layer (JavaScript, Dart) over an embedded native replay SDK,
-the layer that owns the analytics capture pipeline SHALL evaluate trigger groups, because it is the
-layer that observes the captured events and their properties. The embedded native SDK SHALL keep
+The layer that owns the analytics capture pipeline SHALL evaluate trigger groups in a hybrid SDK
+composed of a managed layer (JavaScript, Dart) over an embedded native replay SDK, because it is
+the layer that observes the captured events and their properties. The embedded native SDK SHALL keep
 only the V1 gates of `session-replay-ingestion-controls` for that host and SHALL NOT evaluate the
 groups a second time. The managed layer SHALL hand the effective minimum duration (see "Effective
 minimum duration") to the native layer, which applies it as its minimum-duration release gate, so

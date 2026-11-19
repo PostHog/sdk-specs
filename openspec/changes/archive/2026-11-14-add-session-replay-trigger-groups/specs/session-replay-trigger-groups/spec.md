@@ -944,13 +944,14 @@ trigger match, and a rotation: No posthog-js test on `origin/main` covers this; 
 
 The layer that owns the analytics capture pipeline SHALL evaluate trigger groups in a hybrid SDK
 composed of a managed layer (JavaScript, Dart) over an embedded native replay SDK, because it is
-the layer that observes the captured events and their properties. The embedded native SDK SHALL keep
-only the V1 gates of `session-replay-ingestion-controls` for that host and SHALL NOT evaluate the
-groups a second time. The managed layer SHALL hand the effective minimum duration (see "Effective
+the layer that observes the captured events and their properties. The embedded native SDK SHALL apply
+none of the V1 gating fields for that host (see "Ignore the V1 gating fields under trigger
+groups"), SHALL keep the replay enablement gate and the URL blocklist, SHALL apply the minimum
+duration and the local sample rate the managed layer hands it, and SHALL NOT evaluate the groups a
+second time. The managed layer SHALL hand the effective minimum duration (see "Effective
 minimum duration") to the native layer, which applies it as its minimum-duration release gate, so
 the one logical decision of the hybrid requirement in `session-replay-ingestion-controls` covers
-the group union and the effective minimum. Sampling is the exception to the V1 gates: while
-trigger groups are selected, the managed layer SHALL hand the native layer only the app's local sample rate, never the remote V1 `sampleRate`,
+the group union and the effective minimum. While trigger groups are selected, the managed layer SHALL hand the native layer only the app's local sample rate, never the remote V1 `sampleRate`,
 and the native layer SHALL apply that local rate as the cap of "Local sample rate under trigger
 groups", after the group decision. With no local rate, the native layer SHALL apply no sample rate.
 Where the managed layer already routes capture through
@@ -961,7 +962,7 @@ This requirement applies only to hybrid SDKs that span a managed layer and an em
 replay SDK. Single-layer SDKs are unaffected.
 
 Reference: no merged reference on posthog-js `origin/main`; this requirement comes from the
-cross-SDK contract decisions C2 (native keeps the V1 gates under React Native) and C3 (the
+cross-SDK contract decisions C2 (under React Native, native applies none of the V1 gating fields) and C3 (the
 managed layer hands the effective group minimum to native, which already holds and releases). The
 web arithmetic the managed layer reproduces is `recording-strategies.ts:404-422` and
 `lazy-loaded-session-recorder.ts:2499-2530` at `480395c443`. The sample-rate hand-off records

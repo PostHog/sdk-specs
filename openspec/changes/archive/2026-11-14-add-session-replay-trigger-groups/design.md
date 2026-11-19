@@ -58,8 +58,9 @@ and posthog-js tests for the untested requirements.
   config/remote-config-driven replay enablement") is not modified in this change; its wording
   conflicts with C6 and is flagged as a follow-up change on that spec.
 - **R25, hybrid split, decision-based (C2, C3, cross-SDK decision 4, D1).** The managed layer
-  that owns event capture evaluates the groups; the native SDK keeps only the V1 gates for that
-  host; the managed layer hands the effective minimum to native. Under V2 the managed layer hands
+  that owns event capture evaluates the groups; the native SDK applies none of the V1 gating fields
+  for that host and keeps only the enablement gate, the URL blocklist, and the minimum and local
+  sample rate the managed layer hands it; the managed layer hands the effective minimum to native. Under V2 the managed layer hands
   native only the local sample rate, never the remote V1 rate, and native applies it as the R3 cap. No merged reference exhibits it, so the spec names the
   hand-off and not its signature.
 - **Pending-conditions debug value.** Every V2 SDK writes

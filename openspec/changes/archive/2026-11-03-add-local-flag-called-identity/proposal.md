@@ -46,7 +46,9 @@ _None._
 
 - **posthog-python**: already compliant.
 - **posthog-go**: attaches both properties only from remote `/flags` metadata; its locally evaluated
-  `$feature_flag_called` events need the definition's `id` and `version`.
-- **Other server SDKs with local evaluation** (posthog-node, posthog-php, posthog-ruby, posthog-dotnet,
+  `$feature_flag_called` events need the definition's `id` and `version`. Recorded as a known gap.
+- **posthog-node**: attaches `$feature_flag_id` but not `$feature_flag_version` on locally evaluated reads,
+  and its snapshot record hardcodes `version: undefined`. Recorded as a known gap.
+- **Other server SDKs with local evaluation** (posthog-php, posthog-ruby, posthog-dotnet,
   posthog-java, posthog-rs, posthog-elixir): attach both properties on locally evaluated reads.
 - **Client SDKs**: not applicable — they do not evaluate flags locally.

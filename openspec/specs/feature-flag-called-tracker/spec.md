@@ -714,6 +714,12 @@ response or from local evaluation.
 `$feature_flag_id` and `$feature_flag_version` are already on the minimal-event allowlist, so a minimized
 event carries whichever of them the read resolved.
 
+Known gap: posthog-node sends `$feature_flag_id` but not `$feature_flag_version` on a locally evaluated
+read, and its snapshot record hardcodes `version: undefined` for a locally evaluated flag. posthog-go sends
+neither property on a locally evaluated read, because it reads both from the remote `FlagDetail` only, and
+its snapshot record for a locally evaluated flag leaves both unset. A follow-up should take them from the
+local definition in both SDKs.
+
 #### Scenario: A locally evaluated read reports the definition's id and version (@server)
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** persistent storage is empty

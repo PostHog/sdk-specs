@@ -274,20 +274,15 @@ When the supplied error-like input already carries stack trace information (for 
 
 ### Requirement: Synthesized stacks stop at the application call site
 
-When the SDK synthesizes a current stack for an exception — the case `exception-event-metadata`
-marks with `mechanism.synthetic` equal to `true` — that stack SHALL end at the application frame
-that called the public exception-capture API. In the canonical bottom-up order defined by "Stack
-frame ordering", the last frame SHALL be the application call site, and the SDK's own
-capture-path frames SHALL NOT follow it. This holds in every build configuration the SDK
-supports, including a stripped build, an optimized build that inlines the capture path, and a
-build that links the SDK statically into the application, so the SDK MUST NOT rely on a fixed
-frame count or on its own binary carrying a distinct name. A language-bridge frame that sits
-between the caller and the SDK and that the SDK cannot identify at runtime MAY remain; the SDK
-SHALL remove it when it can identify it.
+When the SDK synthesizes a current stack for an exception — the case `exception-event-metadata` marks with `mechanism.synthetic` equal to `true` — that stack SHALL end at the application frame that called the public exception-capture API. In the canonical bottom-up order defined by "Stack frame ordering", the last frame SHALL be the application call site, and the SDK's own capture-path frames SHALL NOT follow it. This holds in every build configuration the SDK supports, including a stripped build, an optimized build that inlines the capture path, and a build that links the SDK statically into the application. A compiled or native SDK MUST NOT rely on a fixed frame count or on its own binary carrying a distinct name, because inlining and static linking change both. A language-bridge frame that sits between the caller and the SDK and that the SDK cannot identify at runtime MAY remain; the SDK SHALL remove it when it can identify it.
 
 This requirement does not change stacks taken from a runtime exception, traceback, or crash
 report: those keep their own frames under "Stack trace preservation over synthesis". It does not
 change frame order, which "Stack frame ordering" defines.
+
+Known gap: posthog-js (browser, `@posthog/node` and react-native) builds its synthetic `Error`
+inside its own capture method and skips only the message line, so that method's frame (and on
+react-native, `captureExceptionInternal` as well) stays at the end of a synthesized stack.
 
 #### Scenario: A synthesized stack ends at the caller (@both)
 - **GIVEN** an initialized SDK with a valid distinct id

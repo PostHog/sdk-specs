@@ -13,9 +13,10 @@ PostHog/posthog-ios#1077) changed each public `captureException` overload to rea
 stack in its own body and drop its own frame, so the trace starts at the call site in every build
 mode.
 
-posthog-js already follows the same shape: `@posthog/node` builds its `syntheticException` with
-`new Error(...)` inside the public capture method, and the string/primitive coercers use that
-stack (`packages/node/src/client.ts`, `packages/core/src/error-tracking/coercers/`).
+posthog-js does not conform yet: browser, `@posthog/node` and react-native build their
+`syntheticException` with `new Error(...)` inside the SDK's own capture method and skip only the
+message line, so that method's frame stays at the top of the stack. The spec records this as a
+known gap.
 
 The behavior is contractual — it decides the frames that reach `$exception_list[].stacktrace`, and
 therefore the server-side issue location and the fingerprint — but no spec states it.
@@ -47,7 +48,7 @@ None.
 Specifications only. No SDK changes in this PR.
 
 Conformance was **not** audited across every SDK for this change. Verified: posthog-ios conforms
-on `main` after PostHog/posthog-ios#1079 (its 4.0 port is PostHog/posthog-ios#1080, open at the
-time of writing); posthog-js synthesizes its stack at the public capture boundary; posthog-python
+on `main` after PostHog/posthog-ios#1079 (its 4.0 port, PostHog/posthog-ios#1080, is merged);
+posthog-js keeps its own capture-method frame (known gap); posthog-python
 builds stacks from the exception traceback and so does not synthesize one here. Every other SDK is
 unchecked — see design.md.

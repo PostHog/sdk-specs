@@ -8,6 +8,7 @@
 
 ## 3. Downstream follow-ups (separate changes, not this one)
 
-- [ ] 3.1 posthog-ios: land the 4.0 port, PostHog/posthog-ios#1080
+- [x] 3.1 posthog-ios: land the 4.0 port, PostHog/posthog-ios#1080
+- [ ] 3.4 posthog-js: drop the SDK's own capture-method frame(s) from synthesized stacks (browser, node, react-native)
 - [ ] 3.2 Audit the remaining SDKs that synthesize a current stack (android, flutter, react-native, kmp, unity, dotnet, java, go, php, ruby, elixir, rs)
 - [ ] 3.3 posthog-sdk-test-harness: step bindings for the new scenarios

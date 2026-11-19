@@ -16,8 +16,8 @@ application source.
 
 | SDK | Synthesizes a current stack? | Behavior | Source |
 |---|---|---|---|
-| posthog-ios | yes, for a never-raised error or `NSException` | conforms on `main` since 2026-11-15. Each public `captureException` overload reads `Thread.callStackReturnAddresses` in its own body and drops its own frame; the convenience overloads no longer call each other | PostHog/posthog-ios#1079, fixing #1077. 4.0 port open as #1080 |
-| posthog-js (`@posthog/node`, core coercers) | yes, for non-`Error` input | conforms. `new Error('PostHog syntheticException')` is constructed inside the public capture method and the string/primitive coercers read its `stack` | `packages/node/src/client.ts`, `packages/core/src/error-tracking/coercers/string-coercer.ts` (read 2026-11-16 via code search, not run) |
+| posthog-ios | yes, for a never-raised error or `NSException` | conforms on `main` since 2026-11-15. Each public `captureException` overload reads `Thread.callStackReturnAddresses` in its own body and drops its own frame; the convenience overloads no longer call each other | PostHog/posthog-ios#1079, fixing #1077. 4.0 port merged as #1080 |
+| posthog-js (browser, `@posthog/node`, react-native) | yes, for non-`Error` input | known gap. The synthetic `Error` is constructed inside the SDK's own capture method and the parser skips only its message line (`skipFirstLines` defaults to 1), so that method's frame stays on top; react-native builds it in `captureExceptionInternal`, adding a second SDK frame | `packages/node/src/client.ts:3450`, `packages/browser/src/posthog-core.ts:4587`, `packages/react-native/src/posthog-rn.ts:2578`, `packages/core/src/error-tracking/error-properties-builder.ts:165` (read 2026-11-18, not run) |
 | posthog-python | no | stacks come from `__traceback__` / `sys.exc_info()`, which start at the raise site. `should_hide_frame` filters inherited `sentry_sdk.` frames only | `posthog/exception_utils.py` (read 2026-11-16) |
 | every other SDK | unknown | not audited for this change | — |
 

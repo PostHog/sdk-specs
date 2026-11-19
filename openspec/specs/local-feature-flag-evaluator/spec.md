@@ -747,7 +747,7 @@ A required property key listed as known absent is not missing context. The crite
 
 Known absence SHALL NOT change cohort membership read from stored static or realtime cohorts, SHALL NOT affect holdouts, which read no properties, and SHALL apply to a flag dependency because the dependency evaluates with the same listing. A dynamic-cohort property leaf SHALL use the table above before applying its `negation`.
 
-When both operands are available but the property value cannot be interpreted by the selected operator, the criterion SHALL be a definitive no-match. A malformed condition value SHALL be inconclusive unless an operator-family requirement explicitly defines a safe result. A named negative operator SHALL negate only a valid comparison; it MUST NOT convert an invalid pattern, invalid numeric/date/version operand, or inconclusive criterion into a match. Implementations MUST NOT expose parser or matcher exceptions to application code.
+When both operands are available but the property value cannot be interpreted by the selected operator, the criterion SHALL be a definitive no-match. The one exception is `not_between`, which matches a property value that does not convert to a number, as the numeric criteria requirement defines. A malformed condition value SHALL be inconclusive unless an operator-family requirement explicitly defines a safe result. Apart from that `not_between` exception, a named negative operator SHALL negate only a valid comparison; it MUST NOT convert an invalid pattern, invalid numeric/date/version operand, or inconclusive criterion into a match. Implementations MUST NOT expose parser or matcher exceptions to application code.
 
 #### Scenario Outline: Omitted and null operators default to exact (@server)
 - **GIVEN** a local condition uses <operator-state> for its property operator
@@ -816,9 +816,11 @@ For `gt`, `gte`, `lt`, and `lte`, the condition SHALL be a string matching the c
 
 The legacy wire alias `min` SHALL behave as `gte`, and `max` SHALL behave as `lte`.
 
-A present property that cannot be converted to a finite number SHALL be a definitive no-match. An invalid condition number SHALL be inconclusive. Binary64 rounding is observable for values that cannot be represented exactly.
+For these four operators, a present property that cannot be converted to a finite number SHALL be a definitive no-match. An invalid condition number SHALL be inconclusive. Binary64 rounding is observable for values that cannot be represented exactly.
 
-For dynamic-cohort property leaves, `between` SHALL accept exactly two finite numeric or numeric-string bounds `[low, high]`, require `low <= high`, and match inclusively at both bounds. `not_between` SHALL negate only a valid inclusive range comparison. Missing, nonnumeric, non-finite, reversed, or malformed ranges SHALL NOT match either range operator; a malformed condition range SHALL be inconclusive before applying any cohort leaf `negation`.
+For dynamic-cohort property leaves, `between` SHALL accept exactly two numeric or numeric-string bounds `[low, high]`, require `low <= high`, and match inclusively at both bounds. A bound MAY be infinite, such as `"-inf"` or `"inf"`. A condition value that is not a two-element array, or that has a nonnumeric bound, a NaN bound, or `low > high`, is a malformed range. A malformed condition range SHALL be inconclusive before applying any cohort leaf `negation`.
+
+The range operators follow HogQL, which reads a property value that does not convert to a number as NULL. For these operators, a property string converts to a number when it matches the decimal grammar of the numeric ordering operators or is `inf`, `infinity`, or `nan` in any letter case with an optional sign. A supplied property that is null, a boolean, an array, an object, or a string that does not convert SHALL NOT match `between` and SHALL match `not_between`. A property that converts to NaN SHALL match neither operator. A property that converts to positive or negative infinity SHALL compare as that infinity. An absent property key follows the missing-context rule of the operator inventory: it is inconclusive unless the key is listed as known absent.
 
 #### Scenario Outline: Numeric ordering uses complete finite binary64 semantics (@server)
 - **GIVEN** a local property condition with operator <operator> and condition value <condition>
@@ -848,13 +850,17 @@ For dynamic-cohort property leaves, `between` SHALL accept exactly two finite nu
   | `between` | `["10", "20"]` | `20` | true |
   | `between` | `[10, 20]` | `21` | false |
   | `not_between` | `[10, 20]` | `21` | true |
-  | `not_between` | `[10, 20]` | `"not-a-number"` | false |
+  | `between` | `[10, 20]` | `"not-a-number"` | false |
+  | `not_between` | `[10, 20]` | `"not-a-number"` | true |
+  | `not_between` | `[10, 20]` | `null` | true |
+  | `between` | `[10, 20]` | `"NaN"` | false |
   | `not_between` | `[10, 20]` | `"NaN"` | false |
   | `between` | `[10, 20]` | `"inf"` | false |
-  | `not_between` | `[10, 20]` | `"inf"` | false |
+  | `not_between` | `[10, 20]` | `"inf"` | true |
+  | `between` | `["-inf", "inf"]` | `0` | true |
   | `between` | `[20, 10]` | `15` | inconclusive |
   | `not_between` | `[10]` | `15` | inconclusive |
-  | `between` | `["-inf", "inf"]` | `0` | inconclusive |
+  | `between` | `["NaN", 20]` | `15` | inconclusive |
 
 #### Scenario: Cohort negation does not invert a malformed range (@server)
 - **GIVEN** a dynamic cohort leaf has condition `between [1,2,3]`

@@ -858,13 +858,17 @@ Feature: Local Feature Flag Evaluator
       | "between"     | ["10", "20"]     | 20             | true         |
       | "between"     | [10, 20]         | 21             | false        |
       | "not_between" | [10, 20]         | 21             | true         |
-      | "not_between" | [10, 20]         | "not-a-number" | false        |
+      | "between"     | [10, 20]         | "not-a-number" | false        |
+      | "not_between" | [10, 20]         | "not-a-number" | true         |
+      | "not_between" | [10, 20]         | null           | true         |
+      | "between"     | [10, 20]         | "NaN"          | false        |
       | "not_between" | [10, 20]         | "NaN"          | false        |
       | "between"     | [10, 20]         | "inf"          | false        |
-      | "not_between" | [10, 20]         | "inf"          | false        |
+      | "not_between" | [10, 20]         | "inf"          | true         |
+      | "between"     | ["-inf", "inf"]  | 0              | true         |
       | "between"     | [20, 10]         | 15             | inconclusive |
       | "not_between" | [10]             | 15             | inconclusive |
-      | "between"     | ["-inf", "inf"] | 0              | inconclusive |
+      | "between"     | ["NaN", 20]      | 15             | inconclusive |
 
   @server
   Scenario: Cohort negation does not invert a malformed range

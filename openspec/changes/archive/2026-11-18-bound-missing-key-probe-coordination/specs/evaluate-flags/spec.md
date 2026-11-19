@@ -24,7 +24,7 @@ When probes for the same key overlap within one definitions generation, positive
 
 After a probe settles without establishing negative knowledge, whether because the key was returned, the response was not clean, or a clean omission could not be retained, the evaluations that waited for it SHALL be able to begin their own fallbacks concurrently. They MUST NOT be made to wait for each other's fallbacks for the settled key. They SHALL still coordinate on any other unknown missing key they have not yet settled.
 
-An SDK MAY also retain positive knowledge: that a current-generation remote response returned a requested key with no local definition. Positive knowledge SHALL use a finite-capacity in-memory store and SHALL be cleared under the same rules as negative knowledge, including after every successful definitions refresh. While a key's positive knowledge is retained and valid, an evaluation that needs a remote result for that key MAY make its own fallback directly instead of coordinating on an existence probe, because the key's existence is already established. Such a fallback SHALL still use the caller's original requested scope and SHALL NOT reuse another context's value or payload. A later current-generation clean omission of the key, from a fallback whose requested scope included the key and that began after the positive response, SHALL clear its positive knowledge and MAY establish negative knowledge for it. A fallback whose requested scope did not include the key provides no evidence about it. Evicting positive knowledge returns the key to unknown, so later evaluations coordinate on it again.
+An SDK MAY also retain positive knowledge: that a current-generation remote response returned a requested key with no local definition. Positive knowledge SHALL use a finite-capacity in-memory store and SHALL be cleared under the same rules as negative knowledge, including after every successful definitions refresh. While a key's positive knowledge is retained and valid, an evaluation that needs a remote result for that key MAY make its own fallback directly instead of coordinating on an existence probe, because the key's existence is already established. Such a fallback SHALL still use the caller's original requested scope and SHALL NOT reuse another context's value or payload. A later current-generation clean omission of the key, from a fallback whose requested scope included the key and that began after the positive response, SHALL clear its positive knowledge. It SHALL establish negative knowledge for the key under the same conditions as any other clean omission, unless another current-generation response returned the key while that fallback was in flight. A fallback whose requested scope did not include the key provides no evidence about it. Evicting positive knowledge returns the key to unknown, so later evaluations coordinate on it again.
 
 When local-only mode is true, the SDK SHALL NOT make a remote evaluation request; flags that cannot be resolved locally, including requested keys with no local definition, SHALL be absent from the snapshot. When a non-empty request-time key list is supplied, any remote evaluation request and the resulting snapshot SHALL be scoped to those keys. An internal local evaluator MAY inspect additional definitions, but values outside the requested set SHALL be dropped before the snapshot is returned.
 
@@ -116,7 +116,7 @@ When local-only mode is true, the SDK SHALL NOT make a remote evaluation request
 
 #### Scenario: Concurrent clean omissions share one existence probe
 - **GIVEN** loaded local definitions do not contain requested key "deleted-flag"
-- **AND** no valid negative knowledge is retained for "deleted-flag"
+- **AND** neither negative nor positive knowledge is retained for "deleted-flag"
 - **AND** the clean remote response omits "deleted-flag" and establishes negative knowledge before any waiting evaluation is released
 - **WHEN** multiple evaluations in the same SDK instance concurrently request "deleted-flag"
 - **AND** that knowledge is still retained and valid when each waiting evaluation decides whether to fall back
@@ -216,7 +216,7 @@ When local-only mode is true, the SDK SHALL NOT make a remote evaluation request
 - **GIVEN** positive knowledge is retained for "retired-flag"
 - **WHEN** a current-generation fallback whose requested scope included "retired-flag", and that began after that knowledge was established, cleanly omits "retired-flag"
 - **THEN** positive knowledge for "retired-flag" is cleared
-- **AND** negative knowledge for "retired-flag" may be retained
+- **AND** negative knowledge for "retired-flag" is retained
 
 #### Scenario: A fallback for other keys does not clear positive knowledge
 - **GIVEN** positive knowledge is retained for "new-flag"

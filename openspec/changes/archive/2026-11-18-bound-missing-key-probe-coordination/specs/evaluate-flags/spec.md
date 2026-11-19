@@ -149,7 +149,7 @@ When local-only mode is true, the SDK SHALL NOT make a remote evaluation request
 - **AND** an existence probe for "deleted-flag" is in flight and does not complete
 - **WHEN** a second evaluation requests "deleted-flag"
 - **THEN** it waits no longer than the SDK's finite coordination wait
-- **AND** it then makes its own direct fallback with its original requested scope
+- **AND** if "deleted-flag" still needs remote evaluation, it then makes its own direct fallback with its original requested scope
 - **AND** it is no longer registered as waiting for the stalled probe
 
 #### Scenario: An abandoned probe releases waiting evaluations
@@ -162,13 +162,14 @@ When local-only mode is true, the SDK SHALL NOT make a remote evaluation request
 - **AND** after that probe began and before it completed, another evaluation's fallback in the same definitions generation returned "new-flag"
 - **AND** a second evaluation is also waiting for that probe
 - **WHEN** the in-flight probe completes with a clean omission of "new-flag"
-- **THEN** each waiting evaluation makes its own fallback for its complete evaluation context
-- **AND** neither waits for the other's fallback
+- **THEN** that omission does not suppress either waiting evaluation's fallback
+- **AND** each waiting evaluation that still needs remote evaluation for "new-flag" when it decides can begin its own fallback without waiting for the other's fallback
 
 #### Scenario: Negative knowledge cleared before a waiter decides does not suppress it
 - **GIVEN** an evaluation is waiting for the in-flight probe for "new-flag"
 - **AND** that probe cleanly omits "new-flag" and establishes negative knowledge
 - **WHEN** another current-generation response returns "new-flag" before the waiting evaluation decides whether to fall back
+- **AND** no valid negative knowledge is retained for "new-flag" when it decides
 - **THEN** the waiting evaluation makes its own fallback for its complete evaluation context
 
 #### Scenario: Waiters of a returned key fall back concurrently
@@ -215,6 +216,7 @@ When local-only mode is true, the SDK SHALL NOT make a remote evaluation request
 - **GIVEN** positive knowledge is retained for "retired-flag"
 - **WHEN** a current-generation fallback whose requested scope included "retired-flag", and that began after that knowledge was established, cleanly omits "retired-flag"
 - **AND** no other current-generation response returned "retired-flag" while that fallback was in flight
+- **AND** the SDK still retains enough returned-key history to rule out such a response
 - **THEN** positive knowledge for "retired-flag" is cleared
 - **AND** negative knowledge for "retired-flag" is retained
 

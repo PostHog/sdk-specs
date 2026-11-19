@@ -375,8 +375,10 @@ group: No posthog-js test on `origin/main` covers this; decision-based (the sour
 
 ### Requirement: Group-level property filters
 
-When a group configures `conditions.properties`, the SDK SHALL evaluate those filters before any
-leg activates the group, and SHALL NOT activate the group while they fail. For an event-leg
+When a group configures `conditions.properties`, the SDK SHALL evaluate those filters before an
+event leg or URL/screen leg activates the group, and SHALL NOT activate the group through that leg
+while they fail. The filters SHALL NOT gate a flag leg or a group with no event, URL, or flag
+conditions (see "A group with no conditions activates at once"). For an event-leg
 activation the filters SHALL be evaluated against the captured event's properties (and the stored
 person properties). For a URL-leg or screen-leg activation the filters SHALL be evaluated with no
 event properties: `type: person` filters read the stored person properties and work as usual, a
@@ -389,7 +391,12 @@ This requirement applies to all replay-capable SDKs.
 Reference: posthog-js `origin/main` `480395c443`
 (`packages/browser/src/extensions/replay/external/recording-strategies.ts:669-679`:
 `_checkGroupLevelProperties(matcher, eventProperties)` with the stored person properties;
-`:479-482`: event leg passes `event.properties`; `:442-445`: URL leg passes `undefined`).
+`:479-482`: event leg passes `event.properties`; `:442-445`: URL leg passes `undefined`; the
+flag callback at `:689-696` does not check them; `triggerMatching.ts:582-589` builds an
+`AlwaysActivatedTriggerMatching` for a group with no events, URLs, or flag, and the class at
+`:200-207` returns activated with no filter). The `_checkGroupLevelProperties` calls are at `:443`
+and `:480` at `480395c443` (`:447` and `:484` at `eb2f69258`). No posthog-js test on `origin/main`
+covers a flag-only or conditionless group with `properties`; source only.
 
 Covering test: posthog-js `packages/browser/src/__tests__/extensions/replay/lazy-sessionrecording.test.ts:9451`
 ("blocks trigger activation when group-level property filters fail"), `:9490` ("checks both
@@ -419,6 +426,21 @@ passes `undefined`).
 - **WHEN** the current URL or screen name changes to one matching "Checkout"
 - **THEN** session recording should not be active
 
+#### Scenario: Group-level filters do not gate a flag leg
+- **GIVEN** session replay is enabled
+- **AND** the remote config sets `version` to 2 and configures a trigger group whose only condition is boolean flag "replay-flag", with group-level filter on person property "plan" equal to "vip" and a sample rate of 1.0
+- **AND** the current person has property "plan" set to "free"
+- **AND** feature flag "replay-flag" is enabled for the user
+- **WHEN** the SDK resolves whether to record the current session
+- **THEN** session recording should be active
+
+#### Scenario: Group-level filters do not gate a group with no conditions
+- **GIVEN** session replay is enabled
+- **AND** the remote config sets `version` to 2 and configures a trigger group with no events, URLs, or flag, a group-level filter on person property "plan" equal to "vip", and a sample rate of 1.0
+- **AND** the current person has property "plan" set to "free"
+- **WHEN** the SDK resolves whether to record the current session before any event is captured
+- **THEN** session recording should be active
+
 #### Scenario: A negative event filter matches a URL or screen activation
 - **GIVEN** session replay is enabled
 - **AND** the remote config sets `version` to 2 and configures a trigger group with a URL condition matching "Checkout", group-level filter on event property "country" not equal to "EU", and a sample rate of 1.0
@@ -437,9 +459,17 @@ operator SHALL NOT match. The SDK SHALL check the property's absence before anyt
 the property is missing or `null`, the filter SHALL match if its operator is one of the negative
 operators `is_not`, `not_icontains`, or `not_regex`, and SHALL NOT match otherwise, whatever the
 filter's `value`. Only for a present property SHALL an unknown operator, or a filter whose `value`
-is missing or `null`, fail to match. Array values SHALL be compared element-wise: a filter value array matches
-when any element matches, and an array property matches when any element matches; values are
-compared as strings.
+is missing or `null`, fail to match. Values SHALL be normalized to string arrays: a
+scalar becomes a one-element array and each element is converted to a string. For the positive
+operators `exact`, `icontains`, `regex`, `gt`, and `lt`, the filter SHALL match when any property
+element matches any filter value. For the negative operators `is_not`, `not_icontains`, and
+`not_regex`, the filter SHALL match only when every property element fails to match every filter
+value, so one match rejects. `exact` and `is_not` SHALL compare the strings for equality, `icontains`
+and `not_icontains` SHALL compare them case-insensitively, and `regex` and `not_regex` SHALL test the
+property string against the filter value as a pattern. `gt` and `lt` SHALL parse both the property
+value and the filter value with JavaScript `parseFloat` semantics and compare the numbers; a
+property value that does not parse SHALL NOT match, and a filter value that does not parse never
+matches either.
 
 This requirement applies to all replay-capable SDKs.
 
@@ -448,8 +478,17 @@ Reference: posthog-js `origin/main` `480395c443`
 `matchTriggerPropertyFilters` — `every`, `type === 'person' ? personProperties :
 eventProperties`, default `exact`; `:53-55` returns `NEGATIVE_OPERATORS.has(operator)` for a
 missing or null property before the operator lookup and the filter-value check; then unknown
-operator returns false, missing filter value returns false, string-array normalization). These
-lines are unchanged at `origin/main` `b4bbe65d55`. Person properties come from
+operator returns false, missing filter value returns false, `.map(String)` string-array
+normalization at `:57-70`, then `propertyComparisons[operator](targetValues, actualValues)`). These
+lines are unchanged at `origin/main` `b4bbe65d55`. The comparators are
+`packages/core/src/surveys/property-matching.ts:29-46` at `480395c443`: `exact` / `regex` /
+`icontains` use `values.some(... targets.some(...))`; `is_not` / `not_regex` / `not_icontains` use
+`values.every(... targets.every(...))`; `icontains` and `not_icontains` lower-case both sides;
+`gt` / `lt` apply `parseFloat` with an `!isNaN` guard on the property value. The matcher is called
+from `recording-strategies.ts:498` (per-event filters) and `:678` (group-level filters); the
+behavior is unchanged at `eb2f69258`. No posthog-js test on `origin/main` covers a negative
+operator over a list, a `gt` or `lt` string-versus-number case, or a non-numeric `gt` value; source
+only. Person properties come from
 `$stored_person_properties` (`recording-strategies.ts:493`, `:677`).
 
 Covering test: posthog-js `packages/browser/src/__tests__/extensions/replay/triggerGroups.test.ts:152-353`
@@ -479,16 +518,49 @@ null property, default operator, array properties).
 - **WHEN** the filter is evaluated against an event with property "country" set to "US"
 - **THEN** the filter should not match
 
-#### Scenario: Array values match any element
+#### Scenario: A positive operator matches any element of a list
 - **GIVEN** a trigger group with a filter on event property "tags" equal to the list "beta", "vip"
 - **WHEN** the filters are evaluated against an event with property "tags" set to the list "vip", "eu"
 - **THEN** the filter should match
 
+#### Scenario: A negative operator rejects when any value matches
+- **GIVEN** a trigger group with a filter on event property "country" with operator `is_not` and the list "EU", "US"
+- **WHEN** the filters are evaluated against an event with property "country" set to "EU"
+- **THEN** the filter should not match
+- **WHEN** the filters are evaluated against an event with property "country" set to "UK"
+- **THEN** the filter should match
+
+#### Scenario: not_icontains is case-insensitive over an array property
+- **GIVEN** a trigger group with a filter on event property "tags" with operator `not_icontains` and value "beta"
+- **WHEN** the filters are evaluated against an event with property "tags" set to the list "vip", "Beta-2"
+- **THEN** the filter should not match
+- **WHEN** the filters are evaluated against an event with property "tags" set to the list "vip", "eu"
+- **THEN** the filter should match
+
+#### Scenario: gt and lt compare numbers
+- **GIVEN** a trigger group with a filter on event property "amount" greater than "100"
+- **WHEN** the filters are evaluated against an event with property "amount" set to "9"
+- **THEN** the filter should not match
+- **WHEN** the filters are evaluated against an event with property "amount" set to 200
+- **THEN** the filter should match
+- **GIVEN** a trigger group with a filter on event property "amount" less than "100"
+- **WHEN** the filters are evaluated against an event with property "amount" set to 9
+- **THEN** the filter should match
+
+#### Scenario: A property value that does not parse as a number never matches gt
+- **GIVEN** a trigger group with a filter on event property "amount" greater than "100"
+- **WHEN** the filters are evaluated against an event with property "amount" set to "abc"
+- **THEN** the filter should not match
+
 ### Requirement: Group activation lasts for the session
 
-The SDK SHALL store each group's activation per group and per session id, so a group activated once
-stays activated for the rest of that session without a second matching event, URL, or screen, and
-so one group's activation never counts for another group. When the session id changes, the SDK
+The SDK SHALL store each group's event, URL, and screen leg matches per group and per session id,
+so a leg that matched once stays satisfied for the rest of that session without a second matching
+event, URL, or screen, and so one group's activation never counts for another group. The SDK SHALL
+NOT store a flag leg match: the flag leg SHALL be evaluated from the current flag value, so a group
+whose activation depends on the flag returns to pending when the flag stops matching, and a flag
+that matches again re-satisfies it. A group's activation is the combination, per its match type, of
+its stored legs and the current flag leg. When the session id changes, the SDK
 SHALL re-arm every group: the new session needs its own matching event, URL, screen, or flag. Where
 the SDK persists state across page loads or process restarts, the persisted activation SHALL be
 keyed on the session id so it is honored only for the session it belongs to.
@@ -499,10 +571,14 @@ Reference: posthog-js `origin/main` `480395c443`
 (`packages/browser/src/extensions/replay/external/triggerMatching.ts:667-676`: `activateTrigger`
 persists the session id under a per-group URL or event key, "prevents cross-group contamination
 and survives page reloads"; `recording-strategies.ts:600-612`: the per-group keys are cleared with
-the conditional-recording persistence).
+the conditional-recording persistence). The flag leg is not stored:
+`triggerMatching.ts:466-467` sets `this.linkedFlagSeen = linkedFlagMatches` on every flag
+response, `:427-428` reads it for the status, and `activateTrigger` at `:664-676` persists only the
+URL and event keys.
 
 Covering test: No posthog-js test on `origin/main` covers this; decision-based (the V1 rotation
-tests do not cover groups; the per-group persistence key is source only).
+tests do not cover groups; the per-group persistence key is source only). No posthog-js test on
+`origin/main` covers a flag leg that stops matching; source only.
 
 #### Scenario: Activation is re-armed on a new session
 - **GIVEN** session replay is enabled
@@ -510,6 +586,14 @@ tests do not cover groups; the per-group persistence key is source only).
 - **AND** an event named "checkout_started" has activated the group for the current session
 - **WHEN** the session id rotates to a new session
 - **THEN** session recording should not be active until the client captures "checkout_started" again
+
+#### Scenario: A flag leg follows the current flag value
+- **GIVEN** session replay is enabled
+- **AND** the remote config sets `version` to 2 and configures a trigger group whose only condition is boolean flag "replay-flag", with a sample rate of 1.0
+- **AND** feature flag "replay-flag" is enabled for the user
+- **AND** session recording is active
+- **WHEN** feature flags reload and "replay-flag" is no longer enabled
+- **THEN** the group should not be activated
 
 #### Scenario: One group's activation does not activate another
 - **GIVEN** session replay is enabled
@@ -758,12 +842,16 @@ Covering test: posthog-js `packages/browser/src/__tests__/extensions/replay/lazy
 
 ### Requirement: Event-leg activation releases the interaction hold
 
-A group activation caused by its event leg SHALL count as the "event trigger" that releases the
-hold and ships the held data, on SDKs that implement the "Interaction hold for unconfirmed-activity
-recording epochs" of `session-replay-ingestion-controls`. A group activation caused by its
-URL leg or its flag leg SHALL NOT release the hold, because neither proves a human is present. The
-release SHALL happen even when the activating event arrives after the SDK stopped evaluating event
-legs for performance (see "Stop group evaluation after the first flush").
+A matching event leg SHALL count as the "event trigger" that releases the hold and ships the held
+data, on SDKs that implement the "Interaction hold for unconfirmed-activity recording epochs" of
+`session-replay-ingestion-controls`. An event matches the leg when its name equals one of the
+group's event conditions and its group-level and per-event property filters pass. That match SHALL
+release the hold even when the group stays pending on another leg, for example an `all` group still
+waiting on its URL or flag leg. A URL-leg or flag-leg match SHALL NOT release the hold, because
+neither proves a human is present. Releasing the hold does not by itself make the group eligible:
+group eligibility, sampling, the effective minimum duration, and the URL blocklist remain separate
+emission gates. The release SHALL happen even when the matching event arrives after the SDK stopped
+evaluating event legs for performance (see "Stop group evaluation after the first flush").
 
 This requirement applies to SDKs that implement the interaction hold (currently posthog-js).
 Other SDKs are exempt.
@@ -771,7 +859,13 @@ Other SDKs are exempt.
 Reference: posthog-js `origin/main` `480395c443`
 (`packages/browser/src/extensions/replay/external/lazy-loaded-session-recorder.ts:1044-1050`:
 `_onTriggerActivated` — "V2 event-trigger matches release the interaction hold here ... URL and
-linked-flag activations never release").
+linked-flag activations never release"; `if (triggerType === 'event') { this._releaseHoldAndFlush() }`).
+The event path reaches it from `recording-strategies.ts:504-506`
+(`matcher.activateTrigger(triggerType, sessionId)`, `this.updateActiveTriggers(sessionId)`,
+`this._onTriggerActivated(triggerType)`) with no combined-status check, so an event that matches
+the leg releases the hold whether or not the group's combined status is activated (`:508-510` at
+`eb2f69258`). No posthog-js test on `origin/main` covers a matching event leg on a group that stays
+pending on another leg; source only.
 
 Covering test: posthog-js `packages/browser/src/__tests__/extensions/replay/lazy-sessionrecording.test.ts:2262`
 ("an event trigger match releases the hold and ships under the rotated session id"), `:2292` ("an
@@ -793,6 +887,18 @@ initial-flush unhook optimization").
 - **AND** the session id rotated because of an inactivity timeout and the rotated epoch's replay data is held with no confirmed user interaction
 - **WHEN** the current URL changes to one matching "/checkout"
 - **THEN** the held replay data should remain withheld
+
+#### Scenario: A matching event leg releases the hold while the group stays pending
+- **GIVEN** posthog-js with session replay enabled
+- **AND** the remote config sets `version` to 2 and configures a trigger group with match type "all", event condition "$pageview", URL condition matching "/checkout", and a sample rate of 1.0
+- **AND** the session id rotated because of an inactivity timeout and the rotated epoch's replay data is held with no confirmed user interaction
+- **AND** the current URL does not match "/checkout"
+- **WHEN** the client captures an event named "$pageview"
+- **THEN** the hold should be released
+- **AND** the group should remain pending
+- **AND** no replay data should be emitted
+- **WHEN** the current URL changes to one matching "/checkout"
+- **THEN** session recording should be active
 
 ### Requirement: Trigger-group debug properties
 
@@ -844,8 +950,10 @@ within trigger groups" — the pending text).
 ### Requirement: Stop group evaluation after the first flush (MAY)
 
 An SDK SHALL NOT stop evaluating event legs before a session's replay data has been emitted for
-the first time; after that, it MAY stop evaluating them for the rest of that session, because the groups that could still activate can no
-longer change whether the session records. An SDK that does this SHALL still honor the interaction
+the first time; after that, it MAY stop evaluating them for the rest of that session. An SDK that
+does so accepts that a pending group's event leg cannot activate the session later in that session
+(for example after a reload lowers an active group's rate to 0, or an active group's flag stops
+matching) until the session id rotates. An SDK that does this SHALL still honor the interaction
 hold release (see "Event-leg activation releases the interaction hold") for a hold that begins
 after it stopped evaluating, and SHALL resume evaluation for a new session.
 
@@ -854,7 +962,10 @@ This requirement applies to all replay-capable SDKs as an allowed optimization.
 Reference: posthog-js `origin/main` `480395c443`
 (`packages/browser/src/extensions/replay/external/recording-strategies.ts:464-471`: "Stop
 checking triggers after initial buffer flush"; `:596-598`: `onFlushComplete` sets
-`_hasCompletedInitialFlush`).
+`_hasCompletedInitialFlush`). At `480395c443` `:465-470` removes
+`_removeEventTriggerCaptureHook` once `_hasCompletedInitialFlush` is set (`:469-474` at
+`eb2f69258`); nothing resets the flag, and the strategy is rebuilt only in `start()`
+(`lazy-loaded-session-recorder.ts:1251`; `:1253` at `eb2f69258`).
 
 Covering test: posthog-js `packages/browser/src/__tests__/extensions/replay/lazy-sessionrecording.test.ts:9532`
 ("stops checking triggers after initial buffer flush (performance optimization)"), `:2329`
@@ -867,6 +978,14 @@ Covering test: posthog-js `packages/browser/src/__tests__/extensions/replay/lazy
 - **WHEN** the client captures an event named "another_event"
 - **THEN** session recording should remain active
 - **AND** the SDK may leave group "B" unevaluated for the rest of the session
+
+#### Scenario: A stopped evaluation does not activate a pending group later
+- **GIVEN** session replay is enabled
+- **AND** the remote config sets `version` to 2 and configures a trigger group "A" with boolean flag condition "replay-flag" and a trigger group "B" with event condition "error", both with a sample rate of 1.0
+- **AND** feature flag "replay-flag" is enabled and the session's replay data has been emitted
+- **WHEN** feature flags reload and "replay-flag" is no longer enabled
+- **AND** the client captures an event named "error"
+- **THEN** session recording may remain inactive
 
 ### Requirement: `$snapshot` is not a trigger
 

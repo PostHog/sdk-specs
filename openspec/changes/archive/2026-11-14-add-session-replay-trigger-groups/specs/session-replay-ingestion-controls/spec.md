@@ -70,7 +70,7 @@ When a new recording epoch begins — whether from a session id rotating because
 
 When adding the next replay event would make a held epoch's buffered data exceed the emission size cap (the buffer size at which the SDK would otherwise flush a non-held buffer as a single emission), the SDK SHALL stop collecting further replay data for that epoch until the hold is released but SHALL NOT discard what it has already buffered — the cap bounds the memory either way, and discarding would lose the epoch start, which the hold exists to preserve. On release the retained data SHALL be emitted, and the SDK SHALL take a fresh full snapshot so playback is continuous across the gap between the cap and the release point. Reaching the cap SHALL NOT by itself make a held fresh-start epoch ineligible for the clean-unload release. A held epoch at the cap that is never released SHALL still emit nothing.
 
-A trigger group (`session-replay-trigger-groups`) activated by its event leg counts as an event trigger for this release; a group activated by its URL or flag leg does not, because those legs fire without a human present. Reference: posthog-js `origin/main` `480395c443`, `packages/browser/src/extensions/replay/external/lazy-loaded-session-recorder.ts:1044-1050` (`_onTriggerActivated` releases the hold only for `triggerType === 'event'`). Covering tests: `packages/browser/src/__tests__/extensions/replay/lazy-sessionrecording.test.ts:2262` ("an event trigger match releases the hold and ships under the rotated session id"), `:2292` ("an event trigger whose property filters do not match retains the hold"), `:2312` ("a URL trigger activation does not release the hold"), `:2329` ("releases a hold that begins after the initial-flush unhook optimization").
+A trigger group (`session-replay-trigger-groups`) with a matching event leg counts as an event trigger for this release, even while the group stays pending on another leg; a URL-leg or flag-leg match does not, because those legs fire without a human present. Releasing the hold does not by itself make the group eligible: group eligibility, sampling, the effective minimum duration, and the URL blocklist remain separate emission gates. Reference: posthog-js `origin/main` `480395c443`, `packages/browser/src/extensions/replay/external/lazy-loaded-session-recorder.ts:1044-1050` (`_onTriggerActivated` releases the hold only for `triggerType === 'event'`; reached from `recording-strategies.ts:504-506` with no combined-status check, `:508-510` at `eb2f69258`; no posthog-js test on `origin/main` covers an event leg on a group that stays pending on another leg, source only). Covering tests: `packages/browser/src/__tests__/extensions/replay/lazy-sessionrecording.test.ts:2262` ("an event trigger match releases the hold and ships under the rotated session id"), `:2292` ("an event trigger whose property filters do not match retains the hold"), `:2312` ("a URL trigger activation does not release the hold"), `:2329` ("releases a hold that begins after the initial-flush unhook optimization").
 
 This requirement applies to SDKs whose sessions can start or rotate without a confirmed-interaction signal (currently posthog-js / web). SDKs without this concept, or whose sessions never start/rotate this way, are exempt.
 
@@ -124,5 +124,14 @@ This requirement applies to SDKs whose sessions can start or rotate without a co
 - **AND** a rotated session is held with no confirmed user activity
 - **WHEN** a group whose URL leg matches the current URL activates
 - **THEN** the held replay data should remain withheld
-- **WHEN** the client captures an event that activates a group's event leg
-- **THEN** the withheld replay data should be released and recording should be active
+- **WHEN** the client captures an event that matches a group's event leg
+- **THEN** the withheld replay data should be released
+
+#### Scenario: A matching event leg releases the hold while its group stays pending
+- **GIVEN** session replay is enabled and the remote config selects trigger groups
+- **AND** a group with match type "all" has event condition "$pageview" and a URL condition matching "/checkout"
+- **AND** a rotated session is held with no confirmed user activity and the current URL does not match "/checkout"
+- **WHEN** the client captures an event named "$pageview"
+- **THEN** the hold should be released
+- **AND** the group should remain pending
+- **AND** no replay data should be emitted

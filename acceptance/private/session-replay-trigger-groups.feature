@@ -186,6 +186,32 @@ Feature: Session Replay Trigger Groups
     When the current person's property "plan" changes to "vip" and the client captures an event named "$exception"
     Then session recording should be active
 
+  Scenario: Group-level filters do not gate a flag leg
+    Given the SDK is initialized with token "test-token" and session replay enabled
+    And the remote config sets the trigger configuration version to 2
+    And the remote config configures a trigger group with boolean flag condition "replay-flag", a group-level filter on person property "plan" equal to "vip", and a sample rate of 1.0
+    And the current person has property "plan" set to "free"
+    And feature flag "replay-flag" is enabled for the user
+    When the SDK resolves whether to record the current session
+    Then session recording should be active
+
+  Scenario: Group-level filters do not gate a group with no conditions
+    Given the SDK is initialized with token "test-token" and session replay enabled
+    And the remote config sets the trigger configuration version to 2
+    And the remote config configures a trigger group with no events, URLs, or flag, a group-level filter on person property "plan" equal to "vip", and a sample rate of 1.0
+    And the current person has property "plan" set to "free"
+    When the SDK resolves whether to record the current session before any event is captured
+    Then session recording should be active
+
+  Scenario: A flag leg follows the current flag value
+    Given the SDK is initialized with token "test-token" and session replay enabled
+    And the remote config sets the trigger configuration version to 2
+    And the remote config configures a trigger group with boolean flag condition "replay-flag" and a sample rate of 1.0
+    And feature flag "replay-flag" is enabled for the user
+    And session recording is active
+    When feature flags reload and "replay-flag" is no longer enabled
+    Then the trigger group should not be activated
+
   # Session rotation
 
   Scenario: Activation is re-armed on a new session
@@ -206,3 +232,16 @@ Feature: Session Replay Trigger Groups
     When the client captures an event named "$exception"
     Then the held replay data should be released under the rotated session id
     And session recording should be active
+
+  Scenario: A matching event leg releases the interaction hold while its group stays pending
+    Given the SDK is initialized with token "test-token" and session replay enabled
+    And the remote config sets the trigger configuration version to 2
+    And the remote config configures a trigger group with match type "all", event condition "$pageview", URL condition matching "/checkout", and a sample rate of 1.0
+    And the session id rotated because of an inactivity timeout and the rotated epoch's replay data is held with no confirmed user interaction
+    And the current URL does not match "/checkout"
+    When the client captures an event named "$pageview"
+    Then the held replay data should be released
+    And the trigger group should remain pending
+    And no replay data should be emitted
+    When the current URL changes to one matching "/checkout"
+    Then session recording should be active

@@ -132,10 +132,14 @@ only). The mobile half has no posthog-js analog; decision-based (D1).
 
 ### Requirement: Trigger group shape
 
-The SDK SHALL read each entry of `triggerGroups` as an object with `id` (string), `name` (string),
-`sampleRate` (decimal between 0 and 1; see "Coerce a group sample rate" for other wire forms), an
-optional `minDurationMs` (milliseconds), and `conditions`. `conditions` SHALL be read as `matchType`
-(`any` or `all`), an optional `events` list of `{ name, properties? }` objects, an optional `urls`
+The SDK SHALL read each entry of `triggerGroups` as an object with `id` (string), an optional
+`name` (string), `sampleRate` (decimal between 0 and 1; see "Coerce a group sample rate" for other
+wire forms), an optional `minDurationMs` (milliseconds), and `conditions`. A missing or `null`
+`name` SHALL be read as the empty string; the name is a display field only, so matching never
+depends on it, and a debug entry for an unnamed group carries the empty string where the name goes.
+`conditions` SHALL be read as an optional `matchType`: only the literal `any` SHALL select OR, and
+a missing `matchType`, or any other value, SHALL be read as `all`. `conditions` also carries an
+optional `events` list of `{ name, properties? }` objects, an optional `urls`
 list of `{ url, matching: 'regex' }` objects, an optional `flag` (a flag key string or
 `{ flag, variant }`), and optional group-level `properties` (property filters, see "Property
 filter semantics"). A missing `events`, `urls`, or `flag` SHALL be read as that leg being
@@ -150,7 +154,15 @@ Reference: posthog-js `origin/main` `480395c443`
 `SessionRecordingTriggerPropertyFilter`, `SessionRecordingTriggerGroup`). Server: PostHog/posthog
 `origin/master` `0280b22a` `posthog/models/remote_config.py:203-222` normalizes `events` entries
 to `{ "name": e }` and a stored flag object to the SDK flag form, and drops a group whose
-`conditions` is not an object or whose `events` is neither null nor a list.
+`conditions` is not an object or whose `events` is neither null nor a list. The validator at
+`posthog/api/team/session_recording_settings.py:136` requires only `id`, `sampleRate`, and
+`conditions` on a group (its docstring at `:95` marks `name` optional, and `:99` documents
+`matchType` without requiring it). posthog-js combines a group's legs with
+`group.conditions.matchType === 'any' ? new OrTriggerMatching(matchers) : new AndTriggerMatching(matchers)`
+(`packages/browser/src/extensions/replay/external/triggerMatching.ts:607-610`, unchanged at
+`eb2f69258`), so a missing value means AND. For a missing `name`, posthog-js renders the pending
+debug entry from `matcher.group.name` (`recording-strategies.ts:656`), which prints `undefined`;
+reading it as the empty string is a debug-only difference that every mobile port already makes.
 
 Covering test: posthog-js `packages/browser/src/__tests__/extensions/replay/triggerGroups.test.ts:66`
 ("should create matcher with event triggers and ANY match type"), `:81` ("should create matcher
@@ -164,6 +176,22 @@ with URL triggers and ALL match type"), `:97` ("should create matcher with featu
 - **WHEN** the SDK reads the remote config
 - **THEN** the SDK should track one trigger group whose event, URL, and flag legs are configured
 - **AND** the group's minimum duration should be 2000 milliseconds
+
+#### Scenario: A group without a name is read and evaluated
+- **GIVEN** session replay is enabled
+- **AND** the remote config sets `version` to 2 and configures a trigger group with id "g1", no name, no conditions, and a sample rate of 1.0
+- **WHEN** the SDK resolves whether to record the current session
+- **THEN** the SDK should track one trigger group whose name is the empty string
+- **AND** session recording should be active
+
+#### Scenario: An omitted match type requires every configured leg
+- **GIVEN** session replay is enabled
+- **AND** the remote config sets `version` to 2 and configures a trigger group with no match type, event condition "$exception", boolean flag condition "replay-flag", and a sample rate of 1.0
+- **AND** feature flag "replay-flag" is not enabled for the user
+- **WHEN** the client captures an event named "$exception"
+- **THEN** session recording should not be active
+- **WHEN** feature flag "replay-flag" becomes enabled for the user
+- **THEN** session recording should be active
 
 #### Scenario: A missing leg is read as unconfigured
 - **GIVEN** session replay is enabled
@@ -935,7 +963,9 @@ within trigger groups" — the pending text).
 #### Scenario: A matched and sampled group is reported
 - **GIVEN** session replay is enabled
 - **AND** the remote config sets `version` to 2 and configures a trigger group with id "g1", name "Errors", event condition "$exception", and a sample rate of 1.0
-- **WHEN** the client captures an event named "$exception" and then another eligible SDK event
+- **WHEN** the client captures an event named "$exception"
+- **AND** the wall clock advances by at least 30 seconds after the SDK accepts it, so the debug throttle window of `session-replay-debug-properties` has passed
+- **AND** the client captures another eligible SDK event
 - **THEN** the later event's properties include `$sdk_debug_replay_remote_trigger_matching_config` set to "v2_trigger_groups"
 - **AND** `$sdk_debug_replay_trigger_groups_count` set to 1
 - **AND** `$sdk_debug_replay_matched_recording_trigger_groups` containing one entry with id "g1", name "Errors", matched true, and sampled true

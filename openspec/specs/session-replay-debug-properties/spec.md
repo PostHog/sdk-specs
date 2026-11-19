@@ -14,7 +14,7 @@ these keys; the one exception is four cumulative replay drop counters that the b
 to `$snapshot` while they are above zero. On mobile a crash-time `$exception` reported on a later
 launch is stamped from a crash-context snapshot that carries the full bundle while replay is not
 intentionally off. While replay is intentionally off (off in local config, explicitly stopped,
-opted out, or off in the cached remote config), an event carries `$recording_status: disabled`
+opted out, or off in the cached remote config), an event carries at most `$recording_status: disabled`
 and no other replay diagnostic key.
 
 It is distinct from `is-session-replay-active`, which is a getter the caller invokes; these
@@ -243,7 +243,12 @@ queue). Time spent in `beforeSend` SHALL NOT shorten the window. An event that c
 but was not accepted — dropped by `beforeSend`, suppressed as a duplicate (for example a
 deduplicated `$set`), or not stored — SHALL NOT start the window, so the next eligible event
 carries the bundle. An event that did not carry the bundle SHALL NOT start or move the window,
-including when the interval elapses while it is in `beforeSend`. The window is measured on the
+including when the interval elapses while it is in `beforeSend`. An eligible event captured while
+replay is intentionally off carries no bundle, so it SHALL NOT claim, start, or move the window,
+and the first eligible event after replay is turned back on carries the bundle. posthog-js claims
+the window for such an event whenever its recording extension is installed (`origin/main`
+`04b89402b` `packages/browser/src/posthog-core.ts:2090-2093`); that is a known posthog-js gap, not
+a behavior to copy. The window is measured on the
 wall clock, not against the event's timestamp: a capture with an explicit past or future
 timestamp neither attaches the bundle outside the wall-clock rule nor holds the window shut. The
 window is per SDK instance, not per event name or per session. A timer (browser) and a stored
@@ -1219,7 +1224,8 @@ Replay is *off locally* when any of these holds:
   same test to its own config (React Native: replay is not enabled and has not been started
   manually).
 - The app has explicitly stopped replay (`stopSessionRecording()` or its platform equivalent).
-- The user has opted out of capture.
+- The user has opted out of capture. No event is captured while opted out, so this affects only
+  the mobile crash-context snapshot and a hybrid wrapper's debug map.
 
 Replay is *off remotely* when the SDK's cached remote config turns replay off: `sessionRecording`
 is the boolean `false`. On mobile, a remote config whose `quotaLimited` list contains
@@ -1356,13 +1362,21 @@ requirement.
 - **THEN** the event's `$recording_status` is `disabled`
 - **AND** the event includes none of the removal set
 
+#### Scenario: An event captured while replay is off does not use up the window
+- **GIVEN** replay is enabled locally and remotely and no 30-second window is open
+- **AND** the app stops session replay
+- **WHEN** an eligible SDK event is captured and accepted
+- **AND** the app starts session replay again within 30 seconds
+- **AND** another eligible SDK event is captured
+- **THEN** the first event's `$recording_status` is `disabled` and it includes none of the removal set
+- **AND** the second event carries the optional bundle
+
 #### Scenario: A sampled-out session keeps every key
 - **GIVEN** replay is enabled locally and remotely
 - **AND** the session was sampled out, so `$recording_status` is `disabled`
 - **WHEN** a custom event is captured
 - **THEN** the event includes the trigger status keys and `$sdk_debug_replay_internal_buffer_length`
   that the other requirements call for
-- **AND** the gate did not read `$recording_status` to decide
 
 #### Scenario: A pending linked flag keeps every key
 - **GIVEN** replay is enabled locally and remotely

@@ -591,9 +591,9 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
   awaiting-config rule.
 - **Backwards compatibility:** Backward-compatible; the change only removes diagnostic keys from
   events captured while replay is off.
-- **Remediation:** Land #992. Separately, decide whether Android should distinguish a missing
-  `sessionRecording` key from `false` (the response default), or whether the spec should accept that
-  reading.
+- **Remediation:** Land #992. Treating a missing `sessionRecording` key as `false` is a low-priority
+  Android follow-up: the server always sends the key, as `false` or a config object (PostHog/posthog
+  `c1fe8dcf295` `posthog/models/remote_config.py:305-326`).
 
 <a id="n18"></a>
 

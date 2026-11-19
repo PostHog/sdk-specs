@@ -295,6 +295,8 @@ A required property key listed as known absent is not missing context. The crite
 
 Known absence SHALL NOT change cohort membership read from stored static or realtime cohorts, SHALL NOT affect holdouts, which read no properties, and SHALL apply to a flag dependency because the dependency evaluates with the same listing. A dynamic-cohort property leaf SHALL use the table above before applying its `negation`.
 
+The known-absent table SHALL apply only to an operator the SDK implements locally. An inventory operator that the SDK does not implement locally SHALL make the flag inconclusive with the `unsupported_definition` cause, even when the key is listed as known absent. The SDK SHALL check operator support before it applies the table, so the flag falls back to remote evaluation and the flags service decides the result.
+
 When both operands are available but the property value cannot be interpreted by the selected operator, the criterion SHALL be a definitive no-match. The one exception is `not_between`, which matches a property value that does not convert to a number, as the numeric criteria requirement defines. A malformed condition value SHALL be inconclusive unless an operator-family requirement explicitly defines a safe result. Apart from that `not_between` exception, a named negative operator SHALL negate only a valid comparison; it MUST NOT convert an invalid pattern, invalid numeric/date/version operand, or inconclusive criterion into a match. Implementations MUST NOT expose parser or matcher exceptions to application code.
 
 #### Scenario Outline: Omitted and null operators default to exact (@server)
@@ -327,6 +329,13 @@ When both operands are available but the property value cannot be interpreted by
   | `future_operator` | `"pro"` | property value `"pro"` present | inconclusive |
   | `gt` | `"10"` | property value `"not-a-number"` present | false |
   | `gt` | `"not-a-number"` | property value `10` present | inconclusive |
+
+#### Scenario: An operator the SDK does not implement falls back before known absence (@server)
+- **GIVEN** a local condition has operator `not_between` and condition value `[1, 2]`
+- **AND** the SDK does not implement `not_between` locally
+- **WHEN** it is evaluated with the required key listed as known absent
+- **THEN** the flag should remain unresolved with reason `unsupported_definition`
+- **AND** the criterion should not resolve from the known-absent table
 
 ### Requirement: Unavailable enrollment context remains inconclusive
 

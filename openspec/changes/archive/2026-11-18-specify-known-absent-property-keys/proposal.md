@@ -7,6 +7,7 @@ Caller-supplied property maps cannot say that a property is absent. An omitted k
 - Define a known-absence input: person property keys, and per group type group property keys, known to be absent for one evaluation.
 - Specify the operator results for a known-absent key so local and remote evaluation agree.
 - Replace the deferral in the `is_set` and `is_not_set` requirement, and carve known-absent keys out of the existing "missing key remains inconclusive" rules.
+- Require an SDK to check operator support before it applies the known-absent table, so an operator it does not implement falls back to `/flags`.
 - Make `between` and `not_between` follow HogQL and the flags service: a property value that does not convert to a number matches `not_between`, NaN matches neither operator, and infinite values and bounds are valid. This makes a known-absent key and a non-numeric value give the same `not_between` result.
 - Specify that remote fallback sends `person_property_keys_known_absent` and `group_property_keys_known_absent`, with the server limits.
 - Add acceptance scenarios and apply/archive this change on the same branch.

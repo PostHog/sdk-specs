@@ -161,6 +161,14 @@ Feature: Local Feature Flag Evaluator
       | "semver_neq"          | "1.2.3"                  | false   |
       | "is_date_before"      | "2025-01-01T10:00:00Z"   | false   |
 
+  Scenario: An operator the SDK does not implement falls back before known absence
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And a local condition has operator "not_between" and condition value [1, 2]
+    And the SDK does not implement operator "not_between" locally
+    When it is evaluated with the required key listed as known absent
+    Then the flag should remain unresolved with reason "unsupported_definition"
+    And the criterion should not resolve from the known-absent table
+
   Scenario: Remote fallback sends the listed person keys
     Given the SDK is initialized with token "test-token" and local evaluation enabled
     And remote feature flag evaluation is enabled

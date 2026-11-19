@@ -334,3 +334,39 @@ Feature: Feature Flag Called Tracker
     Then the enqueued "$feature_flag_called" event should be minimized per the allowlist
     And the enqueued event properties should not include "$feature_flag_rule_id"
     And the enqueued event properties should not include "$feature_flag_config_version"
+
+  @client @requires:flag_event_default
+  Scenario: Client-level event default off silences flag reads
+    Given the SDK is initialized with token "test-token" and JSON configuration:
+      """application/json
+      {"send_feature_flag_event":false}
+      """
+    And cached feature flags are:
+      | key     | value |
+      | beta-ui | true  |
+    When get feature flag result "beta-ui" is called
+    And get feature flag "beta-ui" is called
+    And is feature enabled "beta-ui" is called
+    Then no event named "$feature_flag_called" should be enqueued
+
+  @client @requires:flag_event_default
+  Scenario: Per-call tracking option overrides a disabled client-level default
+    Given the SDK is initialized with token "test-token" and JSON configuration:
+      """application/json
+      {"send_feature_flag_event":false}
+      """
+    And cached feature flags are:
+      | key     | value |
+      | beta-ui | true  |
+    When get feature flag result "beta-ui" is called with tracking enabled
+    Then exactly one event named "$feature_flag_called" should be enqueued for flag "beta-ui"
+
+  @client
+  Scenario: Suppressed read leaves the dedupe tracker untouched
+    Given the SDK is initialized with token "test-token"
+    And cached feature flags are:
+      | key     | value |
+      | beta-ui | true  |
+    When get feature flag result "beta-ui" is called with tracking disabled
+    And get feature flag result "beta-ui" is called
+    Then exactly one event named "$feature_flag_called" should be enqueued for flag "beta-ui"

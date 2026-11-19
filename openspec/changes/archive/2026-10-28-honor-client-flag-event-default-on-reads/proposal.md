@@ -52,7 +52,10 @@ _None._
 
 - **posthog-ios, posthog-android**: already conform.
 - **posthog-flutter**: conforms from #662 onward; the 5.x behavior is the divergence this records.
-- **Client SDKs with no client-level default** (posthog-js today): unaffected, the
+- **posthog-js core / react-native**: already conform. `sendFeatureFlagEvent` is the client-level
+  default, and a read resolves `options.sendEvent ?? this.sendFeatureFlagEvent` before it consults
+  the dedupe tracker (`packages/core/src/posthog-core.ts`).
+- **Client SDKs with no client-level default** (posthog-js browser today): unaffected, the
   `@requires:flag_event_default` scenarios do not apply to them.
 - **Acceptance adapters**: two new steps, `get feature flag result "<key>" is called with tracking
   disabled` and `... with tracking enabled`, modelled on the existing

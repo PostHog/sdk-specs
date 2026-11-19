@@ -11,6 +11,7 @@ The coordination exists to avoid duplicate requests. It must not become a single
 - Release waiters when the probe owner ends without completing or when the coordination mechanism fails.
 - Require waiters of a probe that returned the key or was not clean to begin their own fallbacks concurrently instead of one at a time.
 - Permit the duplicate requests these rules can cause, and make a returned key win over a clean omission from an overlapping probe in the same definitions generation.
+- Allow SDKs to retain positive knowledge for returned keys and skip coordination for them, so only keys whose existence is unknown are coordinated.
 - Limit the no-duplicate rule to waiters that see valid negative knowledge established before they stop waiting.
 
 ## Capabilities

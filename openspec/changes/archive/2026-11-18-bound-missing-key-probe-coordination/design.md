@@ -37,9 +37,11 @@ An evaluation can find a second key in flight after the first one settles. Givin
 
 The bounded wait allows two probes for the same key in the same definitions generation. If the newer one returns a newly created flag before the older one cleanly omits it, the older omission must not hide the flag until the next refresh. The SDK remembers when each key was returned in the current generation. It ignores an omission from a probe that was already in flight when the key was returned. A probe that starts later can still record an omission, so a deleted flag stops being probed. When the bounded history has evicted entries newer than a probe's start, the SDK can't tell what that probe overlapped, so it doesn't record the probe's omissions.
 
-### Allow one shared retry after an inconclusive probe
+### Coordinate only keys whose existence is unknown
 
-When a probe fails or reports errors, nobody learns whether the key exists. Sending every waiter to `/flags` at once is a burst exactly when PostHog is unhealthy. Releasing waiters one at a time recreates the queue that caused the incident. One shared retry is the middle ground: it can still establish negative knowledge for everyone, it costs at most one extra request round trip within the existing deadline, and if it also fails the waiters proceed together.
+Every caller needs its own remote result for a key that exists, because values depend on the evaluation context. Coordinating on such a key only makes callers wait for a request whose answer they can't reuse. SDKs may therefore remember keys a current-generation response returned and let later callers request them directly. Positive knowledge follows the same lifetime as negative knowledge. A later clean omission from a request that started after the key was returned clears it, so a deleted flag moves to missing instead of staying present until the next refresh.
+
+A single shared retry after an inconclusive probe was considered and rejected. It only reduces requests while the remote service returns errors, it adds latency to every waiter in that case, and it needs per-group retry bookkeeping across multi-key waits, owner exits, and deadlines. The burst it avoids is bounded by one request per waiting evaluation.
 
 ### Release settled waiters together
 

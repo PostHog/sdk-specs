@@ -10,6 +10,8 @@ A refresh that accepts a caller deadline or cancellation SHALL return control wh
 
 Whether a refresh refuses, reports an error, or is a logged no-op when local evaluation is not configured — no privileged key, or local evaluation disabled — is SDK-specific.
 
+Known gap: posthog-node's `reloadFeatureFlags()` returns a promise that resolves after a failed refresh as well as a successful one. An unauthorized, forbidden or rate-limited response, or an undecodable body, is passed only to the `onError` callback; a quota-limited or server-error response is not reported at all. A follow-up should reject the promise on those failures.
+
 #### Scenario: An awaited refresh completes with the fetched definitions in use
 - **GIVEN** the SDK is initialized with token "test-token" and local evaluation enabled
 - **AND** the SDK exposes a manual definition refresh with an observable completion

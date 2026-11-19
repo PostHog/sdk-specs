@@ -4,7 +4,7 @@
 
 - posthog-go `b17c59b1` (PostHog/posthog-go#458) adds `ReloadFeatureFlagsWithContext(ctx) error` behind a `FlagReloader` interface: it fetches definitions and returns once they are in use, with the fetch error on a non-success status, a quota-limited response (`ErrFlagDefinitionsQuotaLimited`) or a decode failure, or the context error if the caller's deadline ends first. The existing `ReloadFeatureFlags()` keeps signalling the poller and returning.
 - posthog-rs `3188466a` (PostHog/posthog-rs#380) adds `Client::reload_feature_flags` (async and blocking) with the same shape: it returns once the fresh definitions are in use, or `Error::Connection` / `Error::Serialization` on failure, and leaves the background poll on its schedule.
-- posthog-node's `reloadFeatureFlags()` already awaits a forced definition load (`packages/node/src/client.ts`), and posthog-python's `load_feature_flags()` loads synchronously before returning (`posthog/client.py`), so the completion rule matches the SDKs that shipped it earlier.
+- posthog-node's `reloadFeatureFlags()` already awaits a forced definition load (`packages/node/src/client.ts`), and posthog-python's `load_feature_flags()` loads synchronously before returning (`posthog/client.py`), so the completion rule matches the SDKs that shipped it earlier. posthog-node's promise does not yet report a failed refresh: it resolves either way, and only some failures reach `onError`.
 
 Both PRs cite the same driver: the shared harness's local evaluation suite needs a refresh that returns only when the fresh snapshot is usable.
 
@@ -24,5 +24,5 @@ None.
 
 ## Impact
 
-- Descriptive of shipped behavior in posthog-go, posthog-rs, posthog-node and posthog-python. No SDK behavior change is required by this spec change.
+- Descriptive of shipped behavior in posthog-go, posthog-rs and posthog-python. posthog-node meets the completion rule but not the failure-reporting rule, recorded as a known gap: its `reloadFeatureFlags()` promise should reject when the refresh fails.
 - Deliberately unspecified: what a refresh does when local evaluation is not configured. posthog-go refuses without a secret key, posthog-rs returns `Error::InvalidArgument`, and posthog-python logs a warning, clears definitions and returns. The SDKs diverge, so the requirement marks it SDK-specific rather than picking a winner.

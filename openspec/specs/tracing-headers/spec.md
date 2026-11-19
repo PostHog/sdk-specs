@@ -426,7 +426,7 @@ Traceparent targets SHALL match exactly: a scheme-qualified entry matches that o
 
 ### Requirement: Traceparent header generation
 
-For each matching request the SDK SHALL generate a fresh, cryptographically random `traceparent` of the form `00-<32 hex digit trace id>-<16 hex digit span id>-01`, and SHALL NOT replace a `traceparent` the application already set. The propagated span id parents the server's root span; the SDK records no span of its own. An SDK that implements `traces` MAY propagate its active span's context instead, keeping this format and the target gate.
+For each matching request the SDK SHALL generate a fresh `traceparent` of the form `00-<32 hex digit trace id>-<16 hex digit span id>-01`, with random lowercase-hex ids, neither all zeros, and SHALL NOT replace a `traceparent` the application already set. The SDK SHOULD draw the ids from a cryptographically secure source where the platform provides one. The propagated span id parents the server's root span; the SDK records no span of its own. An SDK that implements `traces` MAY propagate its active span's context instead, keeping the W3C version-00 format and the target gate.
 
 #### Scenario: a listed target receives a sampled traceparent
 - **GIVEN** traceparent propagation is enabled for "api.example.com"

@@ -15,14 +15,17 @@ delivery problem.
   - posthog-js SHALL attach `$sdk_debug_retry_queue_size` whenever its retry queue is not empty,
     because that queue only holds failed requests waiting to be retried.
   - A mobile SDK SHOULD attach `$sdk_debug_pending_queue_size` when the depth is at or above its
-    `flushAt`, and MAY omit it below that threshold, where the queue is ordinary batching.
-    Every first-party mobile SDK, including React Native and Flutter desktop, omits it below
-    `flushAt`.
+    current flush threshold, and MAY omit it below that threshold, where the queue is ordinary
+    batching. The flush threshold is the depth at which the SDK starts a flush: the configured
+    `flushAt`, or the lower value an SDK that reduces `flushAt` after a `413` response is using.
+    Every first-party mobile SDK, including React Native and Flutter desktop, omits it below that
+    threshold.
   - When attached, it goes on every non-`$snapshot` event as before, and it stays stripped from
     the mobile crash-context snapshot.
   - The key is SDK-owned. While the queue is not backed up, the SDK removes a registered or
     caller-supplied value of the same name, so the app cannot make a healthy queue look backed up.
-    This keeps today's behavior, where the SDK value already replaces such a value.
+    This keeps today's behavior, where the SDK value already replaces such a value. The keys
+    requirement and the replay-off gate state this exception next to their caller-wins rule.
 - **Modified: Session, queue, hold-reason, trigger, and mode keys.** The two scenarios that
   expected the queue key on any eligible event now set up a backed-up queue first.
 - **Modified: Attach the disabled shape when replay is not configured.** The scenarios no longer
@@ -55,7 +58,7 @@ _None._
 - **posthog-js react-native:** attach `$sdk_debug_pending_queue_size` only when the persisted
   queue holds at least `flushAt` events.
 - **posthog-ios, posthog-android:** attach `$sdk_debug_pending_queue_size` only when the queue's
-  depth is at or above `flushAt`.
+  depth is at or above the current `flushAt`, which both SDKs halve after a `413` response.
 - **posthog-flutter:** the Dart core (Windows and Linux) follows the mobile rule. iOS, macOS,
   Android and web events follow the native SDKs and posthog-js.
 - Consumers that filter on the key existing see fewer events with it: only those captured while

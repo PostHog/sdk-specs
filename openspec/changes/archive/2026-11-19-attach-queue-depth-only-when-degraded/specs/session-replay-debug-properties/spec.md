@@ -15,11 +15,13 @@ The SDK SHALL NOT attach the queue-depth key when the queue's depth is `0`. On t
 retry queue only holds requests that failed and are backing off, so any depth above `0` is a
 backlog, and posthog-js SHALL attach `$sdk_debug_retry_queue_size` whenever the retry queue is not
 empty. On mobile the single pending queue also holds events waiting for an ordinary flush, so a
-depth below the SDK's `flushAt` threshold is normal batching. A mobile SDK SHOULD attach
-`$sdk_debug_pending_queue_size` when the depth is at or above its configured `flushAt` (a flush is
-due and has not happened: offline, failing, backing off, or suspended), and MAY omit it below that
-threshold. Every first-party mobile SDK, including wrappers that build their own events (React
-Native, Flutter desktop), omits it below `flushAt`.
+depth below the SDK's flush threshold is normal batching. The *flush threshold* is the queue depth
+at which the SDK starts a flush: the configured `flushAt`, or the lower value an SDK that reduces
+`flushAt` after a `413` response is currently using. A mobile SDK SHOULD attach
+`$sdk_debug_pending_queue_size` when the depth is at or above its current flush threshold (a flush
+is due and has not happened: offline, failing, backing off, or suspended), and MAY omit it below
+that threshold. Every first-party mobile SDK, including wrappers that build their own events (React
+Native, Flutter desktop), omits it below its current flush threshold.
 
 When the key is attached, it SHALL be attached the same way on every captured event except
 `$snapshot` and the minimal `$feature_flag_called` envelope, whether or not the event is eligible,
@@ -70,11 +72,6 @@ key; a backed-up queue attaches it on a custom event and on an eligible event in
 - **WHEN** a custom event is captured
 - **THEN** the event's properties include `$sdk_debug_retry_queue_size` with the retry queue's length
 
-#### Scenario: Ordinary batching below `flushAt` may omit the key (mobile)
-- **GIVEN** a mobile SDK whose pending queue holds more than `0` and fewer than `flushAt` events
-- **WHEN** a custom event is captured
-- **THEN** the event's properties MAY omit `$sdk_debug_pending_queue_size`
-
 #### Scenario: A queue at or above `flushAt` attaches the key (mobile)
 - **GIVEN** a mobile SDK whose pending queue holds at least `flushAt` events, because a flush is
   failing, backing off, or has not run
@@ -124,9 +121,9 @@ posthog-js SHALL report `$sdk_debug_retry_queue_size` from its dedicated retry-o
 (requests that failed and are backing off), separate from its normal outgoing batch. Mobile SDKs
 have no separate retry queue — a single disk-backed queue handles both normal pre-flush batching
 and post-failure retry backoff — so reporting the same depth under the `retry_queue_size` name
-would misrepresent ordinary buffering as a stuck retry loop. Mobile SDKs SHALL instead report
-that queue's current depth as `$sdk_debug_pending_queue_size`, and SHALL NOT emit
-`$sdk_debug_retry_queue_size`. This is a deliberate key-name divergence from posthog-js, not an
+would misrepresent ordinary buffering as a stuck retry loop. Mobile SDKs instead report that
+queue's current depth as `$sdk_debug_pending_queue_size`, when "The queue-depth key is attached only while the send queue is backed up" says to attach it, and
+SHALL NOT emit `$sdk_debug_retry_queue_size`. This is a deliberate key-name divergence from posthog-js, not an
 oversight: the two keys measure genuinely different things (a retry-only backlog vs. a combined
 pending-send depth), so giving them the same name across SDKs would make the property misleading
 on whichever platform lacks a true retry-only queue. The queue-depth key is in neither tier (its
@@ -174,7 +171,8 @@ off. `$sdk_debug_replay_throttle_delay_ms` (the configured
 mutation-throttle delay) MUST NOT be attached by any SDK.
 
 `$recording_status` and the `$sdk_debug_*` keys are properties the SDK sets itself, so they follow
-capture's **Caller-supplied event properties take precedence**: a registered (super) property of
+capture's **Caller-supplied event properties take precedence**, except the queue-depth key, which is
+SDK-owned (see "The queue-depth key is attached only while the send queue is backed up"): a registered (super) property of
 the same name overrides the SDK-computed value, a caller-supplied event property overrides both,
 and `before_send` can change any of them. The override applies to that event only; the next event
 without that key carries the SDK-computed value again.
@@ -466,7 +464,8 @@ The gate removes keys and never adds one. Keys that are not replay diagnostics a
 `$sdk_debug_error_capturing_properties`, and the browser's `$sdk_debug_extensions_init_method` and
 `$sdk_debug_extensions_init_time_ms`. The gate constrains what the SDK attaches itself. A caller
 who supplies or registers a key by name keeps the caller-wins rule in "Session, queue, hold-reason,
-trigger, and mode keys". The `$snapshot` drop counters are outside the gate: they exist only while
+trigger, and mode keys", except for the queue-depth key, which is SDK-owned (see
+"The queue-depth key is attached only while the send queue is backed up"). The `$snapshot` drop counters are outside the gate: they exist only while
 the recorder runs, and their own requirement governs them.
 
 The SDK SHALL evaluate the gate every time it builds the debug map for an event. Turning replay

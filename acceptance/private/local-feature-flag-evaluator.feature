@@ -160,6 +160,18 @@ Feature: Local Feature Flag Evaluator
       | "gt"                  | "10"                     | false   |
       | "semver_neq"          | "1.2.3"                  | false   |
       | "is_date_before"      | "2025-01-01T10:00:00Z"   | false   |
+      | "not_regex"           | "["                      | true    |
+      | "regex"               | "["                      | false   |
+      | "gt"                  | "not-a-number"           | false   |
+      | "semver_gt"           | "not-a-version"          | false   |
+      | "is_date_after"       | "not-a-date"             | false   |
+
+  Scenario: An omitted condition value stays inconclusive for a known-absent key
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And a local condition has operator "is_not" and condition value omitted
+    When it is evaluated with the required key listed as known absent
+    Then local evaluation should be inconclusive
+    And remote evaluation should remain eligible
 
   Scenario: An operator the SDK does not implement falls back before known absence
     Given the SDK is initialized with token "test-token" and local evaluation enabled
@@ -830,6 +842,20 @@ Feature: Local Feature Flag Evaluator
       | operator    |
       | "regex"     |
       | "not_regex" |
+
+  @server
+  Scenario Outline: A known-absent key resolves regex criteria without compiling the pattern
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag "regex-limited" uses operator <operator>
+    And its pattern uses syntax unsupported by the SDK regex engine
+    When local feature flag "regex-limited" is evaluated with the required key listed as known absent
+    Then the local evaluation result should be <result>
+    And the SDK should not require remote fallback
+
+    Examples:
+      | operator    | result |
+      | "regex"     | false  |
+      | "not_regex" | true   |
 
   @server
   Scenario Outline: Numeric ordering uses complete finite binary64 semantics

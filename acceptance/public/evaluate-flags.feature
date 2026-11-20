@@ -510,10 +510,12 @@ Feature: Evaluate Flags
       | remote-flag | true  |
     And the delayed remote feature flag evaluation response is released before the SDK coordination wait expires
     And remote feature flag evaluation responses for distinct ids "user-2" and "user-3" returning "remote-flag" are delayed
-    When evaluate flags is started concurrently for distinct ids "user-1", "user-2", and "user-3" with flag key "remote-flag"
+    When evaluate flags is started for distinct id "user-1" with flag key "remote-flag"
     Then exactly one remote feature flag evaluation request should be in flight
+    When evaluate flags is started concurrently for distinct ids "user-2" and "user-3" with flag key "remote-flag"
+    Then two evaluations should be waiting on the in-flight probe for "remote-flag"
     When the delayed remote feature flag evaluation response for distinct id "user-1" is released
-    Then two remote feature flag evaluation requests should be in flight before either response is released
+    Then remote feature flag evaluation requests for distinct ids "user-2" and "user-3" should both be in flight before either waiting evaluation's coordination wait expires
 
   @server
   Scenario: Waiters of an errored probe fall back concurrently
@@ -526,10 +528,12 @@ Feature: Evaluate Flags
     And the delayed remote feature flag evaluation response for distinct id "user-1" reports errors while computing flags and omits "missing-flag"
     And the delayed remote feature flag evaluation response is released before the SDK coordination wait expires
     And remote feature flag evaluation responses for distinct ids "user-2" and "user-3" omitting "missing-flag" are delayed
-    When evaluate flags is started concurrently for distinct ids "user-1", "user-2", and "user-3" with flag key "missing-flag"
+    When evaluate flags is started for distinct id "user-1" with flag key "missing-flag"
     Then exactly one remote feature flag evaluation request should be in flight
+    When evaluate flags is started concurrently for distinct ids "user-2" and "user-3" with flag key "missing-flag"
+    Then two evaluations should be waiting on the in-flight probe for "missing-flag"
     When the delayed remote feature flag evaluation response for distinct id "user-1" is released
-    Then two remote feature flag evaluation requests should be in flight before either response is released
+    Then remote feature flag evaluation requests for distinct ids "user-2" and "user-3" should both be in flight before either waiting evaluation's coordination wait expires
 
   @server
   Scenario: Mixed missing-key scope waits for its overlapping probe

@@ -504,7 +504,8 @@ Feature: Evaluate Flags
     And persistent storage is empty
     And the mock PostHog server is reset
     And the SDK is initialized with token "test-token"
-    Given no local feature flag definition is loaded for "remote-flag"
+    Given local feature flag definitions resolve "beta-ui" for distinct id "user-1" as true
+    And no local feature flag definition is loaded for "remote-flag"
     And the delayed remote feature flag evaluation response for distinct id "user-1" returns:
       | key         | value |
       | remote-flag | true  |
@@ -524,7 +525,8 @@ Feature: Evaluate Flags
     And persistent storage is empty
     And the mock PostHog server is reset
     And the SDK is initialized with token "test-token"
-    Given no local feature flag definition is loaded for "missing-flag"
+    Given local feature flag definitions resolve "beta-ui" for distinct id "user-1" as true
+    And no local feature flag definition is loaded for "missing-flag"
     And the delayed remote feature flag evaluation response for distinct id "user-1" reports errors while computing flags and omits "missing-flag"
     And the SDK coordination wait does not expire during this scenario
     And remote feature flag evaluation responses for distinct ids "user-2" and "user-3" omitting "missing-flag" are delayed

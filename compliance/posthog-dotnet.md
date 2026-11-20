@@ -1,9 +1,29 @@
 # posthog-dotnet — SDK Compliance
 
 **Repo:** [PostHog/posthog-dotnet](https://github.com/PostHog/posthog-dotnet)
-**Audited commit:** `ae4d019c2101385f4ad96294466ed67a6dc67bfc` ([commit](https://github.com/PostHog/posthog-dotnet/commit/ae4d019c2101385f4ad96294466ed67a6dc67bfc)) — audited on 2026-10-05
-**Audited against sdk-specs commit:** `75c8f5d80f6da165dd8874301476aa8d5520f3a6`
-**Summary:** 5 ✅ · 19 🟡 · 10 ❌ · 30 ➖ · 0 ❓
+**Audited commit:** `362f459d16c3b27ffe81fbd07775050ed3ba1f24` ([commit](https://github.com/PostHog/posthog-dotnet/commit/362f459d16c3b27ffe81fbd07775050ed3ba1f24)) — audited on 2026-11-16
+**Audited against sdk-specs commit:** `6968122`
+**Summary:** 6 ✅ · 19 🟡 · 10 ❌ · 34 ➖ · 0 ❓ (69 rows)
+
+**2026-11-16 targeted re-audit.** Scope this run: the five rows that take this file from 64 to 69
+contracts — of which **Emails was the one genuine ❌/✅ call left in the matrix, and it resolves ✅**
+— plus every row the sdk-specs delta `e08cbc0`→`6968122` lands on (the flag getters, Feature Flag
+Called Tracker, Local Feature Flag Evaluator, Capture, Tracing Headers, Remote Config). Rows outside
+that set carry forward from 2026-10-05. One row changed status (Emails, a new row), and two rows
+gained a new gap inside an existing 🟡/❌ — see [n16], [n20] and [n21].
+
+**Emails is the headline.** The repository now ships `src/PostHog/Emails/` (`EmailSender.cs`,
+`IPostHogEmails.cs`, `EmailException.cs`, `EmailResults.cs`, `EmailTracking.cs`,
+`HashedAttachments.cs`), which did not exist at `ae4d019c`. It is a full implementation, not a stub:
+the send body is [#163](https://github.com/PostHog/sdk-specs/pull/163)'s flattened
+`{"template_id", "to", "message_data", "distinct_id"}` with `distinct_id` present only when the caller
+passed one (`EmailSender.cs:803-809`), the template id is lowercased by `Guid.ToString("D")`, the app
+host is resolved from exactly the five Cloud ingestion hosts (`:46-53`), the paths match the spec's
+HTTP mapping (`:20-22`), the status-to-error-name mapping is the spec's table including the `409`/`422`
+idempotency split and the `429` quota split (`EmailException.cs:121-143`), and the attempt loop keeps
+one idempotency key across retries with a 30 s cap and a 15 s default request timeout (`:24-27`).
+.NET joins posthog-php, posthog-ruby and posthog-go, making four server SDKs shipping this capability
+in two cycles.
 
 Note on repo layout: `posthog-dotnet` is a multi-package repo with three shipped NuGet packages —
 `PostHog` (core, `src/PostHog/`), `PostHog.AspNetCore` (`src/PostHog.AspNetCore/`), and `PostHog.AI`
@@ -45,6 +65,23 @@ contracts missing from the previous 59-row matrix were audited for the first tim
 dominates the flag-payload rows — an unguarded `JsonDocument.Parse` at
 `src/PostHog/Features/FeatureFlag.cs:75,101` — and fixing that single call pair resolves [n7],
 [n15], [n16], and [n17] together.
+
+**Delta rows re-verified and unchanged this run.** *Failed remote flag details are not evaluated
+results* and its bulk siblings ([#211](https://github.com/PostHog/sdk-specs/pull/211)): the response
+projection collects every key whose v4 record has `failed: true` and filters the value map by it
+(`src/PostHog/Api/FlagsApiResult.cs:129-145`), keeping the set on `FailedKeys` for diagnostics, so a
+failed placeholder never becomes a result — correct, and independent of `errorsWhileComputingFlags`.
+*Failed direct getter evaluations report `evaluation_failed`* ([#211](https://github.com/PostHog/sdk-specs/pull/211)):
+the error constant exists and is used for flag-called reporting (`src/PostHog/Features/FeatureFlagError.cs:21`).
+*`quotaLimited` in the wire-field table* ([#198](https://github.com/PostHog/sdk-specs/pull/198)): parsed
+and carried through (`FlagsApiResult.cs:146`). *Capture serializes set-like and listed sequence
+property values as arrays* ([#215](https://github.com/PostHog/sdk-specs/pull/215)): the C# row of the
+spec's table (`ISet<T>`, `Queue<T>`, `LinkedList<T>`) is met for free — properties are `object` values
+serialized by `System.Text.Json`, which writes any of them as a JSON array from the runtime type, and
+no converter in `src/PostHog/Json/` intercepts them. *Optional posthog-js cookie fallback*
+([#116](https://github.com/PostHog/sdk-specs/pull/116)) is a `MAY` that is off by default; the
+ASP.NET Core middleware reads the two tracing headers only (`src/PostHog.AspNetCore/Tracing/PostHogTracingHeaders.cs:16,21`),
+which is conformant, so row 63 stays ✅.
 
 | # | Contract | Status | Note |
 |---|----------|--------|------|
@@ -112,6 +149,11 @@ dominates the flag-payload rows — an unguarded `JsonDocument.Parse` at
 | 62 | Traces | ❌ | [n26] |
 | 63 | Tracing Headers | ✅ |  |
 | 64 | Unregister | ➖ | client-side persistent super-properties registry; acceptance is `@client`-only; no register/super-property mutation API exists to unregister from |
+| 65 | Emails | ✅ | |
+| 66 | AI Datasets | ➖ | spec `Applicability` is `server`, and its own text scopes it to the SDKs that implement the AI management API. `src/PostHog.AI/` is OpenAI/LLM-observability instrumentation only (`PostHogOpenAIHandler.cs`, `PostHogAIContext.cs`, `PostHogAIExtensions.cs`); grep for `dataset` across `src/**/*.cs` returns no management surface. N/A until a .NET package implements it |
+| 67 | AI Scorers | ➖ | as row 66: no scorer surface in `src/PostHog.AI/` or elsewhere in the solution |
+| 68 | Offline Evaluations | ➖ | as row 66: no offline-evaluation surface in the solution |
+| 69 | Experiment Exposure | ➖ | `both`-scoped but conditioned on reading `/flags?v=4` records. The SDK requests `flags/?v=2` (`src/PostHog/Api/PostHogApiClient.cs:122`) and `experiment_exposure` appears nowhere in `src/**/*.cs`, so it "sees config version 2 flags as legacy values and sends no direct exposure", which the spec makes conformant. Becomes a real row if the client moves to `v=4` |
 
 ## Notes
 
@@ -208,7 +250,8 @@ dominates the flag-payload rows — an unguarded `JsonDocument.Parse` at
 ### n16 — Get Feature Flag Result (🟡 Partial)
 - **Spec requires:** A canonical result object `{ key, enabled, variant?, payload? }`; unknown flags return no structured result, not a partial/default object. Since PR [#71](https://github.com/PostHog/sdk-specs/pull/71), the result's serialized payload must also be validated as JSON before access, with malformed input logged and treated as absent rather than discarding the flag's value.
 - **SDK currently:** No method literally named `GetFeatureFlagResultAsync` exists, but `Features/FeatureFlag.cs` is a de facto canonical result record with `Key`/`IsEnabled`/`VariantKey`/`Payload`/`HasExperiment`, matching the spec's shape closely, and the canonical `EvaluateFlagsAsync(distinctId).GetFlag(key)` path correctly returns `null` for an unknown flag. The still-shipped deprecated `GetFeatureFlagAsync`, on a remote-evaluation miss, constructs a **synthetic disabled flag** instead of returning nothing (`src/PostHog/PostHogClient.cs:747-756`: `response = new FeatureFlag { Key = featureKey, IsEnabled = false }`) — the "partial/default object" anti-pattern the spec's unknown-flag scenario forbids. **New this audit:** the same record's `Payload` is built by an unguarded `JsonDocument.Parse` in both factories (`src/PostHog/Features/FeatureFlag.cs:75,101`), so a malformed payload throws during construction of the result object itself and the flag's evaluated value is lost along with it — see [n7] and [n15] for the two call sites that swallow the exception and what each discards.
-- **Backwards compatibility:** Backward-compatible — the correct unknown-flag behavior already lives on the recommended `EvaluateFlagsAsync` path, a literally-named wrapper would be a pure addition, and the payload-parse guard only affects already-unusable input.
+- **New this run — an empty variant reads as enabled.** sdk-specs [#193](https://github.com/PostHog/sdk-specs/pull/193) added "Empty variant reads as disabled": a flag whose value is `""` SHALL produce `enabled: false` with `variant: ""`. Both factories compute `IsEnabled = value.IsString ? value.StringValue is not null : value.Value` (`src/PostHog/Features/FeatureFlag.cs:74-78` remote, `:101-105` local), so `""` is a non-null string and the record comes out `IsEnabled = true, VariantKey = ""`. The same record drives the implicit `bool` conversion (`:180`) and therefore [n20].
+- **Backwards compatibility:** Backward-compatible — the correct unknown-flag behavior already lives on the recommended `EvaluateFlagsAsync` path, a literally-named wrapper would be a pure addition, the payload-parse guard only affects already-unusable input, and the empty-variant fix changes a value that is wrong today in both directions (a `""` flag is reported enabled with no variant to act on).
 - **Remediation:** Optionally add a thin `GetFeatureFlagResultAsync` naming-parity wrapper over `EvaluateFlagsAsync(...).GetFlag(...)`; document that the deprecated `GetFeatureFlagAsync`'s missing-flag case intentionally differs. Apply the shared `TryParsePayload` fix from [n7].
 
 ### n17 — Get Feature Flags And Payloads (🟡 Partial)
@@ -232,14 +275,16 @@ dominates the flag-payload rows — an unguarded `JsonDocument.Parse` at
 ### n20 — Is Feature Enabled (❌ Fail)
 - **Spec requires:** hard `SHALL`, `@both`, no server-SDK carve-out: the SDK SHALL accept a caller-supplied default value and SHALL return it whenever the flag has no value (not loaded, failed request, unknown key); a flag with a real value — including `false` — always wins over the default.
 - **SDK currently:** `IsFeatureEnabledAsync(featureKey, distinctId, FeatureFlagOptions?, CancellationToken)` (`IPostHogClient.cs:188-192`, impl `PostHogClient.cs:615-619`) has **no `defaultValue` parameter anywhere** (confirmed via exhaustive grep of all flag-related code). It collapses every miss to hardcoded `false`: `return result is { IsEnabled: true };`. The canonical replacement, `FeatureFlagEvaluations.IsEnabled(key)` (`FeatureFlagEvaluations.cs:84-88`), has the identical shape (`return record is { Enabled: true };`) — a genuinely-disabled flag and a flag with no value at all are indistinguishable, and there is no way for a caller to override a miss to `true`. This is the identical known gap pattern independently found in posthog-ruby/-python/-node.
+- **New this run — an empty variant reads as enabled.** [#193](https://github.com/PostHog/sdk-specs/pull/193) requires `is-feature-enabled` to return `false` for a flag whose value is `""`, with or without a caller default. The boolean comes from `FeatureFlag.IsEnabled` ([n16]), which is `true` for `""`, and the implicit `bool` operator (`src/PostHog/Features/FeatureFlag.cs:180`) carries that through every enabled-style read.
 - **Backwards compatibility:** Backward-compatible — adding a `defaultValue`-aware overload on the canonical `FeatureFlagEvaluations` surface (returning the default only when no record exists) is purely additive via C# overloading.
 - **Remediation:** Add `FeatureFlagEvaluations.IsEnabled(string key, bool defaultValue)` (and/or an equivalent parameter on `IsFeatureEnabledAsync`) that returns `defaultValue` only on a genuine miss, distinguishing it from a real `false` result. Also fix `FeatureFlagExtensions.cs`'s `bool?`-returning overload, whose XML doc claims `null`-on-miss semantics it doesn't actually implement (it delegates to the same `bool`-collapsing core method).
 
 ### n21 — Local Feature Flag Evaluator (🟡 Partial)
 - **Spec requires:** The local matching engine must agree with `/local_evaluation`. Requirements added over the last two cycles include **experiment holdouts** (PR [#76](https://github.com/PostHog/sdk-specs/pull/76)) — a flag with a configured holdout must evaluate the holdout before its release conditions so the local answer matches the backend's — plus versioned property matching (PR [#59](https://github.com/PostHog/sdk-specs/pull/59)), `is_set`/`is_not_set` presence semantics, Unicode-vs-ASCII case folding across the operator families, float rollout percentages (PR [#46](https://github.com/PostHog/sdk-specs/pull/46)), and an inconclusive, per-flag-scoped result for an unrecognized operator.
 - **SDK currently:** This row was ✅ at the 2026-08-06 audit and the evaluator has since absorbed nearly all of the new requirements through real fixes: `property_matching_version` is deserialized off the definitions response and threaded through matching (`src/PostHog/Api/LocalEvaluationApiResult.cs:25-26`, PR [#317](https://github.com/PostHog/posthog-dotnet/pull/317)); local string filters were aligned with the flags service (PR [#306](https://github.com/PostHog/posthog-dotnet/pull/306)); presence-operator semantics were aligned (PR [#305](https://github.com/PostHog/posthog-dotnet/pull/305)); fractional rollout percentages are supported (PR [#292](https://github.com/PostHog/posthog-dotnet/pull/292)); a numeric operand sent as JSON compares correctly (PR [#325](https://github.com/PostHog/posthog-dotnet/pull/325)); `null` `early_exit` values are handled (PR [#312](https://github.com/PostHog/posthog-dotnet/pull/312)); empty evaluation key scopes are handled (PR [#304](https://github.com/PostHog/posthog-dotnet/pull/304)); and the inconclusive-result contract is modelled properly throughout by `InconclusiveMatchException`, which is caught per flag and converted into a remote fallback rather than a wrong answer (`src/PostHog/Features/LocalEvaluator.cs:163-172,326-373,542-592`). **The one confirmed gap is experiment holdouts:** `grep -rni holdout src --include=*.cs` returns **zero** matches. A flag configured with a holdout is evaluated locally as though the holdout did not exist, so every identity inside the holdout receives an answer that disagrees with the backend — a silent correctness divergence rather than a missing feature. Because the requirement is new (2026-09-28) this is not a regression, but it is now **four for four** on the server SDKs checked since it landed (php, ruby, go, dotnet).
+- **New this run — no local feature enrollment.** sdk-specs [#178](https://github.com/PostHog/sdk-specs/pull/178) added "Feature enrollment precedes holdouts and release conditions": for an active flag without experience continuity whose `filters.feature_enrollment` is `true`, the evaluator SHALL read the person property `$feature_enrollment/<flag key>` before holdouts, release conditions and rollout, treating only JSON `true` and `"true"` as enrolled, and SHALL report inconclusive (cause `missing_context`) when the caller supplied no such property. `feature_enrollment` appears nowhere in `src/**/*.cs` (grep: zero hits), so `LocalEvaluator` runs enrollment-gated flags straight through ordinary targeting and can return a value the service would not.
 - **Backwards compatibility:** Backward-compatible — reading the holdout off the definition and applying it ahead of release-condition matching is additive, affects only flags that have a holdout configured, and changes only answers that are wrong today, moving them toward the remote result. No caller can be depending on the current behavior being correct.
-- **Remediation:** Add a `Holdout` member to the local flag-definition filter model in `src/PostHog/Api/` and evaluate it in `LocalEvaluator.ComputeFlagLocally` before the flag's own release conditions, resolving the flag to the holdout's variant/disabled outcome when the identity falls inside it. Add fixtures covering an identity inside and outside a holdout.
+- **Remediation:** Add a `Holdout` member to the local flag-definition filter model in `src/PostHog/Api/` and evaluate it in `LocalEvaluator.ComputeFlagLocally` before the flag's own release conditions, resolving the flag to the holdout's variant/disabled outcome when the identity falls inside it. Add fixtures covering an identity inside and outside a holdout. Separately, add feature-enrollment support: read `filters.feature_enrollment` on the definition, check the person property `$feature_enrollment/<key>` before holdouts and release conditions, accept only `true` and `"true"` as enrolled, and report inconclusive with `missing_context` when the caller supplied no enrollment property (both changes are additive to the definition model and only affect flags that carry the new field).
 
 ### n22 — Logs (❌ Fail)
 - **Spec requires:** a `captureLog`/logger API producing OTLP-shaped log records, shipped via `POST {host}/i/v1/logs`, with severity mapping, batching, and feature-flag/session-id context enrichment.

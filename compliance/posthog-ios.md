@@ -2,8 +2,8 @@
 
 **Repo:** [PostHog/posthog-ios](https://github.com/PostHog/posthog-ios)
 **Audited commit:** `e27cbe4cb0bf5958fe79a061783af2dfb1b17ab4` ([commit](https://github.com/PostHog/posthog-ios/commit/e27cbe4cb0bf5958fe79a061783af2dfb1b17ab4)) on the 4.0 release branch `chore/v4-remove-deprecated` ([PostHog/posthog-ios#873](https://github.com/PostHog/posthog-ios/pull/873)), before 4.0.0 is published — first audited on 2026-11-05 at `3460e534a`, re-checked on 2026-11-10 (see [Re-check](#re-check-2026-11-10))
-**Audited against sdk-specs commit:** `752f899` plus [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79` (capture v1, including #147's AI lane), treated as merged to `main`; first audited against `dd11a6b`
-**Summary:** 44 ✅ · 14 🟡 · 1 ❌ · 10 ➖ (69 rows; previous audit 2026-10-08 at `f5cbe87c` + posthog-ios#924–#934 scored 38/16/4/6 on 64 rows)
+**Audited against sdk-specs commit:** `752f899` plus [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79` (capture v1, including #147's AI lane), treated as merged to `main`; first audited against `dd11a6b`. **Spec-delta checked to `6968122` on 2026-11-16** — see [Spec-delta check](#spec-delta-check-2026-11-16); one row moves, Capture ✅→🟡
+**Summary:** 43 ✅ · 15 🟡 · 1 ❌ · 10 ➖ · 0 ❓ (69 rows, after the 2026-11-16 spec-delta check; previous audit 2026-10-08 at `f5cbe87c` + posthog-ios#924–#934 scored 38/16/4/6 on 64 rows)
 
 Note on repo layout: `posthog-ios` is a single-package repo, distributed through Swift Package Manager
 only from 4.0. Core SDK logic lives at `PostHog/` (flat files: `PostHogSDK.swift` — the main public
@@ -141,7 +141,7 @@ Retry Queue.
 | 2 | Traces | ❌ | [n2] |
 | 3 | Tracing Headers | ✅ | new server span-context bridge requirements (#129) are `@server` only |
 | 4 | Alias | 🟡 | [n3] |
-| 5 | Capture | ✅ | was 🟡; [n4]; identity-call migration-guide example (#146 `15501ca`) lands in 4.0 with posthog-ios#1053; capture v1 wire conforms (#146); empty event names dropped (also after `beforeSend`); `NSNull` properties omitted (#1047); own `$lib` pair filled after caller properties (#1050); empty variant left out of `$active_feature_flags` |
+| 5 | Capture | 🟡 | was ✅ at the 4.0 audit (itself up from 🟡); [n4]; identity-call migration-guide example (#146 `15501ca`) lands in 4.0 with posthog-ios#1053; capture v1 wire conforms (#146); empty event names dropped (also after `beforeSend`); `NSNull` properties omitted (#1047); own `$lib` pair filled after caller properties (#1050); empty variant left out of `$active_feature_flags`; **2026-11-16: ✅→🟡** — `Set`/`NSSet` property values are dropped, see [Spec-delta check](#spec-delta-check-2026-11-16) |
 | 6 | Capture AI | ✅ | was ➖; #146 adds iOS 4.0 to Applicability; the AI lane conforms, including the `NSNull` cleanup (#1047) — [n27] |
 | 7 | Capture Exception | ✅ | was 🟡; [n5]; `NSNull` custom properties omitted (#1047) |
 | 8 | Create Person Profile | ➖ | unchanged — spec Applicability still says only the posthog-js family exposes it; no `createPersonProfile` in iOS |
@@ -206,6 +206,51 @@ Retry Queue.
 | 67 | AI Scorers | ➖ | **new row**: server SDKs only (personal API key); no iOS surface |
 | 68 | Offline Evaluations | ➖ | **new row**: server SDKs only; no iOS surface |
 | 69 | Emails | ➖ | **new row**: "Server SDKs only" — needs a secret key that must never reach a client |
+
+## Spec-delta check (2026-11-16)
+
+The weekly audit's 2026-11-16 run did not re-audit this SDK: the out-of-cycle 4.0 audit above is six
+days old and far more thorough than a rotation slot would be. What this run did instead was check the
+rows that `openspec/specs/` changed between `752f899` (the 4.0 audit's baseline) and `6968122`. Three
+changes apply to a mobile client SDK; the rest are MCP analytics and AI-evaluation changes that stay
+➖ here. Checked against the 4.0 branch `chore/v4-remove-deprecated` at `4c944806`, the current tip of
+the branch the audit above used.
+
+- **Capture serializes set-like and listed sequence property values as arrays**
+  ([#215](https://github.com/PostHog/sdk-specs/pull/215)) — **one row moves, Capture ✅→🟡.** The
+  Swift/Objective-C row of the new table is `Set`, `NSSet`, with no listed ordered sequences, and the
+  requirement says an SDK "MUST NOT ... drop the property or the event because of it". `isValidObject`
+  (`PostHog/Utils/DictUtils.swift:211-232`) accepts strings, bools, finite numbers, and whatever
+  `JSONSerialization.isValidJSONObject([object])` accepts — a `Set`/`NSSet` is none of those — and
+  `sanitizeInvalidValue` (`:70-88`) converts only `URL`, `Date`, `[String: Any]`, `[AnyHashable: Any]`
+  and `[Any]`. A set therefore falls through to `newDict.removeValue(forKey: key)` and the property is
+  logged and dropped, including when nested inside an array or dictionary. The 4.0 `NSNull` work
+  ([posthog-ios#1047](https://github.com/PostHog/posthog-ios/pull/1047)) reworked the same two
+  functions without adding a set branch. **Backward-compatible:** converting a set to an array only
+  affects properties that are dropped today, and the spec explicitly does not require the public
+  property types to change. **Remediation:** add `if let set = value as? NSSet { return sanitizeArray(set.allObjects) }`
+  (or the Swift `Set` equivalent) to `sanitizeInvalidValue`, before the array branch, so nested and
+  top-level sets both convert.
+- **Failed remote flag handling** ([#211](https://github.com/PostHog/sdk-specs/pull/211)) — **met, no
+  row moves.** Failed records are excluded where the served maps are derived
+  (`PostHog/PostHogRemoteConfig.swift:587-590`), legacy persisted placeholders are cleaned on load
+  (`:153`, `:1025-1038`), a failed key is skipped when the result list is built (`:1327`), and a failed
+  direct read contributes `evaluation_failed` rather than a missing-flag classification (`:929-931`).
+- **The optional replay debug bundle is limited to keys the SDK attaches itself**
+  ([#139](https://github.com/PostHog/sdk-specs/pull/139)) — **met, no row moves.** The optional bundle
+  is gated on `isReplayDebugEvent`, which requires a `$` prefix
+  (`PostHog/PostHogSDK.swift:730-732`, applied at `:872` and `:2253-2254`), so a custom event carries
+  none of it.
+
+Not applicable this delta: the MCP analytics changes
+([#185](https://github.com/PostHog/sdk-specs/pull/185),
+[#212](https://github.com/PostHog/sdk-specs/pull/212),
+[#184](https://github.com/PostHog/sdk-specs/pull/184),
+[#192](https://github.com/PostHog/sdk-specs/pull/192)) — there is no iOS MCP package — and the
+AI-evaluation changes ([#213](https://github.com/PostHog/sdk-specs/pull/213)), which are server-scope.
+`$feature_flag_variant_key` ([#203](https://github.com/PostHog/sdk-specs/pull/203)) and local feature
+enrollment ([#178](https://github.com/PostHog/sdk-specs/pull/178)) do not reach an SDK that requests
+`/flags?v=2` and runs no local evaluator.
 
 ## Notes
 

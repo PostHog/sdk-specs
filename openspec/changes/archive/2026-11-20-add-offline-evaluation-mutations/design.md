@@ -1,6 +1,6 @@
 ## Context
 
-The backend accepts revision-checked writes to stored resources. Upload receipts contain identities, acceptance times, and outcomes. They do not carry an edit revision. [Backend contract](https://github.com/PostHog/posthog/blob/a0eedd4a6c6e9c10c3c34ceeb432ffa089334ffe/docs/internal/ai-offline-evaluation-reporting.md#updating-and-deleting-offline-evaluation-data)
+The backend accepts revision-checked writes to stored resources. Upload receipts contain identities, acceptance times, and outcomes. They do not carry an edit revision. [Backend contract](https://github.com/PostHog/posthog/blob/573ed146815aacdd3a724ca1900738d8de7fa1b1/docs/internal/ai-offline-evaluation-reporting.md#updating-and-deleting-offline-evaluation-data)
 
 ## Decisions
 

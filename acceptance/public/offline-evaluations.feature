@@ -381,6 +381,10 @@ Feature: Offline Evaluations
     When the service returns HTTP 202 for an item payload delete
     Then the caller receives invalid_response with unknown persistence
 
+  Scenario: An update acknowledgment cannot go backwards
+    When the caller submits revision 3 and the successful PATCH response carries revision 2
+    Then the SDK reports invalid_response with unknown persistence and sends no second request
+
   Scenario: An ingestion-only key cannot edit an accepted item
     When an ingestion-only caller updates an accepted item's trial with its current revision
     Then the caller receives the service's permission error and the trial is preserved
@@ -392,6 +396,11 @@ Feature: Offline Evaluations
     When the caller changes the reported result from true to false using its current revision
     Then the PATCH body carries a JSON boolean false and the caller receives the new result revision
     And the service recomputes the dependent composite using its pinned formula
+
+  Scenario: Correcting an error clears its stored message
+    Given a reported error with a stored error_message and reasoning
+    When the caller corrects its status to ok with a valid score at the current revision
+    Then the stored result payload no longer contains error_message and retains its reasoning
 
   Scenario: Setting the same reported outcome preserves its revision
     Given a reported result with value false and revision 5
@@ -405,6 +414,17 @@ Feature: Offline Evaluations
     When the caller updates the payload with only output set to null at the observed item revision
     Then the PATCH body contains that revision and a payload containing only output set to JSON null
     And the stored input is preserved and the caller receives the current item revision
+
+  Scenario: An empty update can supply the first payload
+    Given an item with no stored payload inside its original retention window
+    When the caller updates its payload with an empty object at the current revision
+    Then the service receives an explicit empty payload object and stores it
+    And the caller receives an advanced item revision
+
+  Scenario: An empty update preserves an existing payload
+    Given a result with stored reasoning inside its original retention window
+    When the caller updates its payload with an empty object at the current revision
+    Then the stored reasoning is preserved and the caller receives an advanced result revision
 
   Scenario: A deleted result payload stays unavailable
     Given a caller has deleted a result payload and read the new result revision

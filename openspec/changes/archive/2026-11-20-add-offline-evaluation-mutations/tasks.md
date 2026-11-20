@@ -6,6 +6,6 @@
 
 ## 2. Verify and publish
 
-- [x] 2.1 Add 13 public scenarios and verify discovery against harness 1.32.0. All 68 offline-evaluation cases await management bindings.
+- [x] 2.1 Add 17 public scenarios and verify discovery against harness 1.32.0. All 72 offline-evaluation cases await management bindings.
 - [x] 2.2 Validate the delta for synchronization into the canonical offline-evaluations spec.
-- [x] 2.3 Check the ten sync and async method signatures, preserve all 55 existing scenarios, and run the 42 Python mutation tests.
+- [x] 2.3 Check the ten sync and async method signatures, preserve all 55 existing scenarios, and run the Python and JavaScript mutation suites.

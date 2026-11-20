@@ -110,6 +110,7 @@ Host URLs must be absolute HTTP(S), without credentials, query, or fragment.
 |---|---|
 | Experiment create, upload, complete, fail | Personal or project secret key with `offline_evaluation_ingestion:write` |
 | Experiment tag read/update | Personal key with `evaluation:read` / `evaluation:write` |
+| [Item, result, and payload operations](#requirement-revision-checked-operations-on-experiment-handles) | Personal key with `evaluation:read` for revision reads or `evaluation:write` and editor access for mutations. Result revision reads, result and result-payload mutations, and item deletes also require `llm_analytics:read` and access to the affected scorers. |
 | Dataset read/write | Personal key with `dataset:read` / `dataset:write` |
 | Scorer read/write | Personal key with `llm_analytics:read` / `llm_analytics:write` |
 
@@ -688,7 +689,7 @@ A newly created or resumed experiment handle SHALL expose the following operatio
 
 A revision SHALL be a nonnegative integer. Zero is valid. The SDK SHALL reject an invalid UUID or revision, including a boolean, before I/O. A revision read SHALL validate the returned owner ID and revision. A missing revision, including on older servers, SHALL surface as `invalid_response`.
 
-Every mutation SHALL require the caller's observed revision. PATCH SHALL send it in the JSON body alongside the changed fields. DELETE SHALL send it as the `revision` query parameter with no request body. PATCH SHALL return the server's revision, which can equal or exceed the submitted one. DELETE SHALL require HTTP 204 and return no value (Python `None`). A malformed success acknowledgment SHALL surface as `invalid_response` with unknown persistence.
+Every mutation SHALL require the caller's observed revision. PATCH SHALL send it in the JSON body alongside the changed fields. DELETE SHALL send it as the `revision` query parameter with no request body. PATCH SHALL return the server's revision when it equals or exceeds the submitted revision. If the response revision is lower, the SDK SHALL raise `invalid_response` with unknown persistence. DELETE SHALL require HTTP 204 and return no value (Python `None`). A malformed success acknowledgment SHALL surface as `invalid_response` with unknown persistence.
 
 The SDK SHALL send each mutation once. A stale revision SHALL surface as HTTP 409 `revision_conflict` with rejected persistence. After a lost response the caller SHALL receive an error with unknown persistence. The SDK SHALL NOT refresh the revision or replay a write on the caller's behalf. Revision reads follow the existing bounded retry policy.
 
@@ -715,6 +716,10 @@ Reads require a personal key with `evaluation:read`. Writes require a personal k
 - **WHEN** the service returns HTTP 202 for an item payload delete
 - **THEN** the caller receives invalid_response with unknown persistence
 
+#### Scenario: An update acknowledgment cannot go backwards
+- **WHEN** the caller submits revision 3 and the successful PATCH response carries revision 2
+- **THEN** the SDK reports invalid_response with unknown persistence and sends no second request
+
 #### Scenario: An ingestion-only key cannot edit an accepted item
 - **WHEN** an ingestion-only caller updates an accepted item's trial with its current revision
 - **THEN** the caller receives the service's permission error and the trial is preserved
@@ -723,7 +728,7 @@ Reads require a personal key with `evaluation:read`. Writes require a personal k
 
 The API SHALL accept corrections during uploading and after completion or failure. Item updates accept one or more of `case_key`, `trial`, `model_version`, and `application_trace_id`. Omission preserves a field and explicit null clears it. Clearing the item model restores the usual experiment-model fallback. Reported result updates accept one or more of `status`, `value`, and `error_code`. The SDK SHALL preserve which fields were supplied and enforce the existing score encoding rules, including the distinction between a boolean and a number. Python exposes these keyword fields as `ItemUpdate` and `ResultUpdate`. Unsupported fields and empty item or result updates SHALL fail before I/O.
 
-The service SHALL validate a partial correction against the stored result and its pinned scorer version. On a status change it clears the score for a non-ok status and clears the error code for a non-error status unless the caller supplies a conflicting value, which is rejected. A change in a reported status or value SHALL recompute dependent composites using their pinned formulas in the same transaction. A direct score edit to a calculated result SHALL be rejected. An unchanged reported outcome SHALL preserve its revision and scoring time. Changing only the error code SHALL advance the result revision while preserving the scoring time and dependent composites.
+The service SHALL validate a partial correction against the stored result and its pinned scorer version. On a status change it clears the score for a non-ok status and clears the error code for a non-error status unless the caller supplies a conflicting value, which is rejected. When a result leaves `error`, the service SHALL also remove any stored `error_message` field from its payload. A change in a reported status or value SHALL recompute dependent composites using their pinned formulas in the same transaction. A direct score edit to a calculated result SHALL be rejected. An unchanged reported outcome SHALL preserve its revision and scoring time. Changing only the error code SHALL advance the result revision while preserving the scoring time and dependent composites.
 
 An item and its payload share a revision, as do a result and its payload. Adding, changing, or deleting a result on a retained item, including changes to the result payload, SHALL advance the item's revision.
 
@@ -732,6 +737,11 @@ An item and its payload share a revision, as do a result and its payload. Adding
 - **WHEN** the caller changes the reported result from true to false using its current revision
 - **THEN** the PATCH body carries a JSON boolean false and the caller receives the new result revision
 - **AND** the service recomputes the dependent composite using its pinned formula
+
+#### Scenario: Correcting an error clears its stored message
+- **GIVEN** a reported error with a stored error_message and reasoning
+- **WHEN** the caller corrects its status to ok with a valid score at the current revision
+- **THEN** the stored result payload no longer contains error_message and retains its reasoning
 
 #### Scenario: Setting the same reported outcome preserves its revision
 - **GIVEN** a reported result with value false and revision 5
@@ -742,6 +752,8 @@ An item and its payload share a revision, as do a result and its payload. Adding
 
 A payload PATCH SHALL send a `payload` object containing the supplied top-level fields. Item fields are `input`, `output`, `expected_output`, and `metadata`. Result fields are `reasoning`, `error_message`, and `metadata`. Each supplied field replaces its whole value, including an explicit JSON null. Omitted fields SHALL be preserved. The existing payload field types and byte limits apply, including the limit on the final merged payload. Changing item input, output, or expected output keeps the scores and can mark them stale.
 
+The SDK SHALL send an explicitly empty `payload: {}` on both item and result payload updates. Within the original retention window, the service SHALL store `{}` when the owner has never had a payload. If a payload is already stored, the service SHALL preserve its fields. Both writes advance the owner's revision. For a deleted or expired payload, even `{}` SHALL surface HTTP 409 `payload_unavailable`.
+
 A first payload can be added within 30 days of the owner's original acceptance. Edits SHALL preserve that deadline. Deleting a stored payload SHALL remove only the payload and advance the owner's revision. A payload that was never stored, already deleted, or removed by retention cannot be deleted. The service SHALL return HTTP 409 `payload_unavailable` and preserve the revision in those cases. A deleted or expired payload cannot be restored on that record. Its reported score can still be corrected.
 
 #### Scenario: A payload edit distinguishes omission from explicit null
@@ -749,6 +761,17 @@ A first payload can be added within 30 days of the owner's original acceptance. 
 - **WHEN** the caller updates the payload with only output set to null at the observed item revision
 - **THEN** the PATCH body contains that revision and a payload containing only output set to JSON null
 - **AND** the stored input is preserved and the caller receives the current item revision
+
+#### Scenario: An empty update can supply the first payload
+- **GIVEN** an item with no stored payload inside its original retention window
+- **WHEN** the caller updates its payload with an empty object at the current revision
+- **THEN** the service receives an explicit empty payload object and stores it
+- **AND** the caller receives an advanced item revision
+
+#### Scenario: An empty update preserves an existing payload
+- **GIVEN** a result with stored reasoning inside its original retention window
+- **WHEN** the caller updates its payload with an empty object at the current revision
+- **THEN** the stored reasoning is preserved and the caller receives an advanced result revision
 
 #### Scenario: A deleted result payload stays unavailable
 - **GIVEN** a caller has deleted a result payload and read the new result revision

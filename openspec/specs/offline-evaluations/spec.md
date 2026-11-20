@@ -36,6 +36,7 @@ It exposes `datasets` and `scorers`, and closes owned HTTP resources through `cl
 | Experiment `upload_results` | Finite sequence of result declarations | Bulk receipt containing per-request receipts |
 | Experiment `complete`, `fail` | No fields | Experiment receipt |
 | Experiment `get_tags`, `set_tags` | No fields / replacement tag names | Server-normalized tags |
+| Experiment [revision reads, updates, and deletes](#requirement-revision-checked-operations-on-experiment-handles) | Stored item or result UUID, observed revision for writes | Current revision for reads and updates, no value for deletes |
 | Item/result `to_dict`, `from_dict` | Declaration / saved JSON declaration | Detached JSON / restored declaration |
 
 Experiment options: `id`, `started_at`, nullable `run_source` (`ci`, `local`, `scheduled`),
@@ -228,12 +229,14 @@ Server rejection of a value incompatible with the pinned configuration SHALL be 
 ### Requirement: Upload identity and idempotent acknowledgments
 
 An upload SHALL accept item declarations or references to items already accepted in the
-experiment. Result identity SHALL be the experiment/item/scorer-version combination. Exact
+experiment. Result identity SHALL be the experiment/item/scorer-version combination. While the records are retained, exact
 replays SHALL retain stored identities and original acceptance times with `created=false`;
 changed content for an existing identity SHALL conflict. Every HTTP upload is atomic at the
 backend. The SDK SHALL validate that receipts acknowledge exactly the referenced item set
 and submitted result pairs in order, with distinct result UUIDs. Malformed or incomplete
 acknowledgments SHALL not be reported as successful persistence.
+
+For a retained result, an exact upload replay SHALL acknowledge its original outcome after an edit. The original declaration remains the replay identity. A retry SHALL NOT overwrite a correction. While an experiment is uploading, re-uploading a hard-deleted result or redeclaring a hard-deleted item SHALL create the missing records. Recreated reported results count as new usage. A recreated item SHALL start at a higher revision than its deleted copy.
 
 #### Scenario: Multiple scorers share one item declaration
 - **GIVEN** an isolated offline evaluation client and two results for one item using different scorer versions
@@ -250,6 +253,18 @@ acknowledgments SHALL not be reported as successful persistence.
 - **GIVEN** an isolated offline evaluation client and an upload of two results
 - **WHEN** the mock service responds successfully but acknowledges only one result
 - **THEN** the caller receives an invalid-response error with unknown persistence
+
+#### Scenario: An upload retry preserves a score correction
+- **GIVEN** an acknowledged reported error with code timeout that was later corrected to ok
+- **WHEN** the caller replays the original upload with an ingestion-only key
+- **THEN** the receipt returns the original error and code with created false
+- **AND** the stored corrected result remains ok
+
+#### Scenario: An uploading experiment can recreate a deleted item
+- **GIVEN** a hard-deleted item and its reported result in an uploading experiment
+- **WHEN** the caller re-uploads the original item and result declarations
+- **THEN** the receipt identifies both as created and the reported result counts as new usage
+- **AND** a delayed delete using the previous item's revision receives revision_conflict
 
 ### Requirement: Bounded and independently replayable upload chunks
 
@@ -297,8 +312,9 @@ automatically complete/fail the experiment.
 Completion SHALL occur only on an explicit call, require expected counts to match accepted
 counts when declared, and return a completed receipt. Counts include all result statuses.
 Explicit failure SHALL retain accepted data and omit expected-count checks. Repeating the
-same terminal action SHALL be safe; conflicting terminal actions and new data after closure
-SHALL surface conflicts. Exact replays of previously accepted data remain safe after closure.
+same terminal action SHALL be safe. Conflicting terminal actions and uploads that would
+create or recreate data after closure SHALL surface conflicts. Exact replays of retained data
+remain safe after closure. Explicit corrections and deletes can change retained records after closure.
 Operations on one handle SHALL be serialized, including all chunks of a bulk upload; other
 handles/processes remain subject to backend concurrency.
 
@@ -317,6 +333,11 @@ handles/processes remain subject to backend concurrency.
 - **GIVEN** an isolated offline evaluation client and a completed experiment with an accepted result
 - **WHEN** the caller replays that result and then attempts a new result
 - **THEN** the replay is acknowledged without duplication and the new result produces a conflict
+
+#### Scenario: A closed experiment rejects an upload that would recreate a result
+- **GIVEN** a completed experiment whose accepted reported result has since been deleted
+- **WHEN** the caller replays its original upload
+- **THEN** the caller receives HTTP 409 with code experiment_closed and the result stays deleted
 
 ### Requirement: Retry only operations with safe identity
 
@@ -479,9 +500,10 @@ not mutate the item. Saved declarations predating `model_version` SHALL remain v
 to restoration. The SDK SHALL NOT fill missing or null models with a resolved default during
 restoration or replay; those values SHALL retain the backend's legacy item identity.
 
-An explicit model SHALL participate in immutable item content. The backend SHALL acknowledge
-an exact replay with the existing identities, acceptance times, and `created=false`. Changing,
-adding, or removing a non-null model for an accepted item UUID SHALL conflict, including when
+An explicit model SHALL participate in the original upload declaration. A revision-checked
+item update can correct the current model. The backend SHALL acknowledge
+an exact replay of the retained declaration with the existing identities, acceptance times, and `created=false`. Changing,
+adding, or removing a non-null model by re-uploading a retained item UUID SHALL conflict, including when
 the explicit value equals the inherited experiment model. The SDK SHALL surface that server
 conflict through the existing structured error contract. A different execution SHALL use a
 different item UUID, even if it uses the same dataset case and scorer version.
@@ -552,8 +574,9 @@ Declarations SHALL snapshot and restore calculation requests through to_dict
 and from_dict with stable item/scorer-version identities. Upload SHALL NOT
 discover scorer definitions or evaluate formulas. The backend requires calculation
 requests for composites and reported values for reported scorers. New calculations
-require an uploading experiment; exact retries return stored outcomes, including
-after completion, subject to current composite/input access.
+require an uploading experiment. Exact retries of retained results return their original
+outcomes, including after completion, subject to current composite/input access. Calculating
+a new composite from an edited input, or replaying that calculation, requires stored-result read access.
 
 #### Scenario: A saved calculation is restored
 - **GIVEN** a calculation declaration attached to a reusable evaluation item
@@ -615,8 +638,8 @@ SHALL preserve the failed request's identities, content, and ordering.
 - **AND** no complete or fail operation is sent automatically
 
 ### Requirement: Calculated outcomes are visible in upload receipts
-Result receipts SHALL expose the stored status and nullable error_code on initial
-uploads and exact retries. HTTP success SHALL NOT imply a successful calculation.
+Result receipts SHALL expose the status and nullable error_code acknowledged at the
+original acceptance of a retained result, including on exact retries after a correction. HTTP success SHALL NOT imply a successful calculation.
 Missing outcomes on composite acknowledgments SHALL produce invalid-response
 errors with unknown persistence and retain recoverable pending work.
 Older reported acknowledgments without outcome fields SHALL remain accepted;
@@ -645,3 +668,99 @@ Experiment-level formulas and result inspection APIs remain outside this SDK cap
 - **WHEN** the experiment is completed with expected_result_count 3
 - **THEN** the composite error counts toward completion
 - **AND** only the newly accepted reported inputs contribute billing usage
+
+### Requirement: Revision-checked operations on experiment handles
+
+A newly created or resumed experiment handle SHALL expose the following operations on the project's app API. The paths below are relative to `offline_experiments/{experiment_id}/`. Use the stored item or result UUID from the upload receipt. Sync and async calls SHALL have the same arguments, acknowledgments, and failure semantics.
+
+| Python method | HTTP method and relative path | Returns |
+|---|---|---|
+| `get_item_revision(item_id)` | GET `items/{item_id}/` | Item revision |
+| `get_result_revision(result_id)` | GET `results/{result_id}/payload/` | Result revision, even when its payload is unavailable |
+| `update_item(item_id, *, revision, **fields)` | PATCH `items/{item_id}/` | Current item revision |
+| `update_result(result_id, *, revision, **fields)` | PATCH `results/{result_id}/` | Current result revision |
+| `update_item_payload(item_id, *, revision, payload)` | PATCH `items/{item_id}/payload/` | Current item revision |
+| `update_result_payload(result_id, *, revision, payload)` | PATCH `results/{result_id}/payload/` | Current result revision |
+| `delete_item(item_id, *, revision)` | DELETE `items/{item_id}/` | No value |
+| `delete_result(result_id, *, revision)` | DELETE `results/{result_id}/` | No value |
+| `delete_item_payload(item_id, *, revision)` | DELETE `items/{item_id}/payload/` | No value |
+| `delete_result_payload(result_id, *, revision)` | DELETE `results/{result_id}/payload/` | No value |
+
+A revision SHALL be a nonnegative integer. Zero is valid. The SDK SHALL reject an invalid UUID or revision, including a boolean, before I/O. A revision read SHALL validate the returned owner ID and revision. A missing revision, including on older servers, SHALL surface as `invalid_response`.
+
+Every mutation SHALL require the caller's observed revision. PATCH SHALL send it in the JSON body alongside the changed fields. DELETE SHALL send it as the `revision` query parameter with no request body. PATCH SHALL return the server's revision, which can equal or exceed the submitted one. DELETE SHALL require HTTP 204 and return no value (Python `None`). A malformed success acknowledgment SHALL surface as `invalid_response` with unknown persistence.
+
+The SDK SHALL send each mutation once. A stale revision SHALL surface as HTTP 409 `revision_conflict` with rejected persistence. After a lost response the caller SHALL receive an error with unknown persistence. The SDK SHALL NOT refresh the revision or replay a write on the caller's behalf. Revision reads follow the existing bounded retry policy.
+
+Reads require a personal key with `evaluation:read`. Writes require a personal key with `evaluation:write` and evaluation editor access. Reading a result revision, mutating a result or its payload, and deleting an item additionally require `llm_analytics:read` and access to the affected scorers and composite inputs. An ingestion-only key cannot authorize a mutation.
+
+#### Scenario: A result revision can be read without a stored payload
+- **GIVEN** a resumed experiment handle and a result whose payload was never provided
+- **WHEN** the caller reads the result revision and the payload endpoint returns its ID and revision 0
+- **THEN** the caller receives the integer 0
+
+#### Scenario: A stale item delete after a score edit is rejected
+- **GIVEN** a caller has read an item revision and another caller has since changed one of its scores
+- **WHEN** the caller deletes the item using the older revision
+- **THEN** the service receives one DELETE with that revision in the query and an empty body
+- **AND** the caller receives HTTP 409 with code revision_conflict and rejected persistence
+
+#### Scenario: A lost mutation response leaves the outcome unknown
+- **GIVEN** a resumed experiment handle and a mock service that loses the response to a result update
+- **WHEN** the caller submits the update with revision 2 and retries enabled
+- **THEN** the service receives one PATCH carrying revision 2
+- **AND** the caller receives an error with unknown persistence and the service receives no revision refresh
+
+#### Scenario: An invalid mutation acknowledgment cannot confirm persistence
+- **WHEN** the service returns HTTP 202 for an item payload delete
+- **THEN** the caller receives invalid_response with unknown persistence
+
+#### Scenario: An ingestion-only key cannot edit an accepted item
+- **WHEN** an ingestion-only caller updates an accepted item's trial with its current revision
+- **THEN** the caller receives the service's permission error and the trial is preserved
+
+### Requirement: Partial corrections to accepted items and scores
+
+The API SHALL accept corrections during uploading and after completion or failure. Item updates accept one or more of `case_key`, `trial`, `model_version`, and `application_trace_id`. Omission preserves a field and explicit null clears it. Clearing the item model restores the usual experiment-model fallback. Reported result updates accept one or more of `status`, `value`, and `error_code`. The SDK SHALL preserve which fields were supplied and enforce the existing score encoding rules, including the distinction between a boolean and a number. Python exposes these keyword fields as `ItemUpdate` and `ResultUpdate`. Unsupported fields and empty item or result updates SHALL fail before I/O.
+
+The service SHALL validate a partial correction against the stored result and its pinned scorer version. On a status change it clears the score for a non-ok status and clears the error code for a non-error status unless the caller supplies a conflicting value, which is rejected. A change in a reported status or value SHALL recompute dependent composites using their pinned formulas in the same transaction. A direct score edit to a calculated result SHALL be rejected. An unchanged reported outcome SHALL preserve its revision and scoring time. Changing only the error code SHALL advance the result revision while preserving the scoring time and dependent composites.
+
+An item and its payload share a revision, as do a result and its payload. Adding, changing, or deleting a result on a retained item, including changes to the result payload, SHALL advance the item's revision.
+
+#### Scenario: Correcting a reported score on a completed experiment
+- **GIVEN** a completed experiment with a reported boolean result and an accepted dependent composite
+- **WHEN** the caller changes the reported result from true to false using its current revision
+- **THEN** the PATCH body carries a JSON boolean false and the caller receives the new result revision
+- **AND** the service recomputes the dependent composite using its pinned formula
+
+#### Scenario: Setting the same reported outcome preserves its revision
+- **GIVEN** a reported result with value false and revision 5
+- **WHEN** the caller sets its value to false at revision 5
+- **THEN** the caller receives revision 5 and the score retains its scoring time
+
+### Requirement: Partial payload updates and payload deletion
+
+A payload PATCH SHALL send a `payload` object containing the supplied top-level fields. Item fields are `input`, `output`, `expected_output`, and `metadata`. Result fields are `reasoning`, `error_message`, and `metadata`. Each supplied field replaces its whole value, including an explicit JSON null. Omitted fields SHALL be preserved. The existing payload field types and byte limits apply, including the limit on the final merged payload. Changing item input, output, or expected output keeps the scores and can mark them stale.
+
+A first payload can be added within 30 days of the owner's original acceptance. Edits SHALL preserve that deadline. Deleting a stored payload SHALL remove only the payload and advance the owner's revision. A payload that was never stored, already deleted, or removed by retention cannot be deleted. The service SHALL return HTTP 409 `payload_unavailable` and preserve the revision in those cases. A deleted or expired payload cannot be restored on that record. Its reported score can still be corrected.
+
+#### Scenario: A payload edit distinguishes omission from explicit null
+- **GIVEN** a stored item payload with input and output
+- **WHEN** the caller updates the payload with only output set to null at the observed item revision
+- **THEN** the PATCH body contains that revision and a payload containing only output set to JSON null
+- **AND** the stored input is preserved and the caller receives the current item revision
+
+#### Scenario: A deleted result payload stays unavailable
+- **GIVEN** a caller has deleted a result payload and read the new result revision
+- **WHEN** the caller attempts to write reasoning at that revision
+- **THEN** the caller receives HTTP 409 with code payload_unavailable and the result still exists
+
+### Requirement: Hard deletion of experiment items and results
+
+Deleting an item SHALL remove its results and all associated payloads. Deleting a result SHALL remove its payload and dependent composites. Deleting a composite SHALL preserve its inputs. These operations SHALL be available on uploading, completed, and failed experiments. Current summaries reflect the remaining records. Closed experiments SHALL retain their closure time and counts recorded at closure. Edits, recomputations, and deletes SHALL NOT count as new ingestion.
+
+#### Scenario: Deleting a reported input removes its dependent composite
+- **GIVEN** an item with two reported inputs and a composite that depends on both
+- **WHEN** the caller deletes one reported input at its current revision
+- **THEN** the call returns no value and the deleted input, its payload, and the composite are removed
+- **AND** the item and the other reported input remain

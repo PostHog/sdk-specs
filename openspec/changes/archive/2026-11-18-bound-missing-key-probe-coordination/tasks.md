@@ -11,5 +11,5 @@
 
 ## 2. Validation
 
-- [x] 2.1 Add acceptance fixtures for concurrent release after a returned or errored probe with three identities, and require the delayed response before the coordination wait expires in the single-probe fixtures.
+- [x] 2.1 Add acceptance fixtures for concurrent release after a returned or errored probe with three identities, and require that the SDK coordination wait does not expire during the single-probe and concurrent-release fixtures.
 - [x] 2.2 Validate the change, sync it into the canonical spec, archive it, and run strict validation for all specs.

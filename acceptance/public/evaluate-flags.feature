@@ -404,6 +404,7 @@ Feature: Evaluate Flags
     Given local feature flag definitions resolve "beta-ui" for distinct id "user-123" as true
     And no local feature flag definition is loaded for "deleted-flag"
     And the clean remote response omitting "deleted-flag" is delayed
+    And the SDK coordination wait does not expire during this scenario
     When evaluate flags is started concurrently for distinct ids "user-123" and "user-456" with flag key "deleted-flag"
     Then exactly one remote feature flag evaluation request should be in flight
     When the delayed remote feature flag evaluation response is released
@@ -497,6 +498,46 @@ Feature: Evaluate Flags
     Then two remote feature flag evaluation requests should be in flight before either response is released
 
   @server
+  Scenario: Waiters of a returned key fall back concurrently
+    Given a fresh SDK acceptance test harness
+    And the SDK clock is fixed at "2025-01-01T00:00:00Z"
+    And persistent storage is empty
+    And the mock PostHog server is reset
+    And the SDK is initialized with token "test-token"
+    Given local feature flag definitions resolve "beta-ui" for distinct id "user-1" as true
+    And no local feature flag definition is loaded for "remote-flag"
+    And the delayed remote feature flag evaluation response for distinct id "user-1" returns:
+      | key         | value |
+      | remote-flag | true  |
+    And the SDK coordination wait does not expire during this scenario
+    And remote feature flag evaluation responses for distinct ids "user-2" and "user-3" returning "remote-flag" are delayed
+    When evaluate flags is started for distinct id "user-1" with flag key "remote-flag"
+    Then exactly one remote feature flag evaluation request should be in flight
+    When evaluate flags is started concurrently for distinct ids "user-2" and "user-3" with flag key "remote-flag"
+    Then two evaluations should be waiting on the in-flight probe for "remote-flag"
+    When the delayed remote feature flag evaluation response for distinct id "user-1" is released
+    Then remote feature flag evaluation requests for distinct ids "user-2" and "user-3" should both be in flight before either of their responses is released
+
+  @server
+  Scenario: Waiters of an errored probe fall back concurrently
+    Given a fresh SDK acceptance test harness
+    And the SDK clock is fixed at "2025-01-01T00:00:00Z"
+    And persistent storage is empty
+    And the mock PostHog server is reset
+    And the SDK is initialized with token "test-token"
+    Given local feature flag definitions resolve "beta-ui" for distinct id "user-1" as true
+    And no local feature flag definition is loaded for "missing-flag"
+    And the delayed remote feature flag evaluation response for distinct id "user-1" reports errors while computing flags and omits "missing-flag"
+    And the SDK coordination wait does not expire during this scenario
+    And remote feature flag evaluation responses for distinct ids "user-2" and "user-3" omitting "missing-flag" are delayed
+    When evaluate flags is started for distinct id "user-1" with flag key "missing-flag"
+    Then exactly one remote feature flag evaluation request should be in flight
+    When evaluate flags is started concurrently for distinct ids "user-2" and "user-3" with flag key "missing-flag"
+    Then two evaluations should be waiting on the in-flight probe for "missing-flag"
+    When the delayed remote feature flag evaluation response for distinct id "user-1" is released
+    Then remote feature flag evaluation requests for distinct ids "user-2" and "user-3" should both be in flight before either of their responses is released
+
+  @server
   Scenario: Mixed missing-key scope waits for its overlapping probe
     Given a fresh SDK acceptance test harness
     And the SDK clock is fixed at "2025-01-01T00:00:00Z"
@@ -505,6 +546,7 @@ Feature: Evaluate Flags
     And the SDK is initialized with token "test-token"
     Given no local feature flag definitions are loaded for "missing-a" and "missing-b"
     And the first clean remote response omitting "missing-a" is delayed
+    And the SDK coordination wait does not expire during this scenario
     And the following remote feature flag evaluation response returns:
       | key       | value |
       | missing-b | true  |

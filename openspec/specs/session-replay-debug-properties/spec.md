@@ -9,7 +9,7 @@ goes on every event except `$snapshot`, so any event says whether replay was dis
 buffering, or active when it was captured. Everything else is an optional bundle that goes only
 on SDK events (names starting with `$`, excluding `$feature_flag_called`, `$snapshot`, and the
 browser's `$$heatmap`), at most once every 30 seconds per SDK instance. One queue-depth key sits
-outside both tiers and stays on every non-`$snapshot` event. `$snapshot` events carry none of
+outside both tiers and is attached only while the send queue is backed up. `$snapshot` events carry none of
 these keys; the one exception is four cumulative replay drop counters that the browser attaches
 to `$snapshot` while they are above zero. On mobile a crash-time `$exception` reported on a later
 launch is stamped from a crash-context snapshot that carries the full bundle while replay is not
@@ -383,41 +383,80 @@ nested in `beforeSend`, a nested capture after `beforeSend` has outlasted the in
 - **AND** an eligible SDK event is captured
 - **THEN** it carries `$sdk_debug_session_start`
 
-### Requirement: The queue-depth key stays on every non-`$snapshot` event
+### Requirement: The queue-depth key is attached only while the send queue is backed up
 
 `$sdk_debug_retry_queue_size` (posthog-js) / `$sdk_debug_pending_queue_size` (mobile) SHALL be
-attached to every captured event except `$snapshot` and the minimal `$feature_flag_called`
-envelope, whether or not the event is eligible and whether or not a window is open, and whether
-or not session replay is configured. It is a point-in-time value and SHALL be stripped from the
-mobile crash-context snapshot like the other point-in-time keys. The key-name divergence
-(retry-only backlog on the browser vs. combined pending depth on mobile) is unchanged and
-specified in the keys requirement.
+attached only while it shows that delivery is behind. The key reports a backlog; a value that says
+the queue is healthy adds bytes to every event and tells nobody anything.
+
+The SDK SHALL NOT attach the queue-depth key when the queue's depth is `0`. On the browser the
+retry queue only holds requests that failed and are backing off, so any depth above `0` is a
+backlog, and posthog-js SHALL attach `$sdk_debug_retry_queue_size` whenever the retry queue is not
+empty. On mobile the single pending queue also holds events waiting for an ordinary flush, so a
+depth below the SDK's `flushAt` threshold is normal batching. A mobile SDK SHOULD attach
+`$sdk_debug_pending_queue_size` when the depth is at or above its configured `flushAt` (a flush is
+due and has not happened: offline, failing, backing off, or suspended), and MAY omit it below that
+threshold. Every first-party mobile SDK, including wrappers that build their own events (React
+Native, Flutter desktop), omits it below `flushAt`.
+
+When the key is attached, it SHALL be attached the same way on every captured event except
+`$snapshot` and the minimal `$feature_flag_called` envelope, whether or not the event is eligible,
+whether or not a window is open, and whether or not session replay is configured or
+intentionally off. The depth is read when the event's properties are built. It is a
+point-in-time value and SHALL be stripped from the mobile crash-context snapshot like the other
+point-in-time keys. The key-name divergence (retry-only backlog on the browser vs. combined pending
+depth on mobile) is unchanged and specified in the keys requirement.
+
+A missing key therefore means the queue was not backed up when the event was built (or, for an
+event from an SDK version that predates this rule, that the value was not reported). Consumers use
+`$lib` and `$lib_version` to tell the two apart.
 
 Reference: posthog-js `origin/main` `928990ded` sets `$sdk_debug_retry_queue_size` outside the
-`this.sessionRecording` block (`packages/browser/src/posthog-core.ts:2176`); the minimal envelope
-is rebuilt from an allowlist (`:1909-1911`, `packages/core/src/featureFlagUtils.ts:263`).
-posthog-ios `origin/main` `88f4b6b56` sets `$sdk_debug_pending_queue_size` from the queue's depth
-(`PostHog/PostHogSDK.swift:638-640`) in the shared-properties build (`:714`), so it is on every
-non-`$snapshot` event whether or not replay is configured, and lists it in `pointInTimeDebugKeys`
-(`:3251-3255`), which `notifyContextDidChange` strips (`:3277-3279`).
+`this.sessionRecording` block (`packages/browser/src/posthog-core.ts:2176`), from the retry queue's
+length; the retry queue holds only requests that failed and are retrying
+(`packages/browser/src/retry-queue.ts`). The minimal envelope is rebuilt from an allowlist
+(`:1909-1911`, `packages/core/src/featureFlagUtils.ts:263`). posthog-ios `origin/main` `88f4b6b56`
+sets `$sdk_debug_pending_queue_size` from the queue's depth (`PostHog/PostHogSDK.swift:638-640`) in
+the shared-properties build (`:714`) and lists it in `pointInTimeDebugKeys` (`:3251-3255`), which
+`notifyContextDidChange` strips (`:3277-3279`). At those commits every SDK attaches the key on
+every non-`$snapshot` event, including at depth `0`; this requirement replaces that rule.
 
-Covering test: posthog-js `packages/browser/src/__tests__/posthog-core-also.test.ts:806`
-("returns calculated properties" — a custom event carries `$sdk_debug_retry_queue_size: 0`) and
-`packages/browser/src/__tests__/__snapshots__/featureflags.test.ts.snap:103` (the full
-`$feature_flag_called` envelope carries it). posthog-ios `PostHogTests/PostHogSDKTest.swift:474` ("reports disabled recording status with no
-replay keys on non-iOS platforms": the queue-depth key is present, `:486`), `:695` (the minimal
-envelope carries no `$sdk_debug_*` key), and
+Covering test: posthog-js `packages/browser/src/__tests__/__snapshots__/featureflags.test.ts.snap:103`
+(the full `$feature_flag_called` envelope) and posthog-ios `PostHogTests/PostHogSDKTest.swift:695`
+(the minimal envelope carries no `$sdk_debug_*` key) and
 `PostHogTests/PostHogSessionReplayRemoteConfigBufferTest.swift:580` ("crash context re-snapshots on
-recording transitions and omits point-in-time counters") at `88f4b6b56`.
+recording transitions and omits point-in-time counters") at `88f4b6b56`. The existing tests that
+expect the key at depth `0` (posthog-js `posthog-core-also.test.ts:806`, posthog-ios
+`PostHogSDKTest.swift:474`) encode the replaced rule. Planned (every SDK): an empty queue attaches no
+key; a backed-up queue attaches it on a custom event and on an eligible event inside the window.
 
-#### Scenario: A custom event carries the queue-depth key
+#### Scenario: An empty queue attaches no queue-depth key
 - **GIVEN** the SDK is initialized
+- **AND** its queue is empty (posthog-js: no request waiting to be retried; mobile: no pending event)
 - **WHEN** a custom event is captured
-- **THEN** the event's properties include `$sdk_debug_retry_queue_size` (posthog-js) or
-  `$sdk_debug_pending_queue_size` (mobile)
+- **THEN** the event's properties include neither `$sdk_debug_retry_queue_size` nor
+  `$sdk_debug_pending_queue_size`
 
-#### Scenario: An eligible event inside the window still carries the queue-depth key
-- **GIVEN** an eligible SDK event carrying the optional bundle was accepted less than 30 seconds
+#### Scenario: A non-empty retry queue attaches the key (browser)
+- **GIVEN** posthog-js has at least one request waiting in its retry queue
+- **WHEN** a custom event is captured
+- **THEN** the event's properties include `$sdk_debug_retry_queue_size` with the retry queue's length
+
+#### Scenario: Ordinary batching below `flushAt` may omit the key (mobile)
+- **GIVEN** a mobile SDK whose pending queue holds more than `0` and fewer than `flushAt` events
+- **WHEN** a custom event is captured
+- **THEN** the event's properties MAY omit `$sdk_debug_pending_queue_size`
+
+#### Scenario: A queue at or above `flushAt` attaches the key (mobile)
+- **GIVEN** a mobile SDK whose pending queue holds at least `flushAt` events, because a flush is
+  failing, backing off, or has not run
+- **WHEN** a custom event is captured
+- **THEN** the event's properties SHOULD include `$sdk_debug_pending_queue_size` with the queue's depth
+- **AND** they do not include `$sdk_debug_retry_queue_size`
+
+#### Scenario: A backed-up queue attaches the key on an eligible event inside the window
+- **GIVEN** the queue is backed up, so the SDK attaches the queue-depth key
+- **AND** an eligible SDK event carrying the optional bundle was accepted less than 30 seconds
   ago
 - **WHEN** another eligible SDK event is captured
 - **THEN** the event's properties include the queue-depth key
@@ -621,7 +660,7 @@ that queue's current depth as `$sdk_debug_pending_queue_size`, and SHALL NOT emi
 oversight: the two keys measure genuinely different things (a retry-only backlog vs. a combined
 pending-send depth), so giving them the same name across SDKs would make the property misleading
 on whichever platform lacks a true retry-only queue. The queue-depth key is in neither tier (its
-own requirement above).
+own requirement, "The queue-depth key is attached only while the send queue is backed up").
 
 When the replay integration is installed, `$sdk_debug_replay_internal_buffer_length` (required)
 SHALL report the number of unsent replay snapshots: on mobile, the held buffer's depth while
@@ -707,6 +746,7 @@ scenario remains planned.
 
 #### Scenario: Session and queue keys are present when a session exists (posthog-js)
 - **GIVEN** posthog-js is initialized with session replay and an active session
+- **AND** at least one request is waiting in its retry queue
 - **AND** no accepted event in the last 30 seconds carried the optional bundle
 - **WHEN** an eligible SDK event is captured
 - **THEN** the event's properties include `$sdk_debug_session_start` and
@@ -715,6 +755,7 @@ scenario remains planned.
 
 #### Scenario: Session and queue keys are present when a session exists (mobile)
 - **GIVEN** a mobile SDK is initialized with session replay enabled and an active session
+- **AND** its pending queue holds at least `flushAt` events
 - **AND** no accepted event in the last 30 seconds carried the optional bundle
 - **WHEN** an eligible SDK event is captured
 - **THEN** the event's properties include `$sdk_debug_session_start` and
@@ -727,7 +768,6 @@ scenario remains planned.
 - **AND** a session is active
 - **WHEN** an eligible SDK event that the window allows is captured
 - **THEN** the event's `$recording_status` is `disabled`
-- **AND** the event's properties include `$sdk_debug_pending_queue_size`
 - **AND** the event's properties do not include `$sdk_debug_session_start`
 
 Mobile SDKs source `$sdk_debug_session_start` from the SDK's own session manager, not from the
@@ -922,7 +962,7 @@ that motivated this spec needed to distinguish from an active or buffering repla
 `$sdk_debug_replay_internal_buffer_length` come from the integration and are absent, and so are
 `$sdk_debug_replay_capture_mode` and `$sdk_debug_session_start`. There is no fallback optional
 bundle. An eligible SDK event carries the same single replay key as a custom event, plus the
-queue-depth key that every event carries. This is the not-configured case of "Attach only the
+queue-depth key while the queue is backed up. This is the not-configured case of "Attach only the
 disabled shape while replay is intentionally off".
 
 This is a deliberate mobile divergence from posthog-js. The browser attaches no replay debug key
@@ -970,7 +1010,6 @@ handler" is not yet in the repo.
 - **THEN** the event's `$recording_status` is `disabled`
 - **AND** the event's properties include neither `$sdk_debug_session_start` nor
   `$sdk_debug_replay_capture_mode`
-- **AND** the event's properties include `$sdk_debug_pending_queue_size`
 
 #### Scenario: No session-recording extension attaches nothing (browser)
 - **GIVEN** posthog-js is initialized without the session-recording extension (not bundled, or
@@ -978,7 +1017,6 @@ handler" is not yet in the repo.
 - **WHEN** a `$pageview` event is captured
 - **THEN** the event's properties include neither `$recording_status` nor any
   `$sdk_debug_replay_*` key
-- **AND** the event's properties include `$sdk_debug_retry_queue_size`
 
 ### Requirement: Stop and uninstall reset the reported state and clear any stale hold reason
 
@@ -1342,8 +1380,7 @@ the same session after a remote-off still attaches them.
 
 Covering test: posthog-js `packages/browser/src/__tests__/posthog-core-also.test.ts:835-850`
 ("returns calculated properties" — with the extension present and not started, a custom event
-carries `$recording_status: 'disabled'` and `$sdk_debug_retry_queue_size`, and no other replay
-key); `packages/browser/src/__tests__/extensions/replay/sessionRecording-onRemoteConfig.test.ts:420-426`
+carries `$recording_status: 'disabled'` and no other replay key); `packages/browser/src/__tests__/extensions/replay/sessionRecording-onRemoteConfig.test.ts:420-426`
 (`sessionRecording: false` from the server leaves status `disabled`) and `:428-454` (remote-off after
 a cached start discards the recording and persists `enabled: false`, without asserting the status
 or the keys); `packages/browser/src/__tests__/extensions/replay/lazy-sessionrecording.test.ts:565`
@@ -1362,7 +1399,6 @@ requirement.
 - **THEN** each event's `$recording_status` is `disabled`
 - **AND** neither event includes any `$sdk_debug_replay_*` key, `$sdk_debug_session_start`, or
   `$sdk_debug_recording_script_not_loaded`
-- **AND** each event includes `$sdk_debug_pending_queue_size`
 
 #### Scenario: Replay off in local config sends only the disabled status (browser)
 - **GIVEN** posthog-js is initialized with `disable_session_recording` set to true
@@ -1371,7 +1407,6 @@ requirement.
 - **THEN** the event's `$recording_status` is `disabled`
 - **AND** the event includes none of the persisted replay debug keys, no `$sdk_debug_rrweb_*` key,
   and no `$sdk_debug_session_start`
-- **AND** the event includes `$sdk_debug_retry_queue_size`
 
 #### Scenario: An explicit stop mid-session switches the next event to the off shape
 - **GIVEN** replay is active and a custom event carried the required keys
@@ -1444,6 +1479,7 @@ requirement.
 
 #### Scenario: Keys that are not replay diagnostics stay while replay is off
 - **GIVEN** replay is intentionally off
+- **AND** the queue is backed up, so the SDK attaches the queue-depth key
 - **WHEN** a custom event is captured
 - **THEN** the event includes the queue-depth key
 - **AND** the browser's `$sdk_debug_extensions_init_method` and `$sdk_debug_extensions_init_time_ms`

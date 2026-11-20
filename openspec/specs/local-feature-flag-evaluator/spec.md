@@ -736,7 +736,7 @@ The existing presence-operator requirement SHALL govern `is_set` and `is_not_set
 
 Because caller-supplied local property maps are partial context, an absent required property key that is not listed as known absent SHALL make that criterion inconclusive for every ordinary property operator, including named negative operators. A value-requiring operator whose condition value is omitted SHALL be inconclusive. An operator that is unknown or invalid for the criterion type SHALL be inconclusive for only the affected flag.
 
-A required property key listed as known absent is not missing context. The criterion SHALL be definitive, without remote fallback, and SHALL use these results regardless of the condition value:
+A required property key listed as known absent is not missing context. The criterion SHALL be definitive, without remote fallback, and SHALL use these results regardless of the condition value. The evaluator SHALL NOT parse, compile, or validate a present condition value for a known-absent key, so an invalid pattern or a malformed numeric, date, or version operand does not change the result. This matches the flags service, which removes a listed key before matching and decides each operator from its missing-value branch before it reads the condition value:
 
 | Operator | Result for a known-absent key |
 | --- | --- |
@@ -747,9 +747,11 @@ A required property key listed as known absent is not missing context. The crite
 
 Known absence SHALL NOT change cohort membership read from stored static or realtime cohorts, SHALL NOT affect holdouts, which read no properties, and SHALL apply to a flag dependency because the dependency evaluates with the same listing. A dynamic-cohort property leaf SHALL use the table above before applying its `negation`.
 
+When the condition value is omitted, a value-requiring operator SHALL remain inconclusive even for a known-absent key, as for any criterion with an omitted condition value.
+
 The known-absent table SHALL apply only to an operator the SDK implements locally. An inventory operator that the SDK does not implement locally SHALL make the flag inconclusive with the `unsupported_definition` cause, even when the key is listed as known absent. The SDK SHALL check operator support before it applies the table, so the flag falls back to remote evaluation and the flags service decides the result.
 
-When both operands are available but the property value cannot be interpreted by the selected operator, the criterion SHALL be a definitive no-match. The one exception is `not_between`, which matches a property value that does not convert to a number, as the numeric criteria requirement defines. A malformed condition value SHALL be inconclusive unless an operator-family requirement explicitly defines a safe result. Apart from that `not_between` exception, a named negative operator SHALL negate only a valid comparison; it MUST NOT convert an invalid pattern, invalid numeric/date/version operand, or inconclusive criterion into a match. Implementations MUST NOT expose parser or matcher exceptions to application code.
+When both operands are available but the property value cannot be interpreted by the selected operator, the criterion SHALL be a definitive no-match. The one exception is `not_between`, which matches a property value that does not convert to a number, as the numeric criteria requirement defines. A malformed condition value SHALL be inconclusive unless an operator-family requirement explicitly defines a safe result. Apart from that `not_between` exception and the known-absent table above, a named negative operator SHALL negate only a valid comparison; it MUST NOT convert an invalid pattern, invalid numeric/date/version operand, or inconclusive criterion into a match. Implementations MUST NOT expose parser or matcher exceptions to application code.
 
 #### Scenario Outline: Omitted and null operators default to exact (@server)
 - **GIVEN** a local condition uses <operator-state> for its property operator
@@ -777,6 +779,12 @@ When both operands are available but the property value cannot be interpreted by
   | `gt` | `"10"` | the required key listed as known absent | false |
   | `semver_neq` | `"1.2.3"` | the required key listed as known absent | false |
   | `is_date_before` | `"2025-01-01T10:00:00Z"` | the required key listed as known absent | false |
+  | `not_regex` | `"["` | the required key listed as known absent | true |
+  | `regex` | `"["` | the required key listed as known absent | false |
+  | `gt` | `"not-a-number"` | the required key listed as known absent | false |
+  | `semver_gt` | `"not-a-version"` | the required key listed as known absent | false |
+  | `is_date_after` | `"not-a-date"` | the required key listed as known absent | false |
+  | `is_not` | omitted | the required key listed as known absent | inconclusive |
   | `exact` | omitted | property value `"pro"` present | inconclusive |
   | `future_operator` | `"pro"` | property value `"pro"` present | inconclusive |
   | `gt` | `"10"` | property value `"not-a-number"` present | false |
@@ -796,6 +804,8 @@ For `regex` and `not_regex`, the condition SHALL be a string pattern. The evalua
 A syntactically invalid pattern SHALL produce a definitive no-match for both `regex` and `not_regex`. Syntax unsupported by an SDK's regex engine, or a regex execution failure, SHALL be inconclusive for that flag and MUST NOT become a match through `not_regex` or cohort negation. Regex matching MUST NOT throw into application code.
 
 Portable acceptance vectors SHALL use syntax shared by the target SDK engines. Engine-specific constructs require remote fallback when the SDK cannot evaluate them.
+
+These pattern rules apply only when the property key is present. For a key listed as known absent, `regex` SHALL NOT match and `not_regex` SHALL match without compiling the pattern, so an invalid, unsupported, or engine-specific pattern does not change the result, as the canonical operator inventory requirement defines.
 
 #### Scenario Outline: Regex criteria search safely without implicit flags or anchors (@server)
 - **GIVEN** a local property condition with operator <operator> and pattern <pattern>
@@ -818,6 +828,12 @@ Portable acceptance vectors SHALL use syntax shared by the target SDK engines. E
 - **WHEN** the pattern is evaluated with `regex` or `not_regex`
 - **THEN** local evaluation should be inconclusive for that flag
 - **AND** neither a negative operator nor cohort negation should turn the failure into a match
+
+#### Scenario: A known-absent key resolves regex criteria without compiling the pattern (@server)
+- **GIVEN** a local condition uses pattern syntax unsupported by the SDK regex engine
+- **WHEN** it is evaluated with the required key listed as known absent
+- **THEN** `regex` should not match and `not_regex` should match
+- **AND** the SDK should not require remote fallback
 
 ### Requirement: Numeric criteria use complete finite binary64 comparisons
 

@@ -160,6 +160,18 @@ Feature: Local Feature Flag Evaluator
       | "gt"                  | "10"                     | false   |
       | "semver_neq"          | "1.2.3"                  | false   |
       | "is_date_before"      | "2025-01-01T10:00:00Z"   | false   |
+      | "not_regex"           | "["                      | true    |
+      | "regex"               | "["                      | false   |
+      | "gt"                  | "not-a-number"           | false   |
+      | "semver_gt"           | "not-a-version"          | false   |
+      | "is_date_after"       | "not-a-date"             | false   |
+
+  Scenario: An omitted condition value stays inconclusive for a known-absent key
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And a local condition has operator "is_not" and no condition value
+    When it is evaluated with the required key listed as known absent
+    Then local evaluation should be inconclusive
+    And remote evaluation should remain eligible
 
   Scenario: An operator the SDK does not implement falls back before known absence
     Given the SDK is initialized with token "test-token" and local evaluation enabled

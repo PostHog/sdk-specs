@@ -20,6 +20,9 @@ delivery problem.
     `flushAt`.
   - When attached, it goes on every non-`$snapshot` event as before, and it stays stripped from
     the mobile crash-context snapshot.
+  - The key is SDK-owned. While the queue is not backed up, the SDK removes a registered or
+    caller-supplied value of the same name, so the app cannot make a healthy queue look backed up.
+    This keeps today's behavior, where the SDK value already replaces such a value.
 - **Modified: Session, queue, hold-reason, trigger, and mode keys.** The two scenarios that
   expected the queue key on any eligible event now set up a backed-up queue first.
 - **Modified: Attach the disabled shape when replay is not configured.** The scenarios no longer

@@ -407,6 +407,12 @@ point-in-time value and SHALL be stripped from the mobile crash-context snapshot
 point-in-time keys. The key-name divergence (retry-only backlog on the browser vs. combined pending
 depth on mobile) is unchanged and specified in the keys requirement.
 
+The queue-depth key is SDK-owned. While the queue is not backed up, the SDK SHALL remove a
+registered or caller-supplied value of the same name instead of sending it, so a value the app set
+cannot make a healthy queue look backed up. While the queue is backed up, the SDK-computed depth
+replaces such a value, as every SDK does today. This is an exception to the caller-wins rule in
+"Session, queue, hold-reason, trigger, and mode keys" for this one key.
+
 A missing key therefore means the queue was not backed up when the event was built (or, for an
 event from an SDK version that predates this rule, that the value was not reported). Consumers use
 `$lib` and `$lib_version` to tell the two apart.
@@ -453,6 +459,13 @@ key; a backed-up queue attaches it on a custom event and on an eligible event in
 - **WHEN** a custom event is captured
 - **THEN** the event's properties SHOULD include `$sdk_debug_pending_queue_size` with the queue's depth
 - **AND** they do not include `$sdk_debug_retry_queue_size`
+
+#### Scenario: A registered or caller value does not reach a healthy event
+- **GIVEN** the app registered `$sdk_debug_pending_queue_size` (or `$sdk_debug_retry_queue_size` on
+  the browser) as a super property
+- **AND** the queue is not backed up
+- **WHEN** a custom event is captured with the same key as a caller-supplied property
+- **THEN** the event's properties do not include that key
 
 #### Scenario: A backed-up queue attaches the key on an eligible event inside the window
 - **GIVEN** the queue is backed up, so the SDK attaches the queue-depth key

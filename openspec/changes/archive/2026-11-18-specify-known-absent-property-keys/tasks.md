@@ -1,7 +1,7 @@
 ## 1. Define and apply the contract
 
 - [x] 1.1 Compare the contract with PostHog/posthog#138239 and issue #88947.
-- [x] 1.2 Modify the presence, equality, enrollment, string-search, multi-contains, and operator-inventory requirements and add the remote-fallback requirement.
+- [x] 1.2 Modify the presence, equality, enrollment, string-search, multi-contains, operator-inventory, and numeric criteria requirements and add the remote-fallback requirement.
 - [x] 1.3 Add matching Gherkin scenarios to the local evaluator acceptance feature.
 - [x] 1.4 Sync the delta into the canonical spec and archive the change.
 - [x] 1.5 Run `openspec validate --specs --strict` where the CLI is installed.

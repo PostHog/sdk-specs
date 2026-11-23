@@ -2,8 +2,9 @@
 
 **Repo:** [PostHog/posthog-react-native](https://github.com/PostHog/posthog-react-native) (archived; code lives in `packages/react-native` + `packages/react-native-plugin` of the `posthog-js` monorepo)
 **Audited commit:** `3ddaa65402896c91dcb7b04cfe433e0b1d2f3313` ([commit](https://github.com/PostHog/posthog-js/commit/3ddaa65402896c91dcb7b04cfe433e0b1d2f3313)) — audited on 2026-10-19. **Nine rows re-audited on 2026-11-10 for `@posthog/react-native-plugin` 3.0** at `210bf35d8c19a15003d0643999ae63bcc2102fb6` ([commit](https://github.com/PostHog/posthog-js/commit/210bf35d8c19a15003d0643999ae63bcc2102fb6), head of [PostHog/posthog-js#5194](https://github.com/PostHog/posthog-js/pull/5194)) — see [react-native-plugin 3.0](#react-native-plugin-30-re-audit-2026-11-10)
-**Audited against sdk-specs commit:** `c72e367` (2026-10-19 rows); `752f899` plus [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79`, treated as merged, for the nine plugin 3.0 rows
-**Summary:** 29 ✅ · 28 🟡 · 2 ❌ · 5 ➖ · 0 ❓ (64 rows; 2026-10-19 at `3ddaa654` scored 29/27/3/5/0; previous full audit 2026-08-06 at `e1efa57` scored 31/23/2/2/1 on 59 rows)
+**Re-audited on 2026-11-23** at posthog-js `ffdb355c4534faec8e3b207a6b1efdd900f38e59` ([commit](https://github.com/PostHog/posthog-js/commit/ffdb355c4534faec8e3b207a6b1efdd900f38e59)) — targeted scope, see [2026-11-23 re-audit](#2026-11-23-re-audit)
+**Audited against sdk-specs commit:** `c72e367` (2026-10-19 rows); `752f899` plus [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79`, treated as merged, for the nine plugin 3.0 rows; `54f4457` for the rows the 2026-11-23 scope names
+**Summary:** 29 ✅ · 28 🟡 · 2 ❌ · 11 ➖ · 0 ❓ (70 rows; 2026-11-16 at `210bf35d8`/`3ddaa654` scored 29/28/2/5/0 on 64 rows; 2026-10-19 at `3ddaa654` scored 29/27/3/5/0; previous full audit 2026-08-06 at `e1efa57` scored 31/23/2/2/1 on 59 rows)
 
 **Repo layout (unchanged, re-confirmed):** `PostHog/posthog-react-native` is archived; the SDK lives at
 `packages/react-native/src` (`PostHog extends PostHogCore`, `posthog-rn.ts`, now 3,345 lines — up from
@@ -118,6 +119,67 @@ on its pre-existing empty-event-name gap.
 [#110](https://github.com/PostHog/sdk-specs/pull/110) — `isRetryableFlagsFetchError`
 (`posthog-core-stateless.ts:208-221`) excludes `ECONNREFUSED`. RN inherits node's clean pass here.
 
+## 2026-11-23 re-audit
+
+**Why this run:** rotation priority 1. React Native was the matrix's clearest first slot — the last
+file short of the full contract list, most of its rows last scored on 2026-10-19, and named directly
+by two spec changes this cycle ([#152](https://github.com/PostHog/sdk-specs/pull/152), React Native's
+`projectToken` adoption, and [#208](https://github.com/PostHog/sdk-specs/pull/208), which names
+posthog-js and posthog-react-native as still sending a registered personless setting on identity
+events). Source references in this section are at posthog-js `ffdb355c` unless they say otherwise.
+
+**Scope.** Not a from-scratch re-derivation of all 70 rows. This run scored: the six rows new to the
+file (`Emails`, `AI Datasets`, `AI Scorers`, `Offline Evaluations`, `Experiment Exposure`,
+`Get Remote Config Payload`, all ➖), every row the `6968122` → `54f4457` spec delta touches, and the
+rows the plugin 3.0 re-audit left explicitly queued (the empty-variant rules of
+[#193](https://github.com/PostHog/sdk-specs/pull/193) and the `$feature_flag_variant_key` rename of
+[#203](https://github.com/PostHog/sdk-specs/pull/203)). Rows outside that set carry forward and say so.
+
+**Movement**
+
+| Contract | Was | Now | Why |
+|---|---|---|---|
+| Setup | 🟡 | ✅ | `PostHogProvider` now takes `projectToken` with `apiKey` kept as a deprecated alias that loses to it — the exact non-breaking shape the spec prescribes ([n27](#n27)) |
+| Set Person Properties | ✅ | 🟡 | New spec text ([#208](https://github.com/PostHog/sdk-specs/pull/208)): the person-properties hash must not be checked or recorded for an update that does not surely process the person ([n35](#n35)) |
+
+**Confirmed met, no row moves**
+
+- **Surveys, local default ([#226](https://github.com/PostHog/sdk-specs/pull/226)).** `disableSurveys`
+  defaults to `false` (`packages/react-native/src/posthog-rn.ts:493`), so the subsystem is on unless the
+  app turns it off, and eligibility matching runs only inside `PostHogSurveyProvider` — an app that
+  installs no provider does no matching work. The wait-period gap from the previous audit is **fixed**:
+  `hasPeriodPassed(survey.conditions?.seenSurveyWaitPeriodInDays, lastSeenSurveyDate)`
+  (`surveys/getActiveMatchingSurveys.ts:64`) is live, and the last-seen date is written on show
+  (`surveys/PostHogSurveyProvider.tsx:361`), which is what [#102](https://github.com/PostHog/sdk-specs/pull/102)
+  asks for. See [n30](#n30) for what is still open.
+- **Queue-depth key ([#238](https://github.com/PostHog/sdk-specs/pull/238)).** `_pendingQueueSize()`
+  (`posthog-rn.ts:974-982`) already returns `undefined` below `flushAt` and the depth at or above it, which
+  is the rule the change introduced for a mobile SDK that builds its own events. See [n24](#n24).
+- **A missing flag reports no value ([#202](https://github.com/PostHog/sdk-specs/pull/202)).** A read of an
+  unknown key sets `$feature_flag_response` to `undefined` (`packages/core/src/posthog-core.ts:1129`), which
+  the JSON serializer drops, so the property is absent — one of the two renderings the requirement names,
+  and never the empty string.
+- **Client-level feature flag event default ([#153](https://github.com/PostHog/sdk-specs/pull/153)).** Every
+  read resolves `options.sendEvent ?? this.sendFeatureFlagEvent` before the dedupe tracker
+  (`posthog-core.ts:1085`), and a suppressed read never reaches `flagCallReported`, which is the order the
+  requirement specifies. The spec records posthog-js core and react-native as conforming; re-verified here.
+- **Client W3C traceparent ([#219](https://github.com/PostHog/sdk-specs/pull/219))** is a MAY with an
+  opt-in target list that defaults to unset. React Native propagates no `traceparent` at all (zero matches
+  in `packages/core/src/tracing-headers.ts` and `packages/react-native/src`), which is the conformant
+  default. Tracing Headers stays ✅.
+
+**Carried-forward gaps re-confirmed on the queued rows**
+
+- **Empty variant ([#193](https://github.com/PostHog/sdk-specs/pull/193)).** `getEnabledFromValue`
+  (`packages/core/src/featureFlagUtils.ts:161-163`) returns `true` for any string, including `""`, so a
+  `""` flag reads `enabled: true` through `getFeatureFlagResult` ([n11](#n11)), and
+  `getCommonEventProperties` lists every cached key in `$active_feature_flags`
+  (`posthog-core.ts:249`), including a `""` one ([n5](#n5)). Both are the known gaps the spec itself
+  records. `isFeatureEnabled` is **not** affected: it coerces with `!!`, and `!!"" === false`
+  (`posthog-core.ts:1276`, `:1280`), so that row stays ✅.
+- **`$feature_flag_variant_key` ([#203](https://github.com/PostHog/sdk-specs/pull/203))** is config
+  version 2 attribution, which React Native never sees on `v=2`; nothing to score (row 69 ➖).
+
 ## Matrix
 
 | # | Contract | Status | Note |
@@ -176,9 +238,9 @@ on its pre-existing empty-event-name gap.
 | 52 | Session Replay Ingestion Controls | 🟡 | [n25] |
 | 53 | Session Replay Privacy | ✅ | [n26] |
 | 54 | Set Group Properties For Flags | ✅ | |
-| 55 | Set Person Properties | ✅ | |
+| 55 | Set Person Properties | 🟡 | [n35] |
 | 56 | Set Person Properties For Flags | ✅ | |
-| 57 | Setup | 🟡 | [n27] |
+| 57 | Setup | ✅ | |
 | 58 | Shutdown | 🟡 | [n28] |
 | 59 | Start Session Recording | 🟡 | [n34] |
 | 60 | Stop Session Recording | 🟡 | [n29] |
@@ -186,6 +248,12 @@ on its pre-existing empty-event-name gap.
 | 62 | Traces | ❌ | [n31] |
 | 63 | Tracing Headers | ✅ | |
 | 64 | Unregister | ✅ | |
+| 65 | Emails | ➖ | `public API (server)` scope; the spec's send/get routes need a project secret API key, which never reaches a mobile client. No `messaging` surface anywhere in `packages/react-native/src` |
+| 66 | AI Datasets | ➖ | conditional applicability — "Server SDKs **that implement** AI dataset management"; no dataset surface in `packages/react-native` |
+| 67 | AI Scorers | ➖ | conditional applicability — "Server SDKs implementing AI scorer management"; no scorer surface in `packages/react-native` |
+| 68 | Offline Evaluations | ➖ | conditional applicability — "Server SDKs implementing offline evaluation uploads"; no upload surface in `packages/react-native` |
+| 69 | Experiment Exposure | ➖ | applicability is "every client or server SDK that reads `/flags?v=4` records… An SDK that does not read them sees config version 2 flags as legacy values and sends no direct exposure". React Native inherits `PostHogCoreStateless.getFlagsResponseFormat()`'s default `version: 2` (`packages/core/src/posthog-core-stateless.ts:423-429`) and adds no override, so it never sees a config version 2 record. Re-scope when RN moves to `v=4` |
+| 70 | Get Remote Config Payload | ➖ | "Server SDKs only. The request needs a secret key, which must never reach a client. … A client SDK SHALL NOT expose it." No `remote_config` route or secret-key option in `packages/react-native/src` |
 
 ## Notes
 
@@ -218,6 +286,8 @@ on its pre-existing empty-event-name gap.
 - **SDK currently:** Enrichment, opt-out gating, and the before-send chain are all correct and were re-read at this commit. **Property precedence is now correct** per PR [#114](https://github.com/PostHog/sdk-specs/pull/114): `enrichProperties` (`packages/core/src/posthog-core.ts:229-238`) spreads `...userProperties` after persisted props, session props, and SDK context, and `mergeCommonEventProperties` is overridden on the client (`:242-247`) to fill gaps rather than overwrite the caller — the opposite of the stateless base's server order. RN's `getCommonEventProperties()` override (`posthog-rn.ts:763-770`) layers screen/app properties without breaking that. **Remaining gap, unchanged:** nothing in `capture()`, `captureStateless()`, or `buildPayload()` validates that `event` is a non-empty string — an empty-string event name is enqueued and sent. Same shared-core gap as posthog-node n5. **Gap, missed on 2026-10-19:** null-valued custom properties are sent as JSON `null`. At `210bf35d8`, `normalizeMessage` (`packages/core/src/posthog-core-stateless.ts:1355-1377`) doesn't drop them, and `sendBatch` serializes with `safeJsonStringify` (`:1615`), whose replacer returns `null` unchanged (`packages/core/src/utils/string-utils.ts:27-65`). So `{"test":null,"nested":{"drop":null}}` is sent as is, against "Capture drops null-valued object properties". The serializer is the same at `3ddaa654`; JS-captured exceptions share this gap ([n33](#n33)).
 - **Backwards compatibility:** Backward-compatible — rejecting an empty event name with a warning is additive, and an omitted property and a `null` one read the same in PostHog.
 - **Remediation:** Add a non-empty-string check for `event` at the top of `captureStateless()` in `@posthog/core`, logging and returning early. Drop null-valued object members, recursively and keeping null array elements, in `@posthog/core` before serializing (also fixes [n33](#n33)).
+
+- **2026-11-23, two gaps added on new spec text, status unchanged.** (1) **`$active_feature_flags` lists an empty variant.** `getCommonEventProperties` (`packages/core/src/posthog-core.ts:249`) sends `Object.keys(featureFlags)`, and `getFlagValuesFromFlags` (`featureFlagUtils.ts:76-81`) filters only `undefined`, so a flag whose value is `""` is listed. `openspec/specs/capture/spec.md:1342` says it SHALL NOT be, and `:1344` records posthog-js core and react-native as the known gap. Backward-compatible: filter `""` out of the key list, keep `$feature/<key>` as `""`. (2) **A registered personless setting reaches identity events.** `openspec/specs/capture/spec.md:406` says a registered `$process_person_profile` SHALL NOT be sent with `$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`, `$set` or `$set_once`, and names posthog-js and posthog-react-native as still sending it; `enrichProperties` spreads `this.props` into every event with no identity-event exception. Backward-compatible, and it is what lets [n35](#n35) keep a hash for an update PostHog ignored.
 
 ### n6 — Device ID Generator (🟡 Partial)
 - **Spec requires:** A stable, independently-generated device identifier distinct from the anonymous/distinct id, surviving `reset()` by default.
@@ -258,6 +328,8 @@ on its pre-existing empty-event-name gap.
 - **SDK currently:** **Downgraded from ✅ this run on new spec text; the code is unchanged.** `_getFeatureFlagResult` builds its `payload` from the same `parsePayload` helper described in [n10](#n10), so a malformed serialized payload surfaces on the result object as the raw string. The flag value, reason, and `$feature_flag_called` reporting on the result path are all correct.
 - **Backwards compatibility:** Needs deprecation path — same reasoning and same single fix as [n10](#n10).
 - **Remediation:** Fixing `parsePayload` closes this row, [n10](#n10), and [n12](#n12) together.
+
+- **2026-11-23, gap added on new spec text, status unchanged.** `openspec/specs/get-feature-flag-result/spec.md:294` (from [#193](https://github.com/PostHog/sdk-specs/pull/193)) requires a flag whose value is `""` to read `enabled: false`, `variant: ""`. `getEnabledFromValue` (`packages/core/src/featureFlagUtils.ts:161-163`) returns `true` for any string, so the result says `enabled: true`. Backward-compatible — returning `false` for an empty variant corrects a value no caller can be relying on, since `isFeatureEnabled` already reports `false` for the same flag. Fix in `@posthog/core`, which closes the same row for browser and node.
 
 ### n12 — Get Feature Flags And Payloads (🟡 Partial)
 - **Spec requires:** The bulk map's payload values follow the same decoding contract, and SHALL agree with the single-key accessor.
@@ -340,6 +412,8 @@ on its pre-existing empty-event-name gap.
 - **Backwards compatibility:** Backward-compatible — letting registered and caller values win only changes events whose caller set these keys.
 - **Remediation:** Fill the debug keys only where the event's properties leave them unset, as the client precedence rule does for other SDK-set values. Gate the debug map on replay state (local enable or manual start, no explicit stop, not opted out, and the cached remote config not off), so an off event carries only `$recording_status: disabled`, and do not let an off event use up the 30 s bundle window.
 
+- **2026-11-23 re-check.** [#238](https://github.com/PostHog/sdk-specs/pull/238) replaced "the queue-depth key stays on every non-`$snapshot` event" with "attached only while the send queue is backed up", and React Native already meets the new rule: `_pendingQueueSize()` (`packages/react-native/src/posthog-rn.ts:974-982`) returns the depth only when it is at or above `flushAt` and `undefined` otherwise, with a comment saying exactly that. The off-state gap above is **unchanged** at `ffdb355c`: `_sessionReplayDebugProperties()` (`:905-962`) still reads no remote config, still sets `$sdk_debug_replay_capture_mode` whenever the native replay module is present (`:955`) and still attaches `$sdk_debug_session_start` whenever the bundle is claimed (`:953`); [PostHog/posthog-js#5797](https://github.com/PostHog/posthog-js/pull/5797) has not landed. The precedence gap is unchanged too.
+
 ### n25 — Session Replay Ingestion Controls (🟡 Partial)
 - **Spec requires:** Linked-flag, event-trigger, sample-rate, and minimum-duration gating of replay ingestion, with restrictive (AND) combination on mobile.
 - **SDK currently (plugin 3.0, `210bf35d8`):** the JS gates are unchanged: linked flag (all three shapes), event triggers after `before_send`, AND combination, persisted activation per session (`packages/react-native/src/posthog-rn.ts:3600-3615`). The two 2026-10-19 gaps were left to the native SDKs, and plugin 3.0's native SDKs implement both. RN validates the sample rate and passes it to native (`:3270-3305`; `packages/react-native-plugin/ios/PosthogReactNativePlugin.swift:409`, `PosthogReactNativePluginModule.kt:178`). posthog-ios 4.0 samples on the session id, with the local rate winning over the remote one, and buffers until the minimum duration is met (posthog-ios `e27cbe4cb` `PostHog/Replay/PostHogReplayIntegration.swift:463-470`, `:641-649`); posthog-android 4.0 keeps the session-keyed sampling decision (`shouldRecordSession`, posthog-android `aaa23d39` `PostHog.kt:3228`) and reports `below_minimum_duration` holds (`PostHogReplayIntegration.kt:3007`). posthog-android's own 🟡 on this row (event triggers matched on the pre-hook name) doesn't reach RN, whose triggers are matched in JS after `before_send`. **Gap:** without a local `sessionReplayConfig.sampleRate`, RN passes the project rate from the cached remote config (`posthog-rn.ts:3270-3284`) as the native SDK's local rate, and both native SDKs prefer a local rate over their fresh remote one (posthog-ios `PostHogReplayIntegration.swift:462-470`; posthog-android `PostHogRemoteConfig.kt:1464-1467`). Once native is set up RN doesn't reconfigure it (`posthog-rn.ts:3192-3198`, `:3650-3652`), so a project rate changed from 1 to 0 keeps sampling sessions in until the next launch, as RN's own log says (`:3313-3314`). The spec requires re-deciding when the sample rate changes.
@@ -352,11 +426,12 @@ on its pre-existing empty-event-name gap.
 - **Backwards compatibility:** No change needed.
 - **Remediation:** None.
 
-### n27 — Setup (🟡 Partial)
-- **Spec requires:** `openspec/specs/setup/spec.md:163` and `:179` — the configuration option carrying the project token SHALL be named `projectToken` (platform-cased). An SDK still naming it `apiKey` SHALL **add `projectToken` and keep `apiKey` as a deprecated alias in the same release**, so the rename needs no major version; where a surface accepts both at once, `projectToken` SHALL win. The spec names React Native's `PostHogProvider` `apiKey` prop explicitly as one of two client SDKs that have not adopted it.
-- **SDK currently:** **Downgraded from ✅ this run on new spec text (PR [#108](https://github.com/PostHog/sdk-specs/pull/108)); the code is unchanged.** `PostHogProvider`'s props still declare only `apiKey?: string` (`packages/react-native/src/PostHogProvider.tsx:25`), consumed at `:132` and `:157` (`new PostHog(apiKey ?? '', parsedOptions)`), with the JSDoc example at `:85` still showing `apiKey`. Grep for `projectToken` across `packages/react-native/src` returns zero hits. The positional `new PostHog(apiKey, options?)` constructor is explicitly **out** of scope per the spec ("their parameter name is not part of the contract"), so the provider prop is the whole of this finding.
-- **Backwards compatibility:** Backward-compatible — the spec itself prescribes the non-breaking shape: add `projectToken`, keep `apiKey` as a deprecated alias in the same release, `projectToken` wins when both are passed.
-- **Remediation:** Add `projectToken?: string` to `PostHogProviderProps`; resolve as `projectToken ?? apiKey`; mark `apiKey` `@deprecated` in TSDoc naming `projectToken` as the replacement, and log a warning when the alias is used; update the JSDoc example. Removal of `apiKey` is a later-major concern only.
+### n27 — Setup (✅ Pass; was 🟡)
+- **Spec requires:** `openspec/specs/setup/spec.md:35` and `:41` — the configuration object names the project credential `projectToken`; an SDK still naming it `apiKey` adds `projectToken` and keeps `apiKey` as a deprecated alias in the same release, and `projectToken` wins where both are passed. [#152](https://github.com/PostHog/sdk-specs/pull/152) rewrote the surface table on 2026-11-18 to record React Native as having adopted the name, leaving Unity as the one client SDK that has not. The constructor's positional parameter is explicitly out of scope.
+- **SDK currently (2026-11-23, `ffdb355c`):** **Resolved.** `PostHogProviderProps` declares `projectToken?: string` (`packages/react-native/src/PostHogProvider.tsx:25`) and keeps `apiKey?: string` marked `@deprecated` naming `projectToken` as the replacement and saying it is removed in the next major (`:27-31`). The resolution is `const token = projectToken ?? apiKey` (`:147`), so `projectToken` wins when both are set, and the JSDoc example uses `projectToken` (`:91`). The constructor parameter is also renamed (`posthog-rn.ts:482`) with an `apiKey` getter kept as a deprecated alias (`:441-445`).
+- **Environment variable ([#214](https://github.com/PostHog/sdk-specs/pull/214)):** not applicable. The requirement binds only "where an SDK reads the project token from an environment variable", and React Native reads it from code only.
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None. Removing `apiKey` is a later-major concern only.
 
 ### n28 — Shutdown (🟡 Partial)
 - **Spec requires:** Flush pending work, then refuse further captures — events captured after shutdown SHALL NOT be enqueued.
@@ -375,6 +450,8 @@ on its pre-existing empty-event-name gap.
 - **SDK currently:** Re-read at this commit. A full display implementation in `packages/react-native/src/surveys/`, wired through `PostHogSurveyProvider` and `posthog-rn.ts`'s `getSurveys()`/`_handleSurveysFromRemoteConfig`. Web-only conditions (`conditions.url`/`conditions.selector`) are correctly and unconditionally excluded; eligibility covers active status, device type, seen/repeat, and linked/targeting/internal flags; the single-active-prompt rule is enforced by a single `activeSurvey` slot; the three core events carry dual-format response keys. **One gap is now fixed:** the display path gates on consent — `canCaptureSurvey(posthog)` (`surveys/survey-progress.ts:133-135`, `!posthog.optedOut && !posthog.isDisabled`) is checked at four points in `PostHogSurveyProvider.tsx` (`:179`, `:256`, `:274`, `:292`), closing the previous audit's "survey can still visually display to an opted-out user" finding. **Two gaps remain:** (1) no `"survey abandoned"` event anywhere in the codebase — the spec's "where supported" makes this allowed-but-real rather than a hard failure; (2) the wait-period repeat rule is still **commented out** — `getActiveMatchingSurveys.ts:54` is a commented `const surveyWaitPeriodInDays = survey.conditions?.seenSurveyWaitPeriodInDays`, so a configured `seenSurveyWaitPeriodInDays` has no effect and a dismissed survey can re-prompt sooner than configured.
 - **Backwards compatibility:** Backward-compatible — honouring a condition that is already in the definition payload, and emitting an additional event, are both additive.
 - **Remediation:** Uncomment and implement the wait-period check against the persisted last-seen timestamp (note sdk-specs PR [#102](https://github.com/PostHog/sdk-specs/pull/102): the period starts when the survey is *shown*); add `"survey abandoned"` on provider teardown with a partially-completed survey.
+
+- **2026-11-23 re-check — one of the two gaps is fixed, one new divergence recorded; row stays 🟡.** The wait-period rule is **implemented**: `hasPeriodPassed(survey.conditions?.seenSurveyWaitPeriodInDays, lastSeenSurveyDate)` runs in `getActiveMatchingSurveys` (`packages/react-native/src/surveys/getActiveMatchingSurveys.ts:64`, helper at `:30-38`), and `setLastSeenSurveyDate(new Date())` is called in the survey's `onShow` (`surveys/PostHogSurveyProvider.tsx:361`), which is the show-time start [#102](https://github.com/PostHog/sdk-specs/pull/102) requires. `"survey abandoned"` is still absent (zero matches in `packages/react-native/src`), which the spec's "where supported" allows. **New, from [#181](https://github.com/PostHog/sdk-specs/pull/181):** the requirement suppresses `$feature_flag_called` for eligibility reads of a `survey-targeting-` key but keeps it for an ordinary linked flag ("one event named `$feature_flag_called` should be enqueued for flag `beta-program`"). React Native satisfies the suppression by construction and misses the second half the same way: eligibility reads the cached map (`isSurveyFlagEnabled`, `getActiveMatchingSurveys.ts:26-28`, over the `useFeatureFlags` snapshot, `surveys/PostHogSurveyProvider.tsx:135`), so **no** eligibility read emits a usage event, for any key. [#226](https://github.com/PostHog/sdk-specs/pull/226)'s enabled-by-default and no-renderer-no-matching rules are both met (see the run section).
 
 ### n31 — Traces (❌ Fail)
 - **Spec requires:** An OTLP span pipeline to `/i/v1/traces` with W3C `traceparent`/`tracestate` interop, the spec's configuration knobs at the spec's defaults, and spec-conformant retry classification.
@@ -403,8 +480,18 @@ audit, and node is the one package that wires it. See the matching entry in
 - **Backwards compatibility:** Backward-compatible — an omitted property and a `null` one read the same in PostHog.
 - **Remediation:** Drop null-valued object members, recursively and keeping null array elements, in `@posthog/core` before serializing; that also fixes Capture ([n5](#n5)).
 
+- **2026-11-23, gap added on new spec text, status unchanged.** `openspec/specs/capture-exception/spec.md`, "Synthesized stacks stop at the application call site" ([#224](https://github.com/PostHog/sdk-specs/pull/224)), requires a synthesized stack to end at the application frame that called the public API, with no SDK capture-path frames after it — and names react-native as a known gap. Confirmed at `ffdb355c`: the synthetic `Error` is constructed inside `captureExceptionInternal` (`packages/react-native/src/posthog-rn.ts:2588`), which the public `captureException` delegates to (`:2566`), so both frames stay at the end of the stack. Backward-compatible — trimming SDK frames changes only the synthesized case, and the spec's own remediation is to build the synthetic error at the public entry point and drop the frames below the caller.
+
 ### n34 — Start Session Recording (🟡 Partial; was ✅)
 - **Spec requires:** A manual start still respects the replay controls; on mobile it still respects event triggers (session-replay-ingestion-controls: "mobile manual start still respects event triggers", and "Event-trigger gating": while triggers are configured and the session isn't activated, the SDK SHALL NOT be recording).
 - **SDK currently (plugin 3.0, `210bf35d8`):** a start while opted out is not recorded as what opt-in restores (`packages/react-native/src/posthog-rn.ts:2134-2151`). But a direct `startSessionRecording()` builds its request without `awaitEventTrigger` (`:2140`), the JS trigger hold only applies when that flag is set (`:2171-2182`), and the call goes straight to native `startRecording` (`:2275`). Native doesn't hold it either: both native SDKs ignore event triggers for RN (posthog-ios `e27cbe4cb` `PostHog/Replay/PostHogReplayIntegration.swift:1573-1576`; posthog-android `aaa23d39` `PostHogRemoteConfig.kt:1494`). So with an unfired trigger configured, a direct start records. Only the opt-in restore waits for the trigger (`_restoreAppRecording`, `:3685`). The RN test that shows a direct start held (`packages/react-native/test/session-replay-opt-out.spec.ts:333-344`) does so with a native mock that holds the start, which the real SDKs don't.
 - **Backwards compatibility:** Backward-compatible — holding a direct start until the trigger fires matches what the spec already requires.
 - **Remediation:** Set `awaitEventTrigger: true` on the direct start request too.
+
+<a id="n35"></a>
+
+### n35 — Set Person Properties (🟡 Partial; was ✅)
+- **Spec requires:** `openspec/specs/set-person-properties/spec.md`, "The person-properties hash only tracks updates that surely process the person" (new 2026-11-19, [#208](https://github.com/PostHog/sdk-specs/pull/208)). A client SDK that skips duplicate person-property updates with a cached hash SHALL read the person-processing setting of each update **as it is sent** and SHALL check the update against the hash, and record the hash, only when that setting is missing or Boolean `true`. For any other value it SHALL send the update without checking the hash and SHALL clear the stored hash.
+- **SDK currently (`ffdb355c`):** `setPersonProperties` (`packages/core/src/posthog-core.ts:1660-1695`) computes `getPersonPropertiesHash(distinctId, set, setOnce)`, returns early when it equals `_cachedPersonProperties`, and records the new hash after capture — unconditionally, without reading the person-processing setting the `$set` event will carry. React Native takes no per-call capture options on this call, so the spec's `@per_call_capture_options_capable` scenarios do not apply; the path that bites is the registered one. A registered `$process_person_profile` reaches `$set` through `enrichProperties` (`:254-262`) — the capture spec records posthog-js and posthog-react-native as still sending the registered value on identity events — so with a registered `false` in place the SDK both suppresses a repeat update and keeps a hash for an update PostHog did not apply to the person.
+- **Backwards compatibility:** Backward-compatible — reading the setting and skipping the cache for anything other than missing/`true` only sends updates that are dropped today, and never suppresses one that is sent today.
+- **Remediation:** In `setPersonProperties`, resolve the `$process_person_profile` value the event will carry (registered or caller-supplied), and when it is anything other than absent or Boolean `true`, skip the hash comparison, send the `$set`, and clear `_cachedPersonProperties`. One fix in `@posthog/core` covers react-native and browser. Fixing the registered-value leak itself ([n5](#n5)) would also close this path.

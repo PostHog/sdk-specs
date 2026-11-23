@@ -1,9 +1,9 @@
 # posthog-node — SDK Compliance
 
 **Repo:** [PostHog/posthog-js](https://github.com/PostHog/posthog-js) (`packages/node` + `packages/core` — the standalone `posthog-node` repo is archived and its code now lives in this monorepo)
-**Audited commit:** `8c832754` ([tree](https://github.com/PostHog/posthog-js/commits/main)) — audited on 2026-11-02
-**Audited against sdk-specs commit:** `be25182`
-**Summary:** 11 ✅ · 21 🟡 · 4 ❌ · 32 ➖ · 0 ❓ (68 rows)
+**Audited commit:** `8c832754` ([tree](https://github.com/PostHog/posthog-js/commits/main)) — audited on 2026-11-02. **Re-audited on 2026-11-23** at `ffdb355c4534faec8e3b207a6b1efdd900f38e59` ([commit](https://github.com/PostHog/posthog-js/commit/ffdb355c4534faec8e3b207a6b1efdd900f38e59)) — targeted scope, see [2026-11-23 re-audit](#2026-11-23-re-audit)
+**Audited against sdk-specs commit:** `be25182` (2026-11-02 rows); `54f4457` for the rows the 2026-11-23 scope names
+**Summary:** 11 ✅ · 23 🟡 · 4 ❌ · 32 ➖ · 0 ❓ (70 rows; 2026-11-02 at `8c832754` scored 11/21/4/32/0 on 68 rows)
 
 **Previous audit:** 2026-10-12 at `4f590b36` (64 rows, 9 ✅ · 21 🟡 · 4 ❌ · 29 ➖ · 1 ❓), with a
 2026-10-19 correction that moved Traces ❌→❓.
@@ -20,6 +20,55 @@ flag-getter option naming (#109). Rows outside those sets carry forward from 202
 which replaces the Unknown note with the evaluation it was waiting for.
 
 **A note on repo layout:** The `PostHog/posthog-node` repository itself has been archived/redirected — its code was moved into the `posthog-js` monorepo and now lives at `packages/node` (Node-specific integration: the `PostHog` client class, Express/NestJS middleware, error-tracking stack-trace enrichment, feature-flag polling, the `captureAi`/`ai-capture` route, and the new `emails/` surface) and `packages/core` (the shared `@posthog/core` library also used by `packages/browser` and `packages/react-native`: the capture/batch/flush/retry engine in `posthog-core-stateless.ts`, the richer ambient-identity `posthog-core.ts` base class used only by client SDKs, and the `logs/`, `traces/` and `metrics/` OTLP pipelines). This audit inspects `packages/node/src` + `packages/core/src` only. `packages/node`'s `PostHogBackendClient` still extends the stateless `PostHogCoreStateless`, **not** the richer client-only `PostHogCore`, so most client-only ambient-identity/session/replay primitives simply don't exist on the Node class at all, making most N/A calls unusually clean-cut.
+
+## 2026-11-23 re-audit
+
+**Why this run:** rotation priority 2 — posthog-node was queued as the second slot, it is the one SDK
+in the matrix that implements **Experiment Exposure**, and six of this cycle's spec commits land on
+flag reads it owns. The monorepo moved from `8c832754` to `ffdb355c`.
+
+**Scope.** The two rows new to the file (`Experiment Exposure`, `Get Remote Config Payload`, both
+scored from scratch) plus the rows the `6968122` → `54f4457` spec delta touches: Feature Flag Called
+Tracker ([#202](https://github.com/PostHog/sdk-specs/pull/202),
+[#168](https://github.com/PostHog/sdk-specs/pull/168)), Local Feature Flag Evaluator
+([#144](https://github.com/PostHog/sdk-specs/pull/144),
+[#230](https://github.com/PostHog/sdk-specs/pull/230)), Flag Definition Loader
+([#229](https://github.com/PostHog/sdk-specs/pull/229)), Evaluate Flags
+([#231](https://github.com/PostHog/sdk-specs/pull/231)), Emails
+([#228](https://github.com/PostHog/sdk-specs/pull/228)) and Capture Exception
+([#224](https://github.com/PostHog/sdk-specs/pull/224)). Every other row carries forward from
+2026-11-02 at `8c832754`. **No row moved on code** — the two status changes are both new rows.
+
+**Confirmed met**
+
+- **Key-scoped messaging paths ([#228](https://github.com/PostHog/sdk-specs/pull/228)).** The spec
+  dropped `/api/projects/@current/` from the send and status routes on 2026-11-18, and posthog-node
+  already sends the new ones: `SEND_PATH = '/api/messaging/send/email/'` and
+  `STATUS_PATH = '/api/messaging/emails/{messageId}/'` (`packages/node/src/emails/emails.ts:37-39`).
+  Emails stays ✅ ([n27](#n27)).
+- **`early_exit` after an inconclusive group ([#230](https://github.com/PostHog/sdk-specs/pull/230)).**
+  `_computeFlagLocally`'s condition loop (`packages/node/src/extensions/feature-flags/feature-flags.ts:683-689`)
+  triggers `early_exit` only on `'out_of_rollout_bound'` — every filter matched and only the rollout
+  excluded the identifier — and when an earlier group was inconclusive it `break`s and stays inconclusive
+  instead of returning `false`, which is exactly the rule the change added.
+- **A missing flag reports no value ([#202](https://github.com/PostHog/sdk-specs/pull/202)).** A read of an
+  unknown key leaves `$feature_flag_response` `undefined` (`client.ts:2363-2365`), which the serializer
+  drops; the empty string is never sent for a missing flag.
+
+**New gaps on new spec text, recorded on rows that were already 🟡**
+
+- **Locally evaluated reads omit `$feature_flag_version`** ([#168](https://github.com/PostHog/sdk-specs/pull/168)) —
+  [n21](#n21).
+- **A manual definition refresh resolves on failure** ([#229](https://github.com/PostHog/sdk-specs/pull/229)) —
+  [n22](#n22).
+- **Nested group quantification is not deferred** ([#144](https://github.com/PostHog/sdk-specs/pull/144)) —
+  [n24](#n24).
+- **A synthesized stack keeps the SDK's capture frame** ([#224](https://github.com/PostHog/sdk-specs/pull/224)) —
+  [n7](#n7).
+- **Probe coordination** ([#231](https://github.com/PostHog/sdk-specs/pull/231)) refines a requirement
+  posthog-node does not implement at all; [n10](#n10) already carries it and is re-confirmed at
+  `ffdb355c` — no negative-knowledge store, no definitions-generation counter and no in-flight probe map
+  anywhere in `packages/node/src`.
 
 | # | Contract | Status | Note |
 |---|----------|--------|------|
@@ -91,6 +140,8 @@ which replaces the Unknown note with the evaluation it was waiting for.
 | 66 | AI Datasets | ➖ | the spec's applicability is conditional — "Server SDKs **that implement** AI dataset management", with posthog-python's `posthog.ai.evaluations` as the only named reference surface. `packages/node` ships no dataset management (`grep -ril datasets packages/node/src` → nothing), so the contract does not bite. Re-scope to ❌ if the spec is ever widened to require it of every server SDK |
 | 67 | AI Scorers | ➖ | same conditional applicability — "Server SDKs implementing AI scorer management"; no scorer surface in `packages/node` |
 | 68 | Offline Evaluations | ➖ | same conditional applicability — "Server SDKs implementing offline evaluation uploads"; no experiment/upload surface in `packages/node`. Note this is the capability that also defines the shared app-API client for the two rows above, so all three would land together |
+| 69 | Experiment Exposure | 🟡 | [n28] |
+| 70 | Get Remote Config Payload | 🟡 | [n29] |
 
 ## Notes
 
@@ -170,6 +221,8 @@ compression, queue and flush, and the error-handling/retry policy. It passes eac
 - **SDK currently:** Two of the previous note's four findings are resolved. (1) The flat-property finding is **withdrawn**: the spec no longer requires `$exception_type`/`$exception_message`, and posthog-node's `buildFromUnknown` returning only `$exception_list`/`$exception_level` (`packages/core/src/error-tracking/error-properties-builder.ts:41-56`) is now the conformant shape. (The Sentry adapter still emits the flat pair at `packages/node/src/extensions/sentry-integration.ts:144-145`, which the spec explicitly permits for compatibility.) (2) Nested `.cause` entries are **no longer hardcoded to `handled: true`** — `convertToExceptionList` (`error-properties-builder.ts:119-145`) now emits nested entries with `type: 'chained'`, a relationship `source`, `exception_id`/`parent_id` linkage and **no `handled` at all**, which is what the metadata spec asks for. Ordering, stack parsing and source-context handling were re-verified and remain correct. Still open: `$exception_level` is a hardcoded literal `'error'` for every path (`error-properties-builder.ts:54`), including the `uncaughtException` boundary that `autocapture.ts` lets terminate the process, where the spec's boundary table says `fatal`; and caller-supplied `additionalProperties` are still spread **after** the SDK-canonical properties in `ErrorTracking.buildEventMessage` (`packages/node/src/extensions/error-tracking/index.ts:66-71`), so an application property bag can overwrite `$exception_list`/`$exception_level`.
 - **Backwards compatibility:** Needs deprecation path — both remaining items change event payloads that downstream dashboards/alerts may read in their current form, and posthog-node ships no deprecation warning for the reserved-key override today (posthog-python does, which is the model to copy).
 - **Remediation:** Derive `$exception_level` from the capture boundary (the uncaught/terminating listeners in `autocapture.ts` already know they are terminating and already pass a typed `mechanism`, so the level can ride the same channel) instead of a literal; and reserve the `$exception_*` keys against the caller's property bag in `buildEventMessage`, warning on override for one minor release before ignoring them. Full detail under [n20].
+
+- **2026-11-23, third gap added on new spec text, status unchanged.** `openspec/specs/capture-exception/spec.md`, "Synthesized stacks stop at the application call site" ([#224](https://github.com/PostHog/sdk-specs/pull/224)), requires a synthesized stack to end at the application frame that called the public exception-capture API, with none of the SDK's own capture-path frames after it; the requirement names `@posthog/node` as a known gap. Confirmed at `ffdb355c`: the synthetic `Error` for an input with no usable stack is built inside the SDK's capture method and only the message line is skipped, so that method's frame is the last frame of the stack. Backward-compatible — it changes only synthesized stacks, where the trailing SDK frame is noise in grouping today.
 
 ### n8 — Debug (✅ Pass)
 - Spec's own applicability line says `client`, and the acceptance file (`acceptance/public/debug.feature`) is tagged `@client` throughout with no scenario-level override. However, posthog-node genuinely implements the exact behavior the spec describes: `debug(enabled: boolean = true): void` is explicitly overridden at `packages/node/src/client.ts` (calls `super.debug(enabled)` then forwards to the feature-flag poller), building on `PostHogCoreStateless.debug()` (installs/removes a wildcard `on('*', ...)` internal-event logger with no capture/network side effects). This mechanically satisfies all 3 acceptance scenarios. Recorded as ✅ (implemented beyond the spec's own stated `client` scope) rather than ➖, since the contract genuinely exists and works.
@@ -279,11 +332,15 @@ observation.
 - **Backwards compatibility:** Backward-compatible — swapping the full-clear for an LRU/bounded map with incremental eviction changes no public API.
 - **Remediation:** Replace `distinctIdHasSentFlagCalls`'s capacity handling with incremental LRU eviction (e.g. a `SizeLimitedDict`-style structure, as posthog-python already uses for the same purpose).
 
+- **2026-11-23, second gap added on new spec text.** `openspec/specs/feature-flag-called-tracker/spec.md`, "Flag definition identity on flag-called events" ([#168](https://github.com/PostHog/sdk-specs/pull/168)), requires `$feature_flag_id` **and** `$feature_flag_version` on a locally evaluated read, taken from the local definition that produced the value, and names posthog-node's gap explicitly. Confirmed at `ffdb355c`: the local-evaluation branch of the single-flag read sets `flagId = flag.id` only (`packages/node/src/client.ts:2259`), leaving `flagVersion` at its `undefined` initializer (`:2238`); only the remote branch fills both (`:2317`). The property is then omitted from the event (`:2368`). Backward-compatible — the local definitions already carry a version, so reading it adds a property that is absent today and suppresses nothing. Same fix should set it on the snapshot record, which the spec notes hardcodes `version: undefined` for a locally evaluated flag.
+
 ### n22 — Flag Definition Loader (🟡 Partial)
 - **Spec requires:** Loader fetches and caches flag/cohort/group-type-mapping definitions for local evaluation; on a refresh failure, stale definitions are retained (not discarded) and a refresh-failure warning is recorded, without disrupting in-flight local evaluation.
 - **SDK currently:** `_loadFeatureFlags()` (`packages/node/src/extensions/feature-flags/feature-flags.ts:883-976`) correctly retains stale definitions on failure — the `default:` branch of its response-status `switch` (lines 968-971) does a bare `return` without calling `updateFlagState`, so existing cached flags are never overwritten by a failed refresh. **However, this default branch also never records any refresh-failure diagnostic** — no `onError?.()` call, no `console.warn`/`this._logger`/`this.onError` invocation of any kind — for any status code other than 401/403/429 (which route through a thrown `ClientError` caught and forwarded to `onError` at lines 973-976). A 503 (or 500, or any other non-explicitly-handled status) — a realistic and common transient failure mode — silently falls through with zero observability, directly failing the acceptance scenario "Loader keeps stale definitions when refresh fails," which explicitly requires that "the SDK should record a flag definition refresh warning" in addition to retaining stale data. This is a newly-identified gap not flagged in the previous audit (which rated this row ✅).
 - **Backwards compatibility:** Backward-compatible — adding a warning log call to an already-silent failure branch has no API impact.
 - **Remediation:** In the `default:` branch of `_loadFeatureFlags()`'s response-status switch, add a `this._logger.warn(...)` (or `this.onError?.(...)`) call recording the unexpected status code before returning, so refresh failures are observable without changing the stale-data-retention behavior.
+
+- **2026-11-23, second gap added on new spec text.** `openspec/specs/flag-definition-loader/spec.md`, "Awaiting a manual definition refresh" ([#229](https://github.com/PostHog/sdk-specs/pull/229)), says a refresh surface that can report an outcome SHALL report the failure that kept the fetched definitions from being published and SHALL NOT report success for it. The spec names posthog-node: `reloadFeatureFlags()` returns a promise that resolves after a failed refresh as well as a successful one, with an unauthorized, forbidden, rate-limited or undecodable response passed only to `onError` and a quota-limited or server-error response not reported at all. That is the same `default:` branch this note already covers, read through the promise rather than through logging, and it is consistent with what is in the code at `ffdb355c`. Backward-compatible — rejecting the promise on a failed refresh is observable only to callers that await it, and the SDK already keeps the stale definitions either way.
 
 ### n23 — HTTP Client (🟡 Partial)
 - **Spec requires:** Native HTTP client injectable/replaceable; ingestion requests include token; gzip; non-2xx/3xx failures reported without throwing to capture callers; a feature-flag-evaluation retry policy: retry only on transport failures or HTTP 502/504, default budget of exactly 1 retry (2 total attempts), exponential backoff starting at 300ms and doubling to 600ms for the second retry.
@@ -296,6 +353,8 @@ observation.
 - **SDK currently:** **Holdouts are implemented** — `packages/core/src/featureFlagLocalEvaluation.ts:546-580` hashes `holdout-<value>` with the service's `-` separator (the comment makes the separator's significance explicit) and `packages/node/src/types.ts:406-408` carries `filters.holdout` through the definition type. posthog-node is the second SDK in this matrix to have them, after posthog-python. The operator-degradation behavior re-verified as correct and the batch isolation in `getAllFlagsAndPayloads` is unchanged. **The group-key rule is the new gap:** `packages/node/src/extensions/feature-flags/feature-flags.ts:400` passes `groups[groupName]` straight into `matchFeatureFlagProperties` as the bucketing value, and `getFeatureFlagHash` (`featureFlagLocalEvaluation.ts:537-541`) interpolates it into a template literal. A string or number key renders correctly (`42` → `"42"`, matching the service), but the declared `bucketingValue: string` type is not enforced at the runtime boundary — `groups` arrives from an untyped caller map — so a boolean key buckets on the literal `"true"` and an object key on `"[object Object]"`, host-specific spellings the service would never produce, instead of making the condition inconclusive and falling back to `/flags`. Nothing crashes, which is the other half of the requirement. This is the identical gap recorded for posthog-python ([posthog-python.md#n19](posthog-python.md)).
 - **Backwards compatibility:** Backward-compatible — today's behavior for a non-scalar group key is a silent disagreement with the backend, so changing it to inconclusive-plus-remote-fallback corrects a wrong answer rather than removing a relied-on one. The acceptance-asset sync gap noted previously is unchanged and needs no code change.
 - **Remediation:** At the group branch in `feature-flags.ts`, narrow the key: accept `string` as-is and `number` via its canonical JSON encoding, and throw `InconclusiveMatchError` for anything else so the flag defers to `/flags`. Separately, mirror the operator-degradation and group-key scenarios from `spec.md` into `acceptance/private/local-feature-flag-evaluator.feature`.
+
+- **2026-11-23, one more deferral class is missing.** `openspec/specs/local-feature-flag-evaluator/spec.md` ([#144](https://github.com/PostHog/sdk-specs/pull/144)) now lists the divergence classes a local regex SHALL treat as inconclusive even when the local engine would answer definitively, among them "quantified assertions, nested or orphan-group quantification, and oversized repeat counts", with `^(a+)+$` as a worked example. The shared portability filter `getPortableRegexClasses` (`packages/core/src/featureFlagLocalEvaluation.ts:255-312`) covers most of the list — non-ASCII patterns and inputs (`:261`, `:347-350`), `\b`/`\B` outside a class (`:272`), lookarounds and anything other than `(?:` (`:289-291`), backreferences and unknown escapes (`:268-270`), repeat counts above `0xffffffff` (`:293-304`) and repeated anchors (`:307`) — but has **no rule for a quantified group**, so `^(a+)+$` compiles and is matched locally against an ASCII input. The service's bounded backtracking budget can disagree. Backward-compatible — deferring a pattern class only moves those flags to remote evaluation. Add a check for a quantifier directly following a group close.
 
 ### n25 — Retry Queue (🟡 Partial)
 - **Spec requires:** `both`. In-memory queue with backpressure/drop-when-full; classify retryable (network errors, 5xx, 429, timeouts) vs. non-retryable (most 4xx) failures; exponential/linear backoff honoring `Retry-After`; retryable failures keep the same events queued for a later, separate flush attempt; success removal by identity/stable-id (not index); terminal/exhausted failures drop the batch.
@@ -315,6 +374,15 @@ exponential progression, no jitter, and no `Retry-After` handling at all. Backwa
 the ingestion retry through the `backoff.ts` helper the same module already ships is additive and
 strictly reduces synchronized retry bursts. This defect is shared with posthog-react-native and
 posthog-browser through `@posthog/core`.
+
+
+**Re-verified 2026-11-23 at `ffdb355c` — [#231](https://github.com/PostHog/sdk-specs/pull/231) refines a
+requirement that is still entirely absent.** That change bounds probe coordination to one SDK instance in
+one process, bounds each waiting evaluation by one finite deadline, and settles what positive evidence does
+to an overlapping probe. posthog-node has nothing to bound: a non-test grep over `packages/node/src` for
+`negative`, `missingKey`, `probe` and `knownMissing` still returns no match, so a requested-but-absent key
+re-probes `/flags` on every call and concurrent evaluations for the same key each make their own request.
+The row stays 🟡 for this one requirement.
 
 ### n26 — MCP Analytics (🟡 Partial, new row)
 - **Spec requires:** The MCP analytics spec's applicability table lists `@posthog/mcp` under **posthog-js**. In practice `packages/mcp/package.json` declares `posthog-node` as both a workspace dependency and a `^5.0.0` peer dependency — the add-on's host SDK, whose `capture` carries the `$mcp_*` events, is posthog-node, not the browser package. This row is scored here on that basis and cross-referenced from [posthog-js.md](posthog-js.md#n37); **the applicability table and the package's actual host client disagree, and which SDK owns this row is a spec question for a human maintainer**, not something this audit resolves. The requirements themselves: one `$mcp_tool_call` per call reaching a final outcome, always carrying `$mcp_tool_name`, `$mcp_is_error`, `$mcp_duration_ms`, `$mcp_source`, `$session_id` and a request-start `timestamp`; no `$mcp_tool_call` for an `input_required` round, a task handle, or a call naming an unregistered tool (a rule that "applies to every SDK" regardless of capability tags); `$mcp_input_required` and `$mcp_unknown_tool` SHOULD be emitted; events bounded at 102,400 bytes with a normative shrink order; `$lib` of the form `posthog-<runtime>-mcp`.
@@ -342,3 +410,25 @@ posthog-browser through `@posthog/core`.
   satisfying the Shutdown requirement, and a disabled or shut-down client raises `client_disabled` /
   `client_closed` rather than sending.
 - **Backwards compatibility:** n/a — Pass.
+
+<a id="n28"></a>
+
+### n28 — Experiment Exposure (🟡 Partial, new row)
+- **Spec requires:** `openspec/specs/experiment-exposure/spec.md`. Applicability is "every client or server SDK that reads `/flags?v=4` records", which posthog-node does (`packages/node/src/client.ts:1405`). A tracked read whose record is a complete config version 2 experiment split SHALL also emit one `$experiment_exposure`, deduped in its own namespace on `(groups, flag key, config version, rule ID, variant key)`, carrying `$feature_flag`, `$feature_flag_response`, `$feature_flag_variant_key`, `$feature_flag_rule_id` and `locally_evaluated`, and never `$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_type`, `$experiment_exposure_source`, an experiment ID or a forced variant. A malformed split fails closed. "Locally evaluated results": a server SDK that evaluates config version 2 flags locally SHALL produce the same reason code, rule ID, rule type and variant key the flags service would, and send the same exposure with `locally_evaluated` true.
+- **SDK currently (`ffdb355c`):** posthog-node is the only SDK in this matrix that implements the capability, and the remote path is a close match. `buildConfigVersion2FlagEvents` (`packages/node/src/flag-events.ts:206-283`) builds both events in one step from the parsed record; `ruleAttribution` (`:109-129`) reports the rule only for the reason codes that allow it, requires the hyphenated UUID form (`:74`, `:120`), and returns a rule-less attribution for a split missing its rule ID, rule type or variant key, so a malformed split sends no exposure. The exposure's dedupe key is `[key, groupEntries, 2, ruleId, variantKey]` (`:277`), tracked in `_experimentExposuresReported` separately from `_distinctIdHasSentFlagCalls` (`client.ts:3266-3274`), and both namespaces clear on shutdown (`:3900-3901`). `EXPOSURE_REMOVED` (`flag-events.ts:55-62`) pins out the four forbidden properties plus the experiment ID and forced variant, even when a super or context property carries them, and the variant key is sent as `$feature_flag_variant_key`, the contract 10.0.0 spelling of [#203](https://github.com/PostHog/sdk-specs/pull/203).
+- **Gap — a locally evaluated experiment split sends no exposure.** Local evaluation produces no config version 2 attribution: a non-test grep for `variant_key`, `rule_id` and `experiment_split` over `packages/node/src/extensions/feature-flags/feature-flags.ts`, `packages/node/src/types.ts` and `packages/core/src/featureFlagLocalEvaluation.ts` returns nothing, and the local branch of the single-flag read passes no record to `_captureFlagCalledEventIfNeeded` (`client.ts:2398`), so `ruleAttribution` returns `undefined` and the read falls through to the config version 1 path. A project whose experiment flag is evaluated locally therefore gets no `$experiment_exposure` from the SDK at all, where the spec requires one with `locally_evaluated` true. The `locally_evaluated` property itself is already plumbed (`client.ts:2370`, `flag-events.ts:265`), so the remote path reports it correctly.
+- **Second gap, shared with [n21](#n21):** an exposure built from a locally evaluated read would also be missing `$feature_flag_version`, which the properties requirement asks for "with the value it puts on the paired `$feature_flag_called` event".
+- **Backwards compatibility:** Backward-compatible — carrying the rule ID, rule type, reason code and variant key through local evaluation and emitting the exposure adds events for a case that emits none today, and changes no public surface.
+- **Remediation:** Extend the local flag-definition type and the evaluator to carry `config_version`, the matched rule's ID and type, the reason code and the assigned variant key, then build a `ParsedFlagRecord`-shaped result from them so the existing `buildConfigVersion2FlagEvents` path handles local reads unchanged.
+
+<a id="n29"></a>
+
+### n29 — Get Remote Config Payload (🟡 Partial, new row)
+- **Spec requires:** `openspec/specs/get-remote-config-payload/spec.md` (new capability, [#220](https://github.com/PostHog/sdk-specs/pull/220)), whose reference surface is posthog-node's `getRemoteConfigPayload(flagKey)`. `GET {host}/api/projects/@current/feature_flags/{flag key}/remote_config?token={project token}` with `Authorization: Bearer {secret key}`; **flag key containment** — the key SHALL NOT change the path outside its one segment, met either by percent-encoding it or by refusing it, and a key of `.` or `..` SHALL be refused; a disabled client or one whose project token is empty or whitespace-only SHALL send nothing; a missing secret key — unset, empty or whitespace-only — SHALL be reported through the error channel or a warning log and SHALL return no result; decode the body as JSON and parse a decoded string once more; one request per call, no caching, no events.
+- **SDK currently (`ffdb355c`):** the route, auth header, double decode, one-request-per-call, no-cache and no-event rules are all met. `_requestRemoteConfigPayload` (`packages/node/src/client.ts:3908-3943`) builds the exact path, sends the secret key in `Authorization` only and the project token in the query, makes one `fetch` with no retry, and emits transport failures on the error emitter rather than throwing. The public method (`:2659-2688`) decodes once and re-parses a decoded string, falling back to the string when the second parse fails.
+- **Gap 1 — the flag key is interpolated raw.** `${this.host}/api/projects/@current/feature_flags/${flagKey}/remote_config?token=…` (`:3914`) applies no encoding and no refusal, so `a/b` adds a path segment, `a?b` adds a query, `a#b` adds a fragment, and `../../../users/@me/` resolves off the route entirely — the containment requirement's worked examples. `encodeURIComponent(this.apiKey)` on the token shows the encoding helper is already at hand one line over.
+- **Gap 2 — blank credentials are not treated as missing.** The gate is `if (this.disabled || !this.apiKey || !this.options.personalApiKey)` (`:3909-3911`), which catches empty strings but not whitespace-only ones, so a client created with the project token `"  "` sends a request and a whitespace-only secret key is sent as `Bearer    `.
+- **Gap 3 — a missing secret key throws to the caller.** `getRemoteConfigPayload` raises `new Error('Personal API key is required for remote config payload decryption')` (`:2666`), rejecting the returned promise, where the requirement asks for the SDK's error channel or a warning log plus no result. posthog-java logs a warning and returns `null`, which is the shape to copy.
+- **Not a gap:** a non-2xx body is returned as the payload rather than treated as a failure — the spec's "Failure status" is a SHOULD and says "an SDK that returns the body still conforms" — and an empty 2xx body rejects, which "Empty body" also allows.
+- **Backwards compatibility:** Backward-compatible for gaps 1 and 2 — encoding a key that today produces a malformed request, and refusing a blank credential that today produces an unauthorized one, change no call that works. Gap 3 is **Needs deprecation path**: callers may be catching the thrown error today, so the warning-plus-`undefined` shape should ship alongside a deprecation note for one minor release.
+- **Remediation:** Percent-encode the flag key with `encodeURIComponent` and refuse `.`, `..` and a blank key before the request; trim-check the project token and the secret key in the gate; and replace the throw with a logged warning returning `undefined`.

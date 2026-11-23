@@ -1,9 +1,9 @@
 # posthog-java — SDK Compliance
 
 **Repo:** [PostHog/posthog-android](https://github.com/PostHog/posthog-android) — `posthog-server/` subdirectory (the standalone `PostHog/posthog-java` repo is archived; its Java/Kotlin server SDK now lives here, package `com.posthog.server`)
-**Audited commit:** `8309f837` ([tree](https://github.com/PostHog/posthog-android/commits/main)) — audited on 2026-11-02
-**Audited against sdk-specs commit:** `be25182`
-**Summary:** 12 ✅ · 14 🟡 · 9 ❌ · 33 ➖ · 0 ❓ (68 rows)
+**Audited commit:** `8309f837` ([tree](https://github.com/PostHog/posthog-android/commits/main)) — audited on 2026-11-02. **Re-audited on 2026-11-23** at `9441af0bfa346a9f74ec55a3356b3dcb3c218b95` ([commit](https://github.com/PostHog/posthog-android/commit/9441af0bfa346a9f74ec55a3356b3dcb3c218b95)) — targeted scope, see [2026-11-23 re-audit](#2026-11-23-re-audit)
+**Audited against sdk-specs commit:** `be25182` (2026-11-02 rows); `54f4457` for the rows the 2026-11-23 scope names
+**Summary:** 12 ✅ · 15 🟡 · 9 ❌ · 34 ➖ · 0 ❓ (70 rows; 2026-11-02 at `8309f837` scored 12/14/9/33/0 on 68 rows)
 
 **Previous audit:** 2026-08-10 at `8659a7b4` (59 rows, 12 ✅ · 13 🟡 · 6 ❌ · 28 ➖ · 0 ❓). That pointer
 was 12 weeks old and the last one in the matrix still short of the full contract list — posthog-java
@@ -34,6 +34,54 @@ is the same defect family posthog-android carries — violates four separate `ex
 rules at once, including the explicit "MUST NOT default unknown synthetic state to `false`". See [n29].
 
 **A note on repo layout:** The standalone `PostHog/posthog-java` GitHub repository is archived; its README redirects to `posthog-android`, at `posthog-android/tree/main/posthog-server`. This audit clones the `posthog-android` monorepo (commit above) and inspects `posthog-server/src/main/java/com/posthog/server/` alongside its declared Gradle dependency `api(project(":posthog"))` — a shared core module at `posthog/src/main/java/com/posthog/` also used by `posthog-android` (the mobile client SDK, audited separately in this matrix). `posthog-server`'s `PostHog` class extends the core's `PostHogStateless` base class rather than the richer client-only `PostHog` base class used by `posthog-android` — so most client-only ambient-identity/session/replay/consent primitives simply aren't exposed on the server class at all. Since the last audit it has grown a `PostHogUncaughtExceptionCapture` integration, an `otel/` package holding a `PostHogContextSpanProcessor`, a `PostHogFeatureFlagFilter`, and a substantially rebuilt `PostHogMemoryQueue` (+251 lines) and `FlagEvaluator` (+459 lines). **`posthog-java` and `posthog-android` no longer share an audited commit** and have not since 2026-10-19.
+
+## 2026-11-23 re-audit
+
+**Why this run:** rotation priority 3 — posthog-java's pointer was three weeks old, it is the last
+server SDK scoring ❌ on **Emails** (a capability four other server SDKs have now shipped), and this
+cycle's spec delta lands on five rows it owns. posthog-android moved from `8309f837` to `9441af0b`.
+Source references in this section are at `9441af0b`; rows outside the scope below carry forward from
+2026-11-02.
+
+**Scope.** The two rows new to the file (`Experiment Exposure` ➖ and `Get Remote Config Payload`,
+scored from scratch), plus Feature Flag Called Tracker
+([#202](https://github.com/PostHog/sdk-specs/pull/202),
+[#168](https://github.com/PostHog/sdk-specs/pull/168)), Local Feature Flag Evaluator
+([#230](https://github.com/PostHog/sdk-specs/pull/230),
+[#144](https://github.com/PostHog/sdk-specs/pull/144)), Flag Definition Loader
+([#229](https://github.com/PostHog/sdk-specs/pull/229)), Evaluate Flags
+([#231](https://github.com/PostHog/sdk-specs/pull/231)) and Emails
+([#228](https://github.com/PostHog/sdk-specs/pull/228)).
+
+**Movement:** two new rows only. `Get Remote Config Payload` enters at 🟡 ([n30](#n30)) and
+`Experiment Exposure` at ➖. No existing row changed status; two picked up new findings
+([n8](#n8), [n18](#n18)), and [n27](#n27) picked up one divergence against new text.
+
+**Confirmed met**
+
+- **Awaiting a manual definition refresh ([#229](https://github.com/PostHog/sdk-specs/pull/229)).**
+  `loadFeatureFlagDefinitions()` (`posthog-server/src/main/java/com/posthog/server/internal/PostHogFeatureFlags.kt:528-553`)
+  is synchronous and blocks on `loadLock` until an in-flight load finishes, so control returns only
+  once the definitions local evaluation reads are the ones that refresh produced — never "scheduled
+  and returned". It reports no outcome at all (returns `Unit`), which the requirement allows: the
+  failure-reporting clause binds only "a refresh surface that **can** report an outcome". Flag
+  Definition Loader stays ✅ ([n9](#n9)). This is the inverse of posthog-node's gap on the same
+  change, where the promise resolves on a failed refresh.
+- **Emails route change ([#228](https://github.com/PostHog/sdk-specs/pull/228))** does not move the
+  row: posthog-java ships no messaging surface at all (zero matches for `messaging` across
+  `posthog-server/src/main` and `posthog/src/main`), so it fails the capability on the same terms as
+  before, now against the key-scoped paths ([n28](#n28)).
+- **Synthesized stacks ([#224](https://github.com/PostHog/sdk-specs/pull/224))** has nothing to bind
+  to here: `captureException` takes a `Throwable` and uses that throwable's own stack, so the SDK
+  never synthesizes a current stack. Capture Exception's existing findings ([n4](#n4)) stand unchanged.
+- **Portable regex subset ([#144](https://github.com/PostHog/sdk-specs/pull/144)).** `portableRegexPattern`
+  (`internal/FlagEvaluator.kt:667-780`) already defers the classes the change enumerates — `\b`/`\B`
+  outside a character class and `\<`/`\>` (`:700`), anything other than a non-capturing `(?:` group
+  (`:734`), oversized repeat counts (`:756`) — and `matchesRegex` (`:617-646`) defers on a non-ASCII
+  input and on an execution failure rather than answering. Scored as met; the same nested-group
+  quantification question recorded for posthog-node was not re-derived here.
+
+## Matrix
 
 | # | Contract | Status | Note |
 |---|----------|--------|------|
@@ -105,6 +153,8 @@ rules at once, including the explicit "MUST NOT default unknown synthetic state 
 | 66 | AI Datasets | ➖ | conditional applicability — "Server SDKs **that implement** AI dataset management", reference surface posthog-python only; no dataset surface in `posthog-server` |
 | 67 | AI Scorers | ➖ | conditional applicability — "Server SDKs implementing AI scorer management"; no scorer surface in `posthog-server` |
 | 68 | Offline Evaluations | ➖ | conditional applicability — "Server SDKs implementing offline evaluation uploads"; no experiment/upload surface in `posthog-server`. This capability also defines the shared app-API client the two rows above depend on, so all three would land together |
+| 69 | Experiment Exposure | ➖ | applicability is "every client or server SDK that reads `/flags?v=4` records… An SDK that does not read them sees config version 2 flags as legacy values and sends no direct exposure". `posthog-server` evaluates remotely through shared-core `PostHogApi.flags()`, which requests `$theHost/flags/?v=2` (`posthog/src/main/java/com/posthog/internal/PostHogApi.kt:600`), and its local evaluator carries no `config_version`, rule ID or variant key (zero matches for `config_version`, `rule_id` and `variant_key` across `posthog-server/src/main` and `posthog/src/main`), so no config version 2 record ever reaches a read. Re-scope when the JVM server SDK moves to `v=4` |
+| 70 | Get Remote Config Payload | 🟡 | [n30] |
 
 ## Notes
 
@@ -181,6 +231,8 @@ empty or blank id on either side still enqueues an event and records no warning,
 - **Backwards compatibility:** Backward-compatible — adding 10 keys to a strip-allowlist `Set` is strictly additive; it can only cause minimized events to retain more properties than before, never fewer.
 - **Remediation:** Add the 10 session-attribution property names to `MINIMAL_FEATURE_FLAG_CALLED_PROPERTIES` in `posthog/src/main/java/com/posthog/PostHogStateless.kt:693-711`.
 
+- **2026-11-23, second gap: a missing flag reports the empty string.** `openspec/specs/feature-flag-called-tracker/spec.md`, "A missing flag reports no value" ([#202](https://github.com/PostHog/sdk-specs/pull/202)), says `$feature_flag_response` SHALL be absent or JSON `null` for a flag the SDK has no record of, and **SHALL NOT be the empty string** — "`""` is not one of them" — because the empty string is the legacy rendering of an empty variant key, which reads as disabled. The shared capture path does exactly that: `captureFeatureFlagCalledEvent` sets `props["\$feature_flag_response"] = value ?: ""` (`posthog/src/main/java/com/posthog/PostHogStateless.kt:683`), and the per-flag getter path reaches it with `null` for an unknown key (`sendFeatureFlagCalled`, `:626-652`), so a missing flag and an empty-variant flag are indistinguishable in flag analytics. The snapshot path is unaffected: `recordAccess` resolves a missing flag to `false` (`posthog-server/src/main/java/com/posthog/server/PostHogFeatureFlagEvaluations.kt:248`), which the requirement's allowed variation accepts. This finding is in the shared `posthog/` module, so it applies to posthog-android as well. Backward-compatible — sending no property, or `null`, for a case that today sends `""` corrects a value that cannot be told apart from a real one downstream.
+
 ### n9 — Flag Definition Loader (✅ Pass)
 - Spec Applicability `both`; acceptance file (`acceptance/private/flag-definition-loader.feature`) tagged `@server`.
 - `internal/LocalEvaluationPoller.kt` runs a genuine background `ScheduledExecutorService`-based poll loop (configurable `pollIntervalSeconds`, default 30s) that periodically refreshes flag definitions without an application call being the trigger. ETag/If-None-Match support exists on a dedicated local-evaluation endpoint. External/shared cache-provider integration (`PostHogFlagDefinitionCacheProvider.kt`) supports both async and sync contracts, with provider-failure fallback to a direct fetch. Personal-API-key gating for local evaluation is enforced. Well tested. No change from prior audit.
@@ -255,6 +307,8 @@ cheaply is the #89 group-key rendering rule — `hash()` (`FlagEvaluator.kt:72-8
 bucketing value, so whether a non-string group key is canonicalized or host-spelled depends on a
 caller this run did not trace. That is a question for the next posthog-java slot, not a separate
 Unknown cell.
+
+- **2026-11-23, deviation 3: the flag-level `early_exit` selector is not implemented.** `openspec/specs/local-feature-flag-evaluator/spec.md` ([#230](https://github.com/PostHog/sdk-specs/pull/230)) specifies `early_exit`: when the selector is `true` and every filter in a group matched but the group's rollout excluded the bucketing identifier, condition evaluation SHALL stop — returning `false` with no later group evaluated, or staying inconclusive when an earlier group was inconclusive. `early_exit` appears nowhere in `posthog-server/src` or `posthog/src` (zero matches), so a definition that sets it is evaluated as though it were absent and a later group can match where the flags service would have stopped and returned `false`. Backward-compatible — honouring a selector already present in the definition payload corrects a local answer the service would contradict; the default stays `false`, so flags that do not set it are unaffected. posthog-node implements this (`packages/node/src/extensions/feature-flags/feature-flags.ts:683-689`) and is the reference.
 
 ### n19 — Logs (❌ Fail)
 - **Spec requires:** A `captureLog`/logger API producing OTLP-shaped log records shipped via `POST {host}/i/v1/logs`, with severity mapping, batching/rate-capping. (No acceptance `.feature` file exists for this contract, and the spec itself has no explicit client-only carve-out language.)
@@ -378,6 +432,23 @@ computed delay by a factor drawn from a window around 1 changes no public surfac
   key accessed for `onlyAccessed()` — the requirement is explicit that access and exposure are
   separate. posthog-node's `feature-flag-evaluations.ts:143-167` is the worked reference.
 
+
+**Re-verified 2026-11-23 at `9441af0b` — [#231](https://github.com/PostHog/sdk-specs/pull/231) is met
+except for the shape of the wait deadline.** The change bounds probe coordination to one SDK instance
+in one process, requires **one finite deadline per evaluation** covering every overlapping probe it
+waits for, and settles the positive-evidence rules. posthog-java has the machinery: `knownMissingFlagKeys`
+and `knownRemoteFlagKeys` are bounded maps cleared on a successful definitions refresh
+(`internal/PostHogFeatureFlags.kt:53`, `:879`), probes are tracked per key with a generation counter
+(`:1400-1411`), a delayed omission cannot overwrite positive evidence published after the probe began
+(`:1443`), and `MissingFlagProbe.await(timeoutMs)` (`:272-284`) bounds the wait rather than blocking
+indefinitely — coordination that stays inside one process, as the change now requires. **Gap:** the wait
+is applied per probe, not per evaluation — `plan.waiting.all { it.await(missingFlagProbeWaitTimeoutMs) }`
+(`:1360`) restarts the full timeout for each probe in the list, so an evaluation waiting on *n*
+overlapping probes can block for up to *n* × the configured timeout, where the spec says one deadline
+"starts when the evaluation first coordinates its missing keys and covers every overlapping probe it
+waits for". Backward-compatible — computing a single deadline before the loop and passing the remaining
+budget to each `await` shortens a worst case and changes no public surface.
+
 ### n28 — Emails (❌ Fail, new row)
 - **Spec requires:** "Server SDKs only" — unconditional, unlike the three AI capabilities above it.
   An `emails` surface with `send` and `get`, a secret-key client option, an app-host option with a
@@ -444,3 +515,12 @@ computed delay by a factor drawn from a window around 1 changes no public surfac
   for nested entries, leaving `source` off the outermost one. Because this is shared core, the fix
   closes the matching posthog-android row in the same change — coordinate the two rather than patching
   `posthog-server` alone.
+
+<a id="n30"></a>
+
+### n30 — Get Remote Config Payload (🟡 Partial, new row)
+- **Spec requires:** `openspec/specs/get-remote-config-payload/spec.md` (new capability, [#220](https://github.com/PostHog/sdk-specs/pull/220)), server SDKs only. `GET {host}/api/projects/@current/feature_flags/{flag key}/remote_config?token={project token}` with `Authorization: Bearer {secret key}` and the secret key never in the URL; the flag key SHALL stay one path segment (encoded or refused, with `.` and `..` refused); a disabled client, or one whose project token is empty **or whitespace-only**, SHALL send nothing; a missing secret key — unset, empty or whitespace-only — SHALL be reported through the error channel or a warning log and return no result; decode the body as JSON and parse a decoded string once more; one request per call, no retry, no caching, no events; failures reported without raising to the caller.
+- **SDK currently (`9441af0b`):** a close match, and the strongest implementation of this capability the matrix has scored. `PostHogInterface.getRemoteConfigPayload(key)` (`posthog-server/src/main/java/com/posthog/server/PostHogInterface.kt:799`) is gated on `isEnabled()` (`PostHog.kt:302-305`), so a client that was never set up sends nothing. `PostHogFeatureFlags.getRemoteConfigPayload` (`internal/PostHogFeatureFlags.kt:1053-1096`) logs a warning and returns `null` when there is no personal API key, **refuses a blank key and the keys `.` and `..` before any request** (`:1061-1064`), and catches `PostHogApiError`, `IOException` and any other `Throwable` into a warning plus `null`, so no failure reaches the caller. `PostHogApi.flagRemoteConfigPayload` (`posthog/src/main/java/com/posthog/internal/PostHogApi.kt:786-815`) builds the route with OkHttp's `addPathSegment(flagKey)`, which percent-encodes the key so it cannot leave its segment, puts the token in the query and the secret key in `Authorization: Bearer` only, makes exactly one call with no retry and no conditional header, and throws on a non-2xx status so the caller treats it as a failure. An empty 2xx body returns `null` with no error, and a decoded JSON string is parsed once more, falling back to the string when that parse fails (`:1078-1095`) — the spec's decoding and "string that is not JSON" rules.
+- **Gap — whitespace-only credentials are not treated as missing.** The spec counts a project token or secret key that "has only whitespace" as missing, and requires no request in both cases. Setup rejects only an empty token (`config.projectToken.isEmpty()`, `posthog/src/main/java/com/posthog/PostHogStateless.kt:67`), and the payload call checks the secret key for `null` only (`:1054`), so a client created with the token `"  "` sends `token=++` and a whitespace-only personal API key is sent as a `Bearer` value.
+- **Backwards compatibility:** Backward-compatible — a blank credential produces an unauthorized or project-less request today, so refusing it changes no working call.
+- **Remediation:** Use `isBlank()` rather than `isEmpty()`/`null` for both credentials: reject a blank project token at setup (or gate this call on it) and treat a blank personal API key the same as a missing one, with the warning the method already logs.

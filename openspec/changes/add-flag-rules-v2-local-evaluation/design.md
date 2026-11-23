@@ -160,11 +160,7 @@ The contract pins `flag_disabled` with `null` for supported documents. It does n
 
 ## Acceptance features
 
-`acceptance/private/flag-rules-v2-local-evaluation.feature` is black-box: it serves typed definitions, calls public getters and evaluated snapshots, flushes, and checks received events and `/flags` traffic. Most of its steps are bound today. It needs three new bindings, which the harness's local evaluation suite adds:
-
-- `the definitions service serves this typed document for v=2 requests:` serves its document to a definitions request with exactly one `v` equal to `2`. Every other request gets the document of `the definitions service serves this typed document:`, and so does a `v=2` request when no version 2 document is set, as the flags service does.
-- `every flag definitions request query parameter "v" should equal "2"`.
-- `no received event named "<name>" should have property "<property>"`.
+`acceptance/private/flag-rules-v2-local-evaluation.feature` is black-box: it serves typed definitions, calls public getters and evaluated snapshots, flushes, and checks received events and `/flags` traffic. Most of its steps are bound today. It needs three new bindings, which the harness's local evaluation suite adds; the feature's header comment names each step and what it does.
 
 The scenarios keep the legacy `@server` tag and add `@requires:feature_flags_local_evaluation_v2`. They move to `@sdk:server` once the steps are bound and a real SDK adapter passes them.
 

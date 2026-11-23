@@ -23,7 +23,7 @@ Why: an SDK without a config version 2 evaluator reads a config version 2 docume
 
 The SDK SHALL read the version 2 feed as it reads the legacy feed: `flags`, `group_type_mapping`, `cohorts`, and the optional `minimal_flag_called_events` and `property_matching_version`. The `flags` list holds config version 1 entries, exactly as the legacy feed carries them, and config version 2 entries, inactive ones included. For a project without config version 2 flags, the flags service answers `v=2` with the legacy body and its ETag. The SDK SHALL load that body as a complete version 2 feed, and its results SHALL NOT change.
 
-The SDK SHALL load every entry it can read. It SHALL NOT reject the feed, or another entry, because one entry is unsupported. It SHALL ignore top-level fields, and entry fields outside `filters`, that it does not know. The closed parser of "Closed parsing of config version 2 documents" applies to `filters` only.
+The SDK SHALL load every entry it can read. It SHALL NOT reject the feed, or another entry, because one entry is unsupported. It SHALL ignore top-level fields, and entry fields outside `filters`, that it does not know.
 
 #### Scenario: A legacy body is a complete version 2 feed (@server)
 - **GIVEN** a project has only config version 1 flags, and the flags service answers `v=2` with the legacy body

@@ -54,9 +54,12 @@ and posthog-js tests for the untested requirements.
   event, so the difference is benign and the spec does not ask web to change.
 - **R24, explicit stop, stays in the new spec.** `stopSessionRecording()` SHALL hold across a
   remote config reload and `startSessionRecording()` SHALL clear it (C6;
-  `posthog-core.ts:4509`, `:4526-4528`). `stop-session-recording/spec.md:59` ("resumed ... by
-  config/remote-config-driven replay enablement") is not modified in this change; its wording
-  conflicts with C6 and is flagged as a follow-up change on that spec.
+  `posthog-core.ts:4509`, `:4526-4528`). This change also adds the reload rule to
+  `stop-session-recording`, whose lifecycle text let config-driven enablement resume a stopped
+  recording. On mobile, a start or stop made while opted out follows `opt-in`
+  (`opt-in/spec.md:180`, scenario at `:229`) and does not set or clear the explicit stop. The
+  browser is unchanged: `opt-in/spec.md:180` already keeps a browser stop in effect through opt-out
+  and opt-in.
 - **R25, hybrid split, decision-based (C2, C3, cross-SDK decision 4, D1).** The managed layer
   that owns event capture evaluates the groups; the native SDK applies none of the V1 gating fields
   for that host and keeps only the enablement gate, the URL blocklist, and the minimum and local

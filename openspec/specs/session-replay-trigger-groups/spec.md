@@ -1162,7 +1162,11 @@ matches, and not when the session id rotates — until the application calls
 time the gates allow recording, it starts without another explicit call. The explicit stop is an
 application-level override above every control in this capability and in
 `session-replay-ingestion-controls`; it is not V2-specific, and SDKs SHALL apply it the same way
-under the V1 fields.
+under the V1 fields. On a mobile client SDK, a `stopSessionRecording()` or
+`startSessionRecording()` call made while the SDK is opted out SHALL NOT set or clear the explicit
+stop: it follows `opt-in` ("Opt-in restarts the session replay the app wanted at opt-out"). The
+browser SDK is unchanged, because `opt-in` already keeps a browser stop in effect through opt-out
+and opt-in, also when the application calls it while opted out.
 
 This requirement applies to all replay-capable SDKs.
 
@@ -1171,7 +1175,9 @@ Reference: posthog-js `origin/main` `480395c443` (`packages/browser/src/posthog-
 sets it back to `false` after applying any overrides;
 `packages/browser/src/extensions/replay/session-recording.ts:139-142`: `_isRecordingEnabled` reads
 `disable_session_recording` on every evaluation, so a reload, a trigger, or a rotation cannot
-restart a stopped recorder).
+restart a stopped recorder). Opt-out exception: `openspec/specs/opt-in/spec.md` ("Opt-in restarts
+the session replay the app wanted at opt-out", scenario "Stopping a recording while opted out does
+not block the restart").
 
 Covering test: posthog-js `packages/browser/src/__tests__/posthog-core.set_config.test.ts:433-439`
 ("should update disable_session_recording config") asserts only the flag. Surviving a reload, a

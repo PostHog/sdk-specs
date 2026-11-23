@@ -64,6 +64,9 @@ evaluates groups. No capability states the V2 contract, so the ports have nothin
 - `session-replay-debug-properties`: the trigger-group keys apply to every SDK that implements
   trigger groups; the pending-conditions key gains its V2 value; the out-of-scope list no longer
   calls those keys browser-only.
+- `stop-session-recording`: a remote config or `/config` load in the same process no longer
+  resumes a stopped recording; only the start API does. The lifecycle line that allowed
+  config-driven resumption is edited by hand on archive.
 
 ## Impact
 
@@ -74,10 +77,13 @@ evaluates groups. No capability states the V2 contract, so the ports have nothin
   on archive, plus hand edits to lines 7, 9 and 31 outside the Requirements section.
 - `openspec/specs/session-replay-debug-properties/spec.md` — three MODIFIED requirements synced
   on archive.
+- `openspec/specs/stop-session-recording/spec.md` — one ADDED requirement synced on archive, plus
+  a hand edit to the lifecycle line outside the Requirements section.
 - `README.md` — one new capability row.
 - `acceptance/private/session-replay-trigger-groups.feature` — new, descriptive scenarios with no
   `@sdk:` tags; `acceptance/private/session-replay-ingestion-controls.feature` — a V1 comment on
-  the minimum-duration block and one `@hybrid` scenario.
+  the minimum-duration block and one `@hybrid` scenario; `acceptance/public/stop-session-recording.feature`
+  — one remote-config-reload scenario.
 - `compliance/*.md` — untouched; the weekly audit adds the new row. posthog-js would be the first
   SDK to pass it.
 - No SDK code. Reference implementation: posthog-js (web). Mobile model: posthog-ios

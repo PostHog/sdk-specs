@@ -779,8 +779,6 @@ The record did not supply the value in each of these cases:
 - a caller-supplied match value: a payload read that takes a match value (`matchValue` or `match_value`) reports the caller's value, not the record's;
 - a stale cached value: a server SDK that falls back to a cache of earlier results reports the cached value when its flags request fails, or when a record arrives but the SDK cannot write it to that cache. The value is the cache's, not the current record's.
 
-The SDK SHALL decide by where the value came from, not by comparing the reported value with the record's value. A caller's value or a cached value that equals the record's value still did not come from the record, and equal legacy renderings prove nothing: every number and object value renders as `true`.
-
 When an SDK keeps the loaded record itself, for example a client SDK that keeps its last loaded flags after a failed reload, a read that reports that record's value reads the record, and the record's attribution applies as usual.
 
 Pairing a caller's value or a stale value with the record's rule and variant would attribute an exposure to the wrong arm. Without `$feature_flag_config_version`, the event is treated like any config version 1 flag call.

@@ -41,3 +41,39 @@ Feature: Application Lifecycle
     When the application lifecycle integration starts
     And the application moves to the background
     Then no lifecycle analytics events should be enqueued
+
+  Scenario: First app start lifecycle events carry setup super properties
+    Given the platform app version is "1.0.0" and build is "100"
+    When setup is called with token "test-token", application lifecycle capture enabled, and super properties:
+      | property    | value      |
+      | environment | production |
+      | app         | consumer   |
+    And the application lifecycle integration starts
+    Then the enqueued "Application Installed" event properties should include:
+      | property    | value      |
+      | environment | production |
+      | app         | consumer   |
+    And the enqueued "Application Opened" event properties should include:
+      | property    | value      |
+      | environment | production |
+      | app         | consumer   |
+
+  Scenario: App update lifecycle event carries updated setup super properties and preserved persisted properties
+    Given lifecycle storage remembers version "1.0.0" and build "100"
+    And persistent storage contains registered properties:
+      | property | value |
+      | locale   | en_US |
+      | plan     | pro   |
+    And the platform app version is "1.1.0" and build is "110"
+    When setup is called with token "test-token", application lifecycle capture enabled, and super properties:
+      | property | value |
+      | locale   | fr_FR |
+    And the application lifecycle integration starts
+    Then the enqueued "Application Updated" event properties should include:
+      | property         | value |
+      | $app_version     | 1.1.0 |
+      | $app_build       | 110   |
+      | previous_version | 1.0.0 |
+      | previous_build   | 100   |
+      | locale           | fr_FR |
+      | plan             | pro   |

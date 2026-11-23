@@ -299,8 +299,8 @@ Feature: Feature Flag Called Tracker
       | shipping the winner        | checkout-flow | true  | "experiment_split" | 2                    | "experiment"    | "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" | "test"            | "targeting_match"   | "targeted_release" | "d2b8c6f4-1e3a-4c5d-9f07-6a8b2c4e0d13" | absent           | $feature_flag_rule_id        | d2b8c6f4-1e3a-4c5d-9f07-6a8b2c4e0d13 |
       | moving to config version 2 | beta-ui       | true  | absent             | 1                    | absent          | absent                                 | absent            | "targeting_match"   | "targeted_release" | "c41f9e07-2d6b-4a83-b5e1-7f0a3c8d2e96" | absent           | $feature_flag_config_version | 2                                    |
 
-  # Values the record did not supply. The read reports another value than the config
-  # version 2 record's, even an equal one, so its event is sent as for config version 1.
+  # Values the record did not supply are sent as for config version 1, even when they
+  # equal the record's value.
 
   @server @payload_flag_events_capable
   Scenario Outline: A caller-supplied match value is reported as config version 1

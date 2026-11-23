@@ -768,7 +768,7 @@ local definition in both SDKs.
 A `$feature_flag_called` event SHALL carry config version 2 attribution (`$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant_key`) only when the value the read reports came from the flag's config version 2 record. When the SDK has a config version 2 record for the flag but that record did not supply the value the read reports, the SDK SHALL send the event as it sends one for a config version 1 flag:
 
 - the event keeps `$feature_flag_reason` where the SDK sends it for a config version 1 flag;
-- the event carries none of `$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant_key`;
+- the event carries no config version 2 attribution;
 - the tracker uses the config version 1 dedupe key, without the components that "Config version 2 dedupe key" adds;
 - the read SHALL NOT emit `$experiment_exposure`, and SHALL NOT consult or add an exposure key (see `experiment-exposure`).
 

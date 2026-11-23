@@ -10,7 +10,7 @@ A tracked read is a flag read on a path that reports `$feature_flag_called` and 
 - `metadata.rule_type` is `experiment`;
 - `metadata.rule_id` is present;
 - `metadata.variant_key` is present;
-- the record supplied the value the read reports. A bootstrapped value, a client-side override, a caller-supplied match value and a stale cached value did not come from the record (see "Values the record did not supply are reported as config version 1" in `feature-flag-called-tracker`).
+- the record supplied the value the read reports (see "Values the record did not supply are reported as config version 1" in `feature-flag-called-tracker`).
 
 "Present" means the member exists and is not `null`. A rule ID counts as present only when it is a string in the hyphenated 8-4-4-4-12 hexadecimal UUID form, the form the event schemas require; any other string counts as a missing rule ID. This applies to every read path that reports `$feature_flag_called`: client getters such as `getFeatureFlag`, `isFeatureEnabled` and `getFeatureFlagResult`, server single-flag getters, snapshot enablement and value reads (see `evaluate-flags`), and typed value or details accessors where the SDK has them. Whether a read is tracked is decided as the existing requirements and "Feature flag event decision covers the exposure" define. The two events dedupe independently: a tracked read whose `$feature_flag_called` the tracker suppresses as a repeat SHALL still emit the exposure when the exposure key is new, and a tracked read whose exposure key is already present SHALL still emit `$feature_flag_called` when its tracker key is new.
 

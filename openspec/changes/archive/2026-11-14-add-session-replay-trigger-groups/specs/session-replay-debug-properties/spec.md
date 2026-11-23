@@ -162,6 +162,17 @@ properties, and `SessionRecording.sdkDebugProperties` reads them back so the req
 puts them on every event. Mobile SDKs SHALL compute trigger status fresh on every property build
 from current integration state. Either way the trigger keys reach events only through the debug
 merge and MUST NOT be attached as registered super properties.
+When the remote config selects trigger groups (`session-replay-trigger-groups`), mobile SDKs SHALL
+report `trigger_disabled` for both keys: the keys describe the V1 linked flag and V1 event
+triggers, and neither is in effect while groups are selected. The state of the groups is carried
+by `$sdk_debug_replay_pending_trigger_conditions` and
+`$sdk_debug_replay_matched_recording_trigger_groups`. This is a deliberate divergence from
+posthog-js, which has no rule for these keys under trigger groups: each group's linked-flag and
+event matcher writes the key as a side effect of a status read (`LinkedFlagMatching.triggerStatus`
+and `EventTriggerMatching.triggerStatus`,
+`packages/browser/src/extensions/replay/external/triggerMatching.ts:413-417` and `:527-531` at
+posthog-js `origin/main` `f0286fd82`), so the browser value follows the group that was read last.
+No posthog-js test covers these two keys under trigger groups.
 `$sdk_debug_replay_pending_trigger_conditions` (optional) SHALL list whichever configured trigger
 kinds are not yet satisfied; on mobile the V1 kinds are `event_trigger` and `linked_flag`,
 and the key is omitted when none is pending. When the remote config selects trigger groups
@@ -327,6 +338,8 @@ posthog-ios `88f4b6b56` reads the manager's start snapshot unconditionally).
 - **AND** `$sdk_debug_replay_pending_trigger_conditions` contains an entry starting with
   `trigger group "checkout": `
 - **AND** it does not contain a bare `trigger_groups` entry
+- **AND** on mobile `$sdk_debug_replay_event_trigger_status` and
+  `$sdk_debug_replay_linked_flag_trigger_status` are both `trigger_disabled`
 
 #### Scenario: A registered property overrides the SDK-computed debug value
 - **GIVEN** a super property named `$recording_status` is registered

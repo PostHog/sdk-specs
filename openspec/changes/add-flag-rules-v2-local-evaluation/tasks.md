@@ -9,7 +9,7 @@
 
 - [ ] 2.1 Settle the decisions in `design.md`, above all the cache field name (decision 9) and the harness capability name (decision 10), and update the delta specs and features for any change.
 - [ ] 2.2 Release contract 10.1.0 (posthog-sdk-test-harness#111) and point this change at the release.
-- [ ] 2.3 Pin in the contract the two outcomes this change proposes beyond it: an inactive entry whose document is unsupported is `flag_disabled` (decision 6), and an unknown entry field outside `filters` is ignored (decision 11).
+- [ ] 2.3 Pin in the contract the two outcomes this change decides beyond it: an inactive entry whose document is unsupported is `flag_disabled` (decision 6), and an unknown entry field outside `filters` is ignored (decision 11).
 
 ## 3. Acceptance and discoverability
 

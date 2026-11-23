@@ -134,7 +134,7 @@ The contract pins `flag_disabled` with `null` for supported documents. It does n
 
 **Alternative.** Add the project timezone to the feed and fall back for naive and relative dates until an SDK has it. Deferred: relative dates are the common case, so most date filters would fall back. The feed can gain an optional timezone field later.
 
-### 9. The shared cache field `flags_v2` (name proposed)
+### 9. The shared cache field `flags_v2`
 
 **Choice.** In data handed to a definition cache provider or another definition store, `flags` keeps config version 1 entries only. Every other entry goes to `flags_v2`, in feed order. A reader loads both and dispatches each entry on its own `filters.version`.
 
@@ -144,13 +144,13 @@ The contract pins `flag_disabled` with `null` for supported documents. It does n
 - A provider that drops unknown fields loses only the config version 2 flags, which then fall back.
 - The name follows the existing snake_case fields and the feed it comes from.
 
-**Open.** The name. Alternatives: `versioned_flags`, `flags_config_v2`.
+**Alternatives.** `versioned_flags`, `flags_config_v2`. Rejected: `flags_v2` says what the field holds and sits next to `flags`.
 
-### 10. The harness capability `feature_flags_local_evaluation_v2` (name proposed)
+### 10. The harness capability `feature_flags_local_evaluation_v2`
 
 **Choice.** The capability follows the harness's `feature_flags_local_evaluation_v1`, and its suffix is the definitions feed version the SDK requests, as `flags_response_v4` names `/flags?v=4`. An SDK declares it only in a release that requests `v=2`, after the in-process replay and the black-box suite pass. The in-process replay covers the cases that a public API cannot reach: complete property maps and the white-box hash cases.
 
-**Open.** The name. Alternative: `flag_rules_v2`, which is shorter but does not say "local", although remote-only SDKs also read rules v2 results.
+**Alternative.** `flag_rules_v2`. Rejected: it is shorter but does not say "local", although remote-only SDKs also read rules v2 results.
 
 ### 11. Unknown entry fields are ignored
 
@@ -185,7 +185,6 @@ The shared-cache scenarios in `flag-definition-loader.feature` use that feature'
 
 ## Open Questions
 
-- The names `flags_v2` and `feature_flags_local_evaluation_v2` (decisions 9 and 10).
-- An inactive flag with an unsupported document, and unknown entry fields outside `filters` (decisions 6 and 11): proposed here, not yet in the contract.
+- When the contract pins decisions 6 and 11 (task 2.3).
 - A config version 1 flag that depends on a config version 2 flag (decision 2): unsupported locally here. Should it instead evaluate the target once the contract has cases for it?
 - The project's timezone in the feed (decision 8): when to add it.

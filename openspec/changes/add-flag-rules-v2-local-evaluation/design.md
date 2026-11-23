@@ -36,7 +36,7 @@ The existing specs this change builds on:
 - A local result for a config version 2 flag equals the flags service's result for the same inputs, or there is no local result.
 - Nothing changes for config version 1 flags, for SDKs that do not ask for the new feed, or for projects without config version 2 flags.
 - A fleet of mixed SDK releases on one shared definition cache stays safe.
-- Feature files that the harness can run once it binds three new steps.
+- A local evaluation feature and experiment exposure scenarios that the harness can run once it binds three new steps.
 
 **Non-Goals:**
 
@@ -164,9 +164,11 @@ The contract pins `flag_disabled` with `null` for supported documents. It does n
 
 - `the definitions service serves this typed document for v=2 requests:` serves its document to a definitions request with exactly one `v` equal to `2`. Every other request gets the document of `the definitions service serves this typed document:`, and so does a `v=2` request when no version 2 document is set, as the flags service does.
 - `every flag definitions request query parameter "v" should equal "2"`.
-- `a received event named "<name>" should not have property "<property>"`.
+- `no received event named "<name>" should have property "<property>"`.
 
 The scenarios keep the legacy `@server` tag and add `@requires:feature_flags_local_evaluation_v2`. They move to `@sdk:server` once the steps are bound and a real SDK adapter passes them.
+
+The shared-cache scenarios in `flag-definition-loader.feature` use that feature's own phrasing. The harness cannot run any scenario of that feature yet, because most of its steps are unbound, so these scenarios also wait for those bindings.
 
 ## Risks / Trade-offs
 

@@ -25,7 +25,7 @@ Feature: Local evaluation of config version 2 flags
 
   # The definitions request
 
-  Scenario: The SDK requests the version 2 feed
+  Scenario: The SDK requests the version 2 feed on the first load and on a reload
     The legacy document lacks "layout-preview", so an SDK that did not send v=2 would
     have to ask /flags for it.
 
@@ -67,6 +67,12 @@ Feature: Local evaluation of config version 2 flags
       {"project_token":"phc_test_key","config":{"secret_key":"phx_test_key"}}
       """
     When the local flag getter is called with JSON arguments:
+      """application/json
+      {"key":"layout-preview","distinct_id":"person-example","person_properties":{"plan":"pro"}}
+      """
+    Then the local flag getter should return JSON true
+    When local definitions are publicly reloaded within 5000 milliseconds
+    And the local flag getter is called with JSON arguments:
       """application/json
       {"key":"layout-preview","distinct_id":"person-example","person_properties":{"plan":"pro"}}
       """
@@ -167,6 +173,68 @@ Feature: Local evaluation of config version 2 flags
       | case_id          | signed_up_at              | result |
       | date-east-of-utc | 2024-06-15T00:30:00+02:00 | true   |
       | date-west-of-utc | 2024-06-14T23:30:00-02:00 | false  |
+
+  # Exact matching: corpus cases v2_boolean.property.exact_false and
+  # v2_boolean.property.legacy_exact_setting
+
+  @case:<case_id>
+  Scenario Outline: Exact matching follows the snapshot's property matching version
+    The rule compares "color" with false, and the caller supplies 0. Legacy matching
+    matches, and explicit matching does not.
+
+    Given the definitions service serves this typed document for v=2 requests:
+      """application/json
+      {"definitions":{<matching_version>"flags":[{"id":405,"key":"example-display-key","active":true,"version":1,"filters":{"version":2,"return_type":"boolean","default_value":false,"rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"targeted_release","targeting":{"properties":[{"key":"color","type":"person","operator":"exact","value":false,"negation":false}]},"value":true}]}}],"group_type_mapping":{},"cohorts":{}}}
+      """
+    And the SDK is initialized for native local evaluation with JSON arguments:
+      """application/json
+      {"project_token":"phc_test_key","config":{"secret_key":"phx_test_key"}}
+      """
+    When the local flag getter is called with JSON arguments:
+      """application/json
+      {"key":"example-display-key","distinct_id":"person-example","person_properties":{"color":0}}
+      """
+    Then the local flag getter should return JSON <result>
+    And no remote flag evaluation path should have been requested
+
+    Examples:
+      | case_id                  | matching_version               | result |
+      | matching-version-omitted |                                | true   |
+      | matching-version-1       | "property_matching_version":1, | true   |
+      | matching-version-2       | "property_matching_version":2, | false  |
+
+  # Targeting that the contract does not cover yet
+
+  @case:<case_id>
+  Scenario Outline: Group, cohort and flag targeting make the whole flag unsupported
+    Each document is valid under the contract's config schema. Its first rule targets
+    everyone, and the read supplies the group and cohort context, so an SDK that
+    evaluated what it reads would return true.
+
+    Given the definitions service serves this typed document for v=2 requests:
+      """application/json
+      {"definitions":{"flags":[{"id":406,"key":"example-display-key","active":true,"version":1,"filters":<config>}],"group_type_mapping":{"0":"workspace"},"cohorts":{"41":{"type":"OR","values":[{"type":"AND","values":[{"key":"plan","type":"person","operator":"exact","value":["pro"]}]}]}}}}
+      """
+    And the SDK is initialized for native local evaluation with JSON arguments:
+      """application/json
+      {"project_token":"phc_test_key","config":{"secret_key":"phx_test_key"}}
+      """
+    When evaluate flags and read is called with JSON arguments:
+      """application/json
+      {"distinct_id":"person-example","options":{"only_evaluate_locally":true,"groups":{"workspace":"workspace-example"},"person_properties":{"plan":"pro"},"group_properties":{"workspace":{"tier":"team"}}},"reads":[{"method":"get_flag","key":"example-display-key"}]}
+      """
+    Then the public snapshot outcomes should have these semantics:
+      """application/json
+      {"results":[{"missing":true}]}
+      """
+    And no remote flag evaluation path should have been requested
+
+    Examples:
+      | case_id                      | config                                                                                                                                                                                                                                                                                                                                                                                                                       |
+      | unsupported-aggregation      | {"version":2,"return_type":"boolean","default_value":false,"aggregation_group_type_index":0,"rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"targeted_release","targeting":{"properties":[]},"value":true}]}                                                                                                                                                                                               |
+      | unsupported-group-predicate  | {"version":2,"return_type":"boolean","default_value":false,"rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"targeted_release","targeting":{"properties":[]},"value":true},{"id":"22222222-2222-4222-8222-222222222222","rule_type":"targeted_release","targeting":{"properties":[{"key":"tier","type":"group","group_type_index":0,"operator":"exact","value":["team"],"negation":false}]},"value":true}]} |
+      | unsupported-cohort-predicate | {"version":2,"return_type":"boolean","default_value":false,"rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"targeted_release","targeting":{"properties":[]},"value":true},{"id":"22222222-2222-4222-8222-222222222222","rule_type":"targeted_release","targeting":{"properties":[{"key":"id","type":"cohort","operator":"in","value":41,"negation":false}]},"value":true}]}                                |
+      | unsupported-flag-predicate   | {"version":2,"return_type":"boolean","default_value":false,"rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"targeted_release","targeting":{"properties":[]},"value":true},{"id":"22222222-2222-4222-8222-222222222222","rule_type":"targeted_release","targeting":{"properties":[{"key":"layout-preview","type":"flag","operator":"flag_evaluates_to","value":true,"negation":false}]},"value":true}]}     |
 
   # Dependencies
 
@@ -450,7 +518,8 @@ Feature: Local evaluation of config version 2 flags
         {"key":"seasonal-theme","distinct_id":"person-example","person_properties":{"plan":"pro"}}
         """
       And pending captures are flushed
-      Then no received event named "$feature_flag_called" should have property "$feature_flag_rule_id"
+      Then exactly 1 received events should be named "$feature_flag_called"
+      And no received event named "$feature_flag_called" should have property "$feature_flag_rule_id"
       And no received event named "$feature_flag_called" should have property "$feature_flag_rule_type"
       And no received event named "$feature_flag_called" should have property "$feature_flag_variant_key"
       And exactly 0 received events should be named "$experiment_exposure"

@@ -92,7 +92,7 @@ The SDK SHALL evaluate with these inputs:
 - explicit exact matching when the definitions snapshot's `property_matching_version` is `2`, as "Definition snapshots retain the property matching version" in `flag-definition-loader` defines;
 - UTC as the timezone (see "Dates are read in UTC").
 
-A predicate also cannot be decided when the supplied value has a form that its operator cannot read, such as `null` for `gt`, or when the SDK cannot reproduce how the flags service reads the value, for example a date format that the contract does not list. The SDK SHALL NOT treat such a predicate as a match or as a miss.
+A predicate also cannot be decided when the supplied value is one that the contract's cases mark `invalid_property`, such as `null` for `gt`, or when the SDK cannot reproduce how the flags service reads a value that the contract does not pin, for example a date format that the contract does not list. The SDK SHALL NOT treat such a predicate as a match or as a miss. A supplied value whose result the contract pins keeps that result: a string that is not a date, for a date operator, or not a version, for a semantic-version operator, is a miss (`v2_boolean.property.date_bad_subject`, `v2_boolean.property.semver_bad_subject`).
 
 #### Scenario: A rule that matches before a missing property decides the flag (@server)
 - **GIVEN** the string flag "example-display-key" has three rules in this order: "plan" is "pro" returns "first"; "color" is "blue" returns "second"; everyone returns "third"
@@ -118,7 +118,7 @@ Each local outcome of a config version 2 flag SHALL use a path that the SDK alre
 | Local outcome | Auto mode | Local-only mode | Unresolved reason |
 | --- | --- | --- | --- |
 | Conclusive | The local record. No remote evaluation request for this flag. | The local record. | none |
-| A predicate cannot be decided: a missing property, or a supplied value its operator cannot read | Remote fallback for this flag | No value: the flag is unresolved | `missing_context` |
+| A predicate cannot be decided: a missing property, or a supplied value that "Ordered evaluation of config version 2 flags" leaves undecided | Remote fallback for this flag | No value: the flag is unresolved | `missing_context` |
 | Unsupported document, or an invalid regular expression | Remote fallback for this flag | No value: the flag is unresolved | `unsupported_definition` |
 | Inactive flag | The `flag_disabled` record of "Inactive config version 2 flags" | The same record | none |
 

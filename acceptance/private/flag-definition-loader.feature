@@ -290,6 +290,9 @@ Feature: Flag Definition Loader
     And no remote feature flag evaluation request should have been sent
 
   # Config version 2 entries in shared caches (flag-rules-v2-local-evaluation)
+  # "legacy-banner", "layout-preview" and "future-config-version" are the entries of the
+  # contract's mixed feed in flag-rules-v2-local-evaluation.feature. Both "legacy-banner"
+  # and "layout-preview" are true for person property "plan" equal to "pro".
 
   @requires:feature_flags_local_evaluation_v2
   Scenario: The shared cache keeps config version 2 entries out of flags
@@ -319,4 +322,9 @@ Feature: Flag Definition Loader
     When the flag definition loader refreshes
     Then local feature flag definitions should include flag "legacy-banner"
     And local feature flag definitions should include flag "layout-preview"
+    When local feature flag "legacy-banner" is evaluated with person property "plan" equal to "pro"
+    Then the local evaluation result should be true
+    When local feature flag "layout-preview" is evaluated with person property "plan" equal to "pro"
+    Then the local evaluation result should be true
     And no direct flag definition API request should be sent
+    And no remote feature flag evaluation request should have been sent

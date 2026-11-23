@@ -979,13 +979,12 @@ within trigger groups" — the pending text).
 
 ### Requirement: Stop group evaluation after the first flush (MAY)
 
-An SDK SHALL NOT stop evaluating event legs before a session's replay data has been emitted for
-the first time; after that, it MAY stop evaluating them for the rest of that session. An SDK that
-does so accepts that a pending group's event leg cannot activate the session later in that session
-(for example after a reload lowers an active group's rate to 0, or an active group's flag stops
-matching) until the session id rotates. An SDK that does this SHALL still honor the interaction
-hold release (see "Event-leg activation releases the interaction hold") for a hold that begins
-after it stopped evaluating, and SHALL resume evaluation for a new session.
+An SDK that stops evaluating event legs after a session's replay data has been emitted for the first time SHALL still honor the interaction hold release
+(see "Event-leg activation releases the interaction hold") for a hold that begins after it stopped
+evaluating, and SHALL resume evaluation for a new session. Such an SDK MAY stop evaluating them for the rest of that session, and accepts
+that a pending group's event leg cannot activate the session later in that session (for example
+after a reload lowers an active group's rate to 0, or an active group's flag stops matching) until
+the session id rotates.
 
 This requirement applies to all replay-capable SDKs as an allowed optimization.
 

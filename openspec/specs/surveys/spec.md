@@ -533,3 +533,143 @@ the last-seen survey date along with the rest of locally owned survey history.
 - **WHEN** cached surveys include an active survey "survey-3" eligible for the current user with no seen-survey wait period
 - **AND** survey eligibility is evaluated
 - **THEN** survey display callback should be invoked for survey "survey-3"
+
+### Requirement: The local surveys option defaults to enabled
+
+A client SDK SHALL default its local surveys switch to enabled. The switch is the configuration
+option that turns the surveys subsystem on and off locally: `surveys`, or an inverted
+`disableSurveys` / `disable_surveys`. An application that sets no option SHALL get the surveys
+subsystem installed and survey definitions loaded under "Canonical surveys behavior", and the
+project's remote configuration SHALL decide whether any survey is delivered to it.
+
+The local switch is a kill switch, not the feature's on-ramp. A project with no surveys, or with
+surveys turned off in its project settings, sends no survey definitions, so an enabled default
+neither renders UI nor adds a request beyond the remote-config load the SDK already makes. An
+application that sets the switch off SHALL still get a disabled subsystem: it returns empty
+results or no-ops rather than rendering UI, as the narrative above requires.
+
+Where an SDK renders survey UI through a renderer or delegate that the application installs
+separately, the enabled default SHALL NOT make the SDK do survey matching work while no renderer
+is installed. With only a no-op default delegate in place, the SDK SHALL keep the loaded survey
+definitions and SHALL skip eligibility matching, so no `$feature_flag_called` event is emitted
+for a survey's linked feature flag and no survey property filters run over captured events, for a
+survey the application cannot display. Installing a renderer or delegate SHALL resume matching
+under the normal eligibility rules.
+
+#### Scenario: Surveys are enabled when the application sets no option (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and no surveys option set
+- **AND** the mock server will return surveys:
+  | id       | name       | active |
+  | survey-1 | NPS Survey | true   |
+- **WHEN** surveys are loaded
+- **THEN** cached surveys should include survey "survey-1"
+
+#### Scenario: An explicit local off disables the subsystem (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and surveys disabled
+- **AND** the mock server will return surveys:
+  | id       | name       | active |
+  | survey-1 | NPS Survey | true   |
+- **WHEN** surveys are loaded
+- **THEN** cached surveys should be empty
+
+#### Scenario: An enabled default does no matching work without a renderer (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and no surveys option set
+- **AND** the SDK has no survey renderer or delegate installed
+- **AND** cached surveys include an active survey "survey-1" linked to feature flag "survey-flag"
+- **WHEN** survey eligibility is evaluated
+- **THEN** survey display callback should not be invoked for survey "survey-1"
+- **AND** no event named "$feature_flag_called" should be enqueued
+
+### Requirement: Survey targeting flag reads emit no usage event
+
+The SDK SHALL suppress the feature flag usage event (`$feature_flag_called`) when it reads a
+feature flag to decide whether a survey is eligible and the flag key starts with
+`survey-targeting-`. This applies to every eligibility read of such a key,
+whichever field of the survey definition carried it — the linked flag, the targeting flag, the
+internal targeting flag, or an entry in `feature_flag_keys`.
+
+Keys prefixed `survey-targeting-` are created by PostHog for survey targeting rather than by the
+customer, so their usage events inflate event volume and flag usage metrics without telling the
+customer anything they asked to measure.
+
+The SDK SHALL match the prefix at the start of the key only. A key that contains
+`survey-targeting-` elsewhere is an ordinary key.
+
+For an eligibility read of any other key — a customer-created linked flag, or a
+`feature_flag_keys` entry — the SDK SHALL keep its configured flag event behavior, so the read
+emits a usage event wherever an ordinary `isFeatureEnabled` read would. Suppression is per read:
+it SHALL NOT change the client-level flag event setting, and an SDK whose flag events are
+disabled globally stays silent for every key regardless of prefix.
+
+The separate read that resolves a linked flag's **variant** SHALL emit no usage event, for any
+key.
+
+This requirement applies to SDKs that own a survey display lifecycle. Wrapper SDKs whose survey
+eligibility runs inside the SDK they wrap conform through that SDK.
+
+#### Scenario: A targeting flag read emits no usage event
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and surveys enabled
+- **AND** feature flag events are enabled
+- **AND** cached surveys include an active survey "survey-1" gated by the targeting flag "survey-targeting-abc123"
+- **WHEN** survey eligibility is evaluated
+- **THEN** no event named "$feature_flag_called" should be enqueued for flag "survey-targeting-abc123"
+
+#### Scenario: An ordinary linked flag read still emits a usage event
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and surveys enabled
+- **AND** feature flag events are enabled
+- **AND** cached surveys include an active survey "survey-1" gated by the linked flag "beta-program"
+- **WHEN** survey eligibility is evaluated
+- **THEN** one event named "$feature_flag_called" should be enqueued for flag "beta-program"
+
+#### Scenario: The prefix only matches at the start of the key
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and surveys enabled
+- **AND** feature flag events are enabled
+- **AND** cached surveys include an active survey "survey-1" gated by the linked flag "legacy-survey-targeting-abc123"
+- **WHEN** survey eligibility is evaluated
+- **THEN** one event named "$feature_flag_called" should be enqueued for flag "legacy-survey-targeting-abc123"
+
+#### Scenario: A linked flag variant lookup emits no usage event
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and surveys enabled
+- **AND** feature flag events are enabled
+- **AND** cached surveys include an active survey "survey-1" gated by the linked flag "beta-program" matching variant "test"
+- **WHEN** survey eligibility is evaluated
+- **THEN** exactly one event named "$feature_flag_called" should be enqueued for flag "beta-program"
+
+#### Scenario: Globally disabled flag events stay disabled for ordinary keys
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and surveys enabled
+- **AND** feature flag events are disabled
+- **AND** cached surveys include an active survey "survey-1" gated by the linked flag "beta-program"
+- **WHEN** survey eligibility is evaluated
+- **THEN** no event named "$feature_flag_called" should be enqueued for flag "beta-program"

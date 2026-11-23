@@ -153,6 +153,18 @@ Feature: Offline Evaluations
     When the mock service responds successfully but acknowledges only one result
     Then the caller receives an invalid-response error with unknown persistence
 
+  Scenario: An upload retry preserves a score correction
+    Given an acknowledged reported error with code timeout that was later corrected to ok
+    When the caller replays the original upload with an ingestion-only key
+    Then the receipt returns the original error and code with created false
+    And the stored corrected result remains ok
+
+  Scenario: An uploading experiment can recreate a deleted item
+    Given a hard-deleted item and its reported result in an uploading experiment
+    When the caller re-uploads the original item and result declarations
+    Then the receipt identifies both as created and the reported result counts as new usage
+    And a delayed delete using the previous item's revision receives revision_conflict
+
   # Requirement: Bounded and independently replayable upload chunks
 
   Scenario: Count boundaries preserve independently replayable declarations
@@ -197,6 +209,11 @@ Feature: Offline Evaluations
     Given an isolated offline evaluation client and a completed experiment with an accepted result
     When the caller replays that result and then attempts a new result
     Then the replay is acknowledged without duplication and the new result produces a conflict
+
+  Scenario: A closed experiment rejects an upload that would recreate a result
+    Given a completed experiment whose accepted reported result has since been deleted
+    When the caller replays its original upload
+    Then the caller receives HTTP 409 with code experiment_closed and the result stays deleted
 
   # Requirement: Retry only operations with safe identity
 
@@ -340,3 +357,84 @@ Feature: Offline Evaluations
     Given an accepted evaluation item with model_version "model-b"
     When the caller uploads another scorer's result using only that item's UUID
     Then the result references the accepted item without redeclaring or looking up its model
+
+  # Requirement: Revision-checked operations on experiment handles
+
+  Scenario: A result revision can be read without a stored payload
+    Given a resumed experiment handle and a result whose payload was never provided
+    When the caller reads the result revision and the payload endpoint returns its ID and revision 0
+    Then the caller receives the integer 0
+
+  Scenario: A stale item delete after a score edit is rejected
+    Given a caller has read an item revision and another caller has since changed one of its scores
+    When the caller deletes the item using the older revision
+    Then the service receives one DELETE with that revision in the query and an empty body
+    And the caller receives HTTP 409 with code revision_conflict and rejected persistence
+
+  Scenario: A lost mutation response leaves the outcome unknown
+    Given a resumed experiment handle and a mock service that loses the response to a result update
+    When the caller submits the update with revision 2 and retries enabled
+    Then the service receives one PATCH carrying revision 2
+    And the caller receives an error with unknown persistence and the service receives no revision refresh
+
+  Scenario: An invalid mutation acknowledgment cannot confirm persistence
+    When the service returns HTTP 202 for an item payload delete
+    Then the caller receives invalid_response with unknown persistence
+
+  Scenario: An update acknowledgment cannot go backwards
+    When the caller submits revision 3 and the successful PATCH response carries revision 2
+    Then the SDK reports invalid_response with unknown persistence and sends no second request
+
+  Scenario: An ingestion-only key cannot edit an accepted item
+    When an ingestion-only caller updates an accepted item's trial with its current revision
+    Then the caller receives the service's permission error and the trial is preserved
+
+  # Requirement: Partial corrections to accepted items and scores
+
+  Scenario: Correcting a reported score on a completed experiment
+    Given a completed experiment with a reported boolean result and an accepted dependent composite
+    When the caller changes the reported result from true to false using its current revision
+    Then the PATCH body carries a JSON boolean false and the caller receives the new result revision
+    And the service recomputes the dependent composite using its pinned formula
+
+  Scenario: Correcting an error clears its stored message
+    Given a reported error with a stored error_message and reasoning
+    When the caller corrects its status to ok with a valid score at the current revision
+    Then the stored result payload no longer contains error_message and retains its reasoning
+
+  Scenario: Setting the same reported outcome preserves its revision
+    Given a reported result with value false and revision 5
+    When the caller sets its value to false at revision 5
+    Then the caller receives revision 5 and the score retains its scoring time
+
+  # Requirement: Partial payload updates and payload deletion
+
+  Scenario: A payload edit distinguishes omission from explicit null
+    Given a stored item payload with input and output
+    When the caller updates the payload with only output set to null at the observed item revision
+    Then the PATCH body contains that revision and a payload containing only output set to JSON null
+    And the stored input is preserved and the caller receives the current item revision
+
+  Scenario: An empty update can supply the first payload
+    Given an item with no stored payload inside its original retention window
+    When the caller updates its payload with an empty object at the current revision
+    Then the service receives an explicit empty payload object and stores it
+    And the caller receives an advanced item revision
+
+  Scenario: An empty update preserves an existing payload
+    Given a result with stored reasoning inside its original retention window
+    When the caller updates its payload with an empty object at the current revision
+    Then the stored reasoning is preserved and the caller receives an advanced result revision
+
+  Scenario: A deleted result payload stays unavailable
+    Given a caller has deleted a result payload and read the new result revision
+    When the caller attempts to write reasoning at that revision
+    Then the caller receives HTTP 409 with code payload_unavailable and the result still exists
+
+  # Requirement: Hard deletion of experiment items and results
+
+  Scenario: Deleting a reported input removes its dependent composite
+    Given an item with two reported inputs and a composite that depends on both
+    When the caller deletes one reported input at its current revision
+    Then the call returns no value and the deleted input, its payload, and the composite are removed
+    And the item and the other reported input remain

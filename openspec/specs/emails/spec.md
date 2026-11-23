@@ -30,8 +30,10 @@ Names below use posthog-node spelling, then posthog-python spelling.
 
 | Operation | Request | Success |
 |---|---|---|
-| `send` | `POST {app host}/api/projects/@current/messaging/send/email/` with `{"template_id", "to", "message_data", "distinct_id"}` | `2xx` with `{"message_id", "replayed", "warnings"}` |
-| `get` | `GET {app host}/api/projects/@current/messaging/emails/{message_id}/` | `200` with `{"id", "status", "created_at", "status_at", "reason"}` |
+| `send` | `POST {app host}/api/messaging/send/email/` with `{"template_id", "to", "message_data", "distinct_id"}` | `2xx` with `{"message_id", "replayed", "warnings"}` |
+| `get` | `GET {app host}/api/messaging/emails/{message_id}/` | `200` with `{"id", "status", "created_at", "status_at", "reason"}` |
+
+These routes take the project from the secret key, so the path names no project. They accept project secret API keys only.
 
 The status is one of `queued`, `sent`, `failed`, `delivered`, `bounced`, or `complained` today, and new statuses can appear.
 
@@ -95,7 +97,7 @@ The SDK SHALL send email requests to the PostHog app host, not the ingestion hos
 #### Scenario: An ingestion host maps to its region's app host
 - **GIVEN** a client whose host is `https://eu.i.posthog.com` and that sets no app host
 - **WHEN** the caller sends an email
-- **THEN** the request goes to `https://eu.posthog.com/api/projects/@current/messaging/send/email/`
+- **THEN** the request goes to `https://eu.posthog.com/api/messaging/send/email/`
 
 ### Requirement: Custom host refusal
 
@@ -109,11 +111,12 @@ For a client host that is not PostHog Cloud and no caller-set app host, the SDK 
 
 ### Requirement: Send request
 
-`send` SHALL send `POST {app host}/api/projects/@current/messaging/send/email/` with a JSON body holding `template_id` (the template ID in lowercase), `to`, `message_data` (the template data, or an empty object), and `distinct_id` only when the caller passed a distinct ID.
+`send` SHALL send `POST {app host}/api/messaging/send/email/` with a JSON body holding `template_id` (the template ID in lowercase), `to`, `message_data` (the template data, or an empty object), and `distinct_id` only when the caller passed a distinct ID. The path SHALL NOT name a project; PostHog takes the project from the secret key.
 
 #### Scenario: The template and its data reach the send route
 - **WHEN** the caller sends to `user@example.com` with template ID `0190F6D2-7C1E-7B3A-9F5E-1C2D3E4F5A6B`, template data `{"name": "Ada"}` and distinct ID `user_123`
-- **THEN** the body is `{"template_id": "0190f6d2-7c1e-7b3a-9f5e-1c2d3e4f5a6b", "to": "user@example.com", "message_data": {"name": "Ada"}, "distinct_id": "user_123"}`
+- **THEN** the request is `POST {app host}/api/messaging/send/email/`
+- **AND** the body is `{"template_id": "0190f6d2-7c1e-7b3a-9f5e-1c2d3e4f5a6b", "to": "user@example.com", "message_data": {"name": "Ada"}, "distinct_id": "user_123"}`
 
 ### Requirement: Send request headers
 
@@ -215,7 +218,11 @@ The SDK SHALL report an email error through the language's idiomatic channel onl
 
 ### Requirement: Status read request
 
-`get` SHALL check that the message ID is a UUID before any request, then send `GET {app host}/api/projects/@current/messaging/emails/{message ID in lowercase}/`. It SHALL use the authentication, host rules and retry policy of a send, with no body and no idempotency key.
+`get` SHALL check that the message ID is a UUID before any request, then send `GET {app host}/api/messaging/emails/{message ID in lowercase}/`. It SHALL use the authentication, host rules and retry policy of a send, with no body and no idempotency key.
+
+#### Scenario: The status read uses the key-scoped path
+- **WHEN** the caller reads the status of message `01A18356-C56C-0001-E494-7666BC915188`
+- **THEN** the request is `GET {app host}/api/messaging/emails/01a18356-c56c-0001-e494-7666bc915188/`
 
 #### Scenario: An unknown message ID is not retried
 - **WHEN** the response is `404` with code `not_found`

@@ -498,7 +498,7 @@ After every filter in a group matches, the evaluator SHALL apply that group's `r
 
 For a matching multivariate condition, a condition-level `variant` SHALL be used only when it names one of the flag's defined variants. If the override is absent or invalid, the evaluator SHALL select a variant with the normal deterministic variant hash. A matching non-multivariate condition SHALL return `true`.
 
-The flag-level `early_exit` selector SHALL default to `false`. When it is `true`, the evaluator SHALL return `false` immediately, with no variant or payload, only when every filter in the current group matched but that group's rollout excluded the effective bucketing identifier. A property, cohort, or dependency mismatch SHALL continue to the next group and SHALL NOT trigger `early_exit`. A locally inconclusive group SHALL also not itself trigger `early_exit`; the evaluator SHALL continue so another independently evaluable group can match. If no later group matches and at least one group was inconclusive, the flag SHALL remain inconclusive even when other groups definitively do not match.
+The flag-level `early_exit` selector SHALL default to `false`. When it is `true`, `early_exit` SHALL trigger only when every filter in the current group matched but that group's rollout excluded the effective bucketing identifier. Triggering `early_exit` SHALL stop condition evaluation: no later group SHALL be evaluated. If no earlier group was inconclusive, the evaluator SHALL return `false`, with no variant or payload. If an earlier group was inconclusive, the flag SHALL remain inconclusive rather than return `false`, so remote evaluation stays eligible. A property, cohort, or dependency mismatch SHALL continue to the next group and SHALL NOT trigger `early_exit`. A locally inconclusive group SHALL also not itself trigger `early_exit`; the evaluator SHALL continue so another independently evaluable group can match. If no later group matches and at least one group was inconclusive, the flag SHALL remain inconclusive even when other groups definitively do not match.
 
 #### Scenario: The first matching condition wins without variant-priority sorting (@server)
 - **GIVEN** a multivariate flag has a first condition that matches person property "plan" equal to "pro" with no variant override
@@ -546,6 +546,18 @@ The flag-level `early_exit` selector SHALL default to `false`. When it is `true`
 - **WHEN** the flag is evaluated locally with person property "plan" equal to "pro"
 - **THEN** the first condition should remain inconclusive and should not trigger `early_exit`
 - **AND** the local evaluation result should be true from the second condition
+
+#### Scenario: Early exit after an inconclusive condition stops evaluation and stays inconclusive (@server)
+- **GIVEN** a flag has `early_exit` enabled
+- **AND** its first condition requires person property "plan" equal to "pro" with rollout percentage `0.0`
+- **AND** its second condition matches person property "region" equal to "US" with rollout percentage `0.0`
+- **AND** its third condition is a catch-all with rollout percentage `100.0`
+- **WHEN** the flag is evaluated locally with person property "region" equal to "US" and no "plan" property
+- **THEN** the first condition should remain inconclusive
+- **AND** the second condition should trigger `early_exit`
+- **AND** the third condition should not be evaluated as a match
+- **AND** local evaluation should be inconclusive
+- **AND** remote evaluation should remain eligible
 
 #### Scenario: Inconclusive state is preserved when no later condition matches (@server)
 - **GIVEN** a flag's first condition cannot be resolved from the supplied local context
@@ -703,7 +715,18 @@ When both operands are available but the property value cannot be interpreted by
 
 For `regex` and `not_regex`, the condition SHALL be a string pattern. The evaluator SHALL stringify the supplied property using the compact JSON rules defined for equality. Matching SHALL be case-sensitive unless the pattern enables case-insensitive behavior, and SHALL search the input without adding implicit anchors. An empty pattern therefore matches every present property value. `not_regex` SHALL negate only a successfully compiled and executed search result.
 
-A syntactically invalid pattern SHALL produce a definitive no-match for both `regex` and `not_regex`. Syntax unsupported by an SDK's regex engine, or a regex execution failure, SHALL be inconclusive for that flag and MUST NOT become a match through `not_regex` or cohort negation. Regex matching MUST NOT throw into application code.
+An unescaped `^` SHALL anchor at the start of the whole input and an unescaped `$` SHALL anchor at its end, unless the pattern itself enables multiline behavior. A trailing line feed SHALL NOT be exempt from the end anchor: `^foo$` SHALL NOT match `"foo\n"`. An SDK whose regex engine applies a different default SHALL translate the anchor or defer the criterion rather than return the engine's divergent result.
+
+A syntactically invalid pattern SHALL produce a definitive no-match for both `regex` and `not_regex`. Syntax unsupported by an SDK's regex engine, or a regex execution failure, SHALL be inconclusive for that flag and MUST NOT become a match through `not_regex` or cohort negation. Regex matching MUST NOT throw into application code. Where an SDK's engine classifies a construct as valid that the flags service rejects, or the reverse, the SDK SHALL defer the criterion instead of returning the definitive no-match.
+
+Local regex matching SHALL be limited to a portable subset on which the SDK's regex engine agrees with the flags service. When the pattern or the stringified input falls outside that subset, the criterion SHALL be inconclusive **even when the local engine would return a definitive result**, and the SDK SHALL use remote evaluation where remote fallback is permitted. Divergence classes that SHALL fall outside the subset include:
+
+- non-ASCII patterns, or non-ASCII inputs matched by shorthand classes such as `\d`, `\w`, and `\s` or by Unicode property escapes such as `\p{L}`, whose membership differs between engines;
+- word boundaries `\b` and `\B` outside a character class, which can exhaust the service's bounded backtracking budget on short inputs — `[\b]` as a backspace literal stays in the subset;
+- quantified assertions, nested or orphan-group quantification, and oversized repeat counts, whose evaluation can exceed the service's step budget or the SDK's own resource limits;
+- constructs only one engine compiles, such as lookarounds, backreferences, class set operations, and engine-specific boundary escapes.
+
+A deferral under this requirement carries the same guarantees as an unsupported-syntax deferral: it MUST NOT become a match through `not_regex` or cohort negation, and local-only evaluation SHALL remain unresolved rather than substituting a guessed boolean. The subset is deliberately conservative — patterns and inputs that would in fact have agreed MAY still defer, at the cost of more remote flag requests and more unresolved local-only results. SDKs SHALL NOT trade that cost for a locally computed boolean that the service would contradict. These rules are a portability contract, not a claim of complete equivalence across every Unicode version, compiler limit, or resource budget.
 
 Portable acceptance vectors SHALL use syntax shared by the target SDK engines. Engine-specific constructs require remote fallback when the SDK cannot evaluate them.
 
@@ -722,12 +745,35 @@ Portable acceptance vectors SHALL use syntax shared by the target SDK engines. E
   | `regex` | `""` | `"admin@example.com"` | true |
   | `not_regex` | `""` | `"admin@example.com"` | false |
   | `regex` | `"\\[1,2\\]"` | `[1,2]` | true |
+  | `regex` | `"^foo$"` | `"foo\n"` | false |
+  | `not_regex` | `"^foo$"` | `"foo\n"` | true |
 
 #### Scenario: Unsupported regex execution is inconclusive (@server)
 - **GIVEN** a pattern uses syntax unsupported by the SDK regex engine
 - **WHEN** the pattern is evaluated with `regex` or `not_regex`
 - **THEN** local evaluation should be inconclusive for that flag
 - **AND** neither a negative operator nor cohort negation should turn the failure into a match
+
+#### Scenario Outline: Engine-divergent regex evaluation defers to the service (@server)
+- **GIVEN** a local property condition with operator <operator> and pattern <pattern>
+- **WHEN** it is evaluated against supplied property value <property>
+- **THEN** local evaluation should be inconclusive for that flag
+- **AND** the SDK should request remote evaluation when remote fallback is permitted
+- **AND** local-only evaluation should remain unresolved rather than returning a definitive result
+- **AND** neither a negative operator nor cohort negation should turn the deferral into a match
+
+  | operator | pattern | property |
+  | `regex` | `"^\\d+$"` | `"١٢٣"` |
+  | `not_regex` | `"^\\d+$"` | `"١٢٣"` |
+  | `regex` | `"^\\p{L}+$"` | `"café"` |
+  | `regex` | `"^a\\b$"` | `"a"` |
+  | `regex` | `"^(a+)+$"` | `"aaaaaaaaaaaaaaaaaaaaaaaaaaa\n"` |
+
+#### Scenario: Portable ASCII regex criteria stay local (@server)
+- **GIVEN** a local property condition with operator `regex` and pattern `"example\\.com"`
+- **WHEN** it is evaluated against supplied property value `"admin@example.com"`
+- **THEN** the criterion match result should be true
+- **AND** no remote flag evaluation request should be sent
 
 ### Requirement: Numeric criteria use complete finite binary64 comparisons
 

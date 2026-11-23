@@ -21,8 +21,19 @@ from the harness's step bindings, not a separate operation inventory.
 
 Capture API declarations are independent of client/server SDK type:
 
-- `capture_ai_v0`: AI capture delivery, including the ordinary-capture no-reroute
-  case. That case accepts either legacy batch or analytics-v1 ordinary traffic.
+- `capture_ai_v0`: AI capture delivery on the legacy `/i/v0/ai/batch/` route, including
+  the ordinary-capture no-reroute case. That case accepts either legacy batch or
+  analytics-v1 ordinary traffic.
+- `capture_ai_v1`: AI capture delivery on the capture v1 `/i/v1/ai/events` route; its
+  no-reroute case expects analytics-v1 ordinary traffic. `capture-ai-v1-delivery.feature`
+  adds the lane isolation case under the same capability.
+- `capture_ai_v1_delivery`: the misroute report, ceiling and byte-batching cases in
+  `capture-ai-v1-delivery.feature`. No adapter declares it until the harness binds drop
+  reports, log read-back and generated payloads on the v2 runner.
+- `capture_ai_returns_uuid`: the AI method returns the admitted event's UUID
+  (posthog-python, posthog-node, posthog-ios, posthog-android; not posthog-go or
+  posthog-rs). `event_uuid_override`: the capture and AI methods accept a
+  caller-supplied `uuid` (server SDKs; not posthog-ios or posthog-android).
 - `capture_v1`: analytics-v1 delivery through ordinary capture.
 - `capture_v0`: legacy capture; `capture_v0_batch` additionally selects the batch
   format checks, while `capture_v0_event` selects the event format checks.
@@ -83,3 +94,22 @@ requests throughout initialization, reload and evaluation. Definitions downloads
 are allowed; `/flags` and `/decide` evaluation requests are not. Reload scenarios
 require fresh authenticated definitions responses within the specified deadline
 and assert changed values in the same SDK instance.
+
+### Native remote flag compatibility
+
+The omitted-GeoIP scenario checks the profile's documented native default, not a
+forced initialization option: `flags_geoip_default_disabled` means a strict
+`geoip_disable: true` request field; undeclared profiles retain the historical
+strict `false` expectation. Explicit per-call true and false still override the
+native default. This follows `capture`'s client-level GeoIP control requirement,
+which recommends disabling enrichment but preserves shipped enabled defaults.
+
+The four explicitly failed-reader cases use the canonical
+`get-feature-flag-result` no-result mapping: native undefined, JSON null or the
+legacy boolean false sentinel, never numeric zero or an arbitrary value. Healthy
+false decisions and non-failed parse errors retain exact checks. The harness
+must verify the failed marker and served `/flags?v=4` body before accepting a
+no-result outcome. These are executable-fixture corrections to existing canonical
+contracts, not amendments to the OpenSpec requirements or new suite selections.
+The matching harness generator must reproduce these features before a release
+pin can move; local dirty bundles are development evidence only.

@@ -18,7 +18,7 @@ Feature: Capture AI
     And the call should return the enqueued event's uuid
     And the enqueued event should include a timestamp and uuid
 
-  @server
+  @server @requires:null_property_omission
   Scenario: AI capture drops null-valued properties on its delivery route
     Given the SDK is initialized with token "test-token"
     And the SDK supports AI capture with no property-changing hooks or filters

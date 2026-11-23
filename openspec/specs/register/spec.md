@@ -82,7 +82,7 @@ Despite the surface differences, the semantics are the same: merge new propertie
 ## Interactions
 
 - **`capture`** — registered properties are merged into future events automatically.
-- **`identify` / `alias` / `group`** — these APIs also pass through the standard event-property enrichment path in audited client SDKs, so registered properties are included there as well.
+- **`identify` / `alias` / `group`** — these APIs also pass through the standard event-property enrichment path in audited client SDKs, so registered properties are included there as well, except a registered `$process_person_profile`, which identity events (`$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`, `$set`, `$set_once`) leave out (see the capture spec's **Caller-supplied event properties take precedence**).
 - **`unregister`** — removes one registered property from the same persistent store.
 - **`reset`** — clears registered properties along with other user-scoped client state.
 - **Session-only property APIs** — where exposed, these are separate from `register` and have different persistence semantics.

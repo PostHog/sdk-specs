@@ -73,6 +73,7 @@ capability-driven selection.
 | Get Feature Flags | [`openspec/specs/get-feature-flags/spec.md`](openspec/specs/get-feature-flags/spec.md) | public API | Canonical |
 | Get Feature Flags And Payloads | [`openspec/specs/get-feature-flags-and-payloads/spec.md`](openspec/specs/get-feature-flags-and-payloads/spec.md) | public API | Canonical |
 | Evaluate Flags | [`openspec/specs/evaluate-flags/spec.md`](openspec/specs/evaluate-flags/spec.md) | public API (server) | Canonical |
+| Get Remote Config Payload | [`openspec/specs/get-remote-config-payload/spec.md`](openspec/specs/get-remote-config-payload/spec.md) | public API (server) | Canonical |
 | Get Session ID | [`openspec/specs/get-session-id/spec.md`](openspec/specs/get-session-id/spec.md) | public API | Canonical |
 | Group | [`openspec/specs/group/spec.md`](openspec/specs/group/spec.md) | public API | Canonical |
 | Group Identify | [`openspec/specs/group-identify/spec.md`](openspec/specs/group-identify/spec.md) | public API | Canonical |

@@ -24,13 +24,13 @@ A tracked read is a flag read on a path that reports `$feature_flag_called` and 
 - `metadata.rule_type` is `experiment`;
 - `metadata.rule_id` is present;
 - `metadata.variant_key` is present;
-- the value came from the flags service or from local evaluation, not from a bootstrapped value or a client-side override.
+- the record supplied the value the read reports. A bootstrapped value, a client-side override, a caller-supplied match value and a stale cached value did not come from the record (see "Values the record did not supply are reported as config version 1" in `feature-flag-called-tracker`).
 
 "Present" means the member exists and is not `null`. A rule ID counts as present only when it is a string in the hyphenated 8-4-4-4-12 hexadecimal UUID form, the form the event schemas require; any other string counts as a missing rule ID. This applies to every read path that reports `$feature_flag_called`: client getters such as `getFeatureFlag`, `isFeatureEnabled` and `getFeatureFlagResult`, server single-flag getters, snapshot enablement and value reads (see `evaluate-flags`), and typed value or details accessors where the SDK has them. Whether a read is tracked is decided as the existing requirements and "Feature flag event decision covers the exposure" define. The two events dedupe independently: a tracked read whose `$feature_flag_called` the tracker suppresses as a repeat SHALL still emit the exposure when the exposure key is new, and a tracked read whose exposure key is already present SHALL still emit `$feature_flag_called` when its tracker key is new.
 
 The trigger SHALL NOT depend on whether an experiment links to the rule. `metadata.has_experiment`, and any experiment the SDK knows about, are not inputs.
 
-No other outcome SHALL emit `$experiment_exposure`: not a targeting match, a percentage rollout match, a terminal rollout miss (including an experiment rule's rollout exclusion), a holdout, a paused experiment, a no-rule match or flag default, a missing flag, a failed or unreadable record, a bootstrapped value, a client-side override, a config version 1 record, or a record from a server that does not send typed values (which reads as config version 1).
+No other outcome SHALL emit `$experiment_exposure`: not a targeting match, a percentage rollout match, a terminal rollout miss (including an experiment rule's rollout exclusion), a holdout, a paused experiment, a no-rule match or flag default, a missing flag, a failed or unreadable record, a bootstrapped value, a client-side override, a caller-supplied match value, a stale cached value, a config version 1 record, or a record from a server that does not send typed values (which reads as config version 1).
 
 The decision SHALL use the evaluation details that supplied the value, not the value the read returned. A read that returned a caller-supplied default instead of the flag's value, because the value is `null` or is `false` read as another type, SHALL still emit the exposure when the details meet the conditions. A variant whose value is `false` is still an assignment.
 

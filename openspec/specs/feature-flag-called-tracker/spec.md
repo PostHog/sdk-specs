@@ -436,9 +436,9 @@ A config version 2 record whose reason code is missing or is not one this table 
 
 A config version 2 `$feature_flag_called` event SHALL NOT carry `$feature_flag_experiment_id`, a holdout ID, `$feature_flag_forced_variant`, or an assignment seed anywhere in the event.
 
-For a config version 2 record, `$feature_flag_response` SHALL be the legacy rendering of the record's value on every read path, including typed reads: `true` or `false` for a boolean, the string for a string, `false` for `null`, and `true` for a number or an object. It SHALL NOT be a caller default. This holds until an event schema for number and object values is decided.
+When a config version 2 record supplies the value, `$feature_flag_response` SHALL be the legacy rendering of the record's value on every read path, including typed reads: `true` or `false` for a boolean, the string for a string, `false` for `null`, and `true` for a number or an object. It SHALL NOT be a caller default. This holds until an event schema for number and object values is decided.
 
-The SDK SHALL NOT add any of these properties for a config version 1 record, a record from a server that does not send typed values, a missing flag, a bootstrapped value or a client-side override. Those events do not change.
+The SDK SHALL NOT add any of these properties for a config version 1 record, a record from a server that does not send typed values, a missing flag, or a value that the record did not supply: a bootstrapped value, a client-side override, a caller-supplied match value or a stale cached value (see "Values the record did not supply are reported as config version 1"). Those events do not change.
 
 #### Scenario: An experiment split carries the full rule tuple
 - **GIVEN** the record for "checkout-flow" has value "blue", reason code `experiment_split`, and metadata config version 2, rule type `experiment`, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
@@ -762,3 +762,57 @@ local definition in both SDKs.
   | property                | value |
   | $feature_flag_id        | 4211  |
   | $feature_flag_version   | 7     |
+
+### Requirement: Values the record did not supply are reported as config version 1
+
+A `$feature_flag_called` event SHALL carry config version 2 attribution (`$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant_key`) only when the value the read reports came from the flag's config version 2 record. When the SDK has a config version 2 record for the flag but that record did not supply the value the read reports, the SDK SHALL send the event as it sends one for a config version 1 flag:
+
+- the event keeps `$feature_flag_reason` where the SDK sends it for a config version 1 flag;
+- the event carries none of `$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant_key`;
+- the tracker uses the config version 1 dedupe key, without the components that "Config version 2 dedupe key" adds;
+- the read SHALL NOT emit `$experiment_exposure`, and SHALL NOT consult or add an exposure key (see `experiment-exposure`).
+
+The record did not supply the value in each of these cases:
+
+- a bootstrapped value from `bootstrap.featureFlags`;
+- a client-side override;
+- a caller-supplied match value: a payload read that takes a match value (`matchValue` or `match_value`) reports the caller's value, not the record's;
+- a stale cached value: a server SDK that falls back to a cache of earlier results reports the cached value when its flags request fails, or when a record arrives but the SDK cannot write it to that cache. The value is the cache's, not the current record's.
+
+The SDK SHALL decide by where the value came from, not by comparing the reported value with the record's value. A caller's value or a cached value that equals the record's value still did not come from the record, and equal legacy renderings prove nothing: every number and object value renders as `true`.
+
+When an SDK keeps the loaded record itself, for example a client SDK that keeps its last loaded flags after a failed reload, a read that reports that record's value reads the record, and the record's attribution applies as usual.
+
+Pairing a caller's value or a stale value with the record's rule and variant would attribute an exposure to the wrong arm. Without `$feature_flag_config_version`, the event is treated like any config version 1 flag call.
+
+#### Scenario: A payload read with a caller-supplied match value is reported as config version 1
+- **GIVEN** a server SDK whose payload read accepts a match value and an option to send flag events
+- **AND** remote evaluation for distinct id "user-123" returns "checkout-flow" as a complete config version 2 experiment split with value "annual", rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
+- **WHEN** the payload of "checkout-flow" is read for "user-123" with match value "annual" and flag events turned on
+- **THEN** one `$feature_flag_called` event is enqueued with `$feature_flag_response` "annual"
+- **AND** it has none of `$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant_key`
+- **AND** no `$experiment_exposure` event is enqueued
+
+#### Scenario: A later read of the record is not suppressed by the config version 1 key
+- **GIVEN** a payload read of "checkout-flow" for distinct id "user-123" with match value "annual" emitted `$feature_flag_called` without config version 2 attribution
+- **AND** the record for "checkout-flow" is still a complete config version 2 experiment split with value "annual" and variant key "test"
+- **WHEN** "checkout-flow" is read for "user-123" with a value read
+- **THEN** a second `$feature_flag_called` event is enqueued with `$feature_flag_config_version` 2 and `$feature_flag_variant_key` "test"
+- **AND** one `$experiment_exposure` event is enqueued with `$feature_flag_variant_key` "test"
+
+#### Scenario: A stale cached value is not attributed to the record that arrived
+- **GIVEN** a server SDK with a cache of earlier results that holds the value "annual" for "checkout-flow" and distinct id "user-123"
+- **AND** remote evaluation for "user-123" returns "checkout-flow" as a complete config version 2 experiment split with value "annual" and variant key "test"
+- **AND** the SDK cannot write that result to its cache, so the read falls back to the cached value
+- **WHEN** a read of "checkout-flow" for "user-123" emits `$feature_flag_called`
+- **THEN** the read returns "annual"
+- **AND** the event has none of `$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant_key`
+- **AND** no `$experiment_exposure` event is enqueued
+
+#### Scenario: A stale cached value after a failed flags request carries no attribution
+- **GIVEN** a server SDK with a cache of earlier results that holds the value "annual" for "checkout-flow" and distinct id "user-123"
+- **AND** the flags request for "user-123" fails
+- **WHEN** a read of "checkout-flow" for "user-123" emits `$feature_flag_called`
+- **THEN** the read returns "annual"
+- **AND** the event has none of `$feature_flag_config_version`, `$feature_flag_reason_code`, `$feature_flag_rule_id`, `$feature_flag_rule_type` and `$feature_flag_variant_key`
+- **AND** no `$experiment_exposure` event is enqueued

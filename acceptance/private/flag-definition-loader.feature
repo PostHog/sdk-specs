@@ -288,3 +288,35 @@ Feature: Flag Definition Loader
     And local feature flag "versioned" is evaluated with person property "plan" equal to "banana"
     Then the local evaluation result should be true
     And no remote feature flag evaluation request should have been sent
+
+  # Config version 2 entries in shared caches (flag-rules-v2-local-evaluation)
+
+  @requires:feature_flags_local_evaluation_v2
+  Scenario: The shared cache keeps config version 2 entries out of flags
+    Given the SDK is initialized with token "test-token", local evaluation enabled, and an external flag definition cache provider
+    And the cache provider fetch-decision operation returns true
+    And the mock server will return v=2 flag definitions with config version 1 flag "legacy-banner", config version 2 flag "layout-preview" and config version 3 flag "future-config-version"
+    When the flag definition loader refreshes
+    Then the cache provider should receive flag definition cache data whose "flags" field holds only "legacy-banner"
+    And the cache data's "flags_v2" field should hold "layout-preview" and then "future-config-version"
+    And the cache data should hold group type mapping, cohorts, minimal flag-called events and the matching version as before
+
+  @excludes:feature_flags_local_evaluation_v2
+  Scenario: An SDK without config version 2 evaluation reads only flags from the shared cache
+    Given the SDK is initialized with token "test-token", local evaluation enabled, and a synchronous external flag definition cache provider
+    And the synchronous cache provider fetch-decision operation returns false
+    And the synchronous cache provider returns cached data with config version 1 flag "legacy-banner" in "flags" and config version 2 flag "layout-preview" in "flags_v2"
+    When the flag definition loader refreshes
+    Then local feature flag definitions should include flag "legacy-banner"
+    And local feature flag definitions should not include flag "layout-preview"
+    And no direct flag definition API request should be sent
+
+  @requires:feature_flags_local_evaluation_v2
+  Scenario: An SDK with config version 2 evaluation reads both fields from the shared cache
+    Given the SDK is initialized with token "test-token", local evaluation enabled, and a synchronous external flag definition cache provider
+    And the synchronous cache provider fetch-decision operation returns false
+    And the synchronous cache provider returns cached data with config version 1 flag "legacy-banner" in "flags" and config version 2 flag "layout-preview" in "flags_v2"
+    When the flag definition loader refreshes
+    Then local feature flag definitions should include flag "legacy-banner"
+    And local feature flag definitions should include flag "layout-preview"
+    And no direct flag definition API request should be sent

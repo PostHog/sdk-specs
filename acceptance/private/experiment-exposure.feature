@@ -265,16 +265,36 @@ Feature: Experiment Exposure
     Then exactly one event named "$feature_flag_called" should be enqueued for flag "checkout-flow"
     And exactly one event named "$experiment_exposure" should be enqueued for flag "checkout-flow"
 
-  @server @v2_local_evaluation_capable
+  # The config version 2 definition of "checkout-flow" below assigns distinct id
+  # "user-123" the variant "test" (value true) when person property "plan" is "pro".
+  # Without "plan", local evaluation cannot decide the rule and the SDK asks /flags.
+  # See flag-rules-v2-local-evaluation.feature for the step that serves a v=2 document.
+  @server @requires:feature_flags_local_evaluation_v2
   Scenario: A remote result after the same local assignment is not a second exposure
-    Given the SDK is initialized with token "test-token"
-    And local feature flag definitions resolve "checkout-flow" for distinct id "user-123" as a complete experiment split with value true, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
-    When get feature flag "checkout-flow" is called for distinct id "user-123"
-    And the local definitions for "checkout-flow" can no longer resolve distinct id "user-123"
-    And the flags response for distinct id "user-123" has request id "9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d" and a complete experiment split for "checkout-flow" with value true, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
-    And get feature flag "checkout-flow" is called for distinct id "user-123"
-    Then exactly one event named "$experiment_exposure" should be enqueued for flag "checkout-flow"
-    And the enqueued "$experiment_exposure" event property "locally_evaluated" should equal "true"
+    Given the definitions service serves this typed document for v=2 requests:
+      """application/json
+      {"definitions":{"flags":[{"id":501,"key":"checkout-flow","active":true,"version":3,"has_experiment":true,"filters":{"version":2,"return_type":"boolean","default_value":false,"rules":[{"id":"3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13","rule_type":"experiment","targeting":{"properties":[{"key":"plan","type":"person","operator":"exact","value":["pro"],"negation":false}]},"paused":false,"rollout_percentage":100,"on_rollout_miss":"continue","assignment_algorithm":"sha1_60_v1","seed":"checkout-flow-test","assign_by":"person","variants":[{"key":"control","weight":50,"value":false},{"key":"test","weight":50,"value":true}]}]}}],"group_type_mapping":{},"cohorts":{}}}
+      """
+    And the mock serves this /flags response body:
+      """application/json
+      {"errorsWhileComputingFlags":false,"flags":{"checkout-flow":{"key":"checkout-flow","value":true,"reason":{"code":"experiment_split","condition_index":0},"metadata":{"id":501,"version":3,"config_version":2,"has_experiment":true,"payload":null,"rule_type":"experiment","rule_id":"3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13","variant_key":"test"}}},"requestId":"9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d","evaluatedAt":1800000000000}
+      """
+    And the SDK is initialized for native local evaluation with JSON arguments:
+      """application/json
+      {"project_token":"phc_test_key","config":{"secret_key":"phx_test_key"}}
+      """
+    When the local flag getter is called with JSON arguments:
+      """application/json
+      {"key":"checkout-flow","distinct_id":"user-123","person_properties":{"plan":"pro"}}
+      """
+    And get feature flag is called with JSON arguments:
+      """application/json
+      {"key":"checkout-flow","distinct_id":"user-123"}
+      """
+    And pending captures are flushed
+    Then exactly 1 requests containing /flags should have been received
+    And exactly 1 received events should be named "$experiment_exposure"
+    And a received event named "$experiment_exposure" should have property "locally_evaluated" equal to JSON true
 
   Scenario: A flags reload does not repeat an exposure
     Given the SDK is initialized with token "test-token"
@@ -401,17 +421,29 @@ Feature: Experiment Exposure
 
   # Local evaluation
 
-  @server @v2_local_evaluation_capable
+  # The definition of "checkout-flow" is the one of "A remote result after the same
+  # local assignment is not a second exposure" above.
+  @server @requires:feature_flags_local_evaluation_v2
   Scenario: A locally evaluated split is exposed
-    Given the SDK is initialized with token "test-token"
-    And local feature flag definitions resolve "checkout-flow" for distinct id "user-123" as a complete experiment split with value true, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
-    When get feature flag "checkout-flow" is called for distinct id "user-123"
-    Then exactly one event named "$experiment_exposure" should be enqueued for flag "checkout-flow"
-    And the enqueued "$experiment_exposure" event properties should include:
-      | property                  | value |
-      | locally_evaluated         | true  |
-      | $feature_flag_variant_key | test  |
-    And no remote feature flag evaluation request should have been sent
+    Given the definitions service serves this typed document for v=2 requests:
+      """application/json
+      {"definitions":{"flags":[{"id":501,"key":"checkout-flow","active":true,"version":3,"has_experiment":true,"filters":{"version":2,"return_type":"boolean","default_value":false,"rules":[{"id":"3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13","rule_type":"experiment","targeting":{"properties":[{"key":"plan","type":"person","operator":"exact","value":["pro"],"negation":false}]},"paused":false,"rollout_percentage":100,"on_rollout_miss":"continue","assignment_algorithm":"sha1_60_v1","seed":"checkout-flow-test","assign_by":"person","variants":[{"key":"control","weight":50,"value":false},{"key":"test","weight":50,"value":true}]}]}}],"group_type_mapping":{},"cohorts":{}}}
+      """
+    And the SDK is initialized for native local evaluation with JSON arguments:
+      """application/json
+      {"project_token":"phc_test_key","config":{"secret_key":"phx_test_key"}}
+      """
+    When the local flag getter is called with JSON arguments:
+      """application/json
+      {"key":"checkout-flow","distinct_id":"user-123","person_properties":{"plan":"pro"}}
+      """
+    Then the local flag getter should return JSON true
+    When pending captures are flushed
+    Then exactly 1 received events should be named "$experiment_exposure"
+    And a received event named "$experiment_exposure" should have property "locally_evaluated" equal to JSON true
+    And a received event named "$experiment_exposure" should have property "$feature_flag_variant_key" equal to JSON "test"
+    And a received event named "$experiment_exposure" should have property "$feature_flag_rule_id" equal to JSON "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13"
+    And no remote flag evaluation path should have been requested
 
   @server
   Scenario: A locally evaluated config version 1 flag gets no SDK exposure

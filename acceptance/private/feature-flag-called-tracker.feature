@@ -303,9 +303,9 @@ Feature: Feature Flag Called Tracker
   # version 2 record's, even an equal one, so its event is sent as for config version 1.
 
   @server @payload_flag_events_capable
-  Scenario: A caller-supplied match value is reported as config version 1
+  Scenario Outline: A caller-supplied match value is reported as config version 1
     Given the SDK is initialized with token "test-token"
-    And the flags response for distinct id "user-123" has a complete experiment split for "checkout-flow" with value "annual", rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
+    And the flags response for distinct id "user-123" has a complete experiment split for "checkout-flow" with value "<record_value>", rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
     When get feature flag payload "checkout-flow" is called for distinct id "user-123" with match value "annual" and flag events turned on
     Then exactly one event named "$feature_flag_called" should be enqueued for flag "checkout-flow"
     And the enqueued event property "$feature_flag_response" should equal "annual"
@@ -321,15 +321,21 @@ Feature: Feature Flag Called Tracker
     And the last enqueued "$feature_flag_called" event property "$feature_flag_variant_key" should equal "test"
     And exactly one event named "$experiment_exposure" should be enqueued for flag "checkout-flow"
 
+    Examples:
+      | case             | record_value |
+      | equal values     | annual       |
+      | different values | monthly      |
+
   @server @flag_fallback_cache_capable
   Scenario Outline: A stale cached value is reported as config version 1
     Given the SDK is initialized with token "test-token" and a cache of earlier flag results
     And that cache holds the value "annual" for flag "checkout-flow" and distinct id "user-123"
-    And the flags response for distinct id "user-123" has a complete experiment split for "checkout-flow" with value "annual", rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
+    And the flags response for distinct id "user-123" has a complete experiment split for "checkout-flow" with value "<record_value>", rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
     And <failure>
     When get feature flag "checkout-flow" is called for distinct id "user-123"
     Then the returned feature flag value should be "annual"
     And exactly one event named "$feature_flag_called" should be enqueued for flag "checkout-flow"
+    And the enqueued event property "$feature_flag_response" should equal "annual"
     And the enqueued event properties should not include "$feature_flag_config_version"
     And the enqueued event properties should not include "$feature_flag_reason_code"
     And the enqueued event properties should not include "$feature_flag_rule_id"
@@ -338,9 +344,10 @@ Feature: Feature Flag Called Tracker
     And no event named "$experiment_exposure" should be enqueued
 
     Examples:
-      | case                 | failure                                               |
-      | failed flags request | the next remote feature flag evaluation request fails |
-      | failed cache write   | writing the flags result to that cache fails          |
+      | case                                | record_value | failure                                               |
+      | failed flags request                | annual       | the next remote feature flag evaluation request fails |
+      | failed cache write                  | annual       | writing the flags result to that cache fails          |
+      | failed cache write, different value | monthly      | writing the flags result to that cache fails          |
 
   # Minimal-event mode
 

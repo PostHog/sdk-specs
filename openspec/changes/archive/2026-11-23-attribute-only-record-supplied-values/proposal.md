@@ -9,10 +9,10 @@ A config version 2 `$feature_flag_called` event carries the record's config vers
 
 ## What Changes
 
-- `feature-flag-called-tracker` states the general rule: config version 2 attribution only when the record supplied the reported value. Otherwise the event is sent as for a config version 1 flag: it keeps `$feature_flag_reason`, carries none of the five attribution properties, uses the config version 1 dedupe key, and the read sends no `$experiment_exposure`. The requirement lists bootstrapped values, client-side overrides, caller-supplied match values and stale cached values.
+- `feature-flag-called-tracker` states the general rule: config version 2 attribution only when the record supplied the reported value. Otherwise the event is sent as for a config version 1 flag: it keeps `$feature_flag_reason`, carries none of the five attribution properties, uses the config version 1 dedupe key, and the read sends no `$experiment_exposure`. The requirement lists bootstrapped values, client-side overrides, caller-supplied match values and stale cached values. A `failed` record that no other value replaces keeps its config version and reason code, as before.
 - The attribution requirement lists the two new cases with bootstrap and overrides, and scopes its `$feature_flag_response` rule to values the record supplied, so a match-value read can report the caller's value.
 - The `experiment-exposure` trigger lists the same four cases.
-- `acceptance/private/feature-flag-called-tracker.feature` gets a match-value scenario and a stale-cache scenario outline.
+- `acceptance/private/feature-flag-called-tracker.feature` gets a match-value and a stale-cache scenario outline, each with a record value that equals the reported value and one that does not.
 
 ## Capabilities
 

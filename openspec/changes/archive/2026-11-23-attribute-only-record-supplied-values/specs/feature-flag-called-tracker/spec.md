@@ -18,6 +18,8 @@ The record did not supply the value in each of these cases:
 
 When an SDK keeps the loaded record itself, for example a client SDK that keeps its last loaded flags after a failed reload, a read that reports that record's value reads the record, and the record's attribution applies as usual.
 
+A `failed` record supplies no value. When no other value takes its place and the read reports the missing response sentinel, the record's attribution still applies as usual: the event keeps the config version and reason code (see "Failed direct getter evaluations report evaluation_failed").
+
 Pairing a caller's value or a stale value with the record's rule and variant would attribute an exposure to the wrong arm. Without `$feature_flag_config_version`, the event is treated like any config version 1 flag call.
 
 #### Scenario: A payload read with a caller-supplied match value is reported as config version 1

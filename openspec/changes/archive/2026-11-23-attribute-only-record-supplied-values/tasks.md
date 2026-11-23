@@ -6,7 +6,7 @@
 
 ## 2. Acceptance features
 
-- [x] 2.1 Add a match-value scenario and a stale-cache scenario outline to `acceptance/private/feature-flag-called-tracker.feature`
+- [x] 2.1 Add a match-value and a stale-cache scenario outline to `acceptance/private/feature-flag-called-tracker.feature`
 
 ## 3. Validation
 

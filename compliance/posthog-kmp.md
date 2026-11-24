@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-kmp](https://github.com/PostHog/posthog-kmp)
 **Audited commit:** `0a88aa7490c4bc51fb263c7f3619d62d838658a4` ([commit](https://github.com/PostHog/posthog-kmp/commit/0a88aa7490c4bc51fb263c7f3619d62d838658a4)), tag `1.0.0` — first audit, 2026-11-23
 **Audited against sdk-specs commit:** `795b69f`; re-checked at `44fe27a`, whose one later spec change (#233, local flag evaluation) is server-only and moves no row
-**Summary:** 18 ✅ · 33 🟡 · 8 ❌ · 11 ➖ · 0 ❓ (70 rows; first audit). On the shared 69-row basis (without Get Remote Config Payload, ➖): 18 ✅ · 33 🟡 · 8 ❌ · 10 ➖.
+**Summary:** 17 ✅ · 34 🟡 · 8 ❌ · 11 ➖ · 0 ❓ (70 rows; first audit). On the shared 69-row basis (without Get Remote Config Payload, ➖): 17 ✅ · 34 🟡 · 8 ❌ · 10 ➖.
 
 **Why this run:** posthog-kmp has no compliance file yet. 1.0.0 is its first stable release.
 
@@ -103,7 +103,7 @@ and JVM (`androidMain/.../PostHog.android.kt:30-31`, `jvmMain/.../PostHog.jvm.kt
 | 55 | Event Batcher | 🟡 | [n30] |
 | 56 | Exception Event Metadata | 🟡 | [n31] |
 | 57 | Experiment Exposure | ➖ | every delegate requests `/flags/?v=2` (posthog-android, posthog-ios per their files; posthog-js 1.435.8 `dist/module.js` `"/flags/?v=2"`) |
-| 58 | Feature Flag Cache | ✅ | |
+| 58 | Feature Flag Cache | 🟡 | [n12] (web) |
 | 59 | Feature Flag Called Tracker | 🟡 | [n32] |
 | 60 | Flag Definition Loader | ➖ | server SDKs |
 | 61 | HTTP Client | 🟡 | [n33] |
@@ -211,9 +211,10 @@ and JVM (`androidMain/.../PostHog.android.kt:30-31`, `jvmMain/.../PostHog.jvm.kt
 
 <a id="n12"></a>
 
-### n12 — Get Feature Flag Payload / Get Feature Flag Result (🟡 Partial)
+### n12 — Get Feature Flag Payload / Get Feature Flag Result / Feature Flag Cache (🟡 Partial)
 - **Spec requires:** "If decoding fails, including for empty or whitespace-only serialized input, the SDK SHALL return the same sentinel used for a known flag without a payload" (`openspec/specs/get-feature-flag-payload/spec.md`, Requirement: Malformed serialized payloads return no payload). A dedicated payload getter MAY be omitted when the result getter returns the payload and takes `sendFeatureFlagEvent` (Requirement: Payload reads through the flag result getter).
 - **SDK currently:** KMP has no `getFeatureFlagPayload`; `getFeatureFlagResult(key, sendFeatureFlagEvent = false)` returns the payload on every target (`commonMain/.../PostHog.kt:498-500`), which the spec permits. Android/JVM/Apple return `null` for a malformed payload (✅ in both files). On web, KMP reads `result.payload` from posthog-js (`jsMain/.../PostHog.js.kt:360-378`, `wasmJsMain/.../PostHog.wasmJs.kt:320-333`), and posthog-js 1.435.8 parses with `try{return JSON.parse(t)}catch(i){return t}` (`dist/module.js`), so a malformed payload comes back as the raw string. KMP's `featureFlagResult()` forces `enabled = false` for an empty variant on every path (`commonMain/.../PostHogModels.kt:225-226`).
+- **Feature Flag Cache (row 58):** the same web gap fails "Cached payload decoding rejects malformed JSON" (`openspec/specs/feature-flag-cache/spec.md:143-162`, #170): invalid JSON "MUST NOT be exposed as a raw payload string" and the SDK "SHALL log parse failures". posthog-js 1.435.8's `parsePayload` (`packages/core/src/featureFlagUtils.ts:110-120`) returns the raw string without a log, and the web bridges forward it. Android/JVM/Apple ✅ (posthog-android n33, posthog-ios n20). `compliance/posthog-js.md` still shows ✅ only because it predates #170.
 - **Backwards compatibility:** Changing the web payload to `null` for malformed JSON is a behaviour change for anyone reading the raw string.
 - **Remediation:** Fix in posthog-js, or have the web bridges drop a payload that is a `String` posthog-js failed to parse (only possible by re-parsing the raw value).
 

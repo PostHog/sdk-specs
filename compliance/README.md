@@ -156,7 +156,7 @@ the single most widely-shared non-compliance in the matrix.
 | posthog-android | 43/70 fully compliant (61%) | 43 | 15 | 1 | 11 | 0 | 2026-11-24 · `1577cfa5` (tag `android-v4.0.3`; all 70 rows) | 16 | [posthog-android.md](posthog-android.md) |
 | posthog-ios | 43/70 fully compliant (61%) | 43 | 15 | 1 | 11 | 0 | 2026-11-24 · `c8fcc2c06` (tag `4.0.5`) | 16 | [posthog-ios.md](posthog-ios.md) |
 | posthog-node | 9/64 fully compliant (14%; 29 contracts N/A on a server SDK) | 9 | 21 | 4 | 29 | 1 | 2026-10-12 · `4f590b36` (posthog-js monorepo; Traces row corrected 2026-10-19) | 25 (+1 ❓) | [posthog-node.md](posthog-node.md) |
-| posthog-flutter | 21/70 fully compliant (30%) | 21 | 32 | 4 | 13 | 0 | 2026-11-24 · `4cb4318b` (tag `6.0.0`; native rows at posthog-ios 4.0.5 / posthog-android 4.0.3) | 36 | [posthog-flutter.md](posthog-flutter.md) |
+| posthog-flutter | 20/70 fully compliant (29%) | 20 | 33 | 4 | 13 | 0 | 2026-11-24 · `4cb4318b` (tag `6.0.0`; native rows at posthog-ios 4.0.5 / posthog-android 4.0.3) | 37 | [posthog-flutter.md](posthog-flutter.md) |
 | posthog-kmp | 15/70 fully compliant (21%) | 15 | 36 | 8 | 11 | 0 | 2026-11-24 · `0a88aa7` (tag `1.0.0`; first audit) | 44 | [posthog-kmp.md](posthog-kmp.md) |
 | posthog-react-native | 29/64 fully compliant (45%) | 29 | 28 | 2 | 5 | 0 | 2026-11-10 · `210bf35d8` (react-native-plugin 3.0: six session replay rows, Opt In, Capture Exception, Exception Event Metadata only); other rows 2026-10-19 · `3ddaa654` — see file header | 30 | [posthog-react-native.md](posthog-react-native.md) |
 | posthog-php | 11/63 fully compliant (17%; 33 contracts N/A on a server SDK; **needs +1: MCP Analytics**) | 11 | 11 | 8 | 33 | 0 | 2026-09-28 · `5451f4e0` | 19 | [posthog-php.md](posthog-php.md) |
@@ -176,9 +176,10 @@ Payload ([#220](https://github.com/PostHog/sdk-specs/pull/220)), ➖ on client S
 - **posthog-ios 44/14/1/10 → 43/15/1/11.** Capture and Capture AI ✅→🟡: a Swift `Set`/`NSSet` property is dropped
   instead of serialized as an array ([#215](https://github.com/PostHog/sdk-specs/pull/215)). Bootstrap 🟡→✅
   (its only gap was MAY-level, as on Android). No ❌ or 🟡 row was fixed in 4.0.1–4.0.5; #211, #153/#202, #181/#226, #224 and #232 are met.
-- **posthog-flutter 23/30/4/12 → 21/32/4/13.** Register 🟡→✅ (its only gap was MAY-level, as on Android). Capture Exception ✅→🟡 (#224: synthesized stacks are trimmed
+- **posthog-flutter 23/30/4/12 → 20/33/4/13.** Register 🟡→✅ (its only gap was MAY-level, as on Android). Capture Exception ✅→🟡 (#224: synthesized stacks are trimmed
   by package name, which fails in obfuscated and web builds); Get Feature Flag and Is Feature Enabled ✅→🟡
-  (web ignores the client-level `sendFeatureFlagEvent`, a gap already in `752f899`). The merged
+  (web ignores the client-level `sendFeatureFlagEvent`, a gap already in `752f899`); Feature Flag Cache
+  ✅→🟡 (web forwards posthog-js's raw malformed-payload string, #170, as on posthog-kmp). The merged
   event-batcher, http-client and retry-queue text says Flutter has no Dart transport, which is wrong for
   Windows/Linux; that is a spec fix, not scored here.
 - **posthog-kmp 15/36/8/11 (first audit).** A facade over posthog-android 4.0.2 (Android), its JVM core
@@ -453,6 +454,7 @@ stalest pointer and its only 59-row file.
 | posthog-flutter | Surveys | Backward-compatible | **6.0** — posthog-android still moves the last-seen survey date on submit and dismiss (#102); posthog-ios now writes it on show — [posthog-flutter.md#n35](posthog-flutter.md#n35) |
 | posthog-flutter | Capture Exception | Backward-compatible | **Downgraded from ✅ (6.0.0)** — synthesized stacks drop SDK frames by package name, so obfuscated and web builds end on SDK frames (#224) — [posthog-flutter.md#n5](posthog-flutter.md#n5) |
 | posthog-flutter | Get Feature Flag / Is Feature Enabled | Backward-compatible | **Downgraded from ✅ (6.0.0)** — web ignores the client-level `sendFeatureFlagEvent` default (#153) — [posthog-flutter.md#n13](posthog-flutter.md#n13) |
+| posthog-flutter | Feature Flag Cache | Backward-compatible | **Downgraded from ✅ (6.0.0)** — web forwards posthog-js's raw malformed-payload string without a log (#170), as on posthog-kmp — [posthog-flutter.md#n15](posthog-flutter.md#n15) |
 | posthog-kmp | Session Replay Ingestion Controls | Backward-compatible | **First audit** — web never sets `disable_session_recording`, so the project's remote setting turns replay on even when KMP config leaves it off — [posthog-kmp.md#n36](posthog-kmp.md#n36) |
 | posthog-kmp | Capture | Backward-compatible | **First audit** — JS sends `Long` values as `{low_1, high_1}` objects; Wasm stringifies sets; Apple drops them (via posthog-ios) — [posthog-kmp.md#n6](posthog-kmp.md#n6) |
 | posthog-kmp | Session Replay Privacy | Backward-compatible | **First audit** — the exact posthog-ios 4.0.3 pin keeps the 4.0.4 GPU-capture privacy fixes out while KMP exposes GPU capture — [posthog-kmp.md#n37](posthog-kmp.md#n37) |

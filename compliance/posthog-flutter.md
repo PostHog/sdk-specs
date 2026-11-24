@@ -4,7 +4,7 @@
 **Audited commit:** `4cb4318b4ee599ea253581416d1c3147efb26f85` ([tag 6.0.0](https://github.com/PostHog/posthog-flutter/releases/tag/6.0.0), [commit](https://github.com/PostHog/posthog-flutter/commit/4cb4318b4ee599ea253581416d1c3147efb26f85)), the released posthog_flutter 6.0.0 — re-audited on 2026-11-24 (see [6.0.0 re-audit](#600-re-audit-2026-11-24)); first audited on 2026-11-10 at `82123e6` ([PostHog/posthog-flutter#637](https://github.com/PostHog/posthog-flutter/pull/637) head)
 **Native SDKs:** released posthog-ios `4.0.5` (`c8fcc2c06`) and posthog-android `4.0.3` (`android-v4.0.3`, `1577cfa5`), the versions the 6.0.0 pins resolve to (`darwin/posthog_flutter/Package.swift:17` `"4.0.3" ..< "5.0.0"`; `android/build.gradle:75` `strictly '[4.0.2,5.0.0)'`)
 **Audited against sdk-specs commit:** `44fe27a` (`main`; #146 merged)
-**Summary:** 21 ✅ · 32 🟡 · 4 ❌ · 13 ➖ · 0 ❓ (70 rows; previous audit 2026-11-10 at `82123e6` scored 23/30/4/12/0 on 69 rows)
+**Summary:** 20 ✅ · 33 🟡 · 4 ❌ · 13 ➖ · 0 ❓ (70 rows; previous audit 2026-11-10 at `82123e6` scored 23/30/4/12/0 on 69 rows)
 
 **Why this run:** posthog_flutter 6.0 ([PostHog/posthog-flutter#637](https://github.com/PostHog/posthog-flutter/pull/637))
 adopts posthog-ios 4.0 and posthog-android 4.0 (`Package.swift` pins `"4.0.0" ..< "5.0.0"`,
@@ -47,6 +47,9 @@ are at `4cb4318b`.
   - Get Feature Flag ✅→🟡 ([n13](#n13)) and Is Feature Enabled ✅→🟡 ([n20](#n20)): on web an
     omitted per-call option ignores `PostHogConfig.sendFeatureFlagEvent`, against
     `get-feature-flag-result/spec.md:264` and #153, which names it "a known gap".
+  - Feature Flag Cache ✅→🟡 ([n15](#n15)): on web a malformed payload from posthog-js reaches the
+    caller as its raw string, against #170 (`feature-flag-cache/spec.md:143-162`); the same gap is 🟡 on
+    posthog-kmp.
   - Register 🟡→✅ ([n25](#n25)): the only gap was blank keys, which `register/spec.md:42` makes
     optional ("may reject"), and 6.0.0 meets the #146 identity-event rule; posthog-android, posthog-ios
     and posthog-js are ✅ on the same reading.
@@ -149,7 +152,7 @@ Emails ➖ (all server-only).
 | 14 | Event Batcher | 🟡 | [n8] |
 | 15 | Exception Event Metadata | ❌ | [n9] |
 | 16 | Exception Steps | ✅ | |
-| 17 | Feature Flag Cache | ✅ | |
+| 17 | Feature Flag Cache | 🟡 | [n15] (web) |
 | 18 | Feature Flag Called Tracker | 🟡 | [n10] |
 | 19 | Flag Definition Loader | ➖ | |
 | 20 | Flush | 🟡 | [n11] |
@@ -334,11 +337,12 @@ adds a **6.0.0** line to the notes it re-checked, and re-points re-verified line
 
 <a id="n15"></a>
 
-### n15 — Get Feature Flag Result (🟡 Partial)
+### n15 — Get Feature Flag Result / Feature Flag Cache (🟡 Partial)
 - **Spec requires:** a structured result (`key`, `enabled`, `variant`, `payload`), `null` for an unknown flag, malformed payloads as no payload, and a per-call `sendFeatureFlagEvent`; (#193) a flag whose value is `""` reads as disabled, `enabled: false` with `variant: ""`.
 - **SDK currently (`82123e6`):** `getFeatureFlagResult(key, {sendFeatureFlagEvent})` (`lib/src/posthog.dart:1079-1084`) follows `PostHogConfig.sendFeatureFlagEvent` when the option is omitted, except on web, which leaves it to posthog-js ([n13](#n13)). Payloads are no payload for malformed, empty or whitespace JSON on iOS/macOS (posthog-ios 4.0, `compliance/posthog-ios.md` n8, ✅), Android and Windows/Linux. An empty variant gives `enabled: false, variant: ""` on Windows/Linux (`lib/src/core/posthog_core.dart:1135-1139`), iOS/macOS (`PostHogRemoteConfig.swift:1184-1192` at `e27cbe4cb`), Android (`PostHogRemoteConfig.kt:1344-1348` at `aaa23d39`) and web, where posthog-js's browser `getFeatureFlagResult` sets `enabled: !!flagValue` and Flutter passes the result through (`lib/src/utils/channel_serialization.dart:176-188`). **Gap on web:** that pass-through (`lib/src/posthog_flutter_web_handler.dart:143-150`) also copies `payload` unchanged, and posthog-js's `parsePayload` returns a malformed payload as its raw string, with no log (`packages/browser-common/src/feature-flags.ts:1531`, `packages/core/src/featureFlagUtils.ts:110-120` at posthog-js `5e31f126d`; `packages/browser-common/tests/feature-flags-behavior.spec.ts:665-684` expects it).
 - **Backwards compatibility:** Backward-compatible — only invalid payloads change.
 - **6.0.0 (`4cb4318b`):** the malformed-payload gap holds (posthog-js `origin/main` still returns the raw string, `packages/core/src/featureFlagUtils.ts:110-120`). #211 (failed records give no result) is met on every path, Windows/Linux via posthog-flutter#721 (`lib/src/core/feature_flag_utils.dart:127-130`). Web also ignores the client-level event default when the option is omitted ([n13](#n13)).
+- **Feature Flag Cache (row 17, ✅→🟡 at 6.0.0):** the same web pass-through fails "Cached payload decoding rejects malformed JSON" (`openspec/specs/feature-flag-cache/spec.md:143-162`, #170): invalid JSON "MUST NOT be exposed as a raw payload string" and the SDK "SHALL log parse failures". posthog-js returns the raw string with no log, and Flutter Web forwards it. iOS/macOS and Android inherit ✅ (posthog-ios n20, posthog-android n33). Windows/Linux meet it: `parsePayload` returns `null` and reports the `FormatException` to `onMalformed` (`lib/src/core/feature_flags.dart:9-21` at `4cb4318b`). Scored as on `compliance/posthog-kmp.md` row 58.
 - **Remediation:** Fix `parsePayload` in posthog-js, or return no payload on web when posthog-js hands back a string that isn't valid JSON; apply [n13](#n13)'s web default.
 
 <a id="n16"></a>

@@ -87,7 +87,7 @@ Reference shape: posthog-js `origin/main` `480395c443` `packages/browser-common/
 - The gating decision never throws into the host app.
 - A group the SDK cannot read is skipped. The server already drops groups that posthog-js cannot read.
 - On mobile, when `version` is `2` and every entry of a non-empty `triggerGroups` is skipped, the SDK does not return to the V1 fields: it records nothing and logs it.
-- A regex pattern that fails to compile never throws into the host app. A filter with such a pattern does not match under `regex` and matches under `not_regex`. A mobile SDK drops such a `urls` pattern and keeps the group.
+- A regex pattern that fails to compile never throws into the host app. A filter with such a pattern does not match under `regex` and matches under `not_regex`. Every SDK skips such a `urls` pattern, keeps the group, and keeps evaluating the other patterns and groups.
 - A group sample rate that is not a number samples in. A blank string or JSON `null` is 0.
 - A missing or quota-limited flag leaves the flag leg unsatisfied.
 
@@ -921,16 +921,18 @@ a pattern that does not match: `regex` SHALL NOT match on that value, and `not_r
 on it. A missing or `null` property keeps the absence rule of "Property filter semantics", whatever
 the pattern.
 
-A mobile SDK SHALL drop a `urls` pattern that fails to compile and SHALL keep the group and its
-other patterns and legs. The dropped pattern never matches, and the leg stays configured, so a
-group whose only pattern fails to compile never satisfies its screen leg. The SDK SHOULD log the
-dropped pattern. On the browser, the SDK logs the pattern and leaves it out of its compiled cache
-when it reads the config, but its URL check then compiles the pattern again and the error leaves
-the check, so the patterns after the failed one in that group are not checked for that URL. This is the current posthog-js behavior, recorded here as a platform
-difference; other SDKs SHALL NOT copy it.
+The SDK SHALL skip a `urls` pattern that fails to compile and SHALL keep the group, its other
+patterns, and its other legs. The leg stays configured, so the skipped pattern never matches, and a
+group whose only pattern fails to compile never satisfies its URL or screen leg. The SDK SHALL keep
+evaluating the other patterns of the group and the other groups, and SHOULD log the skipped
+pattern. The server validates a `urls` pattern with Python `re.compile`, which accepts patterns
+such as `(?i)checkout` that JavaScript rejects, so a config that the server accepted can carry a
+pattern that fails to compile on the client. posthog-js currently throws from its URL check for
+such a pattern (`triggerMatching.ts:115`): the error leaves the recorder's first emitted event, so
+the recorder does not start and no group records, also a group with no conditions. This is a
+defect, not a platform difference, and SDKs SHALL NOT copy it.
 
-This requirement applies to all replay-capable SDKs. The `urls` rule applies to mobile SDKs and to
-hybrid SDKs over them.
+This requirement applies to all replay-capable SDKs.
 
 Reference (filters): posthog-js `origin/main` `f05a993f9d`
 (`packages/core/src/surveys/property-matching.ts:5-12`: `isValidRegex` catches the `new RegExp`
@@ -938,14 +940,21 @@ error; `:14-24`: `isMatchingRegex` returns false for a pattern that is not valid
 `values.some(... targets.some(isMatchingRegex))`; `:32`: `not_regex` is
 `values.every(... targets.every(!isMatchingRegex))`).
 
-Reference (`urls`): posthog-js `origin/main` `f05a993f9d`
-(`packages/browser/src/extensions/replay/external/triggerMatching.ts:262-270`: `_compileRegexCache`
-logs "Invalid URL trigger regex pattern" and does not cache the pattern; `:115`:
-`compiledRegexCache?.get(trigger.url) ?? new RegExp(trigger.url)` compiles a pattern that is not in
-the cache again, which throws; `:395`: `checkUrlTriggerConditions` calls it with no catch;
-`recording-strategies.ts:441-455`: the per-group loop has no catch). The mobile rule is mobile-only
-and decision-based, with no posthog-js reference: it stands in for the web cache omission at
-`triggerMatching.ts:262-270` and does not take the match-time error.
+Reference (`urls`): decision-based. posthog-js `origin/main` `f05a993f9d` skips the pattern only
+when it reads the config: `packages/browser/src/extensions/replay/external/triggerMatching.ts:262-270`
+(`_compileRegexCache`) logs "Invalid URL trigger regex pattern" and does not cache it. The defect:
+`sessionRecordingUrlTriggerMatches` (`:107`) compiles a pattern that is not in the cache again
+at `:115` (`compiledRegexCache?.get(trigger.url) ?? new RegExp(trigger.url)`), which throws;
+`checkUrlTriggerConditions` sets the last checked URL at `:380` and calls it at `:395` with no
+catch; `recording-strategies.ts:428-458` (`checkUrlTriggers`, per-group loop at `:441-457`) has no
+catch; `lazy-loaded-session-recorder.ts:2004-2009` calls it from `onRRwebEmit` with no catch. In
+`packages/rrweb/rrweb/src/record/index.ts`, `wrappedEmit` calls `emit` with no catch
+(`:499-501`), `takeFullSnapshot` emits the Meta event inside a try with only a finally (`:714-725`,
+`:853-855`), `init` runs `takeFullSnapshot` (`:1192-1197`), and when the document is already
+interactive `record` calls `init` at `:1218-1219` inside the try whose catch at `:1277-1282` sets
+`stopped` and only warns. Server: PostHog/posthog `origin/master` `8cc1cfd0ae`
+`posthog/api/team/session_recording_settings.py:206-211` validates each `urls` pattern with
+`re.compile`.
 
 Covering test: posthog-js `packages/core/src/surveys/property-matching.spec.ts:84-87` ("treats
 invalid regexes as non-matches before applying negative quantifiers") and `:27-30` ("returns false
@@ -953,7 +962,8 @@ for invalid regular expressions") cover the filter result.
 `packages/browser/src/__tests__/extensions/replay/checkUrlTriggerConditions.test.ts:408-419`
 ("omits invalid trigger regex from the configuration cache") covers only the cache omission. No
 posthog-js test on `origin/main` covers a URL check against a pattern that fails to compile, or the
-`(?i)` case; source only. The mobile `urls` rule has no posthog-js analog; decision-based.
+`(?i)` case; source only. The `urls` rule is decision-based: no posthog-js test covers a pattern
+that fails to compile at match time.
 
 #### Scenario: A filter pattern that fails to compile does not match
 - **GIVEN** a trigger group with a filter on event property "path" with operator `regex` and value "["
@@ -970,25 +980,36 @@ posthog-js test on `origin/main` covers a URL check against a pattern that fails
 - **THEN** on an SDK whose regex engine compiles "(?i)checkout", the first group's filter should match and the second group's filter should not match
 - **AND** on an SDK whose regex engine does not compile "(?i)checkout", the first group's filter should not match and the second group's filter should match
 
-#### Scenario: A screen pattern that fails to compile is dropped and the group is kept
-- **GIVEN** a mobile SDK with session replay enabled
+#### Scenario: A URL or screen pattern that fails to compile is skipped and the group is kept
+- **GIVEN** session replay is enabled
 - **AND** the remote config sets `version` to 2 and configures a trigger group with URL conditions matching "[" and "Checkout" and a sample rate of 1.0
-- **WHEN** the client captures a "$screen" event with "$screen_name" set to "CheckoutScreen"
+- **WHEN** the current URL or screen name changes to one matching "Checkout"
 - **THEN** session recording should be active
+- **AND** no error should reach the host application
 
-#### Scenario: A group whose only screen pattern fails to compile stays pending
-- **GIVEN** a mobile SDK with session replay enabled
+#### Scenario: A group whose only URL or screen pattern fails to compile stays pending
+- **GIVEN** session replay is enabled
 - **AND** the remote config sets `version` to 2 and configures a trigger group with URL condition matching "[" and a sample rate of 1.0
-- **WHEN** the client captures a "$screen" event with "$screen_name" set to "["
+- **WHEN** the current URL or screen name changes to "["
 - **THEN** session recording should not be active
 - **AND** the SDK should stay in the trigger group model
+- **AND** no error should reach the host application
 
-#### Scenario: An inline-flag screen pattern follows the platform engine
-- **GIVEN** a mobile SDK with session replay enabled
+#### Scenario: An inline-flag URL or screen pattern follows the platform engine
+- **GIVEN** session replay is enabled
 - **AND** the remote config sets `version` to 2 and configures a trigger group with URL condition matching "(?i)checkout" and a sample rate of 1.0
-- **WHEN** the client captures a "$screen" event with "$screen_name" set to "CheckoutScreen"
+- **WHEN** the current URL or screen name changes to one containing "Checkout"
 - **THEN** on an SDK whose regex engine compiles "(?i)checkout", session recording should be active
 - **AND** on an SDK whose regex engine does not compile "(?i)checkout", session recording should not be active
+- **AND** no error should reach the host application
+
+#### Scenario: A pattern that fails to compile does not stop another group from recording
+- **GIVEN** session replay is enabled
+- **AND** the remote config sets `version` to 2 and configures a trigger group named "Checkout" with URL condition matching "(?i)checkout" and a sample rate of 1.0
+- **AND** a trigger group named "Always" with no conditions and a sample rate of 1.0
+- **WHEN** the recorder starts and the current URL or screen name changes to one containing "Checkout"
+- **THEN** session recording should be active
+- **AND** no error should reach the host application
 
 ### Requirement: Group activation lasts for the session
 

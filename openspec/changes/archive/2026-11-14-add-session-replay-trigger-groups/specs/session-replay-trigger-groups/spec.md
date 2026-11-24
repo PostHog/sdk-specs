@@ -488,7 +488,10 @@ the property is missing or `null`, the filter SHALL match if its operator is one
 operators `is_not`, `not_icontains`, or `not_regex`, and SHALL NOT match otherwise, whatever the
 filter's `value`. Only for a present property SHALL an unknown operator, or a filter whose `value`
 is missing or `null`, fail to match. Values SHALL be normalized to string arrays: a
-scalar becomes a one-element array and each element is converted to a string. For the positive
+scalar becomes a one-element array and each element is converted to a string. A filter `value`
+array MAY hold strings, numbers, and Booleans in any mix; the SDK SHALL convert each element the
+way it converts a scalar of that type, and SHALL NOT skip the filter or its group because an
+element is not a string. For the positive
 operators `exact`, `icontains`, `regex`, `gt`, and `lt`, the filter SHALL match when any property
 element matches any filter value. For the negative operators `is_not`, `not_icontains`, and
 `not_regex`, the filter SHALL match only when every property element fails to match every filter
@@ -515,8 +518,12 @@ lines are unchanged at `origin/main` `b4bbe65d55`. The comparators are
 `gt` / `lt` apply `parseFloat` with an `!isNaN` guard on the property value. The matcher is called
 from `recording-strategies.ts:498` (per-event filters) and `:678` (group-level filters); the
 behavior is unchanged at `eb2f69258`. No posthog-js test on `origin/main` covers a negative
-operator over a list, a `gt` or `lt` string-versus-number case, or a non-numeric `gt` value; source
-only. Person properties come from
+operator over a list, a `gt` or `lt` string-versus-number case, a non-numeric `gt` value, or a
+filter `value` array that holds numbers or Booleans; source only. The matcher's own filter type
+declares the array as `(string | number | boolean)[]` (`property-utils.ts:13`) and `:67` converts
+each element with `.map(String)`; the config type at
+`packages/browser-common/src/types/remote-config.ts:32` still declares `string[]` and is narrower
+than what the matcher accepts. Person properties come from
 `$stored_person_properties` (`recording-strategies.ts:493`, `:677`).
 
 Covering test: posthog-js `packages/browser/src/__tests__/extensions/replay/triggerGroups.test.ts:152-353`
@@ -550,6 +557,13 @@ null property, default operator, array properties).
 - **GIVEN** a trigger group with a filter on event property "tags" equal to the list "beta", "vip"
 - **WHEN** the filters are evaluated against an event with property "tags" set to the list "vip", "eu"
 - **THEN** the filter should match
+
+#### Scenario: A numeric filter list matches a scalar number
+- **GIVEN** a trigger group with a filter on event property "amount" equal to the list of numbers 100, 200
+- **WHEN** the filters are evaluated against an event with property "amount" set to the number 200
+- **THEN** the filter should match
+- **WHEN** the filters are evaluated against an event with property "amount" set to the number 300
+- **THEN** the filter should not match
 
 #### Scenario: A negative operator rejects when any value matches
 - **GIVEN** a trigger group with a filter on event property "country" with operator `is_not` and the list "EU", "US"

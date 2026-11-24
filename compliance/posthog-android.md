@@ -60,7 +60,7 @@ android moves from 42/16/1/10 on 69 rows to **45/13/1/11** on 70 rows (61%→64%
   - #215 set and sequence serialization ([n24](#n24)).
   - #211 failed remote flags, #153 the client-level flag event default and #202 missing-flag response ([n8](#n8), [n9](#n9), [n36](#n36)).
   - #181 and #226 surveys ([n22](#n22)).
-  - #232 and #238 replay debug ([n17](#n17), which stays 🟡 on two follow-ups).
+  - #232 replay debug ([n17](#n17)).
 - **Don't apply:**
   - #224 synthesized stacks: android only takes a `Throwable`, so it never synthesizes a stack.
   - #183 consent event: `optIn()` captures none.
@@ -70,7 +70,7 @@ android moves from 42/16/1/10 on 69 rows to **45/13/1/11** on 70 rows (61%→64%
 
 **New gaps found in rows that were already 🟡:**
 - **Surveys:** an unknown question type leaks the survey reservation ([n22](#n22)).
-- **Session Replay Debug Properties:** the remote-off bit isn't persisted ([n17](#n17)).
+- **Session Replay Debug Properties:** the remote-off bit isn't persisted, and a registered or caller `$sdk_debug_pending_queue_size` wins over the SDK's (#238) ([n17](#n17)).
 - **Get Feature Flags:** the cold-start `null` is now confirmed by a probe ([n9](#n9)).
 
 ## posthog-android 4.0 re-audit (2026-11-05)
@@ -258,7 +258,7 @@ complete implementation of that contract outside the browser.
 | 54 | Retry Queue | ✅ | [n27] |
 | 55 | Screen | ✅ |  |
 | 56 | Session Manager | ✅ |  |
-| 57 | Session Replay Debug Properties | 🟡 | [n17]; #992 cleared the main off-state gap; remote-off persistence and the wrapper bridge remain |
+| 57 | Session Replay Debug Properties | 🟡 | [n17]; #992 cleared the main off-state gap; remote-off persistence, the wrapper bridge and #238 queue-depth precedence remain |
 | 58 | Session Replay Ingestion Controls | 🟡 | [n18] |
 | 59 | Session Replay Privacy | ✅ | [n19] |
 | 60 | Set Group Properties For Flags | ✅ |  |
@@ -709,7 +709,7 @@ re-read at 4.0.3 and still conforms, but their line numbers were not re-pointed.
   `$sdk_debug_session_start` whenever the bundle is claimed (`PostHog.kt:890`). Fix in progress:
   [PostHog/posthog-android#992](https://github.com/PostHog/posthog-android/pull/992) (open; closes this
   gap when merged).
-- **4.0.3 (`1577cfa5`): #992 shipped and the main gap is closed. Still 🟡 on the two follow-ups below.**
+- **4.0.3 (`1577cfa5`): #992 shipped and the main gap is closed. Still 🟡 on the three follow-ups below.**
   - **The gate.** `sdkDebugProperties` (`posthog/src/main/java/com/posthog/PostHog.kt:1032-1068`)
     evaluates `isSessionReplayIntentionallyOff()` (`:3317-3321`) on every event. Replay counts as off
     when there is no handler, or when the handler is idle and the app doesn't want replay (an explicit
@@ -721,6 +721,16 @@ re-read at 4.0.3 and still conforms, but their line numbers were not re-pointed.
     `queue.backedUpSize` (`:1063`), which is set only at or above the current `flushAt`
     (`internal/PostHogQueue.kt:96-97`, PostHog/posthog-android#995). `flushAt` is `@Volatile` because
     `413` halving changes it (`:777-778`).
+- **Partial at 4.0.3: a registered or caller queue depth wins (#238).**
+  - **Spec:** the queue-depth key is SDK-owned; while the queue is healthy the SDK SHALL remove a
+    registered or caller value of the same name, and while it is backed up the SDK depth replaces it
+    (`openspec/specs/session-replay-debug-properties/spec.md:412-416`).
+  - **Code:** `buildProperties` merges `sdkDebugProperties(...)` (`posthog/src/main/java/com/posthog/PostHog.kt:967`,
+    which sets the key at `:1063` only when `backedUpSize` is non-null) before `registeredPrefs` (`:972`) and
+    caller `properties` (`:998`), and nothing re-applies or removes the key afterwards (the only other
+    reference is the key set at `:79`).
+  - **Effect:** a registered or caller value is sent while the queue is healthy, and beats the SDK depth
+    while it is backed up. posthog-ios has the same gap ([posthog-ios.md n26](posthog-ios.md#n26)).
 - **Allowed divergence: a `/config` with no `sessionRecording` key is remote off.** The spec lets an
   SDK treat a missing key as off remotely (`openspec/specs/session-replay-debug-properties/spec.md:1259-1269`).
   `PostHogRemoteConfigResponse.sessionRecording` defaults to `false`
@@ -749,9 +759,11 @@ re-read at 4.0.3 and still conforms, but their line numbers were not re-pointed.
     React Native events are still correct, because posthog-js#5797 gates the map in JS.
 - **Backwards compatibility:** Backward-compatible; the change only removes diagnostic keys from
   events captured while replay is off.
-- **Remediation:** Two follow-ups to #992:
+- **Remediation:** Three follow-ups to #992:
   - Persist the remote-off value in the cache preferences and load it in
     `preloadSessionRecordingConfig`, so the gate reads it after a relaunch.
+  - After the caller merge in `buildProperties`, set `$sdk_debug_pending_queue_size` from
+    `queue?.backedUpSize` again, or remove it when that is `null` (#238).
   - Add a gated internal accessor for the debug map, and move the React Native bridge to it. The missing-key reading needs no change: the spec allows it, and the
   server always sends the key, as `false` or a config object (PostHog/posthog `c1fe8dcf295`
   `posthog/models/remote_config.py:305-326`).

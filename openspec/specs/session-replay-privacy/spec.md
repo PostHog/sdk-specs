@@ -82,7 +82,7 @@ Modifier.postHogUnmask()
 
 - **Setup:** replay privacy configuration is installed when session replay starts or the replay recorder is initialized.
 - **Capture:** every DOM event, screenshot, or replay network event is filtered/redacted before serialization.
-- **Remote-config update:** browser replay can update masking and network-capture options from remote config while preserving local overrides. Mobile replay applies the cached `masking.mobile` flags at install and re-resolves them on each remote config update, including mid-session, and drops unsent frames when a resolved flag gets stricter.
+- **Remote-config update:** browser replay can update masking and network-capture options from remote config while preserving local overrides. Mobile replay applies the cached `masking.mobile` flags at install and re-resolves them on each remote config update, including mid-session, and drops frames not yet handed to the upload queue when a resolved flag gets stricter.
 - **View updates:** explicit mask/unmask modifiers update marker state as UI nodes mount, change, or unmount.
 - **Teardown:** stopping replay stops further capture; marker state on app views remains framework-owned unless removed by the modifier/component lifecycle.
 
@@ -330,7 +330,7 @@ code does not change the public API or its default.
 This is new mobile behavior with no reference implementation yet. It diverges from the browser
 by decision. The browser takes the client value first and falls back to the server value, so a local
 `false` beats a server `true` (`lazy-loaded-session-recorder.ts:696-698`, test
-`packages/browser/src/__tests__/extensions/replay/lazy-sessionrecording.test.ts:1031-1042`).
+`packages/browser/src/__tests__/extensions/replay/lazy-sessionrecording.test.ts:1030-1041`).
 Mobile follows the existing mobile rule that the more restrictive side wins for boolean switches:
 posthog-android Logcat capture needs both local and remote on (`posthog-android/src/main/java/com/posthog/android/replay/internal/PostHogLogCatIntegration.kt:31-32`) and exception autocapture needs both (`posthog/src/main/java/com/posthog/internal/PostHogRemoteConfig.kt:830`), posthog-android `origin/main` `1577cfa5`.
 
@@ -378,12 +378,17 @@ posthog-android Logcat capture needs both local and remote on (`posthog-android/
 A mobile SDK SHALL apply the cached remote config's `masking.mobile` flags when session replay is installed, before any frame is captured under the cached config. It SHALL re-resolve the flags on every later remote config update, including one received mid-session, and apply the new values to the next captured frame without restarting replay. Capture reads the resolved value per frame. A cached layer, view hierarchy or mask rectangle computed under an older resolved value MUST NOT be reused.
 
 When a remote config update makes a resolved flag go from `false` to `true`, including the first
-live response of the process, the SDK MUST drop every frame it holds unsent and MUST NOT upload it.
-Frames held unsent are the frames buffered before the first live remote config response, which were
-resolved against the cached config only, the frames held for the minimum recording duration, and a
-frame whose masks were computed under the previous resolved flags and which has not been handed to
-the upload queue yet. A frame already handed to the upload queue is not dropped. When no flag gets
-stricter, held frames are kept. An update that makes a resolved flag go from `true` to `false`
+live response of the process, the SDK MUST drop each frame not yet handed to the upload queue and
+MUST NOT upload it. Those frames are:
+
+- frames buffered before the first live remote config response, which were resolved against the
+  cached config only
+- frames held for the minimum recording duration
+- a frame whose masks were computed under the previous resolved flags and which was not yet handed to
+  the upload queue when the update arrived
+
+A frame already handed to the upload queue is kept and uploaded. When no flag gets stricter, every
+held frame is kept. An update that makes a resolved flag go from `true` to `false`
 applies only to frames captured after it, and MUST NOT retroactively change frames already captured.
 
 This is new mobile behavior with no reference implementation yet. It diverges from the browser by
@@ -432,9 +437,16 @@ drops a stale frame in `PostHogReplayQueue`.
 #### Scenario: A frame collected before a flag gets stricter is dropped
 - **GIVEN** replay is recording with both resolved flags `false`
 - **AND** a frame is being collected under those flags
-- **WHEN** a remote config update arrives with `masking.mobile.maskAllImages: true` before that frame is queued
+- **WHEN** a remote config update arrives with `masking.mobile.maskAllImages: true` before that frame is handed to the upload queue
 - **THEN** that frame is not uploaded
 - **AND** the next frame masks images
+
+#### Scenario: A frame already in the upload queue is kept when a flag gets stricter
+- **GIVEN** replay is recording with both resolved flags `false`
+- **AND** a frame captured under those flags was already handed to the upload queue
+- **WHEN** a remote config update arrives with `masking.mobile.maskAllText: true`
+- **THEN** that frame is still uploaded
+- **AND** frames captured after the update are masked
 
 #### Scenario: Frames buffered before the first live config are kept when nothing gets stricter
 - **GIVEN** the SDK has buffered replay frames captured before the first live remote config response
@@ -536,7 +548,7 @@ starts, with `maskAllInputs` defaulting to `true`. Browser replay MUST NOT read 
 This requirement records the baseline the mobile requirements diverge from and changes no browser
 behavior.
 
-Reference: posthog-js `origin/main` `f05a993f9`, `packages/browser/src/extensions/replay/external/lazy-loaded-session-recorder.ts:682-713` (merge), `:721-764` (warning when a client value shadows a different project value), `:2980-2985` (applied at recorder start). Tests: `packages/browser/src/__tests__/extensions/replay/lazy-sessionrecording.test.ts:1031-1042` (client value overrides server value, in full and per field), `:6580` (remote masking options reach rrweb) and `:6729-6799` (shadow warning).
+Reference: posthog-js `origin/main` `f05a993f9`, `packages/browser/src/extensions/replay/external/lazy-loaded-session-recorder.ts:682-713` (merge), `:721-764` (warning when a client value shadows a different project value), `:2980-2985` (applied at recorder start). Tests: `packages/browser/src/__tests__/extensions/replay/lazy-sessionrecording.test.ts:1030-1041` (client value overrides server value, in full and per field), `:6580` (remote masking options reach rrweb) and `:6729-6799` (shadow warning).
 
 #### Scenario: The client value wins in the browser
 - **GIVEN** `session_recording.maskAllInputs` is `false` in the client config

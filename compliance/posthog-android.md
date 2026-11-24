@@ -653,7 +653,7 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
   requirements from "Mobile SDKs read dedicated mobile masking keys" (`openspec/specs/session-replay-privacy/spec.md:290`)
   onward say the SDK combines `maskAllTextInputs` and `maskAllImages` with
   `sessionRecording.masking.mobile` so the stricter side wins, applies the cached and live config per
-  frame, and drops unsent frames when a flag gets stricter. At `origin/main` `85a681537f` the remote
+  frame, and drops frames not yet handed to the upload queue when a flag gets stricter. At `origin/main` `85a681537f` the remote
   config parser leaves `masking` as a TODO
   (`posthog/src/main/java/com/posthog/internal/PostHogRemoteConfig.kt:619-621`), so masking comes from
   local config only. Fix in progress: branch `feat/replay-remote-masking-config` at `9788d4b2a1`

@@ -623,7 +623,7 @@ Retry Queue.
   requirements from "Mobile SDKs read dedicated mobile masking keys" (`openspec/specs/session-replay-privacy/spec.md:290`)
   onward say the SDK combines `maskAllTextInputs` and `maskAllImages` with
   `sessionRecording.masking.mobile` so the stricter side wins, applies the cached and live config per
-  frame, drops unsent frames when a flag gets stricter, and exposes the resolved flags to wrappers. At
+  frame, drops frames not yet handed to the upload queue when a flag gets stricter, and exposes the resolved flags to wrappers. At
   `origin/main` `2702ea6364` nothing under `PostHog/` reads a `masking` key, so masking comes from
   local config only. Fix in progress: branch `feat/replay-remote-masking-config` at `507ad33a5e`
   (unmerged), which also stamps `RRScreenshotFrame.maskingGeneration` and drops a stale frame in

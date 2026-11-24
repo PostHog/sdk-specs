@@ -154,7 +154,7 @@ the single most widely-shared non-compliance in the matrix.
 | posthog-js | 26/64 fully compliant (41%) | 26 | 21 | 12 | 5 | 0 | 2026-10-05 · `6538babc` (targeted re-audit; most of the 59 pre-existing rows carried from 2026-08-10, see file header) | 33 | [posthog-js.md](posthog-js.md) |
 | posthog-python | 13/64 fully compliant (20%; 30 contracts N/A on a server SDK) | 13 | 16 | 5 | 30 | 0 | 2026-10-12 · `509c8525` | 21 | [posthog-python.md](posthog-python.md) |
 | posthog-android | 43/70 fully compliant (61%) | 43 | 15 | 1 | 11 | 0 | 2026-11-24 · `1577cfa5` (tag `android-v4.0.3`; all 70 rows) | 16 | [posthog-android.md](posthog-android.md) |
-| posthog-ios | 42/70 fully compliant (60%) | 42 | 16 | 1 | 11 | 0 | 2026-11-24 · `c8fcc2c06` (tag `4.0.5`) | 17 | [posthog-ios.md](posthog-ios.md) |
+| posthog-ios | 43/70 fully compliant (61%) | 43 | 15 | 1 | 11 | 0 | 2026-11-24 · `c8fcc2c06` (tag `4.0.5`) | 16 | [posthog-ios.md](posthog-ios.md) |
 | posthog-node | 9/64 fully compliant (14%; 29 contracts N/A on a server SDK) | 9 | 21 | 4 | 29 | 1 | 2026-10-12 · `4f590b36` (posthog-js monorepo; Traces row corrected 2026-10-19) | 25 (+1 ❓) | [posthog-node.md](posthog-node.md) |
 | posthog-flutter | 21/70 fully compliant (30%) | 21 | 32 | 4 | 13 | 0 | 2026-11-24 · `4cb4318b` (tag `6.0.0`; native rows at posthog-ios 4.0.5 / posthog-android 4.0.3) | 36 | [posthog-flutter.md](posthog-flutter.md) |
 | posthog-kmp | 15/70 fully compliant (21%) | 15 | 36 | 8 | 11 | 0 | 2026-11-24 · `0a88aa7` (tag `1.0.0`; first audit) | 44 | [posthog-kmp.md](posthog-kmp.md) |
@@ -173,9 +173,9 @@ Payload ([#220](https://github.com/PostHog/sdk-specs/pull/220)), ➖ on client S
 - **posthog-android 42/16/1/10 → 43/15/1/11.** Capture and Capture AI ✅→🟡: `disableGeoIp` (PostHog/posthog-android#971) overwrites a caller's `$geoip_disable` after the caller merge, against the client caller-precedence rule. Identify 🟡→✅ (PostHog/posthog-android#967 stores the
   person-properties hash only from the queued event, which also meets #208); Bootstrap and Register
   🟡→✅ (their only gaps were MAY-level). All 70 rows are now at 4.0.3, so the 31-row/38-row split is gone.
-- **posthog-ios 44/14/1/10 → 42/16/1/11.** Capture and Capture AI ✅→🟡: a Swift `Set`/`NSSet` property is dropped
-  instead of serialized as an array ([#215](https://github.com/PostHog/sdk-specs/pull/215)). No ❌ or 🟡 row
-  was fixed in 4.0.1–4.0.5; #211, #153/#202, #181/#226, #224 and #232 are met.
+- **posthog-ios 44/14/1/10 → 43/15/1/11.** Capture and Capture AI ✅→🟡: a Swift `Set`/`NSSet` property is dropped
+  instead of serialized as an array ([#215](https://github.com/PostHog/sdk-specs/pull/215)). Bootstrap 🟡→✅
+  (its only gap was MAY-level, as on Android). No ❌ or 🟡 row was fixed in 4.0.1–4.0.5; #211, #153/#202, #181/#226, #224 and #232 are met.
 - **posthog-flutter 23/30/4/12 → 21/32/4/13.** Register 🟡→✅ (its only gap was MAY-level, as on Android). Capture Exception ✅→🟡 (#224: synthesized stacks are trimmed
   by package name, which fails in obfuscated and web builds); Get Feature Flag and Is Feature Enabled ✅→🟡
   (web ignores the client-level `sendFeatureFlagEvent`, a gap already in `752f899`). The merged

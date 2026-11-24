@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-ios](https://github.com/PostHog/posthog-ios)
 **Audited commit:** tag `4.0.5` at `c8fcc2c069c7119253aa5219c45c369f16d669dc` ([tag](https://github.com/PostHog/posthog-ios/tree/4.0.5)), re-audited on 2026-11-24 as a delta from `e27cbe4cb` (see [4.0.5 re-audit](#405-re-audit-2026-11-24)); before that audited on 2026-11-05 at `3460e534a` and re-checked on 2026-11-10 at `e27cbe4cb` on the 4.0 release branch ([PostHog/posthog-ios#873](https://github.com/PostHog/posthog-ios/pull/873)) (see [Re-check](#re-check-2026-11-10))
 **Audited against sdk-specs commit:** `44fe27a` (includes merged capture v1, [#146](https://github.com/PostHog/sdk-specs/pull/146)); previously `752f899` plus #146 at `d387ab79`, first audited against `dd11a6b`
-**Summary:** 42 ✅ · 16 🟡 · 1 ❌ · 11 ➖ (70 rows; previous audit at `e27cbe4cb` scored 44/14/1/10 on 69 rows)
+**Summary:** 43 ✅ · 15 🟡 · 1 ❌ · 11 ➖ (70 rows; previous audit at `e27cbe4cb` scored 44/14/1/10 on 69 rows)
 
 Note on repo layout: `posthog-ios` is a single-package repo, distributed through Swift Package Manager
 only from 4.0. Core SDK logic lives at `PostHog/` (flat files: `PostHogSDK.swift` — the main public
@@ -67,7 +67,8 @@ as `0dbc2245a`. Every open row was re-checked; none was fixed in 4.0.1–4.0.5.
 - **Rows that changed status:** Capture ✅→🟡: the sdk-specs #215 requirement "Capture serializes
   set-like and listed sequence property values as arrays" lists `Set`/`NSSet` for Swift, and iOS
   drops such a property ([n4](#n4)). Capture AI ✅→🟡 for the same drop: `captureAi` goes through
-  `captureInternal` → `sanitizeDictionary` like `capture` ([n27](#n27)). New row: **Get Remote Config Payload** ➖ ("Server SDKs only. The
+  `captureInternal` → `sanitizeDictionary` like `capture` ([n27](#n27)). Bootstrap 🟡→✅: its only gap,
+  `bootstrap.sessionID`, is a MAY, scored as on posthog-android ([n25](#n25)). New row: **Get Remote Config Payload** ➖ ("Server SDKs only. The
   request needs a secret key, which must never reach a client.").
 - **Spec changes met without a status change:**
   - Failed remote flags (#211), met by
@@ -251,7 +252,7 @@ apply.
 | 60 | Session Replay Ingestion Controls | ✅ | |
 | 61 | Session Replay Privacy | 🟡 | was ❌; 4.0 removes wireframe mode, the only path that leaked; SwiftUI `postHogMask()` wins over an enclosing `postHogNoMask()` (over-masks, not a leak) — [n24] |
 | 62 | Surveys | ✅ | popup-delay (#121) and wait-period (#102) SHALLs met since #1049; `survey-targeting-` reads send no event (#181) and surveys default on (#226); the SHOULD eligibility re-check when the delay elapses is not met and not scored — [n29] |
-| 63 | Bootstrap | 🟡 | [n25] |
+| 63 | Bootstrap | ✅ | [n25] |
 | 64 | MCP Analytics | ➖ | Applicability is `server` add-on; no iOS package |
 | 65 | Session Replay Debug Properties | 🟡 | [n26]; (c) and (d) fixed ((d) by posthog-ios#1090, 4.0.3); (a), (b) still open; caller or registered `$sdk_debug_pending_queue_size` not removed or replaced (#238) |
 | 66 | Experiment Exposure | ➖ | **new row**: applies to SDKs that read `/flags?v=4` records; iOS requests `v=2` (`PostHog/PostHogApi.swift:595-599`), so config-version-2 flags read as legacy values |
@@ -749,14 +750,15 @@ apply.
 
 <a id="n25"></a>
 
-### n25 — Bootstrap (🟡 Partial)
+### n25 — Bootstrap (✅ Pass; was 🟡)
 - **Spec requires:** (MAY) `bootstrap.sessionID` (UUIDv7) adopted as the session id, invalid values
   logged and replaced (`openspec/specs/bootstrap/spec.md:143-158`). Spec unchanged since the last audit.
 - **SDK currently:** Every SHALL is met: flag seeding of enabled values only and complete replacement
   (`PostHog/PostHogRemoteConfig.swift:135-157`, `:953-964`), payloads now serialized once at seeding,
   bootstrap cleared on reset (`:1307-1320`). `PostHogBootstrapConfig` still has only `distinctId`,
   `isIdentifiedId`, `featureFlags` and `featureFlagPayloads` (`PostHog/PostHogBootstrapConfig.swift:28-52`),
-  and `PostHogSessionManager.swift` never reads bootstrap. 🟡 for the matrix convention on this MAY.
+  and `PostHogSessionManager.swift` never reads bootstrap. That omission is MAY-only, so it is not a gap
+  (as on posthog-android n4).
 - **Backwards compatibility:** Additive.
 - **Remediation:** Optional `sessionID` with UUIDv7 validation, if parity with posthog-js is wanted.
 

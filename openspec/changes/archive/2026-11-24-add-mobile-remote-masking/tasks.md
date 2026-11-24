@@ -12,6 +12,6 @@
 ## 2. Validation
 
 - [x] 2.1 Run `openspec validate add-mobile-remote-masking --strict`
-- [x] 2.2 At archive, sync the delta into `specs/session-replay-privacy/spec.md` and hand edit three places the delta cannot reach: Behavior item 5 (mobile applies the resolved `masking.mobile` flags, with a pointer to the new requirements), the "Remote-config update" lifecycle line (mobile applies `masking.mobile` on each remote config update), and the "State read" bullet about remote replay config
+- [x] 2.2 At archive, sync the delta into `specs/session-replay-privacy/spec.md` and hand edit four places the delta cannot reach: Behavior item 1 (a pointer to item 5), Behavior item 5 (mobile applies the resolved `masking.mobile` flags, with a pointer to the new requirements), the "Remote-config update" lifecycle line (mobile applies `masking.mobile` on each remote config update), and the "State read" bullet about remote replay config
 - [x] 2.3 Run `openspec validate --specs --strict`
 - [x] 2.4 Archive the change under `openspec/changes/archive/YYYY-MM-DD-add-mobile-remote-masking/`

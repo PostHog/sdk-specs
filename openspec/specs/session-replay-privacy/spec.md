@@ -301,7 +301,7 @@ the local `maskAllImages` flag. Every other mobile masking flag, such as `maskAl
 `maskCustomPaint`, stays local.
 
 This is new mobile behavior with no reference implementation yet. It diverges from the browser in key
-names by decision: the browser reads the web keys (`packages/browser/src/extensions/replay/external/lazy-loaded-session-recorder.ts:682-711`, posthog-js `origin/main` `f05a993f9`).
+names by decision: the browser reads the web keys (`packages/browser/src/extensions/replay/external/lazy-loaded-session-recorder.ts:682-713`, posthog-js `origin/main` `f05a993f9`).
 
 #### Scenario: A mobile SDK reads the mobile keys
 - **GIVEN** the cached remote config has `sessionRecording.masking.mobile` with `maskAllText: true`
@@ -330,7 +330,7 @@ code does not change the public API or its default.
 This is new mobile behavior with no reference implementation yet. It diverges from the browser
 by decision. The browser takes the client value first and falls back to the server value, so a local
 `false` beats a server `true` (`lazy-loaded-session-recorder.ts:696-698`, test
-`packages/browser/src/__tests__/extensions/replay/lazy-sessionrecording.test.ts:6580`).
+`packages/browser/src/__tests__/extensions/replay/lazy-sessionrecording.test.ts:1031-1042`).
 Mobile follows the existing mobile rule that the more restrictive side wins for boolean switches:
 posthog-android Logcat capture needs both local and remote on (`posthog-android/src/main/java/com/posthog/android/replay/internal/PostHogLogCatIntegration.kt:31-32`) and exception autocapture needs both (`posthog/src/main/java/com/posthog/internal/PostHogRemoteConfig.kt:830`), posthog-android `origin/main` `1577cfa5`.
 
@@ -377,23 +377,18 @@ posthog-android Logcat capture needs both local and remote on (`posthog-android/
 
 A mobile SDK SHALL apply the cached remote config's `masking.mobile` flags when session replay is installed, before any frame is captured under the cached config. It SHALL re-resolve the flags on every later remote config update, including one received mid-session, and apply the new values to the next captured frame without restarting replay. Capture reads the resolved value per frame. A cached layer, view hierarchy or mask rectangle computed under an older resolved value MUST NOT be reused.
 
-Frames captured and buffered before the first live remote config response of the process were
-resolved against the cached config only. When the first live response makes a resolved flag go from
-`false` to `true`, the SDK MUST drop those buffered frames and MUST NOT upload them. When no flag
-gets stricter, buffered frames are kept. The same rule applies to every later update: when an update
-makes a resolved flag go from `false` to `true`, the SDK MUST drop every frame it still holds unsent,
-including frames held for the minimum recording duration, and MUST NOT upload them. A later update
-that makes a resolved flag go from `true` to `false` applies only to frames captured after it, and
-MUST NOT retroactively change frames already captured.
-
-A frame whose masks were computed under the previous resolved flags, and which has not been handed to
-the upload queue when an update makes a resolved flag go from `false` to `true`, MUST be dropped and
-MUST NOT be uploaded. A frame already handed to the upload queue counts as held unsent, and the rule
-above drops it.
+When a remote config update makes a resolved flag go from `false` to `true`, including the first
+live response of the process, the SDK MUST drop every frame it holds unsent and MUST NOT upload it.
+Frames held unsent are the frames buffered before the first live remote config response, which were
+resolved against the cached config only, the frames held for the minimum recording duration, and a
+frame whose masks were computed under the previous resolved flags and which has not been handed to
+the upload queue yet. A frame already handed to the upload queue is not dropped. When no flag gets
+stricter, held frames are kept. An update that makes a resolved flag go from `true` to `false`
+applies only to frames captured after it, and MUST NOT retroactively change frames already captured.
 
 This is new mobile behavior with no reference implementation yet. It diverges from the browser by
 decision: the browser reads the masking config once, when the recorder starts
-(`lazy-loaded-session-recorder.ts:2980-2984`), and does not re-resolve it mid-session.
+(`lazy-loaded-session-recorder.ts:2980-2985`), and does not re-resolve it mid-session.
 
 In-progress implementations, not merged and not the reference: posthog-android branch
 `feat/replay-remote-masking-config` at `9788d4b2a1` stamps each frame with a masking generation and
@@ -541,13 +536,14 @@ starts, with `maskAllInputs` defaulting to `true`. Browser replay MUST NOT read 
 This requirement records the baseline the mobile requirements diverge from and changes no browser
 behavior.
 
-Reference: posthog-js `origin/main` `f05a993f9`, `packages/browser/src/extensions/replay/external/lazy-loaded-session-recorder.ts:682-713` (merge), `:721-764` (warning when a client value shadows a different project value), `:2980-2985` (applied at recorder start). Tests: `packages/browser/src/__tests__/extensions/replay/lazy-sessionrecording.test.ts:6580` (remote masking options reach rrweb) and `:6729-6799` (shadow warning).
+Reference: posthog-js `origin/main` `f05a993f9`, `packages/browser/src/extensions/replay/external/lazy-loaded-session-recorder.ts:682-713` (merge), `:721-764` (warning when a client value shadows a different project value), `:2980-2985` (applied at recorder start). Tests: `packages/browser/src/__tests__/extensions/replay/lazy-sessionrecording.test.ts:1031-1042` (client value overrides server value, in full and per field), `:6580` (remote masking options reach rrweb) and `:6729-6799` (shadow warning).
 
 #### Scenario: The client value wins in the browser
-- **GIVEN** `session_recording.maskTextSelector` is `"*"` in the client config
-- **AND** the remote `masking` has no `maskTextSelector`
+- **GIVEN** `session_recording.maskAllInputs` is `false` in the client config
+- **AND** the remote `masking` has `maskAllInputs: true` and `maskTextSelector: "*"`
 - **WHEN** the recorder starts
-- **THEN** rrweb receives `maskTextSelector` `"*"`
+- **THEN** rrweb receives `maskAllInputs` `false`
+- **AND** rrweb receives `maskTextSelector` `"*"`
 
 #### Scenario: The server value fills an unset client value in the browser
 - **GIVEN** `session_recording.maskAllInputs` is unset in the client config

@@ -32,11 +32,12 @@ remote-config update is browser only.
   markers stay masked whatever the resolved flags say.
 - **New requirement: Browser masking precedence is unchanged.** Records the browser behavior as the
   baseline the mobile requirements diverge from.
-- **Hand edit at archive** (the delta cannot reach these): Behavior item 5 and the "Remote-config
-  update" lifecycle line in `specs/session-replay-privacy/spec.md`, and the "State read" bullet
-  about remote replay config. See `tasks.md` 2.2.
+- **Hand edit at archive** (the delta cannot reach these): four places in
+  `specs/session-replay-privacy/spec.md`: Behavior item 1 (a pointer to item 5), Behavior item 5,
+  the "State read" bullet about remote replay config, and the "Remote-config update" lifecycle line.
+  See `tasks.md` 2.2.
 
-Reviewed and not modified: requirements 1 to 4 and 6 to 11 of Behavior, and every existing
+Reviewed and not modified: requirements 2 to 4 and 6 to 11 of Behavior, and every existing
 `### Requirement:`. Behavior item 1 says mobile masks "unless the local replay configuration
 disables those categories". It stays true for the local value but no longer states the whole rule.
 The new requirement takes precedence, and task 2.2 adds a pointer.
@@ -52,8 +53,8 @@ _None._
 
 ### Modified Capabilities
 
-- `session-replay-privacy`: seven added requirements. Two hand edits to Behavior item 5 and the
-  lifecycle section at archive.
+- `session-replay-privacy`: seven added requirements. Four hand edits at archive: Behavior items 1
+  and 5, the "State read" bullet and the "Remote-config update" lifecycle line.
 
 ## Impact
 

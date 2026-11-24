@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-android](https://github.com/PostHog/posthog-android)
 **Audited commit:** `c5e788bd603d3bdda77ac4d213538b9db637299a` ([commit](https://github.com/PostHog/posthog-android/commit/c5e788bd603d3bdda77ac4d213538b9db637299a)) — audited on 2026-10-19. **31 rows re-audited against posthog-android 4.0** at `aaa23d39af4424978bd2439028282e47417490b8` ([commit](https://github.com/PostHog/posthog-android/commit/aaa23d39af4424978bd2439028282e47417490b8), head of the 4.0 integration PR [PostHog/posthog-android#871](https://github.com/PostHog/posthog-android/pull/871)) on 2026-11-10 — see [posthog-android 4.0](#posthog-android-40-re-audit-2026-11-05)
 **Audited against sdk-specs commit:** `c72e367` (2026-10-19 rows); `752f899` plus the capture v1 text of [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79`, which includes [#147](https://github.com/PostHog/sdk-specs/pull/147) (merged into #146's branch as `6a9ed0f`), for the 31 4.0 rows; Capture also against #146's identity-call guide rule from `15501ca`
-**Summary:** 42 ✅ · 16 🟡 · 1 ❌ · 10 ➖ · 0 ❓ (69 rows; 2026-10-19 at `c5e788bd` scored 37/16/5/6/0; previous full audit 2026-08-10 at `8659a7b4` scored 31/16/9/3/0 on 59 rows)
+**Summary:** 41 ✅ · 17 🟡 · 1 ❌ · 10 ➖ · 0 ❓ (69 rows; 2026-10-19 at `c5e788bd` scored 37/16/5/6/0; previous full audit 2026-08-10 at `8659a7b4` scored 31/16/9/3/0 on 59 rows)
 
 **Why the 2026-10-19 run:** rotation priority 3 — the pointer was ten weeks old, and android carries the
 mobile reference for Session Replay Debug Properties. It was also the cheapest third slot available:
@@ -205,7 +205,7 @@ complete implementation of that contract outside the browser.
 | 55 | Session Manager | ✅ |  |
 | 56 | Session Replay Debug Properties | 🟡 | [n17]; off-state shape open (posthog-android#992) |
 | 57 | Session Replay Ingestion Controls | 🟡 | [n18] |
-| 58 | Session Replay Privacy | ✅ | [n19] |
+| 58 | Session Replay Privacy | 🟡 | [n19]; remote mobile masking open (feat/replay-remote-masking-config) |
 | 59 | Set Group Properties For Flags | ✅ |  |
 | 60 | Set Person Properties | ✅ |  |
 | 61 | Set Person Properties For Flags | ✅ |  |
@@ -631,7 +631,7 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
 
 <a id="n19"></a>
 
-### n19 — Session Replay Privacy (✅ Pass; was 🟡)
+### n19 — Session Replay Privacy (🟡 Partial; was ✅)
 - **Spec requires:** `client`. Mask explicitly masked elements and every match in a subtree, exclude
   no-capture elements and their descendants, redact passwords by default, and redact before queueing
   (`session-replay-privacy/spec.md:111-161`). Explicit unmask beats mask markers and category masks (`:54`,
@@ -649,8 +649,19 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
     (`:2775-2783`). Touches on a secure window are dispatched but not recorded (`:845-859`).
   - **Not scored.** An explicit unmask on a password field leaves it unmasked on both paths; the spec
     doesn't rank unmask against password masking.
-- **Backwards compatibility:** No change needed.
-- **Remediation:** None.
+- **Gap (2026-11-24, sdk-specs change `add-mobile-remote-masking`): remote mobile masking.** The new
+  requirements from "Mobile SDKs read dedicated mobile masking keys" (`openspec/specs/session-replay-privacy/spec.md:290`)
+  onward say the SDK combines `maskAllTextInputs` and `maskAllImages` with
+  `sessionRecording.masking.mobile` so the stricter side wins, applies the cached and live config per
+  frame, and drops unsent frames when a flag gets stricter. At `origin/main` `85a681537f` the remote
+  config parser leaves `masking` as a TODO
+  (`posthog/src/main/java/com/posthog/internal/PostHogRemoteConfig.kt:619-621`), so masking comes from
+  local config only. Fix in progress: branch `feat/replay-remote-masking-config` at `9788d4b2a1`
+  (unmerged), which also stamps each frame with a masking generation and drops a stale frame in
+  `PostHogReplayQueue`.
+- **Backwards compatibility:** Backward-compatible. No project has the mobile keys until a project
+  owner turns a toggle on, and the server can only add masking.
+- **Remediation:** Land `feat/replay-remote-masking-config`.
 
 <a id="n20"></a>
 

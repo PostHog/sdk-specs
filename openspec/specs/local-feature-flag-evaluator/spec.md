@@ -151,7 +151,11 @@ When the required property key is absent from caller-supplied local evaluation c
 
 The local evaluator SHALL definitively not match an `is_not_set` property filter whenever the required evaluation property key is present, including when its value is null or another falsey value. When the key is absent from caller-supplied local evaluation context, `is_not_set` SHALL remain inconclusive and SHALL NOT match solely because the key was omitted.
 
-Caller-supplied property maps therefore represent present values or unavailable context; they do not currently represent affirmative knowledge that a property is absent. A definitive `is_not_set` match requires property context known to be complete or an explicit known-absence input. Adding such an input requires a separate SDK evaluation option and corresponding `/flags` request contract and is outside this requirement.
+Caller-supplied property maps represent present values or unavailable context. They do not by themselves represent affirmative knowledge that a property is absent.
+
+An SDK MAY accept a known-absence input: a set of person property keys, and for each group type a set of group property keys, that the caller knows are absent for this evaluation. A listed key is absent, not missing context. The listing SHALL take precedence over any value for the same key in the supplied person or group properties. For a listed key, `is_not_set` SHALL match and `is_set` SHALL NOT match, both without remote fallback. Other operators on a listed key follow the canonical operator inventory requirement.
+
+A key that is omitted from the supplied properties and not listed SHALL remain inconclusive, as described above. Listing a key SHALL NOT affect any other key. Group keys are scoped to the named group type, so a key listed for one group type SHALL NOT apply to another.
 
 #### Scenario: Explicit null matches is_set
 - **GIVEN** local feature flag "profile-complete" matches person property "plan" with operator "is_set"
@@ -181,11 +185,84 @@ Caller-supplied property maps therefore represent present values or unavailable 
 - **WHEN** those flags are evaluated locally
 - **THEN** each `is_not_set` property comparison should not match
 
+#### Scenario: Listed known-absent key matches is_not_set
+- **GIVEN** local feature flag "profile-incomplete" matches person property "plan" with operator "is_not_set"
+- **WHEN** the flag is evaluated locally with person property key "plan" listed as known absent and no "plan" entry in the supplied person properties
+- **THEN** the local evaluation result should be true
+- **AND** the SDK should not require remote fallback
+
+#### Scenario: Listed known-absent key does not match is_set
+- **GIVEN** local feature flag "profile-complete" matches person property "plan" with operator "is_set"
+- **WHEN** the flag is evaluated locally with person property key "plan" listed as known absent
+- **THEN** the local evaluation result should be false
+- **AND** the SDK should not require remote fallback
+
+#### Scenario: Listed known-absent key overrides a supplied value
+- **GIVEN** local feature flag "profile-incomplete" matches person property "plan" with operator "is_not_set"
+- **WHEN** the flag is evaluated locally with person property "plan" set to "pro" and person property key "plan" listed as known absent
+- **THEN** the local evaluation result should be true
+
+#### Scenario: Group known-absent key applies only to its group type
+- **GIVEN** local feature flag "org-incomplete" matches group property "tier" of group type "organization" with operator "is_not_set"
+- **WHEN** the flag is evaluated locally with group property key "tier" listed as known absent for group type "project" only
+- **THEN** local evaluation should be inconclusive
+- **AND** remote evaluation should remain eligible when enabled
+
+#### Scenario: Group known-absent key resolves for its own group type
+- **GIVEN** local feature flag "org-incomplete" matches group property "tier" of group type "organization" with operator "is_not_set"
+- **WHEN** the flag is evaluated locally with group property key "tier" listed as known absent for group type "organization"
+- **THEN** the local evaluation result should be true
+- **AND** remote evaluation should not be required
+
+#### Scenario: Cohort negation applies after the known-absent table
+- **GIVEN** local feature flag "cohort-flag" requires membership in a dynamic cohort with one person property leaf that has operator `exact`, condition value "pro", and `negation` set to true
+- **WHEN** the flag is evaluated locally with person property key "plan" listed as known absent
+- **THEN** the local evaluation result should be true
+- **AND** remote evaluation should not be required
+
+#### Scenario: A flag dependency honors the known-absent listing
+- **GIVEN** local feature flag "parent" matches person property "plan" with operator `is_not_set`
+- **AND** local feature flag "child" has a `flag_evaluates_to` condition requiring flag "parent" to evaluate to true
+- **WHEN** flag "child" is evaluated locally with person property key "plan" listed as known absent
+- **THEN** the local evaluation result should be true
+- **AND** remote evaluation should not be required
+
+#### Scenario: Omitted key that is not listed stays inconclusive
+- **GIVEN** local feature flag "profile-incomplete" matches person property "plan" with operator "is_not_set"
+- **WHEN** the flag is evaluated locally with person property key "region" listed as known absent and no "plan" entry in the supplied person properties
+- **THEN** local evaluation should be inconclusive
+- **AND** remote evaluation should remain eligible when enabled
+
 #### Scenario: Missing property context leaves is_not_set inconclusive
 - **GIVEN** local feature flag "profile-incomplete" matches person property "plan" with operator "is_not_set"
 - **WHEN** the flag is evaluated locally without a "plan" entry in the supplied person properties
 - **THEN** local evaluation should be inconclusive
 - **AND** remote evaluation should remain eligible when enabled
+
+### Requirement: Remote fallback carries known-absent keys
+
+When local evaluation falls back to the `/flags` endpoint and the evaluation had a known-absence input, the SDK SHALL send the same known-absent keys in the request body so that local and remote results agree. The SDK SHALL send `person_property_keys_known_absent` as an array of person property key strings. It SHALL send `group_property_keys_known_absent` as an object mapping a group type name to an array of group property key strings. An SDK SHALL omit a field, or send JSON null, when it has nothing to list.
+
+The flags service treats both fields as optional. A missing or null field means nothing is listed, and requests without them behave as before. Each array holds at most 1000 strings, counted with duplicates and counted per group type for the group field. A field of the wrong type, or an array longer than that, returns HTTP 400 with a message that names the field. Group type names that the project does not have are ignored. A key that the flags service is told is absent is absent for that evaluation even when the request also supplies a value for it in `person_properties` or `group_properties`, and even when the service would otherwise use a stored value or a value it adds itself, such as GeoIP `$geoip_*` properties, `$initial_*` properties copied from a non-initial key, the `$os` and `$os_name` alias, `$group_key`, and `distinct_id`. The flags service ignores a listed person key that carries its person-metadata prefix (`__posthog_person_metadata__`), so known absence never hides a persons-table field such as `created_at`. An SDK forwards such a key unchanged and does not strip it. Operator results follow the canonical operator inventory requirement. Known absence does not change static or realtime cohort membership, which the service reads from stored tables.
+
+An SDK SHALL NOT send a known-absence field that was not part of the caller's input. An SDK SHOULD validate the 1000-key limit before the request so the caller gets a local error instead of a failed fallback, and SHALL NOT silently truncate a list.
+
+#### Scenario: Remote fallback sends the listed person keys
+- **GIVEN** remote feature flag evaluation is enabled
+- **AND** a local flag is inconclusive for another reason
+- **WHEN** the flag is evaluated with person property key "plan" listed as known absent
+- **THEN** the `/flags` request body should include `person_property_keys_known_absent` equal to `["plan"]`
+
+#### Scenario: Remote fallback sends the listed group keys by group type
+- **GIVEN** remote feature flag evaluation is enabled
+- **AND** a local flag is inconclusive for another reason
+- **WHEN** the flag is evaluated with group property key "tier" listed as known absent for group type "organization"
+- **THEN** the `/flags` request body should include `group_property_keys_known_absent` equal to `{"organization": ["tier"]}`
+
+#### Scenario: Requests without a known-absence input omit the fields
+- **GIVEN** remote feature flag evaluation is enabled
+- **WHEN** a flag is evaluated with no known-absent keys
+- **THEN** each known-absence field in the `/flags` request body should be absent or null
 
 ### Requirement: Unrecognized property-filter operators degrade to inconclusive
 
@@ -327,7 +404,7 @@ The existing canonical stringification and safe numeric-ambiguity fallback rules
 
 Full Unicode lowercase SHALL reproduce Rust `str::to_lowercase`, including context-sensitive and multi-code-point mappings. Implementations MUST NOT substitute ASCII-only lowercase, Unicode casefold/equivalence, accent removal, locale-sensitive comparison, simple Unicode lowercase, or a generic case-insensitive collation whose results differ from Rust lowercase-then-compare.
 
-When the required property key is absent from caller-supplied local evaluation context, both operators SHALL remain inconclusive and eligible for remote fallback.
+When the required property key is absent from caller-supplied local evaluation context and is not listed as known absent, both operators SHALL remain inconclusive and eligible for remote fallback. A key listed as known absent is not missing context: `exact` SHALL NOT match and `is_not` SHALL match, as defined by the canonical operator inventory requirement.
 
 #### Scenario: A false-like filter uses aggregate truthiness
 
@@ -448,8 +525,8 @@ suffix check. Each `not_*` operator SHALL be the logical negation of its positiv
 present, supported property value. These operators MUST NOT use Unicode lowercase, Unicode
 casefold/equivalence, locale-sensitive comparison, or accent removal.
 
-When the required property key is absent from caller-supplied local evaluation context, these
-operators SHALL remain inconclusive and eligible for remote fallback.
+When the required property key is absent from caller-supplied local evaluation context and is not listed as known absent, these
+operators SHALL remain inconclusive and eligible for remote fallback. A key listed as known absent is not missing context: the positive operators SHALL NOT match and each `not_*` operator SHALL match, as defined by the canonical operator inventory requirement.
 
 #### Scenario: ASCII case variants match all positive search operators
 
@@ -475,7 +552,7 @@ operators SHALL remain inconclusive and eligible for remote fallback.
 
 The local evaluator SHALL implement `icontains_multi` and `not_icontains_multi` with an array condition. It SHALL stringify the supplied property and each condition member with the backend-compatible representation, lowercase only ASCII characters `A` through `Z`, and compare each member as a substring. `icontains_multi` SHALL match when ANY member matches. `not_icontains_multi` SHALL be the logical inverse for a present, supported property value.
 
-An empty condition array SHALL make `icontains_multi` false and `not_icontains_multi` true. When the required property key is absent from caller-supplied local evaluation context, both operators SHALL remain inconclusive and eligible for remote fallback.
+An empty condition array SHALL make `icontains_multi` false and `not_icontains_multi` true. When the required property key is absent from caller-supplied local evaluation context and is not listed as known absent, both operators SHALL remain inconclusive and eligible for remote fallback. A key listed as known absent is not missing context: `icontains_multi` SHALL NOT match and `not_icontains_multi` SHALL match, even when the condition array is empty.
 
 #### Scenario Outline: Multi-contains evaluates each condition value
 
@@ -683,9 +760,27 @@ The canonical operator inventory SHALL be scoped as follows:
 
 The existing presence-operator requirement SHALL govern `is_set` and `is_not_set`, and the existing dependency-filter requirement SHALL govern `flag_evaluates_to`.
 
-Because caller-supplied local property maps are partial context, an absent required property key SHALL make that criterion inconclusive for every ordinary property operator, including named negative operators. A value-requiring operator whose condition value is omitted SHALL be inconclusive. An operator that is unknown or invalid for the criterion type SHALL be inconclusive for only the affected flag.
+Because caller-supplied local property maps are partial context, an absent required property key that is not listed as known absent SHALL make that criterion inconclusive for every ordinary property operator, including named negative operators. A value-requiring operator whose condition value is omitted SHALL be inconclusive. An operator that is unknown or invalid for the criterion type SHALL be inconclusive for only the affected flag.
 
-When both operands are available but the property value cannot be interpreted by the selected operator, the criterion SHALL be a definitive no-match. A malformed condition value SHALL be inconclusive unless an operator-family requirement explicitly defines a safe result. A named negative operator SHALL negate only a valid comparison; it MUST NOT convert an invalid pattern, invalid numeric/date/version operand, or inconclusive criterion into a match. Implementations MUST NOT expose parser or matcher exceptions to application code.
+A required property key listed as known absent is not missing context. The evaluator SHALL NOT parse, compile, or validate a present condition value for a known-absent key, so an invalid pattern or a malformed numeric, date, or version operand does not change the result. This matches the flags service, which removes a listed key before matching and decides each operator from its missing-value branch before it reads the condition value. Except for the two cases after the table, the criterion SHALL be definitive, without remote fallback, and SHALL use these results:
+
+| Operator | Result for a known-absent key |
+| --- | --- |
+| `is_not_set` | match |
+| `is_not`, `not_icontains`, `not_starts_with`, `not_ends_with`, `not_icontains_multi`, `not_regex`, `not_between` | match |
+| `is_set` | no match |
+| every other operator, including `exact`, `icontains`, `icontains_multi`, `starts_with`, `ends_with`, `regex`, `gt`, `gte`, `lt`, `lte`, `between`, all `semver_*` operators including `semver_neq`, and the `is_date_*` operators | no match |
+
+Two cases SHALL stay inconclusive even for a known-absent key:
+
+- A value-requiring operator whose condition value is omitted or JSON null. The flags service reads a null condition value as omitted and returns no match. The spec keeps an omitted condition value inconclusive for a present key too, so the flag falls back to remote evaluation, which returns that result.
+- A `between` or `not_between` criterion with a malformed range. The flags service validates the range before its missing-value branch, so it doesn't resolve the criterion from the key's absence either.
+
+Known absence SHALL NOT change cohort membership read from stored static or realtime cohorts, SHALL NOT affect holdouts, which read no properties, and SHALL apply to a flag dependency because the dependency evaluates with the same listing. A dynamic-cohort property leaf SHALL use the table above before applying its `negation`.
+
+The known-absent table SHALL apply only to an operator the SDK implements locally. An inventory operator that the SDK does not implement locally SHALL make the flag inconclusive with the `unsupported_definition` cause, even when the key is listed as known absent. The SDK SHALL check operator support before it applies the table, so the flag falls back to remote evaluation and the flags service decides the result.
+
+When both operands are available but the property value cannot be interpreted by the selected operator, the criterion SHALL be a definitive no-match. The one exception is `not_between`, which matches a property value that does not convert to a number, as the numeric criteria requirement defines. A malformed condition value SHALL be inconclusive unless an operator-family requirement explicitly defines a safe result. Apart from that `not_between` exception and the known-absent table above, a named negative operator SHALL negate only a valid comparison; it MUST NOT convert an invalid pattern, invalid numeric/date/version operand, or inconclusive criterion into a match. Implementations MUST NOT expose parser or matcher exceptions to application code.
 
 #### Scenario Outline: Omitted and null operators default to exact (@server)
 - **GIVEN** a local condition uses <operator-state> for its property operator
@@ -706,10 +801,32 @@ When both operands are available but the property value cannot be interpreted by
   | `exact` | `"pro"` | the required key omitted | inconclusive |
   | `is_not` | `"pro"` | the required key omitted | inconclusive |
   | `is_not_set` | omitted | the required key omitted from partial local context | inconclusive |
+  | `exact` | `"pro"` | the required key listed as known absent | false |
+  | `is_not` | `"pro"` | the required key listed as known absent | true |
+  | `not_icontains` | `"pro"` | the required key listed as known absent | true |
+  | `icontains` | `"pro"` | the required key listed as known absent | false |
+  | `gt` | `"10"` | the required key listed as known absent | false |
+  | `semver_neq` | `"1.2.3"` | the required key listed as known absent | false |
+  | `is_date_before` | `"2025-01-01T10:00:00Z"` | the required key listed as known absent | false |
+  | `not_regex` | `"["` | the required key listed as known absent | true |
+  | `regex` | `"["` | the required key listed as known absent | false |
+  | `gt` | `"not-a-number"` | the required key listed as known absent | false |
+  | `semver_gt` | `"not-a-version"` | the required key listed as known absent | false |
+  | `is_date_after` | `"not-a-date"` | the required key listed as known absent | false |
+  | `is_not` | omitted | the required key listed as known absent | inconclusive |
+  | `is_not` | JSON null | the required key listed as known absent | inconclusive |
+  | `not_between` | `[10]` | the required key listed as known absent | inconclusive |
   | `exact` | omitted | property value `"pro"` present | inconclusive |
   | `future_operator` | `"pro"` | property value `"pro"` present | inconclusive |
   | `gt` | `"10"` | property value `"not-a-number"` present | false |
   | `gt` | `"not-a-number"` | property value `10` present | inconclusive |
+
+#### Scenario: An operator the SDK does not implement falls back before known absence (@server)
+- **GIVEN** a local condition has operator `not_between` and condition value `[1, 2]`
+- **AND** the SDK does not implement `not_between` locally
+- **WHEN** it is evaluated with the required key listed as known absent
+- **THEN** the flag should remain unresolved with reason `unsupported_definition`
+- **AND** the criterion should not resolve from the known-absent table
 
 ### Requirement: Regular-expression criteria perform safe case-sensitive search
 
@@ -729,6 +846,8 @@ Local regex matching SHALL be limited to a portable subset on which the SDK's re
 A deferral under this requirement carries the same guarantees as an unsupported-syntax deferral: it MUST NOT become a match through `not_regex` or cohort negation, and local-only evaluation SHALL remain unresolved rather than substituting a guessed boolean. The subset is deliberately conservative — patterns and inputs that would in fact have agreed MAY still defer, at the cost of more remote flag requests and more unresolved local-only results. SDKs SHALL NOT trade that cost for a locally computed boolean that the service would contradict. These rules are a portability contract, not a claim of complete equivalence across every Unicode version, compiler limit, or resource budget.
 
 Portable acceptance vectors SHALL use syntax shared by the target SDK engines. Engine-specific constructs require remote fallback when the SDK cannot evaluate them.
+
+These pattern rules, including the portable-subset deferral, apply only when the property key is present. For a key listed as known absent, `regex` SHALL be a definitive no-match and `not_regex` SHALL be a definitive match, and the evaluator SHALL NOT compile the pattern, so an invalid, unsupported, engine-specific, or engine-divergent pattern does not change the result, as the canonical operator inventory requirement defines.
 
 #### Scenario Outline: Regex criteria search safely without implicit flags or anchors (@server)
 - **GIVEN** a local property condition with operator <operator> and pattern <pattern>
@@ -775,15 +894,23 @@ Portable acceptance vectors SHALL use syntax shared by the target SDK engines. E
 - **THEN** the criterion match result should be true
 - **AND** no remote flag evaluation request should be sent
 
+#### Scenario: A known-absent key resolves regex criteria without compiling the pattern (@server)
+- **GIVEN** a local condition uses pattern syntax unsupported by the SDK regex engine
+- **WHEN** it is evaluated with the required key listed as known absent
+- **THEN** `regex` should not match and `not_regex` should match
+- **AND** the SDK should not require remote fallback
+
 ### Requirement: Numeric criteria use complete finite binary64 comparisons
 
 For `gt`, `gte`, `lt`, and `lte`, the condition SHALL be a string matching the complete decimal grammar `[+-]?(digits[.digits*]?|.digits+)([eE][+-]?digits+)?`, where `digits` means one or more ASCII decimal digits and `digits*` means zero or more. The supplied property MAY be a JSON number or a string matching the same grammar. The evaluator SHALL convert both operands to finite IEEE-754 binary64 values and compare them in `property operator condition` order. No whitespace is trimmed. Partial parses such as `"10px"`, padded strings such as `" 10 "`, non-finite values, null, booleans, arrays, and objects SHALL NOT be accepted. The evaluator MUST NOT fall back to lexicographic or arbitrary-precision decimal comparison.
 
 The legacy wire alias `min` SHALL behave as `gte`, and `max` SHALL behave as `lte`.
 
-A present property that cannot be converted to a finite number SHALL be a definitive no-match. An invalid condition number SHALL be inconclusive. Binary64 rounding is observable for values that cannot be represented exactly.
+For these four operators, a present property that cannot be converted to a finite number SHALL be a definitive no-match. An invalid condition number SHALL be inconclusive. For a key listed as known absent, these four operators SHALL be a definitive no-match, and the evaluator SHALL NOT parse the condition number, so an invalid condition number does not change the result, as the canonical operator inventory requirement defines. Binary64 rounding is observable for values that cannot be represented exactly.
 
-For dynamic-cohort property leaves, `between` SHALL accept exactly two finite numeric or numeric-string bounds `[low, high]`, require `low <= high`, and match inclusively at both bounds. `not_between` SHALL negate only a valid inclusive range comparison. Missing, nonnumeric, non-finite, reversed, or malformed ranges SHALL NOT match either range operator; a malformed condition range SHALL be inconclusive before applying any cohort leaf `negation`.
+For dynamic-cohort property leaves, `between` SHALL accept exactly two numeric or numeric-string bounds `[low, high]`, require `low <= high`, and match inclusively at both bounds. A bound MAY be infinite, such as `"-inf"` or `"inf"`. A condition value that is not a two-element array, or that has a nonnumeric bound, a NaN bound, or `low > high`, is a malformed range. A malformed condition range SHALL be inconclusive before applying any cohort leaf `negation`, even when the key is listed as known absent.
+
+The range operators follow HogQL, which reads a property value that does not convert to a number as NULL. For these operators, a property string converts to a number when it matches the decimal grammar of the numeric ordering operators or is `inf`, `infinity`, or `nan` in any letter case with an optional sign. A supplied property that is null, a boolean, an array, an object, or a string that does not convert SHALL NOT match `between` and SHALL match `not_between`. A property that converts to NaN SHALL match neither operator. A property that converts to positive or negative infinity SHALL compare as that infinity. An absent property key follows the missing-context rule of the operator inventory: it is inconclusive unless the key is listed as known absent.
 
 #### Scenario Outline: Numeric ordering uses complete finite binary64 semantics (@server)
 - **GIVEN** a local property condition with operator <operator> and condition value <condition>
@@ -813,13 +940,17 @@ For dynamic-cohort property leaves, `between` SHALL accept exactly two finite nu
   | `between` | `["10", "20"]` | `20` | true |
   | `between` | `[10, 20]` | `21` | false |
   | `not_between` | `[10, 20]` | `21` | true |
-  | `not_between` | `[10, 20]` | `"not-a-number"` | false |
+  | `between` | `[10, 20]` | `"not-a-number"` | false |
+  | `not_between` | `[10, 20]` | `"not-a-number"` | true |
+  | `not_between` | `[10, 20]` | `null` | true |
+  | `between` | `[10, 20]` | `"NaN"` | false |
   | `not_between` | `[10, 20]` | `"NaN"` | false |
   | `between` | `[10, 20]` | `"inf"` | false |
-  | `not_between` | `[10, 20]` | `"inf"` | false |
+  | `not_between` | `[10, 20]` | `"inf"` | true |
+  | `between` | `["-inf", "inf"]` | `0` | true |
   | `between` | `[20, 10]` | `15` | inconclusive |
   | `not_between` | `[10]` | `15` | inconclusive |
-  | `between` | `["-inf", "inf"]` | `0` | inconclusive |
+  | `between` | `["NaN", 20]` | `15` | inconclusive |
 
 #### Scenario: Cohort negation does not invert a malformed range (@server)
 - **GIVEN** a dynamic cohort leaf has condition `between [1,2,3]`
@@ -840,7 +971,7 @@ A relative condition SHALL consist of an optional leading `-`, an integer from `
 
 On a fall-back overlap, the evaluator SHALL choose the earlier of the two matching instants. If subtraction or naive parsing lands in a spring-forward gap, the criterion SHALL be inconclusive. Month and year lookbacks SHALL subtract one unit at a time, preserving the current local time and clamping after every step. Consequently, a two-month lookback from March 31 can retain February's clamped day in January. Acceptance tests SHALL inject both a fixed clock and an effective timezone.
 
-A present property that is outside the accepted grammar SHALL be a definitive no-match. An omitted, non-string, invalid, or locally uninterpretable condition SHALL be inconclusive.
+A present property that is outside the accepted grammar SHALL be a definitive no-match. An omitted, non-string, invalid, or locally uninterpretable condition SHALL be inconclusive. For a key listed as known absent, the date operators SHALL be a definitive no-match, and the evaluator SHALL NOT parse a present condition, so an invalid or locally uninterpretable condition does not change the result, as the canonical operator inventory requirement defines.
 
 #### Scenario Outline: Date criteria normalize offsets and preserve strict boundaries (@server)
 - **GIVEN** the local evaluator clock is fixed at `2025-01-08T00:00:00Z`
@@ -900,7 +1031,7 @@ Core components SHALL be unsigned 64-bit integers. More than three core componen
 
 For `semver_tilde` and `semver_caret`, the evaluator SHALL normalize and pad the condition to a complete version before applying the corresponding range. Consequently `~1` behaves as `~1.0.0`, and `^0` behaves as `^0.0.0`. For `semver_wildcard`, it SHALL strip leading zeros from numeric components without padding and accept `*`, `x`, or `X` as wildcard tokens. Supported spellings include `*`, `x`, `X`, `1.*`, `1.*.*`, and `1.2.*`; an interior wildcard such as `1.*.3` is invalid. A condition without a wildcard token, such as `1.2`, uses caret semantics.
 
-A prerelease property SHALL satisfy a range only when the range contains a prerelease comparator with the same major, minor, and patch tuple. An invalid property version SHALL be a definitive no-match for every semantic-version operator, including `semver_neq`; an omitted or invalid condition version or range SHALL be inconclusive.
+A prerelease property SHALL satisfy a range only when the range contains a prerelease comparator with the same major, minor, and patch tuple. An invalid property version SHALL be a definitive no-match for every semantic-version operator, including `semver_neq`; an omitted or invalid condition version or range SHALL be inconclusive. For a key listed as known absent, every semantic-version operator SHALL be a definitive no-match, and the evaluator SHALL NOT parse a present condition version or range, so an invalid one does not change the result, as the canonical operator inventory requirement defines.
 
 #### Scenario Outline: Direct semantic-version comparison uses normalized total ordering (@server)
 - **GIVEN** a local property condition with operator <operator> and condition value <condition>
@@ -1236,7 +1367,7 @@ Examples:
 
 ### Requirement: Unavailable enrollment context remains inconclusive
 
-For an active flag without experience continuity, when `filters.feature_enrollment` is true and the enrollment property is absent from the caller's local person-property context, the evaluator SHALL report inconclusive rather than treating the person as opted out or continuing through holdouts and release conditions. Omitted caller properties do not establish absence from stored person properties. Existing remote fallback SHALL remain eligible; local-only evaluation SHALL make no remote request and SHALL preserve the public API's unresolved-result behavior. For a snapshot API exposing unresolved reasons, missing enrollment context SHALL contribute the `missing_context` cause, and inability to resolve a dependency on that enrollment flag SHALL contribute `unresolved_dependency`. Holdouts and release conditions skipped by the enrollment check SHALL NOT contribute unresolved causes. The existing unresolved-reason precedence SHALL apply only among applicable causes; it SHALL NOT require inspecting skipped targeting to find a higher-priority reason.
+For an active flag without experience continuity, when `filters.feature_enrollment` is true and the enrollment property is absent from the caller's local person-property context and is not listed as known absent, the evaluator SHALL report inconclusive rather than treating the person as opted out or continuing through holdouts and release conditions. Omitted caller properties do not establish absence from stored person properties. When the person property key `$feature_enrollment/<flag key>` is listed as known absent, the enrollment property is not missing context. The evaluator SHALL treat the person as not enrolled, SHALL NOT report `missing_context`, and SHALL continue through holdouts and release conditions as for any person without the enrollment property. The listing SHALL take precedence over a supplied value for the same key. Existing remote fallback SHALL remain eligible; local-only evaluation SHALL make no remote request and SHALL preserve the public API's unresolved-result behavior. For a snapshot API exposing unresolved reasons, missing enrollment context SHALL contribute the `missing_context` cause, and inability to resolve a dependency on that enrollment flag SHALL contribute `unresolved_dependency`. Holdouts and release conditions skipped by the enrollment check SHALL NOT contribute unresolved causes. The existing unresolved-reason precedence SHALL apply only among applicable causes; it SHALL NOT require inspecting skipped targeting to find a higher-priority reason.
 
 Enrollment SHALL always use person properties, including when a downloaded definition uses group aggregation. When the evaluator supports retaining person context for that definition, it SHALL evaluate enrollment before requiring a group key or group properties; a missing person enrollment property SHALL contribute `missing_context`. An evaluator whose implementation cannot retain person context for that group-aggregated definition SHALL report inconclusive with the `unsupported_definition` cause rather than interpreting group properties as person enrollment. Existing reason precedence and remote-fallback/local-only rules SHALL still apply. Group aggregation alone SHALL NOT make enrollment unsupported. This does not require accepting group-based flags through the early-access feature creation API.
 
@@ -1247,6 +1378,14 @@ Enrollment SHALL always use person properties, including when a downloaded defin
 - **WHEN** the public flag getter evaluates "beta-feature" with remote fallback enabled
 - **THEN** a remote evaluation request should be made
 - **AND** the returned flag value should be false
+
+#### Scenario: Listed known-absent enrollment key resolves locally (@server)
+- **GIVEN** an active flag "beta-feature" has `feature_enrollment: true` and a release condition matching everyone
+- **AND** person property key `$feature_enrollment/beta-feature` is listed as known absent
+- **AND** no enrollment property is supplied locally
+- **WHEN** the public flag getter evaluates "beta-feature" with remote fallback enabled
+- **THEN** the flag should resolve locally from the release condition
+- **AND** no remote evaluation request should be made
 
 #### Scenario: Local-only evaluation leaves missing enrollment and its dependency unresolved (@server)
 - **GIVEN** an active flag "beta-feature" has `feature_enrollment: true` and a release condition matching everyone

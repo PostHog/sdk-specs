@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-kmp](https://github.com/PostHog/posthog-kmp)
 **Audited commit:** `0a88aa7490c4bc51fb263c7f3619d62d838658a4` ([commit](https://github.com/PostHog/posthog-kmp/commit/0a88aa7490c4bc51fb263c7f3619d62d838658a4)), tag `1.0.0` — first audit, 2026-11-23
 **Audited against sdk-specs commit:** `795b69f`; re-checked at `44fe27a`, whose one later spec change (#233, local flag evaluation) is server-only and moves no row
-**Summary:** 16 ✅ · 35 🟡 · 8 ❌ · 11 ➖ · 0 ❓ (70 rows; first audit). On the shared 69-row basis (without Get Remote Config Payload, ➖): 16 ✅ · 35 🟡 · 8 ❌ · 10 ➖.
+**Summary:** 15 ✅ · 36 🟡 · 8 ❌ · 11 ➖ · 0 ❓ (70 rows; first audit). On the shared 69-row basis (without Get Remote Config Payload, ➖): 15 ✅ · 36 🟡 · 8 ❌ · 10 ➖.
 
 **Why this run:** posthog-kmp has no compliance file yet. 1.0.0 is its first stable release.
 
@@ -56,7 +56,7 @@ and JVM (`androidMain/.../PostHog.android.kt:30-31`, `jvmMain/.../PostHog.jvm.kt
 | 8 | Alias | 🟡 | [n4] |
 | 9 | Bootstrap | ❌ | [n5] KMP-owned |
 | 10 | Capture | 🟡 | [n6] KMP-owned + web |
-| 11 | Capture AI | ✅ | [n7] |
+| 11 | Capture AI | 🟡 | [n7] Apple inherits posthog-ios n27 |
 | 12 | Capture Exception | 🟡 | [n8] KMP-owned |
 | 13 | Create Person Profile | ➖ | Applicability: posthog-js family only; KMP has no such method |
 | 14 | Debug | 🟡 | [n39] KMP-owned |
@@ -168,14 +168,14 @@ and JVM (`androidMain/.../PostHog.android.kt:30-31`, `jvmMain/.../PostHog.jvm.kt
   - **Wasm: `Set` (and any other non-map/list value) becomes a string.** `toJsAny()` falls back to `toString().toJsString()` (`wasmJsMain/.../PostHog.wasmJs.kt:442-454`), so `setOf("a","b")` is sent as `"[a, b]"` — the "string representation of the container" the spec forbids. On JS a Kotlin `Set` serializes through `AbstractMutableCollection.toJSON` as an array.
   - **Apple: `Set` is dropped.** `appendNative` hands every non-map, non-list value to `addObject(value)` uncopied (`appleMain/.../NativeProperties.apple.kt:79`), so a Kotlin `Set` reaches posthog-ios as an `NSSet`. posthog-ios 4.0.3 drops it: `isValidObject` accepts only arrays and dictionaries as containers and `sanitizeInvalidValue` converts only `URL`, `Date`, dictionaries and `[Any]` (`PostHog/Utils/DictUtils.swift:48-88`, `:211-230`), the #215 gap scored in [posthog-ios.md n4](posthog-ios.md#n4).
   - **Web: nested nulls kept.** `commonMain` drops only top-level null values (`commonMain/.../PostHog.kt:616-620`); native delegates drop nested ones themselves, but posthog-js sends nested `null`s, so the web wire is half-cleaned.
-- **Inherited:** Android, JVM ✅ (posthog-android); Apple inherits posthog-ios n4 (🟡, `Set`/`NSSet` dropped, #215); web inherits posthog-js n2.
+- **Inherited:** Android, JVM ✅ (posthog-android; its n24 `disableGeoIp` override can't trigger, since KMP doesn't expose `disableGeoIp`); Apple inherits posthog-ios n4 (🟡, `Set`/`NSSet` dropped, #215); web inherits posthog-js n2.
 - **Backwards compatibility:** Backward-compatible — fixes wire values that PostHog can't use today.
 - **Remediation:** In `jsMain` `toJsValue()`, convert `is Long -> toDouble()` (and `is Set<*>`/`Collection` → array); in `wasmJsMain` `toJsAny()`, map `is Collection<*>` → array before the `toString()` fallback; in `appleMain` `NativeProperties.apple.kt`, convert `is Set<*>` to an array in `appendNative` before the `addObject` fallback; make `dropNullValues()` recursive for the web targets.
 
 <a id="n7"></a>
 
-### n7 — Capture AI (✅ Pass)
-- **Spec note:** Applicability is "`server`, and client SDKs on capture v1 that ship an AI method." Android/JVM/Apple forward `captureAi()` and its four options to the native AI lanes (`jvmCommonMain/.../PostHog.jvmCommon.kt:69-80`, `:129-143`; `appleMain/.../PostHog.apple.kt:69-77`, `:179-197`), both ✅ in their files. The web targets are not on capture v1, so out of scope; `captureAi()` there returns `null` and sends nothing, with a debug log (`jsMain/.../PostHog.js.kt:128-137`), as the KDoc and CHANGELOG state.
+### n7 — Capture AI (🟡 Partial)
+- **Spec note:** Applicability is "`server`, and client SDKs on capture v1 that ship an AI method." Android/JVM/Apple forward `captureAi()` and its four options to the native AI lanes (`jvmCommonMain/.../PostHog.jvmCommon.kt:69-80`, `:129-143`; `appleMain/.../PostHog.apple.kt:69-77`, `:179-197`). Android/JVM ✅: posthog-android n25 is 🟡 only for the `disableGeoIp` caller override, and KMP doesn't expose `disableGeoIp`. **Apple inherits posthog-ios n27 (🟡):** `captureAi` shares `capture`'s sanitizer, so a `Set` property is dropped, as in [n6](#n6). The web targets are not on capture v1, so out of scope; `captureAi()` there returns `null` and sends nothing, with a debug log (`jsMain/.../PostHog.js.kt:128-137`), as the KDoc and CHANGELOG state.
 
 <a id="n8"></a>
 

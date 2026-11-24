@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-ios](https://github.com/PostHog/posthog-ios)
 **Audited commit:** tag `4.0.5` at `c8fcc2c069c7119253aa5219c45c369f16d669dc` ([tag](https://github.com/PostHog/posthog-ios/tree/4.0.5)), re-audited on 2026-11-24 as a delta from `e27cbe4cb` (see [4.0.5 re-audit](#405-re-audit-2026-11-24)); before that audited on 2026-11-05 at `3460e534a` and re-checked on 2026-11-10 at `e27cbe4cb` on the 4.0 release branch ([PostHog/posthog-ios#873](https://github.com/PostHog/posthog-ios/pull/873)) (see [Re-check](#re-check-2026-11-10))
 **Audited against sdk-specs commit:** `44fe27a` (includes merged capture v1, [#146](https://github.com/PostHog/sdk-specs/pull/146)); previously `752f899` plus #146 at `d387ab79`, first audited against `dd11a6b`
-**Summary:** 43 ✅ · 15 🟡 · 1 ❌ · 11 ➖ (70 rows; previous audit at `e27cbe4cb` scored 44/14/1/10 on 69 rows)
+**Summary:** 42 ✅ · 16 🟡 · 1 ❌ · 11 ➖ (70 rows; previous audit at `e27cbe4cb` scored 44/14/1/10 on 69 rows)
 
 Note on repo layout: `posthog-ios` is a single-package repo, distributed through Swift Package Manager
 only from 4.0. Core SDK logic lives at `PostHog/` (flat files: `PostHogSDK.swift` — the main public
@@ -66,7 +66,8 @@ as `0dbc2245a`. Every open row was re-checked; none was fixed in 4.0.1–4.0.5.
 
 - **Rows that changed status:** Capture ✅→🟡: the sdk-specs #215 requirement "Capture serializes
   set-like and listed sequence property values as arrays" lists `Set`/`NSSet` for Swift, and iOS
-  drops such a property ([n4](#n4)). New row: **Get Remote Config Payload** ➖ ("Server SDKs only. The
+  drops such a property ([n4](#n4)). Capture AI ✅→🟡 for the same drop: `captureAi` goes through
+  `captureInternal` → `sanitizeDictionary` like `capture` ([n27](#n27)). New row: **Get Remote Config Payload** ➖ ("Server SDKs only. The
   request needs a secret key, which must never reach a client.").
 - **Spec changes met without a status change:**
   - Failed remote flags (#211), met by
@@ -193,7 +194,7 @@ apply.
 | 3 | Tracing Headers | ✅ | new server span-context bridge requirements (#129) are `@server` only |
 | 4 | Alias | 🟡 | [n3] |
 | 5 | Capture | 🟡 | was ✅; [n4]; #215: a `Set`/`NSSet` property is dropped instead of sent as a JSON array. Capture v1 wire conforms (merged #146); registered `$process_person_profile` left off identity events; empty event names dropped; `NSNull` properties omitted (#1047, now a MAY); own `$lib` pair filled after caller properties (#1050); empty variant left out of `$active_feature_flags` |
-| 6 | Capture AI | ✅ | merged #146 applies it to "client SDKs on capture v1 that ship an AI method"; the AI lane conforms, including the `NSNull` cleanup (#1047) — [n27] |
+| 6 | Capture AI | 🟡 | was ✅; inherits Capture's #215 `Set`/`NSSet` drop ([n4]). Merged #146 applies it to "client SDKs on capture v1 that ship an AI method"; the AI lane conforms, including the `NSNull` cleanup (#1047) — [n27] |
 | 7 | Capture Exception | ✅ | [n5]; `NSNull` custom properties omitted (#1047); synthesized stacks start at the caller (#224, posthog-ios#1079) |
 | 8 | Create Person Profile | ➖ | unchanged — spec Applicability still says only the posthog-js family exposes it; no `createPersonProfile` in iOS |
 | 9 | Debug | ✅ | |
@@ -821,7 +822,7 @@ apply.
 
 <a id="n27"></a>
 
-### n27 — Capture AI (✅ Pass; was ➖)
+### n27 — Capture AI (🟡 Partial; was ✅, before that ➖)
 - **Spec requires:** Applicability in merged [#146](https://github.com/PostHog/sdk-specs/pull/146)
   (`openspec/specs/capture-ai/spec.md:23`) covers "client SDKs on capture v1 that ship an AI method".
   The `d387ab79` text this row was first scored on named posthog-ios 4.0 explicitly; the merged
@@ -849,7 +850,9 @@ apply.
     `PostHog/QueueEndpoint+Factories.swift:79`; see [n4](#n4)).
   - **Not applicable:** the full-AI-capture flag, built-in AI integrations and the OpenTelemetry bridge;
     iOS ships none of them.
+  - **Gap (#215):** `captureAi` (`PostHog/PostHogSDK.swift:1733-1755`) calls `captureInternal` (`:1932`), which runs `sanitizeDictionary` on the properties (`:2035`), so a `Set`/`NSSet` property is dropped exactly as in [n4](#n4). Shared `capture` gaps are scored on Capture AI too, as `posthog-flutter.md` n39 does.
 - **Backwards compatibility:** `captureAi` is new in 4.0.
+- **Remediation:** Fixed by [n4](#n4)'s `Set` conversion in `sanitizeInvalidValue`.
 
 <a id="n28"></a>
 

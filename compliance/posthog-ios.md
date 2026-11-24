@@ -1,7 +1,7 @@
 # posthog-ios — SDK Compliance
 
 **Repo:** [PostHog/posthog-ios](https://github.com/PostHog/posthog-ios)
-**Audited commit:** tag `4.0.5` at `5565e4714e80453353c10a441263c2a8f37bf0d1` ([tag](https://github.com/PostHog/posthog-ios/tree/4.0.5)), re-audited on 2026-11-24 as a delta from `e27cbe4cb` (see [4.0.5 re-audit](#405-re-audit-2026-11-24)); before that audited on 2026-11-05 at `3460e534a` and re-checked on 2026-11-10 at `e27cbe4cb` on the 4.0 release branch ([PostHog/posthog-ios#873](https://github.com/PostHog/posthog-ios/pull/873)) (see [Re-check](#re-check-2026-11-10))
+**Audited commit:** tag `4.0.5` at `c8fcc2c069c7119253aa5219c45c369f16d669dc` ([tag](https://github.com/PostHog/posthog-ios/tree/4.0.5)), re-audited on 2026-11-24 as a delta from `e27cbe4cb` (see [4.0.5 re-audit](#405-re-audit-2026-11-24)); before that audited on 2026-11-05 at `3460e534a` and re-checked on 2026-11-10 at `e27cbe4cb` on the 4.0 release branch ([PostHog/posthog-ios#873](https://github.com/PostHog/posthog-ios/pull/873)) (see [Re-check](#re-check-2026-11-10))
 **Audited against sdk-specs commit:** `44fe27a` (includes merged capture v1, [#146](https://github.com/PostHog/sdk-specs/pull/146)); previously `752f899` plus #146 at `d387ab79`, first audited against `dd11a6b`
 **Summary:** 43 ✅ · 15 🟡 · 1 ❌ · 11 ➖ (70 rows; previous audit at `e27cbe4cb` scored 44/14/1/10 on 69 rows)
 
@@ -60,7 +60,7 @@ Net changes vs. the previous audit:
 
 ## 4.0.5 re-audit (2026-11-24)
 
-Delta audit of the released tag `4.0.5` (`5565e4714`) against sdk-specs `44fe27a`, starting from the
+Delta audit of the released tag `4.0.5` (`c8fcc2c06`) against sdk-specs `44fe27a`, starting from the
 `e27cbe4cb` audit below. The tag was compared with `e27cbe4cb` as trees, because #873 was squash-merged
 as `0dbc2245a`. Every open row was re-checked; none was fixed in 4.0.1–4.0.5.
 

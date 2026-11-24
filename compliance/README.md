@@ -153,8 +153,8 @@ the single most widely-shared non-compliance in the matrix.
 |---|---|---|---|---|---|---|---|---|---|
 | posthog-js | 26/64 fully compliant (41%) | 26 | 21 | 12 | 5 | 0 | 2026-10-05 · `6538babc` (targeted re-audit; most of the 59 pre-existing rows carried from 2026-08-10, see file header) | 33 | [posthog-js.md](posthog-js.md) |
 | posthog-python | 13/64 fully compliant (20%; 30 contracts N/A on a server SDK) | 13 | 16 | 5 | 30 | 0 | 2026-10-12 · `509c8525` | 21 | [posthog-python.md](posthog-python.md) |
-| posthog-android | 45/70 fully compliant (64%) | 45 | 13 | 1 | 11 | 0 | 2026-11-24 · `fb616076` (tag `android-v4.0.3`; all 70 rows) | 14 | [posthog-android.md](posthog-android.md) |
-| posthog-ios | 43/70 fully compliant (61%) | 43 | 15 | 1 | 11 | 0 | 2026-11-24 · `5565e4714` (tag `4.0.5`) | 16 | [posthog-ios.md](posthog-ios.md) |
+| posthog-android | 45/70 fully compliant (64%) | 45 | 13 | 1 | 11 | 0 | 2026-11-24 · `1577cfa5` (tag `android-v4.0.3`; all 70 rows) | 14 | [posthog-android.md](posthog-android.md) |
+| posthog-ios | 43/70 fully compliant (61%) | 43 | 15 | 1 | 11 | 0 | 2026-11-24 · `c8fcc2c06` (tag `4.0.5`) | 16 | [posthog-ios.md](posthog-ios.md) |
 | posthog-node | 9/64 fully compliant (14%; 29 contracts N/A on a server SDK) | 9 | 21 | 4 | 29 | 1 | 2026-10-12 · `4f590b36` (posthog-js monorepo; Traces row corrected 2026-10-19) | 25 (+1 ❓) | [posthog-node.md](posthog-node.md) |
 | posthog-flutter | 20/70 fully compliant (29%) | 20 | 33 | 4 | 13 | 0 | 2026-11-24 · `4cb4318b` (tag `6.0.0`; native rows at posthog-ios 4.0.5 / posthog-android 4.0.3) | 37 | [posthog-flutter.md](posthog-flutter.md) |
 | posthog-kmp | 19/70 fully compliant (27%) | 19 | 32 | 8 | 11 | 0 | 2026-11-24 · `0a88aa7` (tag `1.0.0`; first audit) | 40 | [posthog-kmp.md](posthog-kmp.md) |

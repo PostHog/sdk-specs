@@ -176,12 +176,15 @@ No posthog-js test covers these two keys under trigger groups.
 `$sdk_debug_replay_pending_trigger_conditions` (optional) SHALL list whichever configured trigger
 kinds are not yet satisfied; on mobile the V1 kinds are `event_trigger` and `linked_flag`,
 and the key is omitted when none is pending. When the remote config selects trigger groups
-(`session-replay-trigger-groups`), each pending group SHALL contribute one entry of the form
+(`session-replay-trigger-groups`), and only while no group records and some group is pending, each
+pending group SHALL contribute one entry of the form
 `trigger group "<name>": <condition>` per unsatisfied condition, exactly as posthog-js writes it
 (`V2TriggerGroupStrategy.getPendingTriggerConditions`,
 `packages/browser/src/extensions/replay/external/recording-strategies.ts:649-658` at posthog-js
 `origin/main` `480395c443`), on mobile as well as on the browser; a bare `trigger_groups` entry is
-not a conforming value. In the same configuration `$sdk_debug_replay_remote_trigger_matching_config`
+not a conforming value. A group records when it is activated and sampled in. Once any group
+records, the property SHALL carry no trigger-group entries, also for a group that is still
+pending: a browser SDK MAY write an empty list, and a mobile SDK SHALL omit the key. posthog-js `origin/main` `f05a993f9d` writes the list only while the status is buffering: `packages/browser/src/extensions/replay/external/triggerMatching.ts:850-851` returns sampled as soon as one activated group is sampled in, before `:855-856` returns buffering for a pending group; `lazy-loaded-session-recorder.ts:2295-2320` (`_maybeLogBufferingReason`, called on every flush at `:2423`) registers the pending list at `:2318` and registers `[]` at `:2298` when the status leaves buffering after it reported a reason; `session-recording.ts:554-569` (`sdkDebugProperties`) reads the persisted value back. Covering test for the cleared value: posthog-js `packages/browser/src/__tests__/extensions/replay/lazy-sessionrecording.test.ts:5685` ("reports the same condition again after leaving buffering", V1 URL trigger, asserts `[]` at `:5720`). No posthog-js test covers a pending group next to a group that records; source only. In the same configuration `$sdk_debug_replay_remote_trigger_matching_config`
 (optional) SHALL be `v2_trigger_groups` and `$sdk_debug_replay_trigger_groups_count` (optional)
 SHALL be the number of configured groups (`recording-strategies.ts:379-382`);
 `$sdk_debug_replay_matched_recording_trigger_groups` is specified in
@@ -340,6 +343,14 @@ posthog-ios `88f4b6b56` reads the manager's start snapshot unconditionally).
 - **AND** it does not contain a bare `trigger_groups` entry
 - **AND** on mobile `$sdk_debug_replay_event_trigger_status` and
   `$sdk_debug_replay_linked_flag_trigger_status` are both `trigger_disabled`
+
+#### Scenario: A pending group is not listed once another group records
+- **GIVEN** session replay is enabled
+- **AND** the remote config selects trigger groups and configures a trigger group named "Always" with no conditions and a sample rate of 1.0
+- **AND** a trigger group named "Checkout" with event condition "checkout_started" and a sample rate of 1.0
+- **WHEN** the client captures an eligible SDK event before "checkout_started" is captured
+- **THEN** session recording should be active
+- **AND** the event's `$sdk_debug_replay_pending_trigger_conditions`, if present, includes no entry that starts with `trigger group "Checkout": `
 
 #### Scenario: A registered property overrides the SDK-computed debug value
 - **GIVEN** a super property named `$recording_status` is registered

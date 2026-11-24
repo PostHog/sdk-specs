@@ -1239,10 +1239,14 @@ An SDK that implements trigger groups SHALL attach the trigger-group keys define
 `$sdk_debug_replay_matched_recording_trigger_groups` with one `{ id, name, matched: true,
 sampled }` entry per activated group, where `sampled` is that group's sampling decision; groups
 that are not activated SHALL NOT appear. The SDK SHALL refresh the matched-groups value when a
-group activates and when sampling decisions are made. For each pending group,
-`$sdk_debug_replay_pending_trigger_conditions` SHALL carry one entry per unsatisfied leg in the
+group activates and when sampling decisions are made. While no group records and some group is
+pending, `$sdk_debug_replay_pending_trigger_conditions` SHALL carry, for each pending group, one
+entry per unsatisfied leg in the
 form `trigger group "<name>": <condition>`, where `<condition>` is the leg's own description, as
-posthog-js writes it; a bare `trigger_groups` value does not satisfy this requirement. The
+posthog-js writes it; a bare `trigger_groups` value does not satisfy this requirement. A group
+records when it is activated and sampled in. Once any group records, the property SHALL carry no
+trigger-group entries, also for a group that is still pending: a browser SDK MAY write an empty
+list, and a mobile SDK SHALL omit the key. The
 attach, tiering, and throttling rules for these keys stay in `session-replay-debug-properties`.
 
 This requirement applies to all SDKs that implement trigger groups.
@@ -1254,7 +1258,8 @@ builds `{ id, name, matched: true, sampled }` for activated groups; `:649-658`:
 `getPendingTriggerConditions` maps each pending condition to `trigger group "${name}":
 ${condition}`). posthog-ios `feat/replay-v2-trigger-groups` `23ffc5a905`
 `PostHog/Replay/PostHogReplayIntegration.swift:2120-2122` appends a single `trigger_groups`
-value today and changes to the posthog-js form.
+value today and changes to the posthog-js form. Pending entries only while no group records:
+posthog-js `origin/main` `f05a993f9d` writes the list only while the status is buffering: `packages/browser/src/extensions/replay/external/triggerMatching.ts:850-851` returns sampled as soon as one activated group is sampled in, before `:855-856` returns buffering for a pending group; `lazy-loaded-session-recorder.ts:2295-2320` (`_maybeLogBufferingReason`, called on every flush at `:2423`) registers the pending list at `:2318` and registers `[]` at `:2298` when the status leaves buffering after it reported a reason; `session-recording.ts:554-569` (`sdkDebugProperties`) reads the persisted value back. Covering test for the cleared value: posthog-js `packages/browser/src/__tests__/extensions/replay/lazy-sessionrecording.test.ts:5685` ("reports the same condition again after leaving buffering", V1 URL trigger, asserts `[]` at `:5720`). No posthog-js test covers a pending group next to a group that records; source only.
 
 Covering test: posthog-js `packages/browser/src/__tests__/extensions/replay/lazy-sessionrecording.test.ts:8829`
 ("registers session properties when trigger group matches and is sampled"), `:9137` ("respects
@@ -1278,6 +1283,14 @@ within trigger groups" — the pending text).
 - **WHEN** the client captures an eligible SDK event before "$exception" is captured
 - **THEN** the event's `$sdk_debug_replay_pending_trigger_conditions` includes an entry that starts with `trigger group "Errors": `
 - **AND** it does not include a bare `trigger_groups` entry
+
+#### Scenario: A pending group is not listed once another group records
+- **GIVEN** session replay is enabled
+- **AND** the remote config sets `version` to 2 and configures a trigger group named "Always" with no conditions and a sample rate of 1.0
+- **AND** a trigger group named "Checkout" with event condition "checkout_started" and a sample rate of 1.0
+- **WHEN** the client captures an eligible SDK event before "checkout_started" is captured
+- **THEN** session recording should be active
+- **AND** the event's `$sdk_debug_replay_pending_trigger_conditions`, if present, includes no entry that starts with `trigger group "Checkout": `
 
 ### Requirement: Stop group evaluation after the first flush (MAY)
 

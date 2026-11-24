@@ -37,7 +37,7 @@ In some SDKs, `shouldTrack` and `markSeen` are combined into one atomic "add if 
 3. **Suppress duplicate tracking events.** If the same combination has already been seen, do not emit another `$feature_flag_called` event.
 4. **Allow new tracking when the response or evaluation context changes.** If a flag's value changes for the same key, or if a server-side call evaluates the same flag/value for a different `distinct_id` or group context, allow a new `$feature_flag_called` event.
 5. **Reset on flag change and lifecycle boundaries.** When feature flag state changes, caches are reset, identity is reset, or the SDK is closed/shut down, clear the dedupe tracker so post-reset/reloaded SDK state can emit fresh tracking events and shutdown state cannot leak across SDK lifetimes. On client-side flag reloads, SDKs MAY retain the tracker if they can reliably compare the complete relevant flag state before and after reload (including flag keys, values, payloads, and other cached flag metadata used by accessors) and determine it is unchanged; otherwise, they SHOULD clear the tracker after reload.
-6. **Expose tracking controls unevenly at the wrapper layer when applicable.** For example, Flutter delegates to the underlying native/browser trackers. Flutter 6.0 exposes a per-call `sendFeatureFlagEvent` option on `getFeatureFlag(...)`, `isFeatureEnabled(...)` and `getFeatureFlagResult(...)`; before 6.0 only `getFeatureFlagResult(sendEvent: ...)` had one, and `getFeatureFlag(...)` and `isFeatureEnabled(...)` always used the default tracking path.
+6. **Expose tracking controls unevenly at the wrapper layer when applicable.** For example, Flutter 5.x takes an optional per-call `sendFeatureFlagEvent` on `getFeatureFlag(...)` and `isFeatureEnabled(...)`, and `sendEvent` (default `true`) on `getFeatureFlagResult(...)`; Flutter 6.0 (unreleased) takes the optional `sendFeatureFlagEvent` on all three. When the caller omits it, the read follows `PostHogConfig.sendFeatureFlagEvent` on iOS, Android and desktop rather than forcing tracking on. On web, Flutter currently leaves the option unset and posthog-js applies its own default, a known gap against the client-level default requirement. `getFeatureFlagPayload(...)` emits no tracking event and takes no flag; Flutter 6.0 removes it.
 7. **Cap memory usage where needed.** Larger-scale implementations evict old entries using bounded maps or LRU-style caches. When a bounded tracker reaches its capacity, it SHOULD evict the oldest or least-recently-used entries incrementally. Capacity pressure SHOULD NOT clear the entire tracker, because doing so can flood analytics with duplicate `$feature_flag_called` events. Full tracker clears are reserved for explicit lifecycle/context boundaries such as observed flag-state change/cache reset, identity reset, or SDK close/shutdown.
 
 ## State & lifecycle
@@ -194,6 +194,63 @@ The SDK SHALL implement the canonical `feature-flag-called-tracker` behavior des
 - **WHEN** get feature flag "beta-ui" is called
 - **AND** shutdown is called
 - **THEN** feature flag called tracker state should be empty
+
+### Requirement: A missing flag reports no value
+
+The SDK SHALL report the absence of a value when a read emits `$feature_flag_called` for a flag it
+has no record of — no flag with that key in the loaded or cached flags, flags not loaded yet, or a
+failed flags request. `$feature_flag_response` SHALL either be absent from the
+event's properties or be JSON `null`. The two read the same downstream, and which one an SDK sends
+follows from how its serializer treats a null-valued property (see `capture`, "Capture drops
+null-valued object properties"), so this spec names no winner between them.
+
+`$feature_flag_response` SHALL NOT be the empty string for a missing flag. The empty string is the
+legacy rendering of a flag whose value is an empty variant key, which reads as disabled (see
+`get-feature-flag-result`), so sending it for a missing flag makes the two cases indistinguishable
+in flag analytics.
+
+Allowed variation: an SDK whose enabled check resolves a missing flag to `false` by construction
+(see `is-feature-enabled`, "Allowed variation for the no-default call") MAY report `false` from
+that read path, since the event records the value the read resolved. `absent`, `null` and `false`
+are the values the shared harness accepts for a missing-flag exposure; `""` is not one of them.
+
+This requirement is about the event property only. What a read *returns* for a missing flag,
+including a caller-supplied default, is specified by `get-feature-flag` and `is-feature-enabled`
+and does not change here.
+
+#### Scenario: A missing flag reports no value (@both)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** cached feature flags are:
+  | key     | value |
+  | beta-ui | true  |
+- **WHEN** get feature flag "missing-flag" is called
+- **THEN** one event named "$feature_flag_called" should be enqueued
+- **AND** the enqueued event properties should include:
+  | property      | value        |
+  | $feature_flag | missing-flag |
+- **AND** the enqueued event's `$feature_flag_response` is absent or `null`
+- **AND** it is not the empty string
+
+#### Scenario: An empty variant key still renders as the empty string (@both)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** cached feature flags are:
+  | key     | value |
+  | beta-ui | ""    |
+- **WHEN** get feature flag "beta-ui" is called
+- **THEN** one event named "$feature_flag_called" should be enqueued
+- **AND** the enqueued event properties should include:
+  | property      | value   |
+  | $feature_flag | beta-ui |
+- **AND** `$feature_flag_response` is present and is the empty string, which is what distinguishes
+  this read from a missing flag
 
 ### Requirement: Minimal event mode for non-experiment flags
 
@@ -587,3 +644,121 @@ The SDK SHALL preserve its existing dedupe behavior and feature flag event contr
 - **THEN** the received "$feature_flag_called" event for "checkout" reports "evaluation_failed" in "$feature_flag_error"
 - **AND** it does not report "flag_missing"
 - **AND** "$feature_flag_response" uses the platform's documented missing response sentinel
+
+### Requirement: Client-level feature flag event default
+
+A client SDK that exposes a client-level feature flag event configuration option (`sendFeatureFlagEvent`, in platform casing) SHALL apply it to every flag read that can emit `$feature_flag_called`, including the value getter, the enablement getter, and the structured result getter.
+
+Each read SHALL decide whether to emit in this order: the per-call option when the caller supplied one, then the client-level configuration value, then `true`. A read SHALL NOT default its per-call option to `true` and thereby bypass a disabled client-level configuration. A wrapper SDK that forwards the read to an underlying native or browser SDK SHALL omit the per-call override when the caller supplied none, so the underlying SDK applies its own configured default. Payload-only getters that never emit `$feature_flag_called` take no option and are unaffected.
+
+When the decision is `false`, the read SHALL emit no `$feature_flag_called` event and SHALL NOT consult or update the dedupe tracker, so a later opted-in read of the same flag and value still emits.
+
+#### Scenario: Client-level event default off silences flag reads (@client @requires:flag_event_default)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and its client-level feature flag event default disabled
+- **AND** cached feature flags are:
+  | key     | value |
+  | beta-ui | true  |
+- **WHEN** get feature flag result "beta-ui" is called
+- **AND** get feature flag "beta-ui" is called
+- **AND** is feature enabled "beta-ui" is called
+- **THEN** no event named "$feature_flag_called" should be enqueued
+
+#### Scenario: Per-call tracking option overrides a disabled client-level default (@client @requires:flag_event_default)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and its client-level feature flag event default disabled
+- **AND** cached feature flags are:
+  | key     | value |
+  | beta-ui | true  |
+- **WHEN** get feature flag result "beta-ui" is called with tracking enabled
+- **THEN** exactly one event named "$feature_flag_called" should be enqueued for flag "beta-ui"
+
+#### Scenario: Suppressed read leaves the dedupe tracker untouched (@client)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token"
+- **AND** cached feature flags are:
+  | key     | value |
+  | beta-ui | true  |
+- **WHEN** get feature flag result "beta-ui" is called with tracking disabled
+- **AND** get feature flag result "beta-ui" is called
+- **THEN** exactly one event named "$feature_flag_called" should be enqueued for flag "beta-ui"
+
+### Requirement: Flag definition identity on flag-called events
+
+A `$feature_flag_called` event SHALL identify the flag definition that produced the value through
+`$feature_flag_id` and `$feature_flag_version`, whether the value came from a remote evaluation
+response or from local evaluation.
+
+- A remotely evaluated read SHALL take both values from the flag's evaluation metadata in the response.
+- A locally evaluated read SHALL take them from the `id` and `version` of the local flag definition that
+  produced the value. An SDK SHALL NOT treat local definitions as carrying no version.
+- The SDK SHALL read the local definition from the same definitions snapshot that produced the value,
+  not from its current definitions state, so a definitions refresh between evaluation and capture cannot
+  report another revision's identity.
+- Each property SHALL be omitted when its source does not carry it. A missing `version` SHALL NOT
+  suppress `$feature_flag_id`, and an absent definition SHALL NOT fail the read or the event.
+- Every read path that emits `$feature_flag_called` SHALL follow this rule, including value-only,
+  enabled-state and structured-result getters, and a payload read that the caller opted into tracking.
+- A structured snapshot read (`evaluate-flags`) SHALL record the same `id` and `version` on the locally
+  evaluated flag record it exposes, so an exposure captured from the snapshot carries them too.
+
+`$feature_flag_id` and `$feature_flag_version` are already on the minimal-event allowlist, so a minimized
+event carries whichever of them the read resolved.
+
+Known gap: posthog-node sends `$feature_flag_id` but not `$feature_flag_version` on a locally evaluated
+read, and its snapshot record hardcodes `version: undefined` for a locally evaluated flag. posthog-go sends
+neither property on a locally evaluated read, because it reads both from the remote `FlagDetail` only, and
+its snapshot record for a locally evaluated flag leaves both unset. A follow-up should take them from the
+local definition in both SDKs.
+
+#### Scenario: A locally evaluated read reports the definition's id and version (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and a personal API key for local evaluation
+- **AND** local feature flag definitions include a flag "local-flag" with id 4211 and version 7 rolled out to distinct id "user-123"
+- **WHEN** get feature flag "local-flag" is called for distinct id "user-123"
+- **THEN** no remote flag evaluation request should be sent
+- **AND** one event named "$feature_flag_called" should be enqueued
+- **AND** the enqueued event properties should include:
+  | property                | value      |
+  | $feature_flag           | local-flag |
+  | locally_evaluated       | true       |
+  | $feature_flag_id        | 4211       |
+  | $feature_flag_version   | 7          |
+
+#### Scenario: A local definition without a version still reports its id (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and a personal API key for local evaluation
+- **AND** local feature flag definitions include a flag "unversioned-flag" with id 4212 and no version rolled out to distinct id "user-123"
+- **WHEN** get feature flag "unversioned-flag" is called for distinct id "user-123"
+- **THEN** one event named "$feature_flag_called" should be enqueued
+- **AND** the enqueued event properties should include:
+  | property         | value |
+  | $feature_flag_id | 4212  |
+- **AND** the enqueued event properties should not include "$feature_flag_version"
+
+#### Scenario: A snapshot read carries the local definition's identity (@server)
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and a personal API key for local evaluation
+- **AND** local feature flag definitions include a flag "local-flag" with id 4211 and version 7 rolled out to distinct id "user-123"
+- **WHEN** flags are evaluated once for distinct id "user-123"
+- **AND** the enabled state of "local-flag" is read from the resulting snapshot
+- **THEN** one event named "$feature_flag_called" should be enqueued
+- **AND** the enqueued event properties should include:
+  | property                | value |
+  | $feature_flag_id        | 4211  |
+  | $feature_flag_version   | 7     |

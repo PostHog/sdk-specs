@@ -291,6 +291,21 @@ Feature: Local Feature Flag Evaluator
     And the local evaluation result should be true from the second condition
 
   @server
+  Scenario: Early exit after an inconclusive condition stops evaluation and stays inconclusive
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And remote feature flag evaluation is enabled
+    And local feature flag "mixed-beta" has early exit enabled
+    And its first condition requires person property "plan" equal to "pro" with rollout percentage 0.0
+    And its second condition matches person property "region" equal to "US" with rollout percentage 0.0
+    And its third condition is a catch-all with rollout percentage 100.0
+    When local feature flag "mixed-beta" is evaluated with person property "region" equal to "US" and no "plan" property
+    Then the first condition should remain inconclusive
+    And the second condition should trigger early exit
+    And the third condition should not be evaluated as a match
+    And local evaluation should be inconclusive
+    And remote evaluation should remain eligible
+
+  @server
   Scenario: Inconclusive state is preserved when no later condition matches
     Given the SDK is initialized with token "test-token" and local evaluation enabled
     And remote feature flag evaluation is enabled
@@ -864,6 +879,8 @@ Feature: Local Feature Flag Evaluator
       | "regex"     | ""               | "admin@example.com" | true    |
       | "not_regex" | ""               | "admin@example.com" | false   |
       | "regex"     | "\\[1,2\\]"     | [1,2]                | true    |
+      | "regex"     | "^foo$"         | "foo\n"             | false   |
+      | "not_regex" | "^foo$"         | "foo\n"             | true    |
 
   @server
   Scenario Outline: Unsupported regex execution is inconclusive
@@ -878,6 +895,32 @@ Feature: Local Feature Flag Evaluator
       | operator    |
       | "regex"     |
       | "not_regex" |
+
+  @server
+  Scenario Outline: Engine-divergent regex evaluation defers to the service
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag "regex-divergent" has a person property condition with operator <operator> and pattern <pattern>
+    When local feature flag "regex-divergent" is evaluated with supplied property value <property>
+    Then local evaluation should be inconclusive
+    And the SDK should request remote evaluation when remote fallback is permitted
+    And local-only evaluation should remain unresolved rather than returning a definitive result
+    And neither a negative operator nor cohort negation should turn the deferral into a match
+
+    Examples:
+      | operator    | pattern        | property                        |
+      | "regex"     | "^\\d+$"       | "١٢٣"                           |
+      | "not_regex" | "^\\d+$"       | "١٢٣"                           |
+      | "regex"     | "^\\p{L}+$"    | "café"                          |
+      | "regex"     | "^a\\b$"       | "a"                             |
+      | "regex"     | "^(a+)+$"      | "aaaaaaaaaaaaaaaaaaaaaaaaaaa\n" |
+
+  @server
+  Scenario: Portable ASCII regex criteria stay local
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag "regex-portable" has a person property condition with operator "regex" and pattern "example\\.com"
+    When local feature flag "regex-portable" is evaluated with supplied property value "admin@example.com"
+    Then the criterion match result should be true
+    And no remote flag evaluation request should be sent
 
   @server
   Scenario Outline: A known-absent key resolves regex criteria without compiling the pattern

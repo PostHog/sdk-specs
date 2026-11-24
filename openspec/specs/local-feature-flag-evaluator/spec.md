@@ -155,7 +155,7 @@ Caller-supplied property maps represent present values or unavailable context. T
 
 An SDK MAY accept a known-absence input: a set of person property keys, and for each group type a set of group property keys, that the caller knows are absent for this evaluation. A listed key is absent, not missing context. The listing SHALL take precedence over any value for the same key in the supplied person or group properties. For a listed key, `is_not_set` SHALL match and `is_set` SHALL NOT match, both without remote fallback. Other operators on a listed key follow the canonical operator inventory requirement.
 
-A key that is omitted from the supplied properties and not listed SHALL remain inconclusive, as described above. Listing a key SHALL NOT affect any other key. Person keys that carry the flags service's person-metadata prefix (`__posthog_person_metadata__`) SHALL be ignored, so known absence never hides a persons-table field such as `created_at`. Group keys are scoped to the named group type, so a key listed for one group type SHALL NOT apply to another.
+A key that is omitted from the supplied properties and not listed SHALL remain inconclusive, as described above. Listing a key SHALL NOT affect any other key. Group keys are scoped to the named group type, so a key listed for one group type SHALL NOT apply to another.
 
 #### Scenario: Explicit null matches is_set
 - **GIVEN** local feature flag "profile-complete" matches person property "plan" with operator "is_set"
@@ -208,16 +208,30 @@ A key that is omitted from the supplied properties and not listed SHALL remain i
 - **THEN** local evaluation should be inconclusive
 - **AND** remote evaluation should remain eligible when enabled
 
+#### Scenario: Group known-absent key resolves for its own group type
+- **GIVEN** local feature flag "org-incomplete" matches group property "tier" of group type "organization" with operator "is_not_set"
+- **WHEN** the flag is evaluated locally with group property key "tier" listed as known absent for group type "organization"
+- **THEN** the local evaluation result should be true
+- **AND** remote evaluation should not be required
+
+#### Scenario: Cohort negation applies after the known-absent table
+- **GIVEN** local feature flag "cohort-flag" requires membership in a dynamic cohort with one person property leaf that has operator `exact`, condition value "pro", and `negation` set to true
+- **WHEN** the flag is evaluated locally with person property key "plan" listed as known absent
+- **THEN** the local evaluation result should be true
+- **AND** remote evaluation should not be required
+
+#### Scenario: A flag dependency honors the known-absent listing
+- **GIVEN** local feature flag "parent" matches person property "plan" with operator `is_not_set`
+- **AND** local feature flag "child" has a `flag_evaluates_to` condition requiring flag "parent" to evaluate to true
+- **WHEN** flag "child" is evaluated locally with person property key "plan" listed as known absent
+- **THEN** the local evaluation result should be true
+- **AND** remote evaluation should not be required
+
 #### Scenario: Omitted key that is not listed stays inconclusive
 - **GIVEN** local feature flag "profile-incomplete" matches person property "plan" with operator "is_not_set"
 - **WHEN** the flag is evaluated locally with person property key "region" listed as known absent and no "plan" entry in the supplied person properties
 - **THEN** local evaluation should be inconclusive
 - **AND** remote evaluation should remain eligible when enabled
-
-#### Scenario: Person-metadata key is ignored
-- **GIVEN** a local feature flag matches the persons-table `created_at` field through a person-metadata filter
-- **WHEN** the flag is evaluated locally with person property key `__posthog_person_metadata__created_at` listed as known absent
-- **THEN** the persons-table `created_at` value should still be used for matching
 
 #### Scenario: Missing property context leaves is_not_set inconclusive
 - **GIVEN** local feature flag "profile-incomplete" matches person property "plan" with operator "is_not_set"
@@ -229,7 +243,7 @@ A key that is omitted from the supplied properties and not listed SHALL remain i
 
 When local evaluation falls back to the `/flags` endpoint and the evaluation had a known-absence input, the SDK SHALL send the same known-absent keys in the request body so that local and remote results agree. The SDK SHALL send `person_property_keys_known_absent` as an array of person property key strings. It SHALL send `group_property_keys_known_absent` as an object mapping a group type name to an array of group property key strings. An SDK SHALL omit a field, or send JSON null, when it has nothing to list.
 
-The flags service treats both fields as optional. A missing or null field means nothing is listed, and requests without them behave as before. Each array holds at most 1000 strings, counted with duplicates and counted per group type for the group field. A field of the wrong type, or an array longer than that, returns HTTP 400 with a message that names the field. Group type names that the project does not have are ignored. A key that the flags service is told is absent is absent for that evaluation even when the request also supplies a value for it in `person_properties` or `group_properties`, and even when the service would otherwise use a stored value or a value it adds itself, such as GeoIP `$geoip_*` properties, `$initial_*` properties copied from a non-initial key, the `$os` and `$os_name` alias, `$group_key`, and `distinct_id`. Operator results follow the canonical operator inventory requirement. Known absence does not change static or realtime cohort membership, which the service reads from stored tables.
+The flags service treats both fields as optional. A missing or null field means nothing is listed, and requests without them behave as before. Each array holds at most 1000 strings, counted with duplicates and counted per group type for the group field. A field of the wrong type, or an array longer than that, returns HTTP 400 with a message that names the field. Group type names that the project does not have are ignored. A key that the flags service is told is absent is absent for that evaluation even when the request also supplies a value for it in `person_properties` or `group_properties`, and even when the service would otherwise use a stored value or a value it adds itself, such as GeoIP `$geoip_*` properties, `$initial_*` properties copied from a non-initial key, the `$os` and `$os_name` alias, `$group_key`, and `distinct_id`. The flags service ignores a listed person key that carries its person-metadata prefix (`__posthog_person_metadata__`), so known absence never hides a persons-table field such as `created_at`. An SDK forwards such a key unchanged and does not strip it. Operator results follow the canonical operator inventory requirement. Known absence does not change static or realtime cohort membership, which the service reads from stored tables.
 
 An SDK SHALL NOT send a known-absence field that was not part of the caller's input. An SDK SHOULD validate the 1000-key limit before the request so the caller gets a local error instead of a failed fallback, and SHALL NOT silently truncate a list.
 
@@ -248,7 +262,7 @@ An SDK SHALL NOT send a known-absence field that was not part of the caller's in
 #### Scenario: Requests without a known-absence input omit the fields
 - **GIVEN** remote feature flag evaluation is enabled
 - **WHEN** a flag is evaluated with no known-absent keys
-- **THEN** the `/flags` request body should not require either known-absence field
+- **THEN** each known-absence field in the `/flags` request body should be absent or null
 
 ### Requirement: Unrecognized property-filter operators degrade to inconclusive
 

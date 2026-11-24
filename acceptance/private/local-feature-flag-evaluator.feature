@@ -125,6 +125,29 @@ Feature: Local Feature Flag Evaluator
     Then local evaluation should be inconclusive
     And remote evaluation should remain eligible
 
+  Scenario: Group known-absent key resolves for its own group type
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag definitions include a flag "org-incomplete" matching group property "tier" of group type "organization" with operator "is_not_set"
+    When local feature flag "org-incomplete" is evaluated with group property key "tier" listed as known absent for group type "organization"
+    Then the local evaluation result should be true
+    And the SDK should not require remote fallback
+
+  Scenario: Cohort negation applies after the known-absent table
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag "cohort-flag" requires membership in a dynamic cohort with one person property leaf that has operator "exact" and condition value "pro"
+    And the leaf sets negation to true
+    When local feature flag "cohort-flag" is evaluated with person property key "plan" listed as known absent
+    Then the local evaluation result should be true
+    And the SDK should not require remote fallback
+
+  Scenario: A flag dependency honors the known-absent listing
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag definitions include a flag "parent" matching person property "plan" with operator "is_not_set"
+    And local feature flag "child" has a "flag_evaluates_to" condition requiring flag "parent" to evaluate to true
+    When local feature flag "child" is evaluated with person property key "plan" listed as known absent
+    Then the local evaluation result should be true
+    And the SDK should not require remote fallback
+
   Scenario: Omitted key that is not listed stays inconclusive
     Given the SDK is initialized with token "test-token" and local evaluation enabled
     And remote feature flag evaluation is enabled
@@ -132,12 +155,6 @@ Feature: Local Feature Flag Evaluator
     When local feature flag "profile-incomplete" is evaluated with person property key "region" listed as known absent and no "plan" entry in the supplied person properties
     Then local evaluation should be inconclusive
     And remote evaluation should remain eligible
-
-  Scenario: Person-metadata key is ignored
-    Given the SDK is initialized with token "test-token" and local evaluation enabled
-    And local feature flag definitions include a flag matching the persons-table "created_at" field through a person-metadata filter
-    When the flag is evaluated with person property key "__posthog_person_metadata__created_at" listed as known absent
-    Then the persons-table "created_at" value should still be used for matching
 
   Scenario Outline: Known-absent keys resolve operators without remote fallback
     Given the SDK is initialized with token "test-token" and local evaluation enabled
@@ -153,9 +170,7 @@ Feature: Local Feature Flag Evaluator
       | "exact"               | "pro"                    | false   |
       | "is_not"              | "pro"                    | true    |
       | "not_icontains"       | "pro"                    | true    |
-      | "not_icontains_multi" | ["pro"]                  | true    |
       | "not_regex"           | "^pro"                   | true    |
-      | "not_between"         | [1, 2]                   | true    |
       | "icontains"           | "pro"                    | false   |
       | "gt"                  | "10"                     | false   |
       | "semver_neq"          | "1.2.3"                  | false   |
@@ -194,6 +209,13 @@ Feature: Local Feature Flag Evaluator
     And local feature flag definitions include a flag that is inconclusive for another reason
     When the flag is evaluated with group property key "tier" listed as known absent for group type "organization"
     Then the "/flags" request body should include "group_property_keys_known_absent" equal to {"organization": ["tier"]}
+
+  Scenario: Requests without a known-absence input omit the fields
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And remote feature flag evaluation is enabled
+    And local feature flag definitions include a flag that is inconclusive for another reason
+    When the flag is evaluated with no known-absent keys
+    Then each known-absence field in the "/flags" request body should be absent or null
 
   @server
   Scenario: The first matching condition wins without variant-priority sorting

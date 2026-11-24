@@ -18,7 +18,7 @@ The flags service behavior comes from PostHog/posthog issue #88947 and PostHog/p
 
 ## Validation
 
-The scenarios cover: a listed key with `is_not_set`, a listed key with `is_set`, a supplied value overridden by the listing, group-type scoping, an unlisted omitted key, a person-metadata key, negated operators, and the remote fallback request body. Gherkin scenarios in `acceptance/private/local-feature-flag-evaluator.feature` mirror them. `openspec validate --specs --strict` passes, and the synced canonical spec matches the delta text.
+The scenarios cover: a listed key with `is_not_set`, a listed key with `is_set`, a supplied value overridden by the listing, a group key for its own and for another group type, an unlisted omitted key, cohort negation after the table, a flag dependency, negated operators, an operator the SDK does not implement, the range operators with non-numeric, NaN, and infinite values, and the remote fallback request body with and without a listing. The person-metadata prefix is stated as flags service behavior in the remote-fallback requirement and has no scenario, because a local evaluator has no persons table to check it against. Gherkin scenarios in `acceptance/private/local-feature-flag-evaluator.feature` mirror them. `openspec validate --specs --strict` passes, and the synced canonical spec matches the delta text.
 
 ## Risks
 

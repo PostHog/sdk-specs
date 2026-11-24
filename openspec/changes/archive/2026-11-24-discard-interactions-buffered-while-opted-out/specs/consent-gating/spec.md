@@ -2,11 +2,11 @@
 
 ### Requirement: Interaction data buffered before a consent change is never sent
 
-A capture feature that stores interactions and sends them later rather than capturing each one as it
-happens — the browser's heatmaps buffer, which holds clicks and mouse moves and sends them on a
-timer, and its dead-click and dead-swipe detectors, which hold a click or a touch as a candidate for
-seconds before deciding whether to report it — SHALL decide from the consent state at the time of
-the interaction, not from the consent state at the time of the send.
+A capture feature that buffers interactions and sends them later SHALL decide from the consent
+state at the time of the interaction, not from the consent state at the time of the send. The
+features in scope today are the browser's heatmaps buffer, which holds clicks and mouse moves and
+sends them on a timer, and its dead-click and dead-swipe detectors, which hold a click or a touch
+as a candidate for seconds before deciding whether to report it.
 
 The SDK SHALL read the consent state when it stores an interaction and SHALL NOT store one made
 while capture is disallowed. Discarding the stored data at send time is not enough on its own: the

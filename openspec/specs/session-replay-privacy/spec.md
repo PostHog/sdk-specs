@@ -391,6 +391,13 @@ A frame already handed to the upload queue is kept and uploaded. When no flag ge
 held frame is kept. An update that makes a resolved flag go from `true` to `false`
 applies only to frames captured after it, and MUST NOT retroactively change frames already captured.
 
+Dropped frames can hold the recording's only meta event and full snapshot. After a drop, the first
+frame the SDK keeps MUST carry a fresh meta event and a full snapshot, as at the start of a
+recording, so the recording still plays back. The SDK MUST reset any state that marks the meta event
+or full snapshot as already sent, and any duplicate-frame detection, so an unchanged screen still
+produces that full snapshot. A wrapper that captures frames itself, such as posthog-flutter for
+Flutter content, MUST reset its own duplicate-frame detection too.
+
 This is new mobile behavior with no reference implementation yet. It diverges from the browser by
 decision: the browser reads the masking config once, when the recorder starts
 (`lazy-loaded-session-recorder.ts:2980-2985`), and does not re-resolve it mid-session.
@@ -448,6 +455,15 @@ drops a stale frame in `PostHogReplayQueue`.
 - **THEN** that frame is still uploaded
 - **AND** frames captured after the update are masked
 
+#### Scenario: The recording still plays back after a drop
+- **GIVEN** no cached remote config has `masking.mobile`, and both resolved flags are `false`
+- **AND** the SDK has buffered the recording's meta event and first full snapshot before the first live remote config response
+- **AND** the screen does not change after that
+- **WHEN** the first live response arrives with `masking.mobile.maskAllText: true`
+- **THEN** the buffered frames are dropped and not uploaded
+- **AND** the next frame the SDK keeps includes a meta event and a full snapshot with text masked
+- **AND** the recording plays back from that frame
+
 #### Scenario: Frames buffered before the first live config are kept when nothing gets stricter
 - **GIVEN** the SDK has buffered replay frames captured before the first live remote config response
 - **AND** the cached resolved flags are `true` and `false`
@@ -456,9 +472,9 @@ drops a stale frame in `PostHogReplayQueue`.
 
 ### Requirement: Log once when the server turns on a mask the local value had off
 
-A mobile SDK SHOULD write one debug-level log entry when a resolved flag is `true` only because the
-server value is `true` and the local value is `false`. The entry SHALL name the flag. It is written
-once per flag per process and MUST NOT be written when the local value is already `true`.
+A debug log entry for a mask that the server turned on SHALL name the flag. A mobile SDK SHOULD
+write one debug-level log entry when a resolved flag is `true` only because the server value is
+`true` and the local value is `false`. It is written once per flag per process and MUST NOT be written when the local value is already `true`.
 It MUST NOT be a warning or an error and MUST NOT change capture.
 
 This is new mobile behavior with no reference implementation yet. The browser warns once when a client value shadows a different project value (`lazy-loaded-session-recorder.ts:721-764`, tests `lazy-sessionrecording.test.ts:6729-6799`). That warning is for the opposite case, because there the client value wins. Mobile logs when the server adds a mask, because the app's local value no longer decides.

@@ -261,6 +261,8 @@ apply.
 
 ## Notes
 
+<a id="n1"></a>
+
 ### n1 — Logs (🟡 Partial)
 - **Spec requires:** non-finite floats encoded as `stringValue`, empty attribute keys dropped, a final flush on
   shutdown, a persistent-queue drain that repeats "until the queue is drained or a send fails", `Retry-After` as a
@@ -279,6 +281,8 @@ apply.
 - **Remediation:** Give the logs storage path a sanitizer that stringifies non-finite floats instead of dropping
   them; loop the queue drain (n6).
 
+<a id="n2"></a>
+
 ### n2 — Traces (❌ Fail)
 - **Spec requires:** `startSpan`/`withSpan`, OTLP traces to `POST {host}/i/v1/traces`, shutdown flush, shared
   backoff, mobile context.
@@ -286,6 +290,8 @@ apply.
   under `PostHog/`; `PostHog/Tracing/` holds only `PostHogTracingHeadersIntegration.swift`.
 - **Backwards compatibility:** Backward-compatible; net-new opt-in API.
 - **Remediation:** Implement traces net-new, modeled on the logs pipeline.
+
+<a id="n3"></a>
 
 ### n3 — Alias (🟡 Partial)
 - **Spec requires:** unchanged since the last audit. The `@client` scenario "Client alias links the
@@ -301,6 +307,8 @@ apply.
 - **Backwards compatibility:** Backward-compatible. Both fixes are additive.
 - **Remediation:** Set `props["distinct_id"] = distinctId` (or fix the spec scenario to match
   Behavior step 4), and drop a blank alias with a log, as `identify()` does.
+
+<a id="n4"></a>
 
 ### n4 — Capture (🟡 Partial; was ✅)
 - **Spec requires:**
@@ -358,6 +366,8 @@ apply.
   Keep an empty set as `[]`: don't let it fall into the "empty array is omitted" rule. Add a test for
   `Set<String>`, `NSSet` and a nested set.
 
+<a id="n5"></a>
+
 ### n5 — Capture Exception (✅ Pass; was 🟡)
 - **Spec requires:** Applicability is now `both` (server delivery scenarios are `@server`). "Exception
   capture drops null-valued custom object properties" follows capture's null rule (a MAY since merged
@@ -385,6 +395,8 @@ apply.
   every frame, and iOS frames carry no `chunk_id`.
 - **Backwards compatibility:** Backward-compatible apart from the 4.0 null-property change in n4.
 
+<a id="n6"></a>
+
 ### n6 — Flush (🟡 Partial)
 - **Spec requires:** Behavior step 3, "Build and send batches until the queue is drained or a failure stops
   progress", replay queues included.
@@ -397,6 +409,8 @@ apply.
 - **Backwards compatibility:** Backward-compatible; only the number of requests per flush changes.
 - **Remediation:** After a successful window, peek the next one, bounded by the depth captured at flush start;
   stop on the first failure.
+
+<a id="n7"></a>
 
 ### n7 — Get Feature Flag Payload (✅ Pass; was 🟡)
 - **Spec requires:** a cache-only payload read with no `$feature_flag_called` by default; malformed, `""`
@@ -418,6 +432,8 @@ apply.
 - **Backwards compatibility:** Breaking in 4.0 by design (method removed; malformed payloads now `nil`);
   both are in the 4.0 changeset and `MIGRATION.md`.
 
+<a id="n8"></a>
+
 ### n8 — Get Feature Flag Result (✅ Pass; was 🟡)
 - **Spec requires:** key/enabled/variant/payload, `nil` for unknown flags; a malformed payload is the
   no-payload value without changing key/enabled/variant. New: the per-call option is named
@@ -434,6 +450,8 @@ apply.
   with variant `""`; `isFeatureEnabled` returns `!variant.isEmpty` for a string before it looks at the
   default (`PostHog/PostHogSDK.swift:3447-3453`) (posthog-ios#1037).
 - **Backwards compatibility:** Malformed payloads changed from raw string to `nil` in 4.0 (changeset entry).
+
+<a id="n9"></a>
 
 ### n9 — Get Feature Flags (🟡 Partial; was ❌)
 - **Spec requires:** a cache-only bulk read of all flag values, no payloads (Behavior step 4), tracking
@@ -454,6 +472,8 @@ apply.
 - **Remediation:** None required beyond the recorded variant; optionally expose a flat
   `[String: Any]` getter for parity with posthog-js.
 
+<a id="n10"></a>
+
 ### n10 — Get Feature Flags And Payloads (🟡 Partial; was ❌)
 - **Spec requires:** one call returning flags and payloads; each payload decoded independently,
   malformed ones omitted or `nil` without dropping the flag value or siblings; a valid JSON `""` kept.
@@ -467,6 +487,8 @@ apply.
 - **Backwards compatibility:** Additive if a paired API is added.
 - **Remediation:** None required beyond the recorded variant; optionally add a two-map convenience.
 
+<a id="n11"></a>
+
 ### n11 — Get Session ID (🟡 Partial)
 - **Spec requires:** "Session id rotates after inactivity timeout": after the timeout `getSessionId()` returns a
   different id (or, per Lifecycle, no active session).
@@ -478,11 +500,15 @@ apply.
 - **Remediation:** In the read-only path, return `nil` when the activity or max-length threshold has expired, or
   get the scenario relaxed for read-only getters (Behavior step 5 already names iOS's read-only mode).
 
+<a id="n12"></a>
+
 ### n12 — Group (✅ Pass)
 - **SDK currently:** `group(type:key:groupProperties:options:)` returns early with a log when `type`
   or `key` is empty (`PostHog/PostHogSDK.swift:2834-2837`) before persisting or sending, as
   [#929](https://github.com/PostHog/posthog-ios/pull/929) (now merged) added. Storage, `$groups`
   attachment (`:883-889`) and flag reload on group change (`:2593-2618`) are unchanged.
+
+<a id="n13"></a>
 
 ### n13 — Group Identify (✅ Pass)
 - **Spec requires:** amended since `f238b16`: the `@client` scenario now expects group properties
@@ -491,6 +517,8 @@ apply.
 - **SDK currently:** The private `groupIdentify` (`PostHog/PostHogSDK.swift:2621-2662`), called only
   from `group()`, nests sanitized properties under `$group_set` (`:2634-2641`); the `group()` guard
   covers blank type/key. The new server-delivery scenarios are `@server`.
+
+<a id="n14"></a>
 
 ### n14 — Is Feature Enabled (✅ Pass; was 🟡)
 - **Spec requires:** boolean mapping, suppressible tracking, and a caller-supplied `defaultValue`
@@ -501,6 +529,8 @@ apply.
   (`PostHog/PostHogSDK.swift:3447-3453`). `$feature_flag_called` reports the flag's own value (`nil` when
   missing), never the default (`PostHog/PostHogSDK.swift:3336-3340`).
 - **Backwards compatibility:** Additive (4.0 changeset).
+
+<a id="n15"></a>
 
 ### n15 — Opt In (🟡 Partial)
 - **Spec requires:** scenario "Opt out can clear local persistence when configured". New on `main`
@@ -537,6 +567,8 @@ apply.
   behavior.
 - **Remediation:** Add an optional clear-local-data parameter to `optOut()`.
 
+<a id="n16"></a>
+
 ### n16 — Reset (🟡 Partial)
 - **Spec requires:** reset clears user-scoped state including opt-out persistence.
 - **SDK currently:** Unchanged at 4.0.5. `reset()` (`PostHog/PostHogSDK.swift:991` onward) clears identity, super properties,
@@ -549,6 +581,8 @@ apply.
 - **Remediation:** In `reset()`, when `persistOptOut` is true, set `config.optOut = false` under `optOutLock`, or
   get the spec to say only persisted state is cleared.
 
+<a id="n17"></a>
+
 ### n17 — Shutdown (✅ Pass)
 - **Spec requires:** flush pending events before tearing down workers (`@both` scenario). New (#135): where
   `shutdown` takes or defaults to a timeout, the timeout bounds the whole drain.
@@ -556,6 +590,8 @@ apply.
   (`:3755-3758`) before stopping them (`:3760-3763`), stops reachability (`:3789`) and clears the flag-called
   tracker (`:3792-3794`). It is fire-and-forget and takes no timeout (spec surface variant: `close(): void`), so the
   timeout requirement does not apply. Like `flush()` it sends one batch per queue (n6); the doc comment says so.
+
+<a id="n18"></a>
 
 ### n18 — Stop Session Recording (✅ Pass)
 - **Spec requires:** `acceptance/public/stop-session-recording.feature` (`@client`): pending replay
@@ -566,6 +602,8 @@ apply.
   `setupLock` (`:3906-3912`), then calls `replayQueue?.flush()` (`:3917`). Snapshots held by the
   minimum-duration/remote-config buffer stay held, as the ingestion controls require. Like `flush()`,
   it is one best-effort asynchronous flush.
+
+<a id="n19"></a>
 
 ### n19 — Exception Event Metadata (🟡 Partial)
 - **Landed at HEAD ([#931](https://github.com/PostHog/posthog-ios/pull/931), merged):** linkage ids
@@ -594,6 +632,8 @@ apply.
 - **Remediation:** Add a typed level (and optionally source) parameter to `captureException`, then
   reserve `$exception_level`/`$exception_source`.
 
+<a id="n20"></a>
+
 ### n20 — Feature Flag Cache (✅ Pass; was 🟡)
 - **Spec requires:** cached reads/writes, persistence, reset clearing; payload reads never expose invalid
   JSON as a raw string; already-decoded strings not decoded again; internal caches MAY stay serialized.
@@ -604,6 +644,8 @@ apply.
   (`:1307-1320`).
 - **Backwards compatibility:** Behavior change for malformed and bootstrapped numeric/boolean-looking
   strings, shipped as 4.0 breaking entries.
+
+<a id="n21"></a>
 
 ### n21 — Feature Flag Called Tracker (✅ Pass)
 - **Spec requires:** dedupe per flag/value, clear on reset and shutdown, a server-gated minimal event whose
@@ -630,6 +672,8 @@ apply.
   attribution rules have nothing to act on (the spec: such an SDK "sees config version 2 flags as legacy
   values").
 
+<a id="n22"></a>
+
 ### n22 — HTTP Client (✅ Pass)
 - **Spec requires:** flags retry policy (transient transport errors incl. DNS/TLS; refused connections not
   retried; 502/504 only; one retry, 300 ms doubling) and (#81) gzip by default with an option that turns
@@ -652,6 +696,8 @@ apply.
   every attempt; exactly `Content-Encoding: gzip`, with a raw fallback only on a local gzip error; no
   legacy encodings; same-origin 307/308 redirects only, at most 5; see [Capture v1](#capture-v1).
 
+<a id="n23"></a>
+
 ### n23 — Persistent Storage (🟡 Partial)
 - **Spec requires:** "Storage failures do not crash SDK calls" — no throw **and** a recorded storage warning.
 - **SDK currently:** Unchanged at 4.0.5. Reads/writes are wrapped in `do`/`catch` (`PostHog/PostHogStorage.swift:366-374`,
@@ -660,6 +706,8 @@ apply.
   not use it.
 - **Backwards compatibility:** Backward-compatible.
 - **Remediation:** Log storage write failures with `hedgeLogWarning` (or another always-on signal).
+
+<a id="n24"></a>
 
 ### n24 — Session Replay Privacy (🟡 Partial; was ❌)
 - **Spec requires:** no-capture elements (`ph-no-capture`, `postHogMask()`) and all their descendants
@@ -698,6 +746,8 @@ apply.
 - **Remediation:** None in the SDK is proposed; revealing more content is not wanted. Either keep the row
   🟡 or have the spec permit the conservative SwiftUI variant (explicit mask wins).
 
+<a id="n25"></a>
+
 ### n25 — Bootstrap (🟡 Partial)
 - **Spec requires:** (MAY) `bootstrap.sessionID` (UUIDv7) adopted as the session id, invalid values
   logged and replaced (`openspec/specs/bootstrap/spec.md:143-158`). Spec unchanged since the last audit.
@@ -708,6 +758,8 @@ apply.
   and `PostHogSessionManager.swift` never reads bootstrap. 🟡 for the matrix convention on this MAY.
 - **Backwards compatibility:** Additive.
 - **Remediation:** Optional `sessionID` with UUIDv7 validation, if parity with posthog-js is wanted.
+
+<a id="n26"></a>
 
 ### n26 — Session Replay Debug Properties (🟡 Partial)
 - **Fixed in 4.0:** (c) — PostHog/posthog-ios#932: `debugProperties()` reports `disabled` when the
@@ -767,6 +819,8 @@ apply.
   in `buildProperties`, set `props["$sdk_debug_pending_queue_size"] = queue?.backedUpDepth` again (nil
   removes the key), so the SDK value wins either way.
 
+<a id="n27"></a>
+
 ### n27 — Capture AI (✅ Pass; was ➖)
 - **Spec requires:** Applicability in merged [#146](https://github.com/PostHog/sdk-specs/pull/146)
   (`openspec/specs/capture-ai/spec.md:23`) covers "client SDKs on capture v1 that ship an AI method".
@@ -797,6 +851,8 @@ apply.
     iOS ships none of them.
 - **Backwards compatibility:** `captureAi` is new in 4.0.
 
+<a id="n28"></a>
+
 ### n28 — On Feature Flags (✅ Pass)
 - **Spec requires:** new since the last audit (#94, #161): a failed non-quota load invokes listeners with
   the last known flags and `errorsLoading`; a runtime registration stays active across `close()`/`setup()`
@@ -819,6 +875,8 @@ apply.
   `lastFeatureFlagsLoaded`, so nothing is replayed to a later listener. `PostHogFeatureFlagsLoaded`
   keeps only `true` booleans and non-empty strings in `flags` and `variants`
   (`PostHog/Models/PostHogFeatureFlagsLoaded.swift:42-56`), so a `""` flag is left out.
+
+<a id="n29"></a>
 
 ### n29 — Surveys (✅ Pass)
 - **Spec requires:** new requirement "Survey popup delay" (`openspec/specs/surveys/spec.md:321-417`,
@@ -857,6 +915,8 @@ apply.
 - **Remediation (optional, SHOULD):** Before the work item shows the survey, ask the integration to re-run its eligibility
   filter for that survey; when it fails, release the reservation (report the survey closed, which is
   now a no-op for an unshown survey) instead of displaying it.
+
+<a id="n30"></a>
 
 ### n30 — Exception Steps (🟡 Partial; was ✅)
 - **Spec requires:** "Normalize to the wire form once, before processing"

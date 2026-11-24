@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-kmp](https://github.com/PostHog/posthog-kmp)
 **Audited commit:** `0a88aa7490c4bc51fb263c7f3619d62d838658a4` ([commit](https://github.com/PostHog/posthog-kmp/commit/0a88aa7490c4bc51fb263c7f3619d62d838658a4)), tag `1.0.0` — first audit, 2026-11-23
 **Audited against sdk-specs commit:** `795b69f`; re-checked at `44fe27a`, whose one later spec change (#233, local flag evaluation) is server-only and moves no row
-**Summary:** 19 ✅ · 32 🟡 · 8 ❌ · 11 ➖ · 0 ❓ (70 rows; first audit). On the shared 69-row basis (without Get Remote Config Payload, ➖): 19 ✅ · 32 🟡 · 8 ❌ · 10 ➖.
+**Summary:** 18 ✅ · 33 🟡 · 8 ❌ · 11 ➖ · 0 ❓ (70 rows; first audit). On the shared 69-row basis (without Get Remote Config Payload, ➖): 18 ✅ · 33 🟡 · 8 ❌ · 10 ➖.
 
 **Why this run:** posthog-kmp has no compliance file yet. 1.0.0 is its first stable release.
 
@@ -88,7 +88,7 @@ and JVM (`androidMain/.../PostHog.android.kt:30-31`, `jvmMain/.../PostHog.jvm.kt
 | 40 | Reset Person Properties For Flags | ✅ | |
 | 41 | Screen | ✅ | [n23] |
 | 42 | Set Group Properties For Flags | ✅ | |
-| 43 | Set Person Properties | ✅ | |
+| 43 | Set Person Properties | 🟡 | [n40] KMP-owned (web) |
 | 44 | Set Person Properties For Flags | ✅ | |
 | 45 | Setup | 🟡 | [n24] KMP-owned |
 | 46 | Shutdown | 🟡 | [n25] |
@@ -313,3 +313,9 @@ and JVM (`androidMain/.../PostHog.android.kt:30-31`, `jvmMain/.../PostHog.jvm.kt
 - **SDK currently (KMP-owned):** the `debug` config and `setDebug(enabled)` reach every target, but `setDebug(enabled: Boolean)` (`commonMain/.../PostHog.kt:600`) has no default and no zero-argument overload, so `PostHog.setDebug()` does not compile. posthog-flutter is 🟡 for the same missing default ([posthog-flutter.md n7](posthog-flutter.md#n7)).
 - **Backwards compatibility:** Additive — existing calls pass `enabled` explicitly.
 - **Remediation:** Declare `setDebug(enabled: Boolean = true)`.
+
+### n40 — Set Person Properties (🟡 Partial)
+- **Spec requires:** "If both property dictionaries are missing or empty, do nothing", and "Empty inputs no-op" (`openspec/specs/set-person-properties/spec.md:39`, `:81`).
+- **SDK currently (KMP-owned, web):** `setPersonProperties` (`commonMain/.../PostHog.kt:279-285`) has no empty-input guard, and both web bridges substitute an empty object when `userPropertiesToSet` is `null` (`jsMain/.../PostHog.js.kt:535-544`, `userProperties?.toJsObject() ?: js("{}")`; `wasmJsMain/.../PostHog.wasmJs.kt:410-419`, `?: createJsObject()`). posthog-js 1.435.8 returns early only when both arguments are falsy (`packages/browser/src/posthog-core.ts:3459-3461`), and `{}` is truthy, so `PostHog.setPersonProperties(null)` on web updates the flag person properties with a reload and sends an empty `$set` event. Android, JVM and Apple forward to native SDKs that are ✅ on this row. Web also drops `eventOptions`, which isn't scored on web here (see [n16](#n16)).
+- **Backwards compatibility:** Backward-compatible — only calls with nothing to set change.
+- **Remediation:** Return early in `commonMain` when both maps are `null` or empty, and pass `undefined` instead of `{}` in the web bridges.

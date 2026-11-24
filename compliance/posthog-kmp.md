@@ -224,8 +224,11 @@ and JVM (`androidMain/.../PostHog.android.kt:30-31`, `jvmMain/.../PostHog.jvm.kt
 - **SDK currently:** Forwarded on every target (`jvmCommonMain/.../PostHog.jvmCommon.kt:286-296`, `appleMain/.../PostHog.apple.kt:360-368`, `jsMain/.../PostHog.js.kt:403-426`); inherits n14/n15/n12 of the delegates. On web, `optOut = true` is applied by calling `opt_out_capturing()` after `init()` (`jsMain/.../PostHog.js.kt:81-83`), which persists the opt-out in posthog-js storage rather than using its `opt_out_capturing_by_default` option.
 
 ### n19 — Register (🟡 Partial)
-- **Spec requires:** (permissive, "MAY reject") blank keys should not persist as stray super properties (`compliance/posthog-android.md` n16).
-- **SDK currently:** `register(key, value)` drops a `null` value silently and forwards a blank key (`commonMain/.../PostHog.kt:186-189`). Android/JVM inherit posthog-android n16; Apple and web ✅.
+- **Spec requires:** a registered super property is merged into later events like a property passed on the event (`openspec/specs/register/spec.md`), so it must reach the wire with the same value conversion as capture. Blank-key rejection is optional ("may reject", `register/spec.md:42`).
+- **SDK currently (KMP-owned, JS):** `platformRegister` writes the raw Kotlin value with `props[key] = value` (`jsMain/.../PostHog.js.kt:176-180`) instead of `value.toJsValue()`, which capture and identify use (`:518-532`). A registered Kotlin `Map`, `List` or `Long` reaches `posthog.register` as a Kotlin runtime object (a `Long` as `{low_1, high_1}`, see [n6](#n6)). Wasm converts with `value.toJsAny()` (`wasmJsMain/.../PostHog.wasmJs.kt:150-154`). The only JS test registers a `String` (`jsTest/.../PostHogJsTest.kt:233`).
+- **Inherited:** Android/JVM ✅ (posthog-android n16 is ✅: blank keys are MAY-level); Apple and Wasm ✅. `register(key, value)` drops a `null` value and forwards a blank key (`commonMain/.../PostHog.kt:186-189`), which the spec permits.
+- **Backwards compatibility:** Backward-compatible — fixes values PostHog can't use today.
+- **Remediation:** In `jsMain` `platformRegister`, write `props[key] = value.toJsValue()`, and add a JS test that registers a map, a list and a `Long`.
 
 ### n20 — Reload Feature Flags (✅ Pass)
 - KMP supplies the callback posthog-js lacks (posthog-js n13): on web it subscribes with `onFeatureFlags`, skips the synchronous pre-reload fire, and delivers the next load once (`jsMain/.../PostHog.js.kt:250-274`); before `init` the callback gets `errorsLoading = true`, matching the native targets.

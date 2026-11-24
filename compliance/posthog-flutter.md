@@ -4,7 +4,7 @@
 **Audited commit:** `4cb4318b4ee599ea253581416d1c3147efb26f85` ([tag 6.0.0](https://github.com/PostHog/posthog-flutter/releases/tag/6.0.0), [commit](https://github.com/PostHog/posthog-flutter/commit/4cb4318b4ee599ea253581416d1c3147efb26f85)), the released posthog_flutter 6.0.0 — re-audited on 2026-11-24 (see [6.0.0 re-audit](#600-re-audit-2026-11-24)); first audited on 2026-11-10 at `82123e6` ([PostHog/posthog-flutter#637](https://github.com/PostHog/posthog-flutter/pull/637) head)
 **Native SDKs:** released posthog-ios `4.0.5` (`c8fcc2c06`) and posthog-android `4.0.3` (`android-v4.0.3`, `1577cfa5`), the versions the 6.0.0 pins resolve to (`darwin/posthog_flutter/Package.swift:17` `"4.0.3" ..< "5.0.0"`; `android/build.gradle:75` `strictly '[4.0.2,5.0.0)'`)
 **Audited against sdk-specs commit:** `44fe27a` (`main`; #146 merged)
-**Summary:** 20 ✅ · 33 🟡 · 4 ❌ · 13 ➖ · 0 ❓ (70 rows; previous audit 2026-11-10 at `82123e6` scored 23/30/4/12/0 on 69 rows)
+**Summary:** 21 ✅ · 32 🟡 · 4 ❌ · 13 ➖ · 0 ❓ (70 rows; previous audit 2026-11-10 at `82123e6` scored 23/30/4/12/0 on 69 rows)
 
 **Why this run:** posthog_flutter 6.0 ([PostHog/posthog-flutter#637](https://github.com/PostHog/posthog-flutter/pull/637))
 adopts posthog-ios 4.0 and posthog-android 4.0 (`Package.swift` pins `"4.0.0" ..< "5.0.0"`,
@@ -47,6 +47,9 @@ are at `4cb4318b`.
   - Get Feature Flag ✅→🟡 ([n13](#n13)) and Is Feature Enabled ✅→🟡 ([n20](#n20)): on web an
     omitted per-call option ignores `PostHogConfig.sendFeatureFlagEvent`, against
     `get-feature-flag-result/spec.md:264` and #153, which names it "a known gap".
+  - Register 🟡→✅ ([n25](#n25)): the only gap was blank keys, which `register/spec.md:42` makes
+    optional ("may reject"), and 6.0.0 meets the #146 identity-event rule; posthog-android, posthog-ios
+    and posthog-js are ✅ on the same reading.
   - Get Remote Config Payload: **new row** ➖ (#220, server SDKs only).
 - **Same status, new findings:** Before Send Hook ([n3](#n3): `disableGeoIp` re-adds
   `$geoip_disable` after the hook), Capture ([n41](#n41): a Dart `Queue` property value is sent as a
@@ -172,7 +175,7 @@ Emails ➖ (all server-only).
 | 40 | On Feature Flags | ✅ | [n22] |
 | 41 | Opt In | 🟡 | [n23] |
 | 42 | Persistent Storage | 🟡 | [n24] |
-| 43 | Register | 🟡 | [n25] |
+| 43 | Register | ✅ | [n25] |
 | 44 | Reload Feature Flags | ✅ | |
 | 45 | Remote Config | 🟡 | [n26] |
 | 46 | Reset | ✅ | |
@@ -364,12 +367,12 @@ adds a **6.0.0** line to the notes it re-checked, and re-points re-verified line
 - **Backwards compatibility:** Backward-compatible — nothing in this repo needs to change.
 - **Remediation:** No action in posthog-flutter for the desktop path. Track the mobile half under posthog-android n15 and posthog-ios n23.
 
-### n25 — Register (🟡 Partial)
-- **Spec requires:** Register a super property merged into later events, with a per-event value winning; implementations MAY reject invalid input such as empty keys (`openspec/specs/register/spec.md:42`), so blank keys should not silently persist as stray super properties.
-- **SDK currently:** `Posthog().register(String key, Object value)` (`lib/src/posthog.dart:467-468`) and `PosthogFlutterIO.register` (`posthog_flutter_io.dart:714-727`) forward the key with no blank check, and so does every other path: Android `PosthogFlutterPlugin.kt:1989` (presence-only `!!`, inheriting `compliance/posthog-android.md` n16 🟡), web `posthog_flutter_web_handler.dart:384-389`, and desktop `posthog_flutter_desktop.dart:401-402` → `core/posthog_core_stateless.dart:388-393`. An empty-string key silently persists as a super property. Per-event properties correctly win over registered ones on desktop (`core/posthog_core.dart:152-154`).
-- **6.0 (`82123e6`):** `registerOptions()`/`unregisterOptions()` (`lib/src/posthog.dart:594-605`) register capture options next to super properties. #146 (`openspec/specs/capture/spec.md:860`, `:1100` at `23c2478`) names them for posthog_flutter 6.0 on every platform except web and has registered layers reach identify, alias, group identify and `$set`, which Flutter does; capture options are scored under Capture ([n41](#n41)), so they don't change this row, and the blank-key finding above still holds on every path.
-- **Backwards compatibility:** Backward-compatible — a blank-key guard only affects invalid input; the spec's validation language is permissive, so this is a minor gap.
-- **Remediation:** Add blank-key rejection to `Posthog().register()`.
+### n25 — Register (✅ Pass; was 🟡)
+- **Spec requires:** Register a super property merged into later events, with a per-event value winning; implementations MAY reject invalid input such as empty keys (`openspec/specs/register/spec.md:42`); registered `$process_person_profile` doesn't reach identity events (`register/spec.md:85`, `capture/spec.md:406`).
+- **SDK currently (6.0.0, `4cb4318b`):** `Posthog().register(String key, Object value)` (`lib/src/posthog.dart:565-566`) forwards to every path. Per-event properties win over registered ones on desktop (`core/posthog_core.dart:201-202`) and natively. Identity events omit a registered `$process_person_profile` ([6.0.0 re-audit](#600-re-audit-2026-11-24), [n41](#n41)). A blank key is forwarded without a check, which the spec permits; posthog-android ([n16](posthog-android.md#n16)), posthog-ios and posthog-js are ✅ on the same reading.
+- **6.0 (`82123e6`):** `registerOptions()`/`unregisterOptions()` register capture options next to super properties; they are scored under Capture ([n41](#n41)) and don't change this row.
+- **Backwards compatibility:** Backward-compatible.
+- **Remediation:** None required. Rejecting blank keys in `Posthog().register()` remains an optional hardening.
 
 ### n26 — Remote Config (🟡 Partial)
 - **Spec requires:** Fetch and apply the project's remote configuration, gating replay and surveys from it.
@@ -419,7 +422,7 @@ adds a **6.0.0** line to the notes it re-checked, and re-points re-verified line
 
 ### n33 — Start Session Recording (🟡 Partial)
 - **Spec requires:** Recording stays inactive while opted out, and the SDK's own local state reflects actual replay state.
-- **SDK currently:** `startSessionRecording({bool resumeCurrent = true})` (`lib/src/posthog.dart:1326-1334` at `4cb4318b`) delegates to native/web, then sets `PostHogInternalEvents.sessionRecordingActive.value = true` unconditionally (`:976`), with no success signal and no `isOptOut()` check. That flag starts the Dart `ChangeDetector`/`ScreenshotCapturer` pipeline, so if native declines to start — posthog-ios ignores `startSessionRecording` while opted out (the comment at `lib/src/posthog.dart:432-433` says so) — Flutter's mirrored state still flips to "active" and Dart-side capture runs anyway. On Android the embedded SDK has no opt-out guard of its own on start (`compliance/posthog-android.md` n20, ❌). [#606](https://github.com/PostHog/posthog-flutter/pull/606) fixed the opt-out side only: `optOut()` now clears the flag and stops native replay (`:399-418`), and `optIn()` restarts it after native re-enables (`:423-438`); an explicit `startSessionRecording()` while opted out still flips the flag.
+- **SDK currently:** `startSessionRecording({bool resumeCurrent = true})` (`lib/src/posthog.dart:1326-1334` at `4cb4318b`) delegates to native/web, then sets `PostHogInternalEvents.sessionRecordingActive.value = true` unconditionally (`:1333`), with no success signal and no `isOptOut()` check. That flag starts the Dart `ChangeDetector`/`ScreenshotCapturer` pipeline, so if native declines to start — posthog-ios ignores `startSessionRecording` while opted out (the comment at `lib/src/posthog.dart:432-433` says so) — Flutter's mirrored state still flips to "active" and Dart-side capture runs anyway. posthog-android 4.0 now conforms on its side (opt-out uninstalls replay and `startSessionReplay` ignores starts while opted out, [posthog-android.md n20](posthog-android.md#n20) ✅), so the gap is Flutter's own Dart-side flip, which still keeps this row 🟡. [#606](https://github.com/PostHog/posthog-flutter/pull/606) fixed the opt-out side only: `optOut()` now clears the flag and stops native replay (`:399-418`), and `optIn()` restarts it after native re-enables (`:423-438`); an explicit `startSessionRecording()` while opted out still flips the flag.
 - **Backwards compatibility:** Backward-compatible — gating the local state flip on a success signal from native (or adding a Dart-side `isOptOut()` check before flipping it) is additive.
 - **Remediation:** Only set `sessionRecordingActive.value = true` after confirming native actually started recording (for example by reading `isSessionReplayActive()` after the call), or add a local `isOptOut()` guard.
 

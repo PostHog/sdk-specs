@@ -10,9 +10,9 @@ The flags service settles it. It removes a listed key from the property map befo
 - The negated-operator rule in the operator inventory requirement makes an exception for the known-absent table, as it already does for `not_between`.
 - The numeric, date, and semantic-version requirements say the same: for a known-absent key, an invalid condition value doesn't make the criterion inconclusive.
 - The regex requirement says its pattern rules apply only to a present key. For a known-absent key, `regex` doesn't match and `not_regex` matches without compiling the pattern.
-- An omitted condition value stays inconclusive for a value-requiring operator, even for a known-absent key.
+- An omitted or JSON null condition value stays inconclusive for a value-requiring operator, even for a known-absent key.
 - A malformed `between` or `not_between` range stays inconclusive, even for a known-absent key, because the flags service validates the range before its missing-value branch.
-- Acceptance scenarios cover an invalid regex, a non-numeric number, an invalid version, an invalid date, a malformed range, an omitted condition value, and a pattern the SDK regex engine doesn't support, each on a listed key.
+- Acceptance scenarios cover an invalid regex, a non-numeric number, an invalid version, an invalid date, a malformed range, an omitted or null condition value, and a pattern the SDK regex engine doesn't support, each on a listed key.
 
 ## Capabilities
 

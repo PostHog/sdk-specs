@@ -750,7 +750,7 @@ The existing presence-operator requirement SHALL govern `is_set` and `is_not_set
 
 Because caller-supplied local property maps are partial context, an absent required property key that is not listed as known absent SHALL make that criterion inconclusive for every ordinary property operator, including named negative operators. A value-requiring operator whose condition value is omitted SHALL be inconclusive. An operator that is unknown or invalid for the criterion type SHALL be inconclusive for only the affected flag.
 
-A required property key listed as known absent is not missing context. For any present condition value, the criterion SHALL be definitive, without remote fallback, and SHALL use these results. The evaluator SHALL NOT parse, compile, or validate a present condition value for a known-absent key, so an invalid pattern or a malformed numeric, date, or version operand does not change the result. This matches the flags service, which removes a listed key before matching and decides each operator from its missing-value branch before it reads the condition value. Two cases stay inconclusive even for a known-absent key, as they do in the flags service or the spec for a present key: a value-requiring operator whose condition value is omitted, and a `between` or `not_between` criterion with a malformed range, because the flags service validates the range before its missing-value branch:
+A required property key listed as known absent is not missing context. The evaluator SHALL NOT parse, compile, or validate a present condition value for a known-absent key, so an invalid pattern or a malformed numeric, date, or version operand does not change the result. This matches the flags service, which removes a listed key before matching and decides each operator from its missing-value branch before it reads the condition value. Except for the two cases after the table, the criterion SHALL be definitive, without remote fallback, and SHALL use these results:
 
 | Operator | Result for a known-absent key |
 | --- | --- |
@@ -758,6 +758,11 @@ A required property key listed as known absent is not missing context. For any p
 | `is_not`, `not_icontains`, `not_starts_with`, `not_ends_with`, `not_icontains_multi`, `not_regex`, `not_between` | match |
 | `is_set` | no match |
 | every other operator, including `exact`, `icontains`, `icontains_multi`, `starts_with`, `ends_with`, `regex`, `gt`, `gte`, `lt`, `lte`, `between`, all `semver_*` operators including `semver_neq`, and the `is_date_*` operators | no match |
+
+Two cases SHALL stay inconclusive even for a known-absent key:
+
+- A value-requiring operator whose condition value is omitted or JSON null. The flags service reads a null condition value as omitted and returns no match. The spec keeps an omitted condition value inconclusive for a present key too, so the flag falls back to remote evaluation, which returns that result.
+- A `between` or `not_between` criterion with a malformed range. The flags service validates the range before its missing-value branch, so it doesn't resolve the criterion from the key's absence either.
 
 Known absence SHALL NOT change cohort membership read from stored static or realtime cohorts, SHALL NOT affect holdouts, which read no properties, and SHALL apply to a flag dependency because the dependency evaluates with the same listing. A dynamic-cohort property leaf SHALL use the table above before applying its `negation`.
 
@@ -797,6 +802,7 @@ When both operands are available but the property value cannot be interpreted by
   | `semver_gt` | `"not-a-version"` | the required key listed as known absent | false |
   | `is_date_after` | `"not-a-date"` | the required key listed as known absent | false |
   | `is_not` | omitted | the required key listed as known absent | inconclusive |
+  | `is_not` | JSON null | the required key listed as known absent | inconclusive |
   | `not_between` | `[10]` | the required key listed as known absent | inconclusive |
   | `exact` | omitted | property value `"pro"` present | inconclusive |
   | `future_operator` | `"pro"` | property value `"pro"` present | inconclusive |
@@ -818,7 +824,7 @@ A syntactically invalid pattern SHALL produce a definitive no-match for both `re
 
 Portable acceptance vectors SHALL use syntax shared by the target SDK engines. Engine-specific constructs require remote fallback when the SDK cannot evaluate them.
 
-These pattern rules apply only when the property key is present. For a key listed as known absent, `regex` SHALL NOT match and `not_regex` SHALL match without compiling the pattern, so an invalid, unsupported, or engine-specific pattern does not change the result, as the canonical operator inventory requirement defines.
+These pattern rules apply only when the property key is present. For a key listed as known absent, `regex` SHALL be a definitive no-match and `not_regex` SHALL be a definitive match, and the evaluator SHALL NOT compile the pattern, so an invalid, unsupported, or engine-specific pattern does not change the result, as the canonical operator inventory requirement defines.
 
 #### Scenario Outline: Regex criteria search safely without implicit flags or anchors (@server)
 - **GIVEN** a local property condition with operator <operator> and pattern <pattern>
@@ -854,7 +860,7 @@ For `gt`, `gte`, `lt`, and `lte`, the condition SHALL be a string matching the c
 
 The legacy wire alias `min` SHALL behave as `gte`, and `max` SHALL behave as `lte`.
 
-For these four operators, a present property that cannot be converted to a finite number SHALL be a definitive no-match. An invalid condition number SHALL be inconclusive. For a key listed as known absent, these four operators SHALL NOT match without parsing the condition number, so an invalid condition number does not change the result, as the canonical operator inventory requirement defines. Binary64 rounding is observable for values that cannot be represented exactly.
+For these four operators, a present property that cannot be converted to a finite number SHALL be a definitive no-match. An invalid condition number SHALL be inconclusive. For a key listed as known absent, these four operators SHALL be a definitive no-match, and the evaluator SHALL NOT parse the condition number, so an invalid condition number does not change the result, as the canonical operator inventory requirement defines. Binary64 rounding is observable for values that cannot be represented exactly.
 
 For dynamic-cohort property leaves, `between` SHALL accept exactly two numeric or numeric-string bounds `[low, high]`, require `low <= high`, and match inclusively at both bounds. A bound MAY be infinite, such as `"-inf"` or `"inf"`. A condition value that is not a two-element array, or that has a nonnumeric bound, a NaN bound, or `low > high`, is a malformed range. A malformed condition range SHALL be inconclusive before applying any cohort leaf `negation`, even when the key is listed as known absent.
 
@@ -919,7 +925,7 @@ A relative condition SHALL consist of an optional leading `-`, an integer from `
 
 On a fall-back overlap, the evaluator SHALL choose the earlier of the two matching instants. If subtraction or naive parsing lands in a spring-forward gap, the criterion SHALL be inconclusive. Month and year lookbacks SHALL subtract one unit at a time, preserving the current local time and clamping after every step. Consequently, a two-month lookback from March 31 can retain February's clamped day in January. Acceptance tests SHALL inject both a fixed clock and an effective timezone.
 
-A present property that is outside the accepted grammar SHALL be a definitive no-match. An omitted, non-string, invalid, or locally uninterpretable condition SHALL be inconclusive. For a key listed as known absent, the date operators SHALL NOT match without parsing a present condition, so an invalid or locally uninterpretable condition does not change the result, as the canonical operator inventory requirement defines.
+A present property that is outside the accepted grammar SHALL be a definitive no-match. An omitted, non-string, invalid, or locally uninterpretable condition SHALL be inconclusive. For a key listed as known absent, the date operators SHALL be a definitive no-match, and the evaluator SHALL NOT parse a present condition, so an invalid or locally uninterpretable condition does not change the result, as the canonical operator inventory requirement defines.
 
 #### Scenario Outline: Date criteria normalize offsets and preserve strict boundaries (@server)
 - **GIVEN** the local evaluator clock is fixed at `2025-01-08T00:00:00Z`
@@ -979,7 +985,7 @@ Core components SHALL be unsigned 64-bit integers. More than three core componen
 
 For `semver_tilde` and `semver_caret`, the evaluator SHALL normalize and pad the condition to a complete version before applying the corresponding range. Consequently `~1` behaves as `~1.0.0`, and `^0` behaves as `^0.0.0`. For `semver_wildcard`, it SHALL strip leading zeros from numeric components without padding and accept `*`, `x`, or `X` as wildcard tokens. Supported spellings include `*`, `x`, `X`, `1.*`, `1.*.*`, and `1.2.*`; an interior wildcard such as `1.*.3` is invalid. A condition without a wildcard token, such as `1.2`, uses caret semantics.
 
-A prerelease property SHALL satisfy a range only when the range contains a prerelease comparator with the same major, minor, and patch tuple. An invalid property version SHALL be a definitive no-match for every semantic-version operator, including `semver_neq`; an omitted or invalid condition version or range SHALL be inconclusive. For a key listed as known absent, every semantic-version operator SHALL NOT match without parsing a present condition version or range, so an invalid one does not change the result, as the canonical operator inventory requirement defines.
+A prerelease property SHALL satisfy a range only when the range contains a prerelease comparator with the same major, minor, and patch tuple. An invalid property version SHALL be a definitive no-match for every semantic-version operator, including `semver_neq`; an omitted or invalid condition version or range SHALL be inconclusive. For a key listed as known absent, every semantic-version operator SHALL be a definitive no-match, and the evaluator SHALL NOT parse a present condition version or range, so an invalid one does not change the result, as the canonical operator inventory requirement defines.
 
 #### Scenario Outline: Direct semantic-version comparison uses normalized total ordering (@server)
 - **GIVEN** a local property condition with operator <operator> and condition value <condition>

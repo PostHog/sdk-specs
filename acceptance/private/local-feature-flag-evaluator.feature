@@ -181,9 +181,23 @@ Feature: Local Feature Flag Evaluator
       | "semver_gt"           | "not-a-version"          | false   |
       | "is_date_after"       | "not-a-date"             | false   |
 
-  Scenario: An omitted condition value stays inconclusive for a known-absent key
+  Scenario Outline: An omitted or null condition value stays inconclusive for a known-absent key
     Given the SDK is initialized with token "test-token" and local evaluation enabled
-    And a local condition has operator "is_not" and condition value omitted
+    And remote feature flag evaluation is enabled
+    And a local condition has operator "is_not" and condition value <condition>
+    When it is evaluated with the required key listed as known absent
+    Then local evaluation should be inconclusive
+    And remote evaluation should remain eligible
+
+    Examples:
+      | condition |
+      | omitted   |
+      | null      |
+
+  Scenario: A malformed range stays inconclusive for a known-absent key
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And remote feature flag evaluation is enabled
+    And a local condition has operator "not_between" and condition value [10]
     When it is evaluated with the required key listed as known absent
     Then local evaluation should be inconclusive
     And remote evaluation should remain eligible

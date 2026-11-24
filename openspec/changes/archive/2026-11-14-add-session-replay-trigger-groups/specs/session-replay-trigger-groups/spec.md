@@ -497,7 +497,8 @@ element matches any filter value. For the negative operators `is_not`, `not_icon
 `not_regex`, the filter SHALL match only when every property element fails to match every filter
 value, so one match rejects. `exact` and `is_not` SHALL compare the strings for equality, `icontains`
 and `not_icontains` SHALL compare them case-insensitively, and `regex` and `not_regex` SHALL test the
-property string against the filter value as a pattern. `gt` and `lt` SHALL parse both the property
+property string against the filter value as a pattern. "Regex patterns use the platform
+engine" defines the dialect and the result of a pattern that fails to compile. `gt` and `lt` SHALL parse both the property
 value and the filter value with JavaScript `parseFloat` semantics and compare the numbers; a
 property value that does not parse SHALL NOT match, and a filter value that does not parse never
 matches either.
@@ -593,6 +594,90 @@ null property, default operator, array properties).
 - **GIVEN** a trigger group with a filter on event property "amount" greater than "100"
 - **WHEN** the filters are evaluated against an event with property "amount" set to "abc"
 - **THEN** the filter should not match
+
+### Requirement: Regex patterns use the platform engine
+
+The SDK SHALL compile every regex pattern of a trigger group — a `regex` or `not_regex` filter
+value, and a `urls` pattern — with the regex engine of its platform. This capability does not
+define a common regex dialect, so a pattern can compile on one platform and fail to compile on
+another: for example, a leading inline flag such as `(?i)` does not compile in JavaScript and
+compiles in the engines the iOS and Android SDKs use. Authors SHOULD keep to the syntax that is
+common to the platforms they target. A pattern that fails to compile SHALL NOT raise an error into
+the host application.
+
+For a present property, a `regex` or `not_regex` filter value that fails to compile SHALL count as
+a pattern that does not match: `regex` SHALL NOT match on that value, and `not_regex` SHALL match
+on it. A missing or `null` property keeps the absence rule of "Property filter semantics", whatever
+the pattern.
+
+A mobile SDK SHALL drop a `urls` pattern that fails to compile and SHALL keep the group and its
+other patterns and legs. The dropped pattern never matches, and the leg stays configured, so a
+group whose only pattern fails to compile never satisfies its screen leg. The SDK SHOULD log the
+dropped pattern. On the browser, the SDK logs the pattern and leaves it out of its compiled cache
+when it reads the config, but its URL check then compiles the pattern again and the error leaves
+the check, so the patterns after the failed one in that group are not checked for that URL. This is the current posthog-js behavior, recorded here as a platform
+difference; other SDKs SHALL NOT copy it.
+
+This requirement applies to all replay-capable SDKs. The `urls` rule applies to mobile SDKs and to
+hybrid SDKs over them.
+
+Reference (filters): posthog-js `origin/main` `f05a993f9d`
+(`packages/core/src/surveys/property-matching.ts:5-12`: `isValidRegex` catches the `new RegExp`
+error; `:14-24`: `isMatchingRegex` returns false for a pattern that is not valid; `:31`: `regex` is
+`values.some(... targets.some(isMatchingRegex))`; `:32`: `not_regex` is
+`values.every(... targets.every(!isMatchingRegex))`).
+
+Reference (`urls`): posthog-js `origin/main` `f05a993f9d`
+(`packages/browser/src/extensions/replay/external/triggerMatching.ts:262-270`: `_compileRegexCache`
+logs "Invalid URL trigger regex pattern" and does not cache the pattern; `:115`:
+`compiledRegexCache?.get(trigger.url) ?? new RegExp(trigger.url)` compiles a pattern that is not in
+the cache again, which throws; `:395`: `checkUrlTriggerConditions` calls it with no catch;
+`recording-strategies.ts:441-455`: the per-group loop has no catch). The mobile rule is mobile-only
+and decision-based, with no posthog-js reference: it stands in for the web cache omission at
+`triggerMatching.ts:262-270` and does not take the match-time error.
+
+Covering test: posthog-js `packages/core/src/surveys/property-matching.spec.ts:84-87` ("treats
+invalid regexes as non-matches before applying negative quantifiers") and `:27-30` ("returns false
+for invalid regular expressions") cover the filter result.
+`packages/browser/src/__tests__/extensions/replay/checkUrlTriggerConditions.test.ts:408-419`
+("omits invalid trigger regex from the configuration cache") covers only the cache omission. No
+posthog-js test on `origin/main` covers a URL check against a pattern that fails to compile, or the
+`(?i)` case; source only. The mobile `urls` rule has no posthog-js analog; decision-based.
+
+#### Scenario: A filter pattern that fails to compile does not match
+- **GIVEN** a trigger group with a filter on event property "path" with operator `regex` and value "["
+- **AND** a second trigger group with a filter on event property "path" with operator `not_regex` and value "["
+- **WHEN** the filters are evaluated against an event with property "path" set to "/checkout"
+- **THEN** the first group's filter should not match
+- **AND** the second group's filter should match
+- **AND** no error should reach the host application
+
+#### Scenario: An inline-flag filter pattern follows the platform engine
+- **GIVEN** a trigger group with a filter on event property "path" with operator `regex` and value "(?i)checkout"
+- **AND** a second trigger group with a filter on event property "path" with operator `not_regex` and value "(?i)checkout"
+- **WHEN** the filters are evaluated against an event with property "path" set to "/Checkout"
+- **THEN** on an SDK whose regex engine compiles "(?i)checkout", the first group's filter should match and the second group's filter should not match
+- **AND** on an SDK whose regex engine does not compile "(?i)checkout", the first group's filter should not match and the second group's filter should match
+
+#### Scenario: A screen pattern that fails to compile is dropped and the group is kept
+- **GIVEN** a mobile SDK with session replay enabled
+- **AND** the remote config sets `version` to 2 and configures a trigger group with URL conditions matching "[" and "Checkout" and a sample rate of 1.0
+- **WHEN** the client captures a "$screen" event with "$screen_name" set to "CheckoutScreen"
+- **THEN** session recording should be active
+
+#### Scenario: A group whose only screen pattern fails to compile stays pending
+- **GIVEN** a mobile SDK with session replay enabled
+- **AND** the remote config sets `version` to 2 and configures a trigger group with URL condition matching "[" and a sample rate of 1.0
+- **WHEN** the client captures a "$screen" event with "$screen_name" set to "["
+- **THEN** session recording should not be active
+- **AND** the SDK should stay in the trigger group model
+
+#### Scenario: An inline-flag screen pattern follows the platform engine
+- **GIVEN** a mobile SDK with session replay enabled
+- **AND** the remote config sets `version` to 2 and configures a trigger group with URL condition matching "(?i)checkout" and a sample rate of 1.0
+- **WHEN** the client captures a "$screen" event with "$screen_name" set to "CheckoutScreen"
+- **THEN** on an SDK whose regex engine compiles "(?i)checkout", session recording should be active
+- **AND** on an SDK whose regex engine does not compile "(?i)checkout", session recording should not be active
 
 ### Requirement: Group activation lasts for the session
 

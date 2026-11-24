@@ -267,7 +267,7 @@ and JVM (`androidMain/.../PostHog.android.kt:30-31`, `jvmMain/.../PostHog.jvm.kt
 - **SDK currently (KMP-owned, JS):** `platformRegister` writes the raw Kotlin value with `props[key] = value` (`jsMain/.../PostHog.js.kt:176-180`) instead of `value.toJsValue()`, which capture and identify use (`:518-532`). A registered Kotlin `Map`, `List` or `Long` reaches `posthog.register` as a Kotlin runtime object (a `Long` as `{low_1, high_1}`, see [n6](#n6)). Wasm converts with `value.toJsAny()` (`wasmJsMain/.../PostHog.wasmJs.kt:150-154`). The only JS test registers a `String` (`jsTest/.../PostHogJsTest.kt:233`).
 - **Inherited:** Android/JVM ✅ (posthog-android n16 is ✅: blank keys are MAY-level); Apple and Wasm ✅. `register(key, value)` drops a `null` value and forwards a blank key (`commonMain/.../PostHog.kt:186-189`), which the spec permits.
 - **Backwards compatibility:** Backward-compatible — fixes values PostHog can't use today.
-- **Remediation:** In `jsMain` `platformRegister`, write `props[key] = value.toJsValue()`, and add a JS test that registers a map, a list and a `Long`.
+- **Remediation:** In `jsMain` `platformRegister`, write `props[key] = value.toJsValue()` (with [n6](#n6)'s `Long` conversion in `toJsValue()`, which `Long` values also need), and add a JS test that registers a map, a list and a `Long`.
 
 <a id="n20"></a>
 

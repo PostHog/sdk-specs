@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-kmp](https://github.com/PostHog/posthog-kmp)
 **Audited commit:** `0a88aa7490c4bc51fb263c7f3619d62d838658a4` ([commit](https://github.com/PostHog/posthog-kmp/commit/0a88aa7490c4bc51fb263c7f3619d62d838658a4)), tag `1.0.0` — first audit, 2026-11-23
 **Audited against sdk-specs commit:** `795b69f`; re-checked at `44fe27a`, whose one later spec change (#233, local flag evaluation) is server-only and moves no row
-**Summary:** 20 ✅ · 31 🟡 · 8 ❌ · 11 ➖ · 0 ❓ (70 rows; first audit). On the shared 69-row basis (without Get Remote Config Payload, ➖): 20 ✅ · 31 🟡 · 8 ❌ · 10 ➖.
+**Summary:** 19 ✅ · 32 🟡 · 8 ❌ · 11 ➖ · 0 ❓ (70 rows; first audit). On the shared 69-row basis (without Get Remote Config Payload, ➖): 19 ✅ · 32 🟡 · 8 ❌ · 10 ➖.
 
 **Why this run:** posthog-kmp has no compliance file yet. 1.0.0 is its first stable release.
 
@@ -59,7 +59,7 @@ and JVM (`androidMain/.../PostHog.android.kt:30-31`, `jvmMain/.../PostHog.jvm.kt
 | 11 | Capture AI | ✅ | [n7] |
 | 12 | Capture Exception | 🟡 | [n8] KMP-owned |
 | 13 | Create Person Profile | ➖ | Applicability: posthog-js family only; KMP has no such method |
-| 14 | Debug | ✅ | `debug` config + `setDebug()` on every target |
+| 14 | Debug | 🟡 | [n39] KMP-owned |
 | 15 | Emails | ➖ | server SDKs only |
 | 16 | Exception Steps | ❌ | [n9] KMP-owned |
 | 17 | Flush | 🟡 | [n10] |
@@ -307,3 +307,9 @@ and JVM (`androidMain/.../PostHog.android.kt:30-31`, `jvmMain/.../PostHog.jvm.kt
 ### n38 — Surveys (🟡 Partial)
 - **Spec requires:** wait-period and undisplayable-question rules (posthog-android n22); opt-out prevents fetch/display, reset clears state (posthog-js n32).
 - **SDK currently:** `surveys` forwarded on Android/iOS/web (`androidMain/.../PostHog.android.kt:39`, `iosMain/.../PlatformCapture.ios.kt:11`, `jsMain/.../PostHog.js.kt:72`); ignored on macOS/JVM. iOS ✅; Android inherits n22 (and displays only with `posthog-android-surveys-compose` on the classpath); web inherits posthog-js n32.
+
+### n39 — Debug (🟡 Partial)
+- **Spec requires:** `debug(enabled?: boolean)`, where an omitted `enabled` defaults to `true` (`openspec/specs/debug/spec.md:18-21`), with the scenario "Debug defaults to enabled when called without an argument" (`:115-122`).
+- **SDK currently (KMP-owned):** the `debug` config and `setDebug(enabled)` reach every target, but `setDebug(enabled: Boolean)` (`commonMain/.../PostHog.kt:600`) has no default and no zero-argument overload, so `PostHog.setDebug()` does not compile. posthog-flutter is 🟡 for the same missing default ([posthog-flutter.md n7](posthog-flutter.md#n7)).
+- **Backwards compatibility:** Additive — existing calls pass `enabled` explicitly.
+- **Remediation:** Declare `setDebug(enabled: Boolean = true)`.

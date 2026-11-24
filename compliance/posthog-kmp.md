@@ -127,7 +127,7 @@ and JVM (`androidMain/.../PostHog.android.kt:30-31`, `jvmMain/.../PostHog.jvm.kt
 
 ### n2 — Traces (❌ Fail)
 - **Spec requires:** a span API (`startSpan`/`withSpan`) shipped as OTLP to `/i/v1/traces` (`openspec/specs/traces/spec.md`, Purpose).
-- **SDK currently:** No span API in `commonMain/.../PostHog.kt:30-603`; no delegate implements it either (posthog-android n23, posthog-ios n23, posthog-js all ❌).
+- **SDK currently:** No span API in `commonMain/.../PostHog.kt:30-603`; no delegate implements it either (posthog-android n23, posthog-ios n2, posthog-js all ❌).
 - **Backwards compatibility:** Additive.
 - **Remediation:** Wait for the native implementations, then forward.
 
@@ -139,9 +139,9 @@ and JVM (`androidMain/.../PostHog.android.kt:30-31`, `jvmMain/.../PostHog.jvm.kt
 
 ### n4 — Alias (🟡 Partial)
 - **Spec requires:** the `@both` scenario "Alias is dropped when required identities are missing" — a blank alias is dropped with a validation warning (as quoted in `compliance/posthog-ios.md` n3).
-- **SDK currently:** `PostHog.alias(alias, eventOptions)` forwards with no blank check (`commonMain/.../PostHog.kt:153-155`). Android/JVM conform (posthog-android ✅); Apple inherits posthog-ios n3 (blank alias accepted); web inherits posthog-js n1 (no empty-alias guard).
+- **SDK currently:** `PostHog.alias(alias, eventOptions)` forwards with no blank check (`commonMain/.../PostHog.kt:153-155`). Android/JVM forward a blank alias too: posthog-android `android-v4.0.2` (`posthog/src/main/java/com/posthog/PostHog.kt:2129-2158`, unchanged in 4.0.3) has no blank-alias guard (as `posthog-flutter.md` notes); Apple inherits posthog-ios n3 (blank alias accepted); web inherits posthog-js n1 (no empty-alias guard).
 - **Backwards compatibility:** Backward-compatible — only affects calls that produce a malformed event today.
-- **Remediation:** Reject a blank `alias` in `commonMain` with a warning, which fixes Apple and web at once.
+- **Remediation:** Reject a blank `alias` in `commonMain` with a warning, which fixes every target at once.
 
 ### n5 — Bootstrap (❌ Fail)
 - **Spec requires:** "The SDK SHALL accept an optional `bootstrap` configuration at setup that seeds identity and feature-flag state before any network request completes," carrying `distinctId`, `isIdentifiedId`, `featureFlags`, `featureFlagPayloads` (`openspec/specs/bootstrap/spec.md`, Requirement: Bootstrap configuration surface).

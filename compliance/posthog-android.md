@@ -1,9 +1,9 @@
 # posthog-android — SDK Compliance
 
 **Repo:** [PostHog/posthog-android](https://github.com/PostHog/posthog-android)
-**Audited commit:** `c5e788bd603d3bdda77ac4d213538b9db637299a` ([commit](https://github.com/PostHog/posthog-android/commit/c5e788bd603d3bdda77ac4d213538b9db637299a)) — audited on 2026-10-19. **31 rows re-audited against posthog-android 4.0** at `aaa23d39af4424978bd2439028282e47417490b8` ([commit](https://github.com/PostHog/posthog-android/commit/aaa23d39af4424978bd2439028282e47417490b8), head of the 4.0 integration PR [PostHog/posthog-android#871](https://github.com/PostHog/posthog-android/pull/871)) on 2026-11-10 — see [posthog-android 4.0](#posthog-android-40-re-audit-2026-11-05)
-**Audited against sdk-specs commit:** `c72e367` (2026-10-19 rows); `752f899` plus the capture v1 text of [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79`, which includes [#147](https://github.com/PostHog/sdk-specs/pull/147) (merged into #146's branch as `6a9ed0f`), for the 31 4.0 rows; Capture also against #146's identity-call guide rule from `15501ca`
-**Summary:** 42 ✅ · 16 🟡 · 1 ❌ · 10 ➖ · 0 ❓ (69 rows; 2026-10-19 at `c5e788bd` scored 37/16/5/6/0; previous full audit 2026-08-10 at `8659a7b4` scored 31/16/9/3/0 on 59 rows)
+**Audited commit:** release tag `android-v4.0.3` = `fb616076b0c9bddf94257c077f4ce34ffcc94b81` ([tag](https://github.com/PostHog/posthog-android/releases/tag/android-v4.0.3), commit `1577cfa5`) — audited on 2026-11-24. All 70 rows are scored at this tag — see [4.0.3 re-audit](#403-re-audit-2026-11-24). Earlier runs: 2026-10-19 at `c5e788bd`, and 31 rows on 2026-11-10 at the unreleased 4.0 branch head `aaa23d39` ([PostHog/posthog-android#871](https://github.com/PostHog/posthog-android/pull/871))
+**Audited against sdk-specs commit:** `44fe27a`
+**Summary:** 45 ✅ · 13 🟡 · 1 ❌ · 11 ➖ · 0 ❓ (70 rows; previous 42/16/1/10/0 on 69 rows at `c5e788bd` + `aaa23d39`; 2026-10-19 at `c5e788bd` scored 37/16/5/6/0; previous full audit 2026-08-10 at `8659a7b4` scored 31/16/9/3/0 on 59 rows)
 
 **Why the 2026-10-19 run:** rotation priority 3 — the pointer was ten weeks old, and android carries the
 mobile reference for Session Replay Debug Properties. It was also the cheapest third slot available:
@@ -20,6 +20,58 @@ reassigned** — a reference to "posthog-android nX" in an older document may po
 
 **Row-count note:** this file previously appended five contracts out of order at the bottom of the
 matrix. It is now a single alphabetical 64-row table.
+
+## 4.0.3 re-audit (2026-11-24)
+
+The pointer moves to the release tag `android-v4.0.3`. This run closes the split between the 31 rows
+scored at `aaa23d39` and the 38 rows carried forward from `c5e788bd`: every row is now scored at
+`fb616076`.
+
+**Scope.**
+- **The 38 carried rows** were re-read at 4.0.3, using `c5e788bd..android-v4.0.3` to find code that moved.
+- **The 31 4.0 rows** were re-checked against the 22 non-bump commits in `aaa23d39..android-v4.0.3`.
+  The ones that matter here:
+  - PostHog/posthog-android#967: person-properties hash.
+  - #970: failed flag records.
+  - #971: `disableGeoIp`.
+  - #992: replay debug keys while replay is off.
+  - #995: queue-depth key.
+  - #1000: survey activation before flag reads.
+  - The surveys default turning `true`.
+  - The registered `$process_person_profile` skip on identity events.
+- **Every spec commit in `752f899..44fe27a`** that binds a mobile client was checked.
+- **Every ❌ and 🟡 row** was re-read.
+
+Two claims were confirmed with throwaway JVM unit tests against the tag:
+- Set-like and `Deque` property values serialize as JSON arrays (passes).
+- `getFeatureFlags()` returns `null` on a cold start with flags on disk (gap).
+
+| Contract | Before | 4.0.3 | Why |
+|---|---|---|---|
+| Bootstrap | 🟡 | ✅ | The only gap was `sessionID`, which `bootstrap/spec.md:145` makes a MAY ([n4](#n4)) |
+| Get Remote Config Payload | — | ➖ | **new row** (#220): server SDKs only; "A client SDK SHALL NOT expose it" |
+| Identify | 🟡 | ✅ | #967 stores the person-properties hash only from the queued event, as #208 requires ([n28](#n28)) |
+| Register | 🟡 | ✅ | The only gap was blank keys, which `register/spec.md:42` makes optional ("may reject"); the #146 identity-event rule is implemented ([n16](#n16)) |
+
+android moves from 42/16/1/10 on 69 rows to **45/13/1/11** on 70 rows (61%→64%).
+
+**Spec changes since `752f899` that pass or don't apply here:**
+- **Pass:**
+  - #215 set and sequence serialization ([n24](#n24)).
+  - #211 failed remote flags, #153 the client-level flag event default and #202 missing-flag response ([n8](#n8), [n9](#n9), [n36](#n36)).
+  - #181 and #226 surveys ([n22](#n22)).
+  - #232 and #238 replay debug ([n17](#n17), which stays 🟡 on two follow-ups).
+- **Don't apply:**
+  - #224 synthesized stacks: android only takes a `Throwable`, so it never synthesizes a stack.
+  - #183 consent event: `optIn()` captures none.
+  - #214 token environment variable: the token comes from code only.
+  - #219 W3C `traceparent`: a MAY for clients.
+- **Bind server SDKs or rows that are ➖ here:** #168, #144, #230, #233, #229, #231, the MCP, LLMA and emails changes, and the exception source registrations.
+
+**New gaps found in rows that were already 🟡:**
+- **Surveys:** an unknown question type leaks the survey reservation ([n22](#n22)).
+- **Session Replay Debug Properties:** the remote-off bit isn't persisted ([n17](#n17)).
+- **Get Feature Flags:** the cold-start `null` is now confirmed by a probe ([n9](#n9)).
 
 ## posthog-android 4.0 re-audit (2026-11-05)
 
@@ -72,14 +124,16 @@ replay, so the next full audit must re-verify it.
 | Reload Feature Flags | ✅ | ✅ | Callback gets `PostHogFeatureFlagsLoaded`, the android variant ([n34](#n34)) |
 | Remote Config | ✅ | ✅ | Request, asset host and cache fallback conform; replies after `close()` or from an earlier setup are dropped ([n32](#n32)) |
 | Retry Queue | ✅ | ✅ | Capture v1 status set, 1 s→30 s jittered backoff, `Retry-After` floor, per-event `retry` resends, no OkHttp retries ([n27](#n27)) |
-| Session Replay Debug Properties | 🟡 | ✅ | Required keys on every event; the optional bundle only on `$` events, at most once per 30 s ([n17](#n17)) |
+| Session Replay Debug Properties | 🟡 | ✅ → 🟡 | Required keys on every event; the optional bundle only on `$` events, at most once per 30 s. Scored ✅ here, then 🟡 after the 2026-11-18 spec change (#232) added the off-state shape ([n17](#n17)) |
 | Session Replay Privacy | 🟡 | ✅ | Wireframe mode is gone (#197), View and Compose unmask agree, and `FLAG_SECURE` windows record black (#160) ([n19](#n19)) |
 | Setup | ✅ | ✅ | `projectToken` only; a blank or `phx_` token disables the SDK with a warning ([n29](#n29)) |
 | Shutdown | ✅ | ✅ | `close()` flushes, stops queues and integrations, and can be called twice ([n30](#n30)) |
 | Start Session Recording | ❌ | ✅ | Replay isn't installed while opted out, so a start stays inactive ([n20](#n20)) |
 | Surveys | 🟡 | 🟡 | Web-only exclusion and popup delay conform; submit and dismiss move the last-seen date (#102), and an unknown question type blocks later surveys ([n22](#n22)) |
 
-android moves from 37/16/5/6 on 2026-10-19 to **43/15/1/10** on 69 rows (58%→62%).
+android moved from 37/16/5/6 on 2026-10-19 to 43/15/1/10 on 69 rows (58%→62%) with this table. The
+2026-11-18 Session Replay Debug Properties regression made it **42/16/1/10** (61%), the count the
+[4.0.3 re-audit](#403-re-audit-2026-11-24) starts from.
 
 **Behavior the spec permits for client SDKs, recorded so it isn't mistaken for a gap:** a `404` (or
 any retryable status) keeps the events on disk with no attempt limit, so a proxy that doesn't serve
@@ -154,7 +208,7 @@ complete implementation of that contract outside the browser.
 | 4 | Application Lifecycle | ✅ | [n31] |
 | 5 | Autocapture | ✅ | [n2] |
 | 6 | Before Send Hook | ✅ | [n3] |
-| 7 | Bootstrap | 🟡 | [n4] |
+| 7 | Bootstrap | ✅ | [n4] |
 | 8 | Capture | ✅ | [n24] |
 | 9 | Capture AI | ✅ | [n25] |
 | 10 | Capture Exception | ✅ | [n40] |
@@ -167,7 +221,7 @@ complete implementation of that contract outside the browser.
 | 17 | Event Batcher | 🟡 | [n6] |
 | 18 | Exception Event Metadata | 🟡 | [n7] |
 | 19 | Exception Steps | ✅ |  |
-| 20 | Experiment Exposure | ➖ | **new row**: applies to SDKs that read `/flags?v=4` records; android 4.0 requests `v=2` (`posthog/src/main/java/com/posthog/internal/PostHogApi.kt:598`), so config-version-2 flags read as legacy values |
+| 20 | Experiment Exposure | ➖ | **new row**: applies to SDKs that read `/flags?v=4` records; android 4.0.3 requests `v=2` (`posthog/src/main/java/com/posthog/internal/PostHogApi.kt:600`), so config-version-2 flags read as legacy values |
 | 21 | Feature Flag Cache | ✅ | [n33] |
 | 22 | Feature Flag Called Tracker | 🟡 | [n8] |
 | 23 | Flag Definition Loader | ➖ |  |
@@ -179,44 +233,45 @@ complete implementation of that contract outside the browser.
 | 29 | Get Feature Flag Result | ✅ | [n36] |
 | 30 | Get Feature Flags | 🟡 | [n9] |
 | 31 | Get Feature Flags And Payloads | 🟡 | [n10] |
-| 32 | Get Session ID | ✅ |  |
-| 33 | Group | 🟡 | [n11] |
-| 34 | Group Identify | 🟡 | [n12] |
-| 35 | HTTP Client | ✅ | [n26] |
-| 36 | Identify | 🟡 | [n28] |
-| 37 | Is Feature Enabled | ✅ | [n37] |
-| 38 | Is Opt Out | ✅ |  |
-| 39 | Is Session Replay Active | ✅ |  |
-| 40 | Local Feature Flag Evaluator | ➖ |  |
-| 41 | Logs | ✅ | [n35] |
-| 42 | MCP Analytics | ➖ |  |
-| 43 | Offline Evaluations | ➖ | **new row**: server SDKs only; no android surface |
-| 44 | On Feature Flags | ✅ | [n13] |
-| 45 | Opt In | 🟡 | [n14] |
-| 46 | Persistent Storage | 🟡 | [n15] |
-| 47 | Register | 🟡 | [n16] |
-| 48 | Reload Feature Flags | ✅ | [n34] |
-| 49 | Remote Config | ✅ | [n32] |
-| 50 | Reset | ✅ |  |
-| 51 | Reset Group Properties For Flags | ✅ |  |
-| 52 | Reset Person Properties For Flags | ✅ |  |
-| 53 | Retry Queue | ✅ | [n27] |
-| 54 | Screen | ✅ |  |
-| 55 | Session Manager | ✅ |  |
-| 56 | Session Replay Debug Properties | 🟡 | [n17]; off-state shape open (posthog-android#992) |
-| 57 | Session Replay Ingestion Controls | 🟡 | [n18] |
-| 58 | Session Replay Privacy | ✅ | [n19] |
-| 59 | Set Group Properties For Flags | ✅ |  |
-| 60 | Set Person Properties | ✅ |  |
-| 61 | Set Person Properties For Flags | ✅ |  |
-| 62 | Setup | ✅ | [n29] |
-| 63 | Shutdown | ✅ | [n30] |
-| 64 | Start Session Recording | ✅ | [n20] |
-| 65 | Stop Session Recording | 🟡 | [n21] |
-| 66 | Surveys | 🟡 | [n22] |
-| 67 | Traces | ❌ | [n23] |
-| 68 | Tracing Headers | ✅ |  |
-| 69 | Unregister | ✅ |  |
+| 32 | Get Remote Config Payload | ➖ | **new row**: server SDKs only (#220, "A client SDK SHALL NOT expose it"); `PostHogApi.flagRemoteConfigPayload` is `@PostHogInternal` and only posthog-server calls it |
+| 33 | Get Session ID | ✅ |  |
+| 34 | Group | 🟡 | [n11] |
+| 35 | Group Identify | 🟡 | [n12] |
+| 36 | HTTP Client | ✅ | [n26] |
+| 37 | Identify | ✅ | [n28] |
+| 38 | Is Feature Enabled | ✅ | [n37] |
+| 39 | Is Opt Out | ✅ |  |
+| 40 | Is Session Replay Active | ✅ |  |
+| 41 | Local Feature Flag Evaluator | ➖ |  |
+| 42 | Logs | ✅ | [n35] |
+| 43 | MCP Analytics | ➖ |  |
+| 44 | Offline Evaluations | ➖ | **new row**: server SDKs only; no android surface |
+| 45 | On Feature Flags | ✅ | [n13] |
+| 46 | Opt In | 🟡 | [n14] |
+| 47 | Persistent Storage | 🟡 | [n15] |
+| 48 | Register | ✅ | [n16] |
+| 49 | Reload Feature Flags | ✅ | [n34] |
+| 50 | Remote Config | ✅ | [n32] |
+| 51 | Reset | ✅ |  |
+| 52 | Reset Group Properties For Flags | ✅ |  |
+| 53 | Reset Person Properties For Flags | ✅ |  |
+| 54 | Retry Queue | ✅ | [n27] |
+| 55 | Screen | ✅ |  |
+| 56 | Session Manager | ✅ |  |
+| 57 | Session Replay Debug Properties | 🟡 | [n17]; #992 cleared the main off-state gap; remote-off persistence and the wrapper bridge remain |
+| 58 | Session Replay Ingestion Controls | 🟡 | [n18] |
+| 59 | Session Replay Privacy | ✅ | [n19] |
+| 60 | Set Group Properties For Flags | ✅ |  |
+| 61 | Set Person Properties | ✅ |  |
+| 62 | Set Person Properties For Flags | ✅ |  |
+| 63 | Setup | ✅ | [n29] |
+| 64 | Shutdown | ✅ | [n30] |
+| 65 | Start Session Recording | ✅ | [n20] |
+| 66 | Stop Session Recording | 🟡 | [n21] |
+| 67 | Surveys | 🟡 | [n22] |
+| 68 | Traces | ❌ | [n23] |
+| 69 | Tracing Headers | ✅ |  |
+| 70 | Unregister | ✅ |  |
 
 ## Notes
 
@@ -224,8 +279,10 @@ Note numbers were reassigned this run when the matrix was re-sorted alphabetical
 forward from the 2026-08-10 audit keep their original analysis, re-checked for existence at
 `c5e788bd`; notes [n2](#n2), [n7](#n7), and [n17](#n17) are new or rewritten this run. A reference
 to "posthog-android nX" in a document written before 2026-10-19 refers to the old numbering.
-Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14](#n14), [n17](#n17), [n19](#n19),
-[n20](#n20), [n22](#n22) and [n24](#n24)-[n40](#n40) are scored at `aaa23d39`.
+Every row is scored at `android-v4.0.3` (`fb616076`) as of 2026-11-24. Notes for rows that changed or
+gained findings that run carry a **4.0.3** paragraph, and their line references point at the tag.
+The other ✅ notes keep the `aaa23d39` or `c5e788bd` lines they were written against: their code was
+re-read at 4.0.3 and still conforms, but their line numbers were not re-pointed.
 
 <a id="n1"></a>
 
@@ -270,23 +327,33 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
 
 <a id="n4"></a>
 
-### n4 — Bootstrap (🟡 Partial)
-- **Spec requires:** (optional — "MAY") a client SDK that owns a session id MAY accept a
-  `sessionID` in the bootstrap config (UUIDv7) and adopt it as the current session id.
-- **SDK currently:** All spec-mandated (MUST) bootstrap fields — identity seeding/reconciliation,
-  feature-flag/payload bootstrap — are fully implemented and correct
-  (`applyBootstrapIfNeeded()` `PostHog.kt:397-437`, `reconcileBootstrapIdentityIfNeeded()`
-  `PostHog.kt:439-477`). `PostHogBootstrapConfig`
-  (`posthog/src/main/java/com/posthog/PostHogBootstrapConfig.kt:24-59`) still has exactly
-  `distinctId`, `isIdentifiedId`, `featureFlags`, `featureFlagPayloads` — no `sessionID` field,
-  confirmed via direct read this cycle. Android owns a client-side session manager
-  (`PostHogSessionManager.kt`) that could consume a bootstrap session id but doesn't — sessions are
-  always freshly generated. Since the spec phrases this as "MAY," this is a spec-permitted
-  omission, not a strict violation.
-- **Backwards compatibility:** Backward-compatible — adding an optional `sessionID` field is
-  purely additive.
-- **Remediation:** Add optional `sessionID` bootstrap support if product wants full parity with
-  SDKs that implement this optional capability.
+### n4 — Bootstrap (✅ Pass; was 🟡)
+- **Spec requires:**
+  - Identity seeding that never overwrites persisted identity, plus reconciliation of a differing
+    identified bootstrap.
+  - Bootstrapped flags and payloads served before the first `/flags`, and replaced by a complete
+    response.
+  - `$feature_flag_bootstrapped_response`/`_payload` and `$used_bootstrap_value` on
+    `$feature_flag_called`.
+  - The flags-loaded callback fired at setup (`bootstrap/spec.md:7-215`).
+  - Session bootstrap is optional: "A client SDK that owns a session id MAY accept a `sessionID`"
+    (`:145`).
+- **SDK currently (4.0.3, `fb616076`):** conforms. The MUSTs were spot-checked at the tag:
+  - **Identity.** `applyBootstrapIfNeeded` (`posthog/src/main/java/com/posthog/PostHog.kt:683-719`)
+    seeds identity on a fresh install only. `reconcileBootstrapIdentityIfNeeded` (`:726-759`)
+    upgrades a matching anonymous id or identifies a differing one.
+  - **Listener.** Bootstrapped flags notify the listeners at setup without a network round trip
+    (`:508-510`).
+  - **Flag-called enrichment.** `$feature_flag_called` carries the bootstrap fields (`:2849-2854`).
+    `flagsLoadedFromRemote` is set by any successful response and cleared on reset
+    (`internal/PostHogRemoteConfig.kt:1722-1727`, `:1840`).
+  - **Complete response.** It replaces served flags (`:1015-1018`).
+  - **Not implemented (MAY).** `PostHogBootstrapConfig` has no `sessionID`
+    (`PostHogBootstrapConfig.kt:35-58`).
+- **Why the change:** the 2026-10-19 note already called the missing `sessionID` "a spec-permitted
+  omission, not a strict violation", so 🟡 contradicted its own evidence.
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None. Optionally add `sessionID` for parity with SDKs that implement it.
 
 <a id="n5"></a>
 
@@ -342,6 +409,13 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
   `encryption`), not a character count. The analytics lane has no per-event size cap. A `413` halves a
   multi-event batch and is terminal for a single event (`deleteFilesIfAPIError`, `:795-821`), which
   #146 allows for client SDKs.
+- **4.0.3 (`fb616076`):** still 🟡, on the same gap: `start()` builds `Timer(true)`
+  (`posthog/src/main/java/com/posthog/internal/PostHogQueue.kt:630`). Retried uuids are now kept once
+  each (`:488-493`), which doesn't affect this row.
+  - **Caveat.** The gap is about the test mechanism only. The "Batcher flushes when interval
+    elapses" scenario (`event-batcher/spec.md:112-122`) is satisfied in real time; it fails only when
+    a harness advances a fake clock. The next audit should run it through
+    `sdk_compliance_adapter` before keeping 🟡.
 - **Backwards compatibility:** Backward-compatible — swap to a `dateProvider`-driven scheduled
   executor internally; no public API change, default real-time behavior unchanged.
 - **Remediation:** Route the periodic-flush timer through `config.dateProvider` for testability.
@@ -370,6 +444,10 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
   5. `captureException` merges caller properties over the generated ones (`posthog/src/main/java/com/posthog/PostHog.kt:1726-1728`), and
      `PostHogStateless.kt:851-852` documents that callers can override `$exception_level`.
   6. `value` is left out when the throwable has no message (`ThrowableCoercer.kt:229-233`).
+- **4.0.3 (`fb616076`):** unchanged. `ThrowableCoercer.kt` hasn't changed since `aaa23d39`, so gaps 1-4
+  and 6 sit at the same lines (`:211`, `:309`, `:229-233`). No file in either module sets
+  `$exception_source`. The spec changes since `752f899` only register Rails, .NET and Sidekiq capture
+  sources (#196, #209, #218), which don't bind android.
 - **Backwards compatibility:** Gaps 1-4 and 6 are backward-compatible (each omits or adds a field, and
   `source` keeps the suppressed relationship). Gap 5 needs a deprecation path: ship a typed `level`
   override before the property map stops winning.
@@ -402,6 +480,20 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
     `FeatureFlagMetadata` has no config version, rule or variant-key fields, so it sends neither the new
     attribution nor `$experiment_exposure`. `experiment-exposure/spec.md:11` treats such flags as legacy.
   - **Not scored (SHOULD).** The tracker isn't cleared after a flags reload, and the map is unbounded.
+- **4.0.3 (`fb616076`):** still 🟡 on the allowlist. `MINIMAL_FEATURE_FLAG_CALLED_PROPERTIES`
+  (`posthog/src/main/java/com/posthog/PostHogStateless.kt:939-962`) gained `$geoip_disable` but still
+  leaves out `$os_name`/`$os_version` and the attribution keys. The spec changes since `752f899` pass:
+  - **Client-level event default** (#153). Each read resolves the per-call value, then
+    `config.sendFeatureFlagEvent`, and a suppressed read never touches the dedupe map
+    (`PostHog.kt:2800-2817`).
+  - **Missing flag reports no value** (#202). `$feature_flag_response` is omitted when the read has
+    no value (`:2829-2830`).
+  - **Failed direct reads report `evaluation_failed`** (#211, PostHog/posthog-android#970).
+    `$feature_flag_error` comes from `getFlagError` (`:2831`, `internal/PostHogRemoteConfig.kt:1578-1587`).
+    It adds `evaluation_failed` only for a failed key with no served value, and
+    `errors_while_computing_flags` as a response-level error. A failed read has no value, so its
+    response is omitted.
+  - #168's local-evaluation attribution binds server SDKs.
 - **Backwards compatibility:** Backward-compatible. Minimized events gain a few static or attribution keys.
 - **Remediation:** Add `$os_name`, `$os_version`, `$referring_domain`, `utm_source`, `utm_medium`,
   `utm_campaign`, `utm_content`, `utm_term`, `gad_source`, `mc_cid`, `gclid` and `fbclid` to the allowlist.
@@ -422,8 +514,24 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
     unlike `getFeatureFlagResult` (`:1338`). After a restart, until the first load finishes or a
     single-flag read hydrates the disk cache, it returns `null` while `getFeatureFlagResult(key)` returns the
     cached value.
+- **4.0.3 (`fb616076`):** still 🟡.
+  - **Gap confirmed at runtime.** `getAllFeatureFlags()` (`posthog/src/main/java/com/posthog/PostHog.kt:2876-2885`)
+    reads keys from `PostHogRemoteConfig.getFeatureFlags()` (`internal/PostHogRemoteConfig.kt:1420-1431`),
+    which still skips `loadFeatureFlagsFromCacheIfNeeded()`; `getFeatureFlagResult` calls it (`:1367`).
+    A unit test against the tag, with `featureFlags = {beta: true}` in cache preferences, printed
+    `before=null single=true after={beta=true}`: one single-flag read is what loads the disk cache.
+  - **Probable side effect (not verified).** `buildProperties` stamps `$feature/*` and
+    `$active_feature_flags` from the same getter (`PostHog.kt:919`), so events captured before the
+    first `/flags` reply probably carry no flag properties. A full-SDK cold start wasn't tested.
+  - **Failed remote flags conform** (#211, PostHog/posthog-android#970; `get-feature-flags/spec.md`
+    **Bulk flag values exclude failed remote decisions**):
+    - Failed records never reach `featureFlags` (`internal/PostHogRemoteConfig.kt:1329`, `:985`).
+    - A complete response replaces served flags (`:1015-1018`), so a failed key isn't kept.
+    - An errored response merges and keeps earlier values (`:972-998`).
+    - A cache load drops failed keys (`:1262`).
 - **Backwards compatibility:** Backward-compatible. A caller that saw `null` gets the cached list.
-- **Remediation:** Call `loadFeatureFlagsFromCacheIfNeeded()` in `getFeatureFlags()`.
+- **Remediation:** Call `loadFeatureFlagsFromCacheIfNeeded()` in `getFeatureFlags()`, and in
+  `getActiveFeatureFlagKeys()`.
 
 <a id="n10"></a>
 
@@ -436,6 +544,9 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
   comes from `getFeatureFlagResult`, with its payload from `decodePayload`
   (`internal/PostHogRemoteConfig.kt:1280-1294`); a malformed payload is `null` on that entry only. **Gap:**
   the same cold-start `null` as [n9](#n9).
+- **4.0.3 (`fb616076`):** still 🟡. The cold-start `null` is confirmed in [n9](#n9). #211's
+  **Combined bulk reads exclude failed remote values and payloads** passes: payloads are filtered to
+  the successful keys (`internal/PostHogRemoteConfig.kt:993-995`, `:1329-1333`).
 - **Backwards compatibility:** Backward-compatible.
 - **Remediation:** Same as [n9](#n9).
 
@@ -449,6 +560,10 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
   `type.isBlank()`/`key.isBlank()` guard — unconditionally writes `newGroups[type] = key` (line
   1587) and forwards to `groupStateless(...)`. Contrast with `identify()`'s blank-id guard
   (`PostHog.kt:1279-1282`). Confirmed unchanged from prior audit via direct read this cycle.
+- **4.0.3 (`fb616076`):** unchanged. `group()` (`posthog/src/main/java/com/posthog/PostHog.kt:2621-2685`)
+  now returns early while opted out (`:2633-2636`) and checks `requirePersonProcessing` (`:2638`), but
+  it still writes `newGroups[type] = key` with no blank check (`:2666`). Kotlin's non-null `String`
+  rules out a missing key, not an empty one.
 - **Backwards compatibility:** Backward-compatible — add an early-return blank-check guard at the
   top of `group()`/`groupStateless()`; only affects currently-malformed (blank) input.
 - **Remediation:** Add shared blank `type`/`key` validation, matching `identify()`'s pattern.
@@ -464,6 +579,9 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
   `$groupidentify`, contrasted directly with the `identify()` guard immediately above it
   (`PostHogStateless.kt:379-382`). Confirmed unchanged via direct read this cycle. Event shape
   (`$group_type`, `$group_key`, `$group_set`) otherwise correct.
+- **4.0.3 (`fb616076`):** unchanged. Android emits `$groupidentify` from `group()` with no blank
+  check (`posthog/src/main/java/com/posthog/PostHog.kt:2642-2647`, `:2671`). `PostHogStateless.with`
+  is now deprecated for core 7.x, so the stateless path isn't the android entry point.
 - **Backwards compatibility:** Backward-compatible — same fix as Group.
 - **Remediation:** Add the same blank-check guard used for `group()`.
 
@@ -506,6 +624,10 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
   - **Gap.** `optOut()` takes no parameters and `PostHogConfig` has no clear-on-opt-out option. Opt-out
     clears only the exception-steps buffer (`PostHog.kt:2028`) and push-token state (`:2037`), leaving
     `distinctId`, `anonymousId` and super properties in place, so the `@client` scenario fails.
+- **4.0.3 (`fb616076`):** unchanged. `optOut()` (`posthog/src/main/java/com/posthog/PostHog.kt:2027-2054`)
+  takes no parameters and clears only the exception-steps buffer (`:2045`) and push-token state
+  (`:2054`). #183's consent-event requirement doesn't apply: `optIn()` (`:1973-2025`) captures no
+  consent event.
 - **Backwards compatibility:** Backward-compatible. An optional `optOut(clearLocalData: Boolean = false)`
   keeps today's default.
 - **Remediation:** Add the optional clear-on-opt-out parameter.
@@ -513,38 +635,44 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
 <a id="n15"></a>
 
 ### n15 — Persistent Storage (🟡 Partial)
-- **Spec requires:** storage failures MUST NOT crash SDK calls, and the SDK SHALL record a storage
-  warning when a write fails.
-- **SDK currently:** `posthog-android/src/main/java/com/posthog/android/internal/PostHogSharedPreferences.kt`,
-  `setValue()` (lines 118-159): the `is Boolean/String/Float/Long/Int` branches (lines 127-146) and
-  the trailing `edit.apply()` (line 158) sit outside any try/catch — only the
-  `else -> serializeObject(...)` branch is defensive. Reconfirmed this cycle that call sites
-  (`PostHog.kt:1936` for `register()`, plus all other `setValue` callers at lines 562, 573, 601,
-  1095, 1108, 1538, 1589, 1973) invoke `getPreferences().setValue(...)` with no surrounding
-  try/catch either — an exception from the unguarded branches propagates to application code,
-  directly contradicting the "storage failures do not crash SDK calls" requirement. No dedicated
-  "storage warning" log signal exists anywhere (`PostHogLogger.kt` exposes only a single
-  `log(message)` method, no distinct warning level; grep for "storage warning"/"StorageWarning"
-  returns zero hits).
-- **Backwards compatibility:** Backward-compatible — wrap the primitive-write branches (and
-  `edit.apply()`) in try/catch and emit a distinct warning log; purely additive, no change to the
-  success path.
-- **Remediation:** Guard the primitive-write branches of `PostHogSharedPreferences.setValue` and
-  emit a storage-warning log on failure.
+- **Spec requires:** the `@client` scenario **Storage failures do not crash SDK calls**
+  (`persistent-storage/spec.md:136-147`). With "persistent storage writes will fail", `register`
+  "should not throw" and "the SDK should record a storage warning". Storage errors are "logged and
+  swallowed" (`:55`).
+- **SDK currently (4.0.3, `fb616076`):**
+  - **Where it fails.** The gap is in the SDK facade, not the SharedPreferences adapter.
+    `register()` (`posthog/src/main/java/com/posthog/PostHog.kt:3048-3060`) calls
+    `getPreferences().setValue(key, value)` (`:3059`) with no try/catch. Neither do `unregister()`
+    (`:3066`) nor `group()` (`:2668`). A `PostHogPreferences` whose write throws, which is what the
+    scenario injects, reaches application code.
+  - **No storage warning.** No code path logs one.
+- **Correction:** earlier versions of this note pointed at the primitive branches of
+  `PostHogSharedPreferences.setValue`. Those put into the editor's in-memory map and can't
+  realistically throw, so they aren't the failure. The scenario fails one layer up.
+- **Backwards compatibility:** Backward-compatible — catch write failures where the SDK writes
+  preferences and log a warning; no change to the success path.
+- **Remediation:** Guard preference writes in `register`/`unregister`/`group` (or in a shared write
+  helper), and log a storage warning when one fails.
 
 <a id="n16"></a>
 
-### n16 — Register (🟡 Partial)
-- **Spec requires:** (permissive — "MAY reject") blank/empty keys should not silently persist as
-  stray super properties.
-- **SDK currently:** `register(key, value)` / `unregister(key)` (`PostHog.kt:1925-1944`) correctly
-  reject reserved internal keys (`ALL_INTERNAL_KEYS` denylist,
-  `internal/PostHogPreferences.kt:63-89`) but have no blank/empty-key check — confirmed via direct
-  read this cycle; an empty-string key is written to/removed from `SharedPreferences` directly with
-  no guard.
-- **Backwards compatibility:** Backward-compatible — add a blank-key guard mirroring the existing
-  reserved-key check; spec's validation language here is permissive, so this is a minor gap.
-- **Remediation:** Add blank-key rejection to `register()`/`unregister()`.
+### n16 — Register (✅ Pass; was 🟡)
+- **Spec requires:** registered properties ride later events, a later call overrides, registered
+  values persist across setup, and a per-event value wins (`register/spec.md:94-160`). Input
+  validation is optional: implementations "may reject invalid input (for example empty keys…)"
+  (`:42`). #146 adds an interaction (`:85`): a registered `$process_person_profile` is not sent on
+  `$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`, `$set` or `$set_once`.
+- **SDK currently (4.0.3, `fb616076`):** conforms.
+  - **Register and unregister.** `register()` (`posthog/src/main/java/com/posthog/PostHog.kt:3048-3060`)
+    rejects reserved internal keys and persists to preferences; `unregister()` is at `:3062-3067`.
+  - **Identity events.** `buildProperties` removes a registered `$process_person_profile` for
+    identity events (`:975`, set in `IDENTITY_EVENTS`, `:3440-3441`). `optionsForEvent` does the same
+    for a wrapper-registered `process_person_profile` option (`:1141`). A value passed on the call
+    still applies. `MIGRATION.md:660-666` documents it.
+  - **Not implemented (allowed).** Blank keys aren't rejected; the spec makes that optional.
+- **Why the change:** the old 🟡 rested only on the optional blank-key check.
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None. Optionally reject blank keys.
 
 <a id="n17"></a>
 
@@ -581,33 +709,50 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
   `$sdk_debug_session_start` whenever the bundle is claimed (`PostHog.kt:890`). Fix in progress:
   [PostHog/posthog-android#992](https://github.com/PostHog/posthog-android/pull/992) (open; closes this
   gap when merged).
+- **4.0.3 (`fb616076`): #992 shipped and the main gap is closed. Still 🟡 on the two follow-ups below.**
+  - **The gate.** `sdkDebugProperties` (`posthog/src/main/java/com/posthog/PostHog.kt:1032-1068`)
+    evaluates `isSessionReplayIntentionallyOff()` (`:3317-3321`) on every event. Replay counts as off
+    when there is no handler, or when the handler is idle and the app doesn't want replay (an explicit
+    stop clears `sessionReplayWanted`, `:3416`) or the last `/config` turned it off.
+  - **The off shape.** While off, the event gets only `$recording_status: disabled`, and no bundle
+    claim, so no `$sdk_debug_session_start` (`:1045-1049`). A running recorder is never off, as
+    `spec.md:1316-1317` requires.
+  - **Queue depth** (#238, `spec.md:386-410`). `$sdk_debug_pending_queue_size` now comes from
+    `queue.backedUpSize` (`:1063`), which is set only at or above the current `flushAt`
+    (`internal/PostHogQueue.kt:96-97`, PostHog/posthog-android#995). `flushAt` is `@Volatile` because
+    `413` halving changes it (`:777-778`).
 - **Allowed divergence: a `/config` with no `sessionRecording` key is remote off.** The spec lets an
   SDK treat a missing key as off remotely (`openspec/specs/session-replay-debug-properties/spec.md:1259-1269`).
   `PostHogRemoteConfigResponse.sessionRecording` defaults to `false`
   (`posthog/src/main/java/com/posthog/internal/PostHogRemoteConfigResponse.kt:10`), so Android cannot
   tell a missing key from `false`. The server always sends the key, so this does not show up in
   practice.
-- **Partial after #992: remote off does not survive a relaunch.** The spec says the gate SHALL read
-  the cached config value (`openspec/specs/session-replay-debug-properties/spec.md:1257`). On a boolean
-  `false`, `processSessionRecordingConfig` removes the cached replay config
-  (`posthog/src/main/java/com/posthog/internal/PostHogRemoteConfig.kt:542` at `origin/main` `1101d79b`),
-  and #992 keeps the off bit in memory only (`sessionRecordingRemotelyDisabled`, `:184-187` and
-  `:337-340` at [#992](https://github.com/PostHog/posthog-android/pull/992) `e8809d38`). After a
-  relaunch the SDK has no cached off value, so events keep the replay keys until the first `/config`
-  arrives.
-- **Partial after #992: the wrapper bridge reads the ungated map.** The spec says every consumer of
-  the debug map, including an API that hands it to a wrapper SDK, SHALL receive the gated map
-  (`openspec/specs/session-replay-debug-properties/spec.md:1312`, scenario `:1458`). The React Native
-  plugin calls `PostHogReplayIntegration.debugProperties()` directly (posthog-js `origin/main`
-  `53e5c0e35` `packages/react-native-plugin/android/src/main/java/com/posthogreactnativeplugin/PosthogReactNativePluginModule.kt:300`),
-  and that method is not gated
-  (`posthog-android/src/main/java/com/posthog/android/replay/PostHogReplayIntegration.kt:3394` at
-  `e8809d38`). React Native events are still correct, because posthog-js#5797 gates the map in JS.
+- **Partial at 4.0.3: remote off does not survive a relaunch.**
+  - **Spec:** "The SDK SHALL read the cached config value, not derived replay-flag state"
+    (`openspec/specs/session-replay-debug-properties/spec.md:1306`).
+  - **Code:** the off bit `sessionRecordingRemotelyDisabled` is an in-memory `@Volatile` field
+    (`posthog/src/main/java/com/posthog/internal/PostHogRemoteConfig.kt:194-196`), set from each
+    `/config` reply (`:363`, `:366`). A boolean `false` deletes the cached replay config
+    (`processSessionRecordingConfig`, `:578-580`), and `preloadSessionRecordingConfig` (`:1189-1215`)
+    restores no off value.
+  - **Effect:** after a relaunch, with `sessionReplay` on locally, `isSessionReplayIntentionallyOff()`
+    is false until `/config` replies, so events carry the full replay keys.
+- **Partial at 4.0.3: the wrapper bridge reads the ungated map.**
+  - **Spec:** "Every consumer of the debug map SHALL receive the gated map. On mobile that includes …
+    any API that hands the map to a wrapper SDK" (`openspec/specs/session-replay-debug-properties/spec.md:1362`).
+  - **Code:** the gate lives only in `PostHog.sdkDebugProperties` (`posthog/src/main/java/com/posthog/PostHog.kt:1045-1049`).
+    `PostHogReplayIntegration.debugProperties()`
+    (`posthog-android/src/main/java/com/posthog/android/replay/PostHogReplayIntegration.kt:3055`)
+    still builds the full map, including `$sdk_debug_replay_capture_mode` (`:3101`).
+  - **Who reads it:** the React Native plugin calls that method directly (posthog-js `origin/main`
+    `53e5c0e35` `packages/react-native-plugin/android/src/main/java/com/posthogreactnativeplugin/PosthogReactNativePluginModule.kt:300`).
+    React Native events are still correct, because posthog-js#5797 gates the map in JS.
 - **Backwards compatibility:** Backward-compatible; the change only removes diagnostic keys from
   events captured while replay is off.
-- **Remediation:** Land #992. Then two follow-ups: persist the remote-off value so the gate reads it
-  from the cache after a relaunch, and add a gated internal accessor for the debug map and move the
-  React Native bridge to it. The missing-key reading needs no change: the spec allows it, and the
+- **Remediation:** Two follow-ups to #992:
+  - Persist the remote-off value in the cache preferences and load it in
+    `preloadSessionRecordingConfig`, so the gate reads it after a relaunch.
+  - Add a gated internal accessor for the debug map, and move the React Native bridge to it. The missing-key reading needs no change: the spec allows it, and the
   server always sends the key, as `false` or a config object (PostHog/posthog `c1fe8dcf295`
   `posthog/models/remote_config.py:305-326`).
 
@@ -624,10 +769,19 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
   beforeSend hook"), but line 836 (and line 834, surveys) were not updated to match — an
   inconsistency within the same method. A `beforeSend` hook that renames (not drops) an event would
   cause trigger matching to see the stale name.
+- **4.0.3 (`fb616076`):** unchanged; the line numbers moved.
+  - **Spec:** matching "observes the event **after** the before-send hook stage"
+    (`session-replay-ingestion-controls/spec.md:203`).
+  - **Code:** `enqueueEvent` passes the pre-hook `event` name to `sessionReplayHandler?.onEvent`
+    (`posthog/src/main/java/com/posthog/PostHog.kt:1525`) and to `surveysHandler?.onEvent` (`:1519`).
+    The snapshot check above them reads `postHogEvent` (`:1489`).
+  - **What passes:** an event the hook drops returns before either call (`:1296-1298`), so the
+    "dropped by before-send" scenario conforms.
+  - **What fails:** only a rename. The old `:834`/`:836` references were stale.
 - **Backwards compatibility:** Backward-compatible — one-line swap to `postHogEvent.event` at both
   call sites, no API/wire change.
 - **Remediation:** Pass `postHogEvent.event` instead of the pre-hook `event` variable at
-  `PostHog.kt:834` and `836`.
+  `PostHog.kt:1519` and `:1525`.
 
 <a id="n19"></a>
 
@@ -672,18 +826,24 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
 <a id="n21"></a>
 
 ### n21 — Stop Session Recording (🟡 Partial)
-- **Spec requires:** stopping session recording should finalize/flush pending replay data, and
-  (for symmetry with start) should be opt-out aware.
-- **SDK currently:** `stopSessionReplay()` (`PostHog.kt:2165-2180`) correctly no-ops if already
-  inactive, but (1) does not flush the replay queue before deactivating —
-  `PostHogReplayIntegration.stop()` only sets `isSessionReplayActive = false` and resets draw-state
-  tracking, no `replayQueue.flush()` call; pending snapshot data relies on the normal timer-driven
-  flush, not an explicit finalize-before-stop; (2) has the same `isOptedOut()` asymmetry as
-  start-session-recording (only `isEnabled()` guard), lower-impact since stopping while opted out
-  is a benign outcome. Both points reconfirmed via direct read this cycle.
+- **Spec requires:** the scenario **Stop session recording finalizes pending replay data**
+  (`stop-session-recording/spec.md:97-106`): "pending replay data should be finalized before the
+  recorder stops". The other two scenarios cover deactivating replay and a stop while inactive.
+- **SDK currently (4.0.3, `fb616076`):**
+  - **Conforms.** `stopSessionReplay()` (`posthog/src/main/java/com/posthog/PostHog.kt:3407-3422`)
+    stops the handler under `setupLock`. It clears `sessionReplayWanted` unless the stop comes from
+    opt-out (`:3415-3417`), and it logs, rather than throws, when replay isn't installed. Since 4.0,
+    opt-out uninstalls replay ([n20](#n20)), so the opt-out asymmetry earlier versions of this note
+    recorded no longer applies.
+  - **Gap.** `PostHogReplayIntegration.stop()` → `stopRecording()`
+    (`posthog-android/src/main/java/com/posthog/android/replay/PostHogReplayIntegration.kt:3029-3048`)
+    clears the active flag and bumps `snapshotGeneration` (`:3040`), which discards an in-flight frame.
+    Nothing flushes the replay queue or releases snapshots held for the minimum duration, so pending
+    data waits for the timer instead of being finalized.
 - **Backwards compatibility:** Backward-compatible — explicitly flushing the replay queue inside
   `stop()` is additive/clarifying, no signature or common-case behavior change.
-- **Remediation:** Flush the replay queue synchronously inside `stopSessionReplay()`.
+- **Remediation:** Flush the replay queue (and decide whether held minimum-duration snapshots are
+  sent or dropped) inside `stopSessionReplay()`.
 
 <a id="n22"></a>
 
@@ -709,6 +869,24 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
     throws. The caller catches it, but the reservation is never released, so no later survey shows until
     reset.
   - **Not scored (SHOULD).** Eligibility isn't re-checked after the popup delay (`:346-348`).
+- **4.0.3 (`fb616076`):** still 🟡; both gaps re-verified at the tag. Gap 2 has the larger user impact:
+  one unknown question type stops every later survey from showing until `reset()`.
+  - **Gap 1.** `setSurveySeen` still writes the date
+    (`posthog-android/src/main/java/com/posthog/android/surveys/PostHogSurveysIntegration.kt:1188-1203`,
+    write at `:1202`) and runs on dismiss (`:457`) and submit (`:994`).
+  - **Gap 2.** The adapter still maps an unknown type to `null`
+    (`posthog/src/main/java/com/posthog/internal/surveys/GsonSurveyQuestionAdapter.kt:43`), and
+    `SurveyProgressStore.questionOrder` still dereferences it
+    (`posthog-android/src/main/java/com/posthog/android/surveys/SurveyProgressStore.kt:68`). No filter
+    drops `null` questions before the survey is reserved, so the reservation still leaks.
+  - **Pass, #181** (**Survey targeting flag reads emit no usage event**, `surveys/spec.md:595`).
+    `matchesFeatureFlags` reads `survey-targeting-` keys with `sendFeatureFlagEvent = false` and
+    other keys with the configured default (`:325`). The linked-variant read is silent (`:336`).
+  - **Pass, #226** (**The local surveys option defaults to enabled**, `:537`).
+    `PostHogConfig.surveys` defaults to `true` (`posthog/src/main/java/com/posthog/PostHogConfig.kt:213`).
+    With only the default delegate installed, `canRenderSurveys()` (`:207`) skips matching and event
+    activation (`:880`, `:1254`). PostHog/posthog-android#1000 also waits for event activation before
+    reading an event survey's flags (`:284-288`).
 - **Backwards compatibility:** Backward-compatible; no public API changes.
 - **Remediation:** Drop `setLastSeenSurveyDate` from `setSurveySeen`. Exclude surveys with an undisplayable
   question before reserving, or release the reservation when `showSurvey` fails.
@@ -729,6 +907,8 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
   capability (`PostHogOkHttpInterceptor.kt`, a different capability per its own purpose statement).
   This capability is unimplemented on every platform in this repo, not exempted specifically for
   Android.
+- **4.0.3 (`fb616076`):** unchanged. Neither `posthog/src/main` nor `posthog-android/src/main` has
+  `/i/v1/traces`, `startSpan` or `resourceSpans`.
 - **Backwards compatibility:** Backward-compatible — the spec itself states tracing SHALL be off
   until the `traces` config is provided, so the entire public API surface is wholly new; nothing
   existing needs to change or deprecate.
@@ -760,7 +940,32 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
     null array elements stay JSON `null` at their indices; arrays are never compacted.
   - **Identity calls under a layered `false`** (#146 at `15501ca`). A `process_person_profile: true` call
     option beats every layer, and "SDK docs and migration guides SHALL show that call option on an
-    identity call as the way to keep identifying under a layered `false`".
+    identity call as the way to keep identifying under a layered `false`". **Superseded:** #146 as
+    merged (`3fb33bf`) replaces this rule, see the 4.0.3 paragraph.
+- **4.0.3 (`fb616076`), against `44fe27a`:** conforms.
+  - **Identity events skip the registered personless setting.** The merged #146 text in
+    **Caller-supplied event properties take precedence** (`capture/spec.md:406`) says: "A registered
+    `$process_person_profile`, and a `process_person_profile` option a wrapper SDK registers, SHALL
+    NOT be sent with the identity events … posthog-android 4.0 … do[es] this."
+    - `buildProperties` removes the registered property when `isIdentityEvent` is set
+      (`posthog/src/main/java/com/posthog/PostHog.kt:975`; `IDENTITY_EVENTS`, `:3440-3441`).
+    - `optionsForEvent` drops the registered option for those events (`:1141`).
+    - A value on the call still applies. `MIGRATION.md:660-666` documents the rule.
+    - The `@client` scenario **A registered personless setting does not reach identity events**
+      (`:476-487`) passes.
+  - **Set-like and listed sequence values** (#215, **Capture serializes set-like and listed sequence
+    property values as arrays**, `:1362`). Kotlin `Set`s and non-`List` `Deque`/`Queue` values reach
+    `GsonSafeMapSerializer`'s fallback (`internal/GsonSafeMapSerializer.kt:81-83`), and Gson writes them
+    as arrays. A unit test against the tag serialized
+    `setOf("a")`, `linkedSetOf("a","b","c")`, `ArrayDeque(listOf("x","y","z"))` and a set holding
+    `{"drop": null, "keep": 1}` as
+    `{"one":["a"],"many":["a","b","c"],"deque":["x","y","z"],"nested":{"inner":[{"keep":1}]}}`.
+    Order is kept and the null member is dropped.
+  - **GeoIP.** The new `disableGeoIp` option (PostHog/posthog-android#971, `PostHogConfig.kt:364-365`)
+    sets `$geoip_disable` after the caller merge (`PostHog.kt:1010-1012`). GeoIP control stays a
+    server-SDK requirement.
+  - **Wire.** A `401` now logs one always-on warning
+    (`internal/PostHogApi.kt:254-259`). Everything else in the `aaa23d39` paragraph below still holds.
 - **SDK currently (4.0, `aaa23d39`):** conforms.
   - **Identity-call guide (tracking 4.0).** The SDK behaves as required: a call option wins over a
     registered `$process_person_profile: false`. `MIGRATION.md:500` at `aaa23d39` doesn't show the call
@@ -869,6 +1074,18 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
   - **Compression.** `captureAiCompression` is independent of `compression`, as `capture-ai` requires.
     `http-client`'s whole-client opt-out excludes a delivery lane with its own compression setting, so
     the two rules agree.
+- **4.0.3 (`fb616076`), against `44fe27a`:** conforms. Two things changed.
+  - **#146 as merged (`3fb33bf`) rewords capture-ai.**
+    - It no longer names posthog-android. Applicability reads "`server`, and client SDKs on capture v1
+      that ship an AI method", which still covers android.
+    - The named client defaults (100 events, 60 s, 50 MiB, the 64 KiB headroom, clamping with a log)
+      become "Client SDKs MAY use a smaller default queue, an idle read and write timeout … and a
+      fixed disk cap" (`capture-ai/spec.md`, **AI lane configuration is scoped to the AI lane**).
+    - The quotes above are from the pre-merge text. Android's values fall within what the merged
+      text allows, so the score doesn't change.
+  - **Code.** An AI event's nested values are now copied before `beforeSend`, even without hooks
+    (`runBeforeSend(..., copyNested = aiLane)`, `posthog/src/main/java/com/posthog/PostHog.kt:1295`).
+    A caller that reuses a list can no longer grow the event past the size check before it is written.
 - **Backwards compatibility:** No change needed.
 - **Remediation:** None.
 
@@ -943,11 +1160,28 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
 
 <a id="n28"></a>
 
-### n28 — Identify (🟡 Partial; was ✅)
+### n28 — Identify (✅ Pass; was 🟡)
 - **Spec requires:** **Canonical identify behavior** (`identify/spec.md:178`): client SDKs keep running
   `identify` while opted out (#167), but "MUST NOT capture or send the `$identify` or `$set` event, and
-  MUST NOT update the person-properties dedup hash for an event it did not capture."
-- **SDK currently (4.0, `aaa23d39`):**
+  MUST NOT update the person-properties dedup hash for an event it did not capture." #208 (`81829c5`)
+  adds a rule in `identify` and `set-person-properties` (**The person-properties hash only tracks
+  updates that surely process the person**). The hash is checked, and recorded once the update is
+  queued, only when the update's `process_person_profile` setting "is missing or the Boolean `true`".
+  Any other value is sent without the check and clears the stored hash.
+- **SDK currently (4.0.3, `fb616076`):** conforms. PostHog/posthog-android#967 is in the tag.
+  - **Check without storing.** `personPropertiesHashIfChanged`
+    (`posthog/src/main/java/com/posthog/PostHog.kt:2507-2526`) checks against the stored hash but
+    doesn't store it. An update whose option isn't missing or `true` skips the check
+    (`surelyProcessesPersonProfile`, `:1166-1169`).
+  - **Store only once queued.** The same-id `$set`, the anonymous-to-identified `$set` and `$identify`
+    go through `captureInternal(..., personPropertiesHash = …)`. The hash is recorded only in the
+    callback that runs once the event is queued (`:1300-1306`).
+    `updatePersonPropertiesHashForQueuedEvent` (`:2536-2562`) records it only when the event as sent
+    after `beforeSend` keeps its name, distinct id and `$set`/`$set_once` payload and still surely
+    processes the person. Otherwise it clears the hash.
+  - **Opt-out.** A `$set` dropped while opted out is never queued, so the hash is left alone and the
+    same properties are sent after opt-in. `setPersonProperties` uses the same path (`:2399-2448`).
+- **Earlier finding, at 4.0 (`aaa23d39`), before #967:**
   - **Passes.** `identify()` (`posthog/src/main/java/com/posthog/PostHog.kt:2236-2371`) has no opt-out
     guard. It updates the ids, sets person properties for flags and reloads flags (`:2287-2317`); `capture`
     then drops the event. All four `@client` scenarios pass.
@@ -955,8 +1189,8 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
     `shouldCapturePersonPropertiesEvent` (`:2350-2358`, `:2450-2466`), and the anonymous-to-identified
     transition (`:2339-2342`). After opt-in, the same properties are treated as a duplicate and the `$set`
     is never sent. No scenario covers this path.
-- **Backwards compatibility:** Backward-compatible internal fix.
-- **Remediation:** Update the hash only after `capture` queued the event. [PostHog/posthog-android#967](https://github.com/PostHog/posthog-android/pull/967) does this on `main` (open); recheck once it reaches the 4.0 branch.
+- **Backwards compatibility:** No change needed.
+- **Remediation:** None. [PostHog/posthog-android#967](https://github.com/PostHog/posthog-android/pull/967) fixed it.
 
 <a id="n29"></a>
 

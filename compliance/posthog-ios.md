@@ -1,9 +1,9 @@
 # posthog-ios — SDK Compliance
 
 **Repo:** [PostHog/posthog-ios](https://github.com/PostHog/posthog-ios)
-**Audited commit:** `e27cbe4cb0bf5958fe79a061783af2dfb1b17ab4` ([commit](https://github.com/PostHog/posthog-ios/commit/e27cbe4cb0bf5958fe79a061783af2dfb1b17ab4)) on the 4.0 release branch `chore/v4-remove-deprecated` ([PostHog/posthog-ios#873](https://github.com/PostHog/posthog-ios/pull/873)), before 4.0.0 is published — first audited on 2026-11-05 at `3460e534a`, re-checked on 2026-11-10 (see [Re-check](#re-check-2026-11-10))
-**Audited against sdk-specs commit:** `752f899` plus [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79` (capture v1, including #147's AI lane), treated as merged to `main`; first audited against `dd11a6b`
-**Summary:** 44 ✅ · 14 🟡 · 1 ❌ · 10 ➖ (69 rows; previous audit 2026-10-08 at `f5cbe87c` + posthog-ios#924–#934 scored 38/16/4/6 on 64 rows)
+**Audited commit:** tag `4.0.5` at `5565e4714e80453353c10a441263c2a8f37bf0d1` ([tag](https://github.com/PostHog/posthog-ios/tree/4.0.5)), re-audited on 2026-11-24 as a delta from `e27cbe4cb` (see [4.0.5 re-audit](#405-re-audit-2026-11-24)); before that audited on 2026-11-05 at `3460e534a` and re-checked on 2026-11-10 at `e27cbe4cb` on the 4.0 release branch ([PostHog/posthog-ios#873](https://github.com/PostHog/posthog-ios/pull/873)) (see [Re-check](#re-check-2026-11-10))
+**Audited against sdk-specs commit:** `44fe27a` (includes merged capture v1, [#146](https://github.com/PostHog/sdk-specs/pull/146)); previously `752f899` plus #146 at `d387ab79`, first audited against `dd11a6b`
+**Summary:** 43 ✅ · 15 🟡 · 1 ❌ · 11 ➖ (70 rows; previous audit at `e27cbe4cb` scored 44/14/1/10 on 69 rows)
 
 Note on repo layout: `posthog-ios` is a single-package repo, distributed through Swift Package Manager
 only from 4.0. Core SDK logic lives at `PostHog/` (flat files: `PostHogSDK.swift` — the main public
@@ -20,8 +20,10 @@ only — no OTLP traces implementation exists), `PushNotifications/`. There is e
 any capability judged N/A (e.g. local flag evaluation, flag-definition polling, evaluate-flags, the AI
 dataset/scorer/evaluation APIs, emails) is N/A because the capability requires a personal or secret
 key a mobile app cannot safely hold, or is server-only per its spec's Applicability line, not because
-of a build-target split. All file paths below are relative to the posthog-ios repo root, and every
-line reference is at `e27cbe4cb`.
+of a build-target split. All file paths below are relative to the posthog-ios repo root. Line
+references re-verified in the 4.0.5 re-audit (the 4.0.5 section and notes n3, n4, n5, n11, n16, n19,
+n21, n23, n24, n26 and n27) are at `4.0.5`; the rest are at `e27cbe4cb`, in files the 4.0.5
+re-audit found unchanged or did not re-read.
 
 This audit re-verified all 64 existing rows against the 4.0 branch (posthog-ios commits since
 `f5cbe87c`, including capture v1 [#938](https://github.com/PostHog/posthog-ios/pull/938) and the
@@ -56,10 +58,56 @@ Net changes vs. the previous audit:
   variants read as disabled (Capture, Get Feature Flag Result, Get Feature Flags, Is Feature Enabled),
   and deferred crash reports following consent at crash time (Opt In).
 
+## 4.0.5 re-audit (2026-11-24)
+
+Delta audit of the released tag `4.0.5` (`5565e4714`) against sdk-specs `44fe27a`, starting from the
+`e27cbe4cb` audit below. The tag was compared with `e27cbe4cb` as trees, because #873 was squash-merged
+as `0dbc2245a`. Every open row was re-checked; none was fixed in 4.0.1–4.0.5.
+
+- **Rows that changed status:** Capture ✅→🟡: the sdk-specs #215 requirement "Capture serializes
+  set-like and listed sequence property values as arrays" lists `Set`/`NSSet` for Swift, and iOS
+  drops such a property ([n4](#n4)). New row: **Get Remote Config Payload** ➖ ("Server SDKs only. The
+  request needs a secret key, which must never reach a client.").
+- **Spec changes met without a status change:**
+  - Failed remote flags (#211), met by
+    [PostHog/posthog-ios#1059](https://github.com/PostHog/posthog-ios/pull/1059): a `failed: true`
+    record is not a value (`PostHog/PostHogRemoteConfig.swift:1325`). On an errored merge it doesn't
+    replace a served value (`:589-595`), and failed placeholders persisted by an older version are cleaned
+    at launch (`:155`, `:1034-1053`). Get Feature Flag Result, Get Feature Flags, Get Feature Flags And
+    Payloads and Is Feature Enabled (the caller's default wins) hold.
+  - Feature Flag Called Tracker: `$feature_flag_called` reports `evaluation_failed` and
+    `errors_while_computing_flags` in `$feature_flag_error` (`:931-943`; `PostHog/PostHogSDK.swift:3614-3616`). The
+    client-level `sendFeatureFlagEvent` default (#153) is met: every getter resolves
+    `sendFeatureFlagEvent ?? config.sendFeatureFlagEvent` (`:3373`), so a suppressed read never reaches
+    the dedupe tracker. A missing flag reports no value (#202): `$feature_flag_response` is `NSNull`
+    (`:3606`), which is omitted on the wire. See [n21](#n21).
+  - Synthesized stacks stop at the call site (#224), met by
+    [PostHog/posthog-ios#1079](https://github.com/PostHog/posthog-ios/pull/1079) ([n5](#n5)).
+  - Surveys: `survey-targeting-` flag reads send no event (#181), with `PostHog/Surveys/PostHogSurveyIntegration.swift:280-288`
+    covering every key field (`:154-171`) and the variant read passing `false` (`:297`). The local
+    option defaults to enabled (#226; `PostHog/PostHogConfig.swift:642`).
+  - A registered `$process_person_profile` is not sent on identity events (merged #146, d59f33a;
+    `PostHog/PostHogSDK.swift:659`, `:690-692`, `:896-899`; [n4](#n4)).
+  - Replay debug keys are dropped while replay is off (#232), met by
+    [PostHog/posthog-ios#1090](https://github.com/PostHog/posthog-ios/pull/1090), shipped in 4.0.3. The
+    queue-depth key is attached only at or above `flushAt` (#238, met in part by
+    [PostHog/posthog-ios#1102](https://github.com/PostHog/posthog-ios/pull/1102)); see [n26](#n26).
+- **Not applicable or met trivially:** the consent event once per opt-in (#183; iOS captures no
+  consent event), `POSTHOG_PROJECT_TOKEN` (#214; the token is read only from code), W3C `traceparent` (#219,
+  MAY), and the server-only flag, MCP and LLMA changes (#144, #168, #220, #229–#231, #233).
+- **Merged #146 vs. the `d387ab79` text audited earlier:** iOS is no longer named in the capture v1
+  lists (5d75baf), but the rules still apply to "client SDKs on capture v1". Null-property omission
+  is now a MAY (4bd0b50), and iOS omits. The `15501ca` docs requirement (n4) is gone, replaced by
+  d59f33a.
+- **Not audited:** the opt-in GPU capture path (`captureMethod = .gpu`, about 3,500 new lines under
+  `PostHog/Replay/`; the default stays `.standard`, `PostHog/Replay/PostHogSessionReplayConfig.swift:95`)
+  against Session Replay Privacy. The new `set-person-properties` scenario for a non-Boolean option
+  (#208) was not re-checked.
+
 ## Re-check (2026-11-10)
 
 Re-checked at the 4.0 branch head `e27cbe4cb` against sdk-specs `752f899` and #146 at `d387ab79`.
-Every line reference on this page is at `e27cbe4cb`.
+Line references in this section are at `e27cbe4cb`.
 
 - **Rows that changed status since the 2026-11-05 audit:** Capture, Capture AI and Capture Exception
   🟡→✅ ([PostHog/posthog-ios#1047](https://github.com/PostHog/posthog-ios/pull/1047) omits `NSNull`
@@ -103,9 +151,12 @@ Every line reference on this page is at `e27cbe4cb`.
 ## Capture v1
 
 4.0 sends analytics events through capture v1. These rows are scored against
-[#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79`, treated as merged: Capture
-([n4](#n4)), Capture AI ([n27](#n27)), Before Send Hook, Event Batcher, HTTP Client ([n22](#n22)) and
-Retry Queue.
+[#146](https://github.com/PostHog/sdk-specs/pull/146), first at `d387ab79` and re-checked against the
+merged text in the 4.0.5 re-audit: Capture ([n4](#n4)), Capture AI ([n27](#n27)), Before Send Hook,
+Event Batcher, HTTP Client ([n22](#n22)) and Retry Queue. The merged text names only the server SDKs
+(5d75baf). Client SDKs on capture v1 follow the same rules through "client SDKs" wording, so these
+scores hold. `PostHog/PostHogApi.swift` is unchanged at 4.0.5, so its line references below still
+apply.
 
 - **Wire.** `POST /i/v1/analytics/events` with a `{created_at, batch}` body and no `api_key`, `sent_at`
   or `offset` (`PostHog/PostHogApi.swift:212`, `:224-227`). Headers on every attempt: `Authorization:
@@ -141,9 +192,9 @@ Retry Queue.
 | 2 | Traces | ❌ | [n2] |
 | 3 | Tracing Headers | ✅ | new server span-context bridge requirements (#129) are `@server` only |
 | 4 | Alias | 🟡 | [n3] |
-| 5 | Capture | ✅ | was 🟡; [n4]; identity-call migration-guide example (#146 `15501ca`) lands in 4.0 with posthog-ios#1053; capture v1 wire conforms (#146); empty event names dropped (also after `beforeSend`); `NSNull` properties omitted (#1047); own `$lib` pair filled after caller properties (#1050); empty variant left out of `$active_feature_flags` |
-| 6 | Capture AI | ✅ | was ➖; #146 adds iOS 4.0 to Applicability; the AI lane conforms, including the `NSNull` cleanup (#1047) — [n27] |
-| 7 | Capture Exception | ✅ | was 🟡; [n5]; `NSNull` custom properties omitted (#1047) |
+| 5 | Capture | 🟡 | was ✅; [n4]; #215: a `Set`/`NSSet` property is dropped instead of sent as a JSON array. Capture v1 wire conforms (merged #146); registered `$process_person_profile` left off identity events; empty event names dropped; `NSNull` properties omitted (#1047, now a MAY); own `$lib` pair filled after caller properties (#1050); empty variant left out of `$active_feature_flags` |
+| 6 | Capture AI | ✅ | merged #146 applies it to "client SDKs on capture v1 that ship an AI method"; the AI lane conforms, including the `NSNull` cleanup (#1047) — [n27] |
+| 7 | Capture Exception | ✅ | [n5]; `NSNull` custom properties omitted (#1047); synthesized stacks start at the caller (#224, posthog-ios#1079) |
 | 8 | Create Person Profile | ➖ | unchanged — spec Applicability still says only the posthog-js family exposes it; no `createPersonProfile` in iOS |
 | 9 | Debug | ✅ | |
 | 10 | Exception Steps | 🟡 | was ✅; `NSNull` step members are byte-counted and buffered, then stripped on the queue and the wire — [n30](#n30) |
@@ -152,60 +203,61 @@ Retry Queue.
 | 13 | Get Distinct ID | ✅ | |
 | 14 | Get Feature Flag | ✅ | per-call option is `sendFeatureFlagEvent` (#109) |
 | 15 | Get Feature Flag Payload | ✅ | was 🟡; getter removed in 4.0, payload read through `getFeatureFlagResult` as the spec now permits — [n7] |
-| 16 | Get Feature Flag Result | ✅ | was 🟡; malformed payload → `nil`; an empty variant reads as disabled (#193) — [n8] |
+| 16 | Get Feature Flag Result | ✅ | malformed payload → `nil`; empty variant reads as disabled (#193); a failed record returns no result (#211, posthog-ios#1059) — [n8] |
 | 17 | Get Feature Flags | 🟡 | was ❌; spec now records `getAllFeatureFlags()`'s result list as the iOS 4.0 surface; empty variant entries read as disabled (#193) — [n9] |
 | 18 | Get Feature Flags And Payloads | 🟡 | was ❌; spec now points iOS 4.0 at the payload-carrying `getAllFeatureFlags()` — [n10] |
 | 19 | Evaluate Flags | ➖ | unchanged: still "applies to server SDKs"; #111/#85 additions are server snapshot reads |
-| 20 | Get Session ID | 🟡 | [n11] |
-| 21 | Group | ✅ | [n12] |
-| 22 | Group Identify | ✅ | [n13] |
-| 23 | Identify | ✅ | new #167 rule met: opt-out gates only the `$identify` event (`PostHog/PostHogSDK.swift:1225-1269`) |
-| 24 | Is Feature Enabled | ✅ | was 🟡; `isFeatureEnabled(_:defaultValue:)` added — [n14] |
-| 25 | Is Opt Out | ✅ | |
-| 26 | Is Session Replay Active | ✅ | |
-| 27 | On Feature Flags | ✅ | [n28]; new requirements met: loads in flight across `reset()` are dropped (#1048), empty variants left out of listener flags (#193) |
-| 28 | Opt In | 🟡 | [n15]; deferred crash reports follow consent at crash time (#199, met) |
-| 29 | Register | ✅ | SDK → registered → caller order (`PostHog/PostHogSDK.swift:838-917`); the SDK's own `$lib` pair fills last, the one exception (`:919-922`) |
-| 30 | Reload Feature Flags | ✅ | |
-| 31 | Reset | 🟡 | [n16] |
-| 32 | Reset Group Properties For Flags | ✅ | |
-| 33 | Reset Person Properties For Flags | ✅ | |
-| 34 | Screen | ✅ | |
-| 35 | Set Group Properties For Flags | ✅ | |
-| 36 | Set Person Properties | ✅ | |
-| 37 | Set Person Properties For Flags | ✅ | |
-| 38 | Setup | ✅ | `projectToken` naming met (`PostHog/PostHogConfig.swift:62`); `apiKey` removed in a major, which the spec allows |
-| 39 | Shutdown | ✅ | [n17]; the new timeout requirement (#135) applies only where shutdown takes a timeout |
-| 40 | Start Session Recording | ✅ | |
-| 41 | Stop Session Recording | ✅ | [n18] |
-| 42 | Unregister | ✅ | |
-| 43 | Application Lifecycle | ✅ | build-invariant rule met (`$app_build_xcode`/`$app_build_sdk` on install/update only); `version`/`build` dropped in 4.0. `$lib`/`$lib_version` stay on every enqueued event; on the wire see "Capture v1" above |
-| 44 | Autocapture | ✅ | |
-| 45 | Before Send Hook | ✅ | after the hook only the uuid is re-imposed (#146 allowance); `options` is non-optional, so the absent-options allowance doesn't arise; a throwing hook logs the event and exception name only, in debug mode |
-| 46 | Consent Gating | ✅ | identify updates local state while opted out and only skips the event, matching #167; deferred crash reports follow consent at crash time (#199, [n15]) |
-| 47 | Device ID Generator | ✅ | |
-| 48 | Event Batcher | ✅ | byte-aware check-before-append batching at 5 MiB (`PostHog/PostHogQueue.swift:544-548`); no analytics per-event cap; a multi-event 413 halves the batch (client allowance) |
-| 49 | Exception Event Metadata | 🟡 | [n19]; caller properties can still override `$exception_level`/`$exception_source`; trace context (#123) and job-retry handled state (#205) are server-only |
-| 50 | Feature Flag Cache | ✅ | was 🟡; malformed → `nil`, bootstrap payloads decoded once — [n20] |
-| 51 | Feature Flag Called Tracker | ✅ | [n21]; config-version-2 attribution (now `$feature_flag_variant_key`, #203) needs `/flags?v=4`, which iOS does not request |
-| 52 | Flag Definition Loader | ➖ | unchanged: new keyless-provider and polling-opt-out requirements are server-only |
-| 53 | HTTP Client | ✅ | [n22]; gzip by default; `compression = .none` turns compression off for every request except the AI lane, which has its own `captureAiCompression`, as #146 now allows |
-| 54 | Local Feature Flag Evaluator | ➖ | unchanged: no local rule engine |
-| 55 | Persistent Storage | 🟡 | [n23] |
-| 56 | Remote Config | ✅ | |
-| 57 | Retry Queue | ✅ | capture v1 status set; jitter factor `[0.75, 1.25)`, capped at 30 s, `Retry-After` floor applied after jitter, also on 2xx retries (`PostHog/PostHogQueue.swift:14-43`, `:247-256`); no attempt limit (client allowance); retries exclude new events (#180) |
-| 58 | Session Manager | ✅ | |
-| 59 | Session Replay Ingestion Controls | ✅ | |
-| 60 | Session Replay Privacy | 🟡 | was ❌; 4.0 removes wireframe mode, the only path that leaked; SwiftUI `postHogMask()` wins over an enclosing `postHogNoMask()` (over-masks, not a leak) — [n24] |
-| 61 | Surveys | ✅ | popup-delay (#121) and wait-period (#102) SHALLs met since #1049; the SHOULD eligibility re-check when the delay elapses is not met and not scored — [n29] |
-| 62 | Bootstrap | 🟡 | [n25] |
-| 63 | MCP Analytics | ➖ | Applicability is `server` add-on; no iOS package |
-| 64 | Session Replay Debug Properties | 🟡 | [n26]; (c) fixed and new precedence rule (#155) met; (a), (b) still open; (d) off-state shape open (posthog-ios#1090) |
-| 65 | Experiment Exposure | ➖ | **new row**: applies to SDKs that read `/flags?v=4` records; iOS requests `v=2` (`PostHog/PostHogApi.swift:595-599`), so config-version-2 flags read as legacy values |
-| 66 | AI Datasets | ➖ | **new row**: server SDKs only (personal API key); no iOS surface |
-| 67 | AI Scorers | ➖ | **new row**: server SDKs only (personal API key); no iOS surface |
-| 68 | Offline Evaluations | ➖ | **new row**: server SDKs only; no iOS surface |
-| 69 | Emails | ➖ | **new row**: "Server SDKs only" — needs a secret key that must never reach a client |
+| 20 | Get Remote Config Payload | ➖ | **new row**: "Server SDKs only. The request needs a secret key, which must never reach a client." |
+| 21 | Get Session ID | 🟡 | [n11] |
+| 22 | Group | ✅ | [n12] |
+| 23 | Group Identify | ✅ | [n13] |
+| 24 | Identify | ✅ | new #167 rule met: opt-out gates only the `$identify` event (`PostHog/PostHogSDK.swift:1225-1269`) |
+| 25 | Is Feature Enabled | ✅ | was 🟡; `isFeatureEnabled(_:defaultValue:)` added — [n14] |
+| 26 | Is Opt Out | ✅ | |
+| 27 | Is Session Replay Active | ✅ | |
+| 28 | On Feature Flags | ✅ | [n28]; new requirements met: loads in flight across `reset()` are dropped (#1048), empty variants left out of listener flags (#193) |
+| 29 | Opt In | 🟡 | [n15]; deferred crash reports follow consent at crash time (#199, met) |
+| 30 | Register | ✅ | SDK → registered → caller order (`PostHog/PostHogSDK.swift:838-917`); the SDK's own `$lib` pair fills last, the one exception (`:919-922`) |
+| 31 | Reload Feature Flags | ✅ | |
+| 32 | Reset | 🟡 | [n16] |
+| 33 | Reset Group Properties For Flags | ✅ | |
+| 34 | Reset Person Properties For Flags | ✅ | |
+| 35 | Screen | ✅ | |
+| 36 | Set Group Properties For Flags | ✅ | |
+| 37 | Set Person Properties | ✅ | |
+| 38 | Set Person Properties For Flags | ✅ | |
+| 39 | Setup | ✅ | `projectToken` naming met (`PostHog/PostHogConfig.swift:62`); `apiKey` removed in a major, which the spec allows |
+| 40 | Shutdown | ✅ | [n17]; the new timeout requirement (#135) applies only where shutdown takes a timeout |
+| 41 | Start Session Recording | ✅ | |
+| 42 | Stop Session Recording | ✅ | [n18] |
+| 43 | Unregister | ✅ | |
+| 44 | Application Lifecycle | ✅ | build-invariant rule met (`$app_build_xcode`/`$app_build_sdk` on install/update only); `version`/`build` dropped in 4.0. `$lib`/`$lib_version` stay on every enqueued event; on the wire see "Capture v1" above |
+| 45 | Autocapture | ✅ | |
+| 46 | Before Send Hook | ✅ | after the hook only the uuid is re-imposed (#146 allowance); `options` is non-optional, so the absent-options allowance doesn't arise; a throwing hook logs the event and exception name only, in debug mode |
+| 47 | Consent Gating | ✅ | identify updates local state while opted out and only skips the event, matching #167; deferred crash reports follow consent at crash time (#199, [n15]) |
+| 48 | Device ID Generator | ✅ | |
+| 49 | Event Batcher | ✅ | byte-aware check-before-append batching at 5 MiB (`PostHog/PostHogQueue.swift:544-548`); no analytics per-event cap; a multi-event 413 halves the batch (client allowance) |
+| 50 | Exception Event Metadata | 🟡 | [n19]; caller properties can still override `$exception_level`/`$exception_source`; trace context (#123) and job-retry handled state (#205) are server-only |
+| 51 | Feature Flag Cache | ✅ | was 🟡; malformed → `nil`, bootstrap payloads decoded once — [n20] |
+| 52 | Feature Flag Called Tracker | ✅ | [n21]; client-level event default (#153), missing flag reports no value (#202) and `evaluation_failed` (#211, posthog-ios#1059) met; config-version-2 attribution needs `/flags?v=4`, which iOS does not request |
+| 53 | Flag Definition Loader | ➖ | unchanged: new keyless-provider and polling-opt-out requirements are server-only |
+| 54 | HTTP Client | ✅ | [n22]; gzip by default; `compression = .none` turns compression off for every request except the AI lane, which has its own `captureAiCompression`, as #146 now allows |
+| 55 | Local Feature Flag Evaluator | ➖ | unchanged: no local rule engine |
+| 56 | Persistent Storage | 🟡 | [n23] |
+| 57 | Remote Config | ✅ | |
+| 58 | Retry Queue | ✅ | capture v1 status set; jitter factor `[0.75, 1.25)`, capped at 30 s, `Retry-After` floor applied after jitter, also on 2xx retries (`PostHog/PostHogQueue.swift:14-43`, `:247-256`); no attempt limit (client allowance); retries exclude new events (#180) |
+| 59 | Session Manager | ✅ | |
+| 60 | Session Replay Ingestion Controls | ✅ | |
+| 61 | Session Replay Privacy | 🟡 | was ❌; 4.0 removes wireframe mode, the only path that leaked; SwiftUI `postHogMask()` wins over an enclosing `postHogNoMask()` (over-masks, not a leak) — [n24] |
+| 62 | Surveys | ✅ | popup-delay (#121) and wait-period (#102) SHALLs met since #1049; `survey-targeting-` reads send no event (#181) and surveys default on (#226); the SHOULD eligibility re-check when the delay elapses is not met and not scored — [n29] |
+| 63 | Bootstrap | 🟡 | [n25] |
+| 64 | MCP Analytics | ➖ | Applicability is `server` add-on; no iOS package |
+| 65 | Session Replay Debug Properties | 🟡 | [n26]; (c) and (d) fixed ((d) by posthog-ios#1090, 4.0.3); (a), (b) still open; caller or registered `$sdk_debug_pending_queue_size` not removed or replaced (#238) |
+| 66 | Experiment Exposure | ➖ | **new row**: applies to SDKs that read `/flags?v=4` records; iOS requests `v=2` (`PostHog/PostHogApi.swift:595-599`), so config-version-2 flags read as legacy values |
+| 67 | AI Datasets | ➖ | **new row**: server SDKs only (personal API key); no iOS surface |
+| 68 | AI Scorers | ➖ | **new row**: server SDKs only (personal API key); no iOS surface |
+| 69 | Offline Evaluations | ➖ | **new row**: server SDKs only; no iOS surface |
+| 70 | Emails | ➖ | **new row**: "Server SDKs only" — needs a secret key that must never reach a client |
 
 ## Notes
 
@@ -242,88 +294,91 @@ Retry Queue.
   dropped when required identities are missing" requires a drop plus a validation warning. Behavior
   step 4 (`openspec/specs/alias/spec.md:73`) still says mobile helpers need not duplicate
   `distinct_id`, which conflicts with the scenario.
-- **SDK currently:** `alias(_:options:)` (`PostHog/PostHogSDK.swift:2557-2592`) gained an `options`
-  parameter in 4.0 but still builds `let props = ["alias": alias]` (`:2574`) with no `distinct_id`,
+- **SDK currently:** Unchanged at 4.0.5. `alias(_:options:)` (`PostHog/PostHogSDK.swift:2588-2622`) gained an `options`
+  parameter in 4.0 but still builds `let props = ["alias": alias]` (`:2605`) with no `distinct_id`,
   and has no blank-alias guard, so `alias("")` is enqueued. The source id always resolves through
-  `getDistinctId()` (`:2576`), so the missing-previous-id case can't happen.
+  `getDistinctId()` (`:2607`), so the missing-previous-id case can't happen.
 - **Backwards compatibility:** Backward-compatible. Both fixes are additive.
 - **Remediation:** Set `props["distinct_id"] = distinctId` (or fix the spec scenario to match
   Behavior step 4), and drop a blank alias with a log, as `identify()` does.
 
-### n4 — Capture (✅ Pass; was 🟡)
-- **Spec requires:** "Capture drops null-valued object properties" (`@both` scenarios): explicit
-  nulls (`NSNull()`) omitted from custom properties recursively, null array elements kept at their
-  index, emptied objects kept as `{}`, applied after `before_send` and on disk serialization.
-  Behavior step 2 / Error handling: drop events with an empty or invalid name. "Caller-supplied event
-  properties take precedence" (#114/#143, client order SDK → registered → caller, a caller value
-  changes that event only), with `$lib`/`$lib_version` as its one exception in #146 at `d387ab79`:
-  "Events name their own library" has every capture v1 SDK fill its own pair after every other layer
-  and before `before_send` (both when `$lib` is unset, only the version when `$lib` is the SDK's own
-  name, never the SDK's version on another library's `$lib`). New on `main` (#193): "Empty variant is
-  not an active feature flag". "Event uuid is sent in canonical form" (#119) and "Client-level GeoIP
-  control" (#131) are server requirements ("Client SDKs SHALL NOT require the option"); "Client-side
-  capture rate limiting never loses tokens to a clock change" (#127) applies only to a client SDK that
-  rate-limits captures (posthog-js). #146 at `15501ca` adds that "SDK docs and migration guides SHALL
-  show that call option on an identity call as the way to keep identifying under a layered `false`".
+### n4 — Capture (🟡 Partial; was ✅)
+- **Spec requires:**
+  - **New (#215):** "Capture serializes set-like and listed sequence property values as arrays"
+    (`openspec/specs/capture/spec.md:1362`): such a value "SHALL serialize as a JSON array of its
+    elements. The SDK MUST NOT serialize such a value as an empty object, as JSON `null`, or as a string
+    representation of the container, and MUST NOT drop the property or the event because of it". The
+    runtime table lists `Set` and `NSSet` for Swift / Objective-C (`:1374`).
+  - **Merged #146 (d59f33a):** "A registered `$process_person_profile` … SHALL NOT be sent with the
+    identity events `$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`, `$set` and
+    `$set_once`" (`:406`). This replaces the `15501ca` rule that docs show a per-call option on identity
+    calls.
+  - **Merged #146 (4bd0b50):** "Capture drops null-valued object properties" is now a MAY ("An SDK MAY
+    omit…"). An SDK that omits must still clean recursively, keep null array elements at their index,
+    keep emptied objects as `{}`, and apply the cleanup after `before_send` and on disk serialization.
+  - **Unchanged:** drop empty or invalid event names (Behavior step 2 / Error handling); client
+    precedence SDK → registered → caller, with `$lib`/`$lib_version` as the one exception ("Events name
+    their own library", now scoped to capture v1); "Empty variant is not an active feature flag" (#193).
+    #119 and #131 are server requirements; #127 applies only to an SDK that rate-limits captures.
 - **SDK currently:**
-  - **Identity calls under a registered `false` (tracking 4.0).** A per-call
-    `process_person_profile: true` keeps an `identify`, `alias`, `group` or `setPersonProperties`
-    event processed. `MIGRATION.md` at `e27cbe4cb` (line 297) doesn't show it yet; the example lands
-    in 4.0 with [PostHog/posthog-ios#1053](https://github.com/PostHog/posthog-ios/pull/1053), which
-    targets the release branch, so this audit doesn't score it as a gap. Recheck at the release-tag repin.
-  - **Empty event names are dropped.** `prepareCaptureEvent` checks after `beforeSend`
-    (`PostHog/PostHogSDK.swift:2102-2109`) and `queueEvent` checks again for every path
-    (`:2745-2751`), with a one-time warning (`:2664-2672`). Whitespace-only names still pass; the
-    spec says "non-empty", so that is not flagged.
+  - **Gap: sets are dropped (#215).** Every capture path runs caller properties through
+    `sanitizeDictionary` (`PostHog/Utils/DictUtils.swift:48-63`; for example
+    `PostHog/PostHogSDK.swift:2035`). `isValidObject` (`DictUtils.swift:211`) rejects a set, and
+    `sanitizeInvalidValue` (`:70-85`) converts only `URL`, `Date`, dictionaries and `[Any]`. So a `Set` or
+    `NSSet` property is removed, with a debug-only `"isn't serializable, dropping the item"` log (`:62`).
+    Falsification: run locally, `Set(["a"]) as Any as? [Any]` and the `NSSet` equivalent are both
+    `nil`, and `JSONSerialization.isValidJSONObject` rejects both. No other set handling exists on the
+    serialization path. The public API takes `[String: Any]`, so callers can pass one.
+  - **Identity events (met).** `optionsForEvent` removes a registered `process_person_profile` for
+    the six identity events (`PostHog/PostHogSDK.swift:659`, `:690-692`). `buildProperties` removes a
+    registered `$process_person_profile` after merging super properties (`:896-899`). A value on the
+    call still applies (`:941`). `MIGRATION.md:577` documents it.
+  - **Empty event names are dropped** after `beforeSend` (`PostHog/PostHogSDK.swift:2131`) and again
+    in `queueEvent` for every path (`:2783`). Whitespace-only names pass; the spec says "non-empty", so
+    that is not flagged.
   - **Null-valued properties are omitted**
-    ([PostHog/posthog-ios#1047](https://github.com/PostHog/posthog-ios/pull/1047)).
-    `droppingNullProperties` (`PostHog/Utils/DictUtils.swift:151-201`) removes `NSNull` and boxed-`nil`
-    members recursively, including dictionaries inside arrays and dictionaries with non-string keys;
-    null array elements keep their index and an emptied dictionary stays `{}`. The analytics and AI
-    queues apply it when an event is written to disk, after `beforeSend`
-    (`PostHog/QueueEndpoint+Factories.swift:48`, `:79`; `PostHog/Models/PostHogEvent.swift:130-134`),
-    and `captureV1JSON` applies it again at send (`PostHog/PostHogApi.swift:411`), which covers events
-    queued by an earlier version. `$set`, `$set_once` and `$group_set` keep their nulls
-    (`DictUtils.swift:139`), which `identify` and `group-identify` require (their scenarios keep
-    `null` values in `$set` and `$group_set`). Replay snapshots are not cleaned; they are not capture
-    events.
-  - **Library identity.** `buildProperties` no longer merges `sdkInfo` as a context layer; after the
-    caller's properties it calls `fillLibraryIdentity` (`PostHog/PostHogSDK.swift:699-710`,
-    `:919-922`; [PostHog/posthog-ios#1050](https://github.com/PostHog/posthog-ios/pull/1050)). A missing,
-    empty or non-string `$lib` gets both values, replacing a lone `$lib_version`; `$lib == "posthog-ios"`
-    (or the wrapper's configured name) with no non-empty `$lib_version` gets the version; any other
-    `$lib` is left alone. `beforeSend` runs after, on the filled values. So "Caller property overrides
-    an SDK context property" (`$lib: custom-lib`) and the `@client` "Another library's $lib does not get
-    the SDK's version" both hold. The memory-exception path with no saved context merges `sdkInfo`
-    under its own properties (`PostHog/ErrorTracking/PostHogMemoryExceptionReporter.swift:74`), which
-    has the same result because nothing else sets `$lib` there.
-  - **Empty variant.** `dynamicContext` stamps `$feature/<key>` for every cached flag but adds a key to
-    `$active_feature_flags` only when its value is not `false` and not `""`
-    (`PostHog/PostHogSDK.swift:602-626`).
-  - **Precedence:** SDK context and SDK-set values first, then `getRegisteredProperties()`
-    (`PostHog/PostHogSDK.swift:874-875`), then caller properties (`:896-917`); SDK state is not
-    changed by a caller value. iOS has no client-side capture rate limiter, so #127 does not apply.
-    #119 and #131 are server-only (`config.disableGeoIp` still stamps `$geoip_disable`, `:848-850`).
-    UTC millisecond timestamps, `before_send` before enqueue, and the ObjC-hook-exception drop are
-    unchanged.
-  - **Capture v1 (#146):** wire, headers, per-event results, options hoisting, `$lib`/`$lib_version`
-    kept, session/window id lifting, blank distinct id fallback, timestamps (three fractional digits,
-    a client allowance) and fail-open token; see [Capture v1](#capture-v1).
-- **Backwards compatibility:** Shipped in the 4.0 changeset and `MIGRATION.md`: null-valued properties
-  are no longer sent, and a caller's `$lib` no longer gets the SDK's `$lib_version`. `[String: Any]`
-  types are unchanged.
+    ([PostHog/posthog-ios#1047](https://github.com/PostHog/posthog-ios/pull/1047)), as the MAY permits.
+    `droppingNullProperties` (`PostHog/Utils/DictUtils.swift:151-201`) cleans recursively, keeps null
+    array elements and `{}`, and runs when the analytics and AI queues write an event to disk
+    (`PostHog/QueueEndpoint+Factories.swift:48`, `:79`) and again in `captureV1JSON`
+    (`PostHog/PostHogApi.swift:411`). `$set`, `$set_once` and `$group_set` keep their nulls
+    (`DictUtils.swift:139`).
+  - **Library identity.** After the caller's properties, `fillLibraryIdentity`
+    (`PostHog/PostHogSDK.swift:722`, called at `:945`) fills both values when `$lib` is missing, and only
+    the version when `$lib` is the SDK's own name; any other `$lib` is left alone. `beforeSend` runs
+    after. ([PostHog/posthog-ios#1050](https://github.com/PostHog/posthog-ios/pull/1050))
+  - **Empty variant.** `$feature/<key>` is stamped for every cached flag; `isActiveFlagValue` leaves
+    `false` and `""` out of `$active_feature_flags` (`PostHog/PostHogSDK.swift:610-626`).
+  - **Precedence:** SDK values, then registered properties (`:896`), then caller properties (`:941`).
+  - **Capture v1 (merged #146):** see [Capture v1](#capture-v1).
+- **Backwards compatibility:** Converting sets is additive: a property that is dropped today would be
+  sent. Shipped in 4.0: nulls omitted, and a caller's `$lib` keeps its own version.
+- **Remediation:** In `sanitizeInvalidValue`, add `if let set = value as? NSSet` before the `[Any]` branch
+  and return `sanitizeArray(set.allObjects)`. A Swift `Set` bridges to `NSSet`; this was checked locally.
+  Keep an empty set as `[]`: don't let it fall into the "empty array is omitted" rule. Add a test for
+  `Set<String>`, `NSSet` and a nested set.
 
 ### n5 — Capture Exception (✅ Pass; was 🟡)
 - **Spec requires:** Applicability is now `both` (server delivery scenarios are `@server`). "Exception
-  capture drops null-valued custom object properties" follows capture's null rule. "Ignored exception
+  capture drops null-valued custom object properties" follows capture's null rule (a MAY since merged
+  #146). "Ignored exception
   types" (optional) drops matching `$exception` events on every path and platform. New: "Fatal
-  exception payloads keep their exception data" for a separate fatal-path serializer.
-- **SDK currently:** Fixed since `f5cbe87c` ([#930](https://github.com/PostHog/posthog-ios/pull/930),
+  exception payloads keep their exception data" for a separate fatal-path serializer. New (#224):
+  "Synthesized stacks stop at the application call site" (`openspec/specs/capture-exception/spec.md:275`):
+  "that stack SHALL end at the application frame that called the public exception-capture API … in
+  every build configuration", with no frame added by one overload delegating to another.
+- **SDK currently:** #224 is met since [PostHog/posthog-ios#1079](https://github.com/PostHog/posthog-ios/pull/1079)
+  (in 4.0.0). Every public `captureException`/`captureExceptionObjC` overload reads
+  `Thread.callStackReturnAddresses.dropFirst()` in its own body (`PostHog/PostHogSDK.swift:4091`,
+  `:4108`, `:4124`, and the `NSException` overloads after them), no overload calls another, and the
+  addresses are symbolicated with `stripTopPostHogFrames: true`
+  (`PostHog/ErrorTracking/PostHogExceptionProcessor.swift:436`). Not verified: a release SPM build with
+  cross-module optimization inlining an entry point; read from code, not run. Fixed since `f5cbe87c` ([#930](https://github.com/PostHog/posthog-ios/pull/930),
   merged): the matcher is platform-neutral
   (`PostHog/ErrorTracking/PostHogErrorTrackingAutoCaptureIntegration.swift:347-368`) and
-  `captureInternal` applies it to every `$exception` (`PostHog/PostHogSDK.swift:1973-1981`); crash
+  `captureInternal` applies it to every `$exception` (`PostHog/PostHogSDK.swift:2002-2007` at 4.0.5); crash
   reports are filtered too (`PostHogErrorTrackingAutoCaptureIntegration.swift:292-296`).
-  `captureExceptionEvent` (`PostHog/PostHogSDK.swift:4247-4261`) still merges caller properties as
+  `captureExceptionEvent` (`PostHog/PostHogSDK.swift:4335-4349` at 4.0.5) still merges caller properties as
   given, but every `$exception`, manual or from a crash report, goes through the analytics queue, whose
   encoder now drops null-valued members (#1047, see [n4](#n4)). The fatal-path requirement is met in
   effect: crash reports are processed on the next launch by `PostHogCrashReportProcessor`, which keeps
@@ -415,9 +470,9 @@ Retry Queue.
 ### n11 — Get Session ID (🟡 Partial)
 - **Spec requires:** "Session id rotates after inactivity timeout": after the timeout `getSessionId()` returns a
   different id (or, per Lifecycle, no active session).
-- **SDK currently:** Unchanged. `getSessionId()` (`PostHog/PostHogSDK.swift:483-489`) reads with `readOnly: true`,
+- **SDK currently:** Unchanged at 4.0.5. `getSessionId()` (`PostHog/PostHogSDK.swift:485-491`) reads with `readOnly: true`,
   and `PostHogSessionManager.getSessionId` returns the stored id before any expiry check
-  (`PostHog/PostHogSessionManager.swift:119-121`; checks at `:128-140`). An expired id is returned until the next
+  (`PostHog/PostHogSessionManager.swift:115-118`; checks at `:120-137`). An expired id is returned until the next
   event or activity rotates it.
 - **Backwards compatibility:** Backward-compatible for either fix.
 - **Remediation:** In the read-only path, return `nil` when the activity or max-length threshold has expired, or
@@ -484,10 +539,10 @@ Retry Queue.
 
 ### n16 — Reset (🟡 Partial)
 - **Spec requires:** reset clears user-scoped state including opt-out persistence.
-- **SDK currently:** Unchanged. `reset()` (`PostHog/PostHogSDK.swift:967-1024`) clears identity, super properties,
-  flags, the flag-called tracker (`:993-995`) and the session. `storage.reset` deletes the persisted `.optOut` key
-  (`PostHog/PostHogStorage.swift:514`), but `reset()` never clears the in-memory `config.optOut` that
-  `isOptOutState()` (`PostHog/PostHogSDK.swift:1465-1471`) and `isOptOut()` (`:3732-3738`) read, so an opted-out
+- **SDK currently:** Unchanged at 4.0.5. `reset()` (`PostHog/PostHogSDK.swift:991` onward) clears identity, super properties,
+  flags, the flag-called tracker (`:1017-1019`) and the session. `storage.reset` deletes the persisted `.optOut` key
+  (`PostHog/PostHogStorage.swift:515`), but `reset()` never clears the in-memory `config.optOut` that
+  `isOptOutState()` (`PostHog/PostHogSDK.swift:1494`) and `isOptOut()` (`:3773`) read, so an opted-out
   user stays opted out until the next launch.
 - **Backwards compatibility:** Signature-compatible; runtime behavior for opted-out users who call `reset()`
   changes, so it needs a release note.
@@ -522,15 +577,15 @@ Retry Queue.
   `value: ""` for a reason-less `NSException` (`PostHogExceptionProcessor.swift:273-274`); UUID-less
   images skipped on the crash path (`PostHogCrashReportProcessor.swift:239-242`) and live path
   (`PostHog/ErrorTracking/Utils/PostHogDebugImageProvider.swift:99`); `$exception_list` and
-  `$debug_images` protected from caller properties (`PostHog/PostHogSDK.swift:4242-4257`).
+  `$debug_images` protected from caller properties (`PostHog/PostHogSDK.swift:4330-4349` at 4.0.5).
 - **Spec requires:** "Application property bags MUST NOT override SDK-owned `$exception_list`,
   `$exception_level`, `$exception_source`, `$debug_images`"
   (`openspec/specs/exception-event-metadata/spec.md:300`). New since `f238b16` (#123): active
   OpenTelemetry trace context as `$trace_id`/`$span_id` — server SDKs only; "Client SDKs, which have
   no ambient OpenTelemetry API, do not derive these properties", which iOS satisfies (no
   `$trace_id`/`$span_id` derivation in `PostHog/`).
-- **SDK currently:** `reservedExceptionPropertyKeys` holds only `$exception_list` and `$debug_images`
-  (`PostHog/PostHogSDK.swift:4242-4245`), so caller properties still override `$exception_level`
+- **SDK currently:** Unchanged at 4.0.5. `reservedExceptionPropertyKeys` holds only `$exception_list` and `$debug_images`
+  (`PostHog/PostHogSDK.swift:4330-4333`), so caller properties still override `$exception_level`
   (hard-coded `"error"`, `PostHogExceptionProcessor.swift:108`) and `$exception_source`. This is
   deliberate: there is no typed level parameter, so the property bag is the only way to set a level,
   and posthog-android/posthog-js also let callers win.
@@ -553,11 +608,24 @@ Retry Queue.
 ### n21 — Feature Flag Called Tracker (✅ Pass)
 - **Spec requires:** dedupe per flag/value, clear on reset and shutdown, a server-gated minimal event whose
   allowlist covers session-attribution keys. New (#162): config-version-2 attribution and dedupe key for
-  `/flags?v=4` records.
-- **SDK currently:** Allowlist includes `$referring_domain`, the `utm_*` keys, `gad_source`, `mc_cid`,
-  `gclid`, `fbclid` (`PostHog/PostHogSDK.swift:3493-3536`); dedupe in `reportFeatureFlagCalled`
-  (`:3538`ff), cleared on `reset()` (`:993-995`) and `close()` (`:3792-3794`); the minimal gate is
-  persisted with the flags (`PostHog/PostHogRemoteConfig.swift:570`). iOS requests `/flags?v=2`
+  `/flags?v=4` records. New on `main`: "Client-level feature flag event default" (#153,
+  `openspec/specs/feature-flag-called-tracker/spec.md:648`): every read resolves per-call option →
+  client-level config → `true`, and a `false` decision "SHALL NOT consult or update the dedupe tracker".
+  "A missing flag reports no value" (#202, `:198`): `$feature_flag_response` absent or `null`, never `""`.
+  "Failed direct getter evaluations report evaluation_failed" (#211, `:595`).
+- **SDK currently:** Line references at 4.0.5. Allowlist includes `$referring_domain`, the `utm_*` keys, `gad_source`, `mc_cid`,
+  `gclid`, `fbclid` and `$feature_flag_error` (`PostHog/PostHogSDK.swift:3530-3573`); dedupe in `reportFeatureFlagCalled`
+  (`:3575`ff), cleared on `reset()` (`:1017-1019`) and `close()` (`:3833-3835`); the minimal gate is
+  persisted with the flags (`PostHog/PostHogRemoteConfig.swift:575`). #153: every getter routes through
+  `getFeatureFlagResult`, which resolves `sendFeatureFlagEvent ?? config.sendFeatureFlagEvent`
+  (`PostHog/PostHogSDK.swift:3373`) and only then calls the tracker, so a suppressed read leaves it
+  untouched. #202: a missing flag sends `$feature_flag_response: NSNull()` (`:3606`), which the queue
+  encoder omits, and an empty variant sends `""`. #211
+  ([PostHog/posthog-ios#1059](https://github.com/PostHog/posthog-ios/pull/1059)): `getFeatureFlagErrors`
+  reports `evaluation_failed` for a present `failed: true` record with no served value and
+  `errors_while_computing_flags` from the persisted response bit (`PostHog/PostHogRemoteConfig.swift:931-943`),
+  sent as `$feature_flag_error` (`PostHog/PostHogSDK.swift:3614-3616`); a failed record never becomes a
+  value (`PostHog/PostHogRemoteConfig.swift:1325`), so the response is the missing sentinel. iOS requests `/flags?v=2`
   (`PostHog/PostHogApi.swift:595-599`), so config-version-2 records never reach it and the new
   attribution rules have nothing to act on (the spec: such an SDK "sees config version 2 flags as legacy
   values").
@@ -586,8 +654,8 @@ Retry Queue.
 
 ### n23 — Persistent Storage (🟡 Partial)
 - **Spec requires:** "Storage failures do not crash SDK calls" — no throw **and** a recorded storage warning.
-- **SDK currently:** Unchanged. Reads/writes are wrapped in `do`/`catch` (`PostHog/PostHogStorage.swift:366-374`,
-  `:377-394`, `:397-425`), but a write failure only calls `hedgeLog` (`:393`), which prints nothing unless debug is
+- **SDK currently:** Unchanged at 4.0.5. Reads/writes are wrapped in `do`/`catch` (`PostHog/PostHogStorage.swift:366-374`,
+  `:377-394`, `:397-425`), but a write failure only calls `hedgeLog` (`:394` at 4.0.5), which prints nothing unless debug is
   on (`PostHog/Utils/Hedgelog.swift:17-20`). 4.0 added `hedgeLogWarning` (always prints, `:22-25`) but storage does
   not use it.
 - **Backwards compatibility:** Backward-compatible.
@@ -619,6 +687,12 @@ Retry Queue.
   regions regardless of an enclosing no-mask (`PostHog/Replay/PostHogReplayIntegration.swift:1187-1200`),
   and `PostHogTests/PostHogMaskScenarioTest.swift:111-129` asserts a masked child inside a
   `postHogNoMask()` container stays masked. This over-masks; it does not leak.
+  4.0.5: the documented SwiftUI precedence is unchanged (`PostHog/SwiftUI/PostHogMaskViewModifier.swift:25-26`
+  at 4.0.5); the other line references in this note are at `e27cbe4cb`. Not audited (❓): the GPU
+  capture path added since `e27cbe4cb` ([PostHog/posthog-ios#911](https://github.com/PostHog/posthog-ios/pull/911),
+  [#966](https://github.com/PostHog/posthog-ios/pull/966) and masking fixes #1097, #1103, #1109,
+  #1110, #1115), which is opt-in (`captureMethod = .gpu`; the default is `.standard`,
+  `PostHog/Replay/PostHogSessionReplayConfig.swift:95`).
 - **Backwards compatibility:** The leak fix ships in 4.0's breaking replay change (screenshot-only),
   already called out in the changeset. Letting `postHogNoMask()` win would reveal content apps mask today.
 - **Remediation:** None in the SDK is proposed; revealing more content is not wanted. Either keep the row
@@ -649,58 +723,75 @@ Retry Queue.
   "Session keys are omitted for a non-UUIDv7 caller session id (mobile)" at `:704` on `752f899`). (b) An event
   timestamped before the current session's start carries the persisted snapshot or none of the keys
   (scenario "A previous-process crash carries no live debug state", `:1016-1022` on `752f899`).
-- **SDK currently:** (a) `replayDebugProperties()` always takes the start from
-  `sessionManager.sessionStartTimestampSnapshot` (`PostHog/PostHogSDK.swift:764-766`), even when
-  `buildProperties` uses a caller-supplied `$session_id` (`:791-794`); no UUIDv7 derivation or
-  omission. (b) `buildProperties` (`:770` onward) never compares `timestamp` with the session start,
-  so a backdated `capture(..., timestamp:)` gets live `$recording_status`/`$sdk_debug_*` values.
-  Crash and OOM reports still bypass `buildProperties` and use the persisted snapshot, so the crash
-  arm of (b) is met; manual backdated captures are not.
-- **(d) Off-state shape (2026-11-18, sdk-specs change `drop-replay-debug-keys-when-replay-off`):** the
-  new requirement "Attach only the disabled shape while replay is intentionally off" (`openspec/specs/session-replay-debug-properties/spec.md:1236`) says that while replay is intentionally off (no integration, `sessionReplay`
-  false and not started manually, an explicit stop, opt-out, or a cached remote config with
-  `sessionRecording == false` or `quotaLimited` containing `mobile_recordings`) an event carries
-  `$recording_status: disabled` and none of the removal set. The crash-context snapshot and the API
-  that hands the map to wrapper SDKs get the gated map. At posthog-ios `origin/main` `a0a71796c2`
-  the no-integration fallback still adds `$sdk_debug_replay_capture_mode` and
-  `$sdk_debug_session_start` (`PostHog/PostHogSDK.swift:816-823`; scenario
-  "No replay integration installed adds nothing to an eligible event (mobile)", `openspec/specs/session-replay-debug-properties/spec.md:966`), and the
-  integration's `debugProperties()` (`PostHog/Replay/PostHogReplayIntegration.swift:2050`) keeps
-  capture mode (`:2081`) and the other replay keys after an explicit stop or a remote-off (scenarios
-  `openspec/specs/session-replay-debug-properties/spec.md:815`, `:1376`, `:1385`, `:1393`). Fix in progress:
-  [PostHog/posthog-ios#1090](https://github.com/PostHog/posthog-ios/pull/1090) (open). #1090 and
-  `feat/replay-v2-trigger-groups` can land in either order: both add an `explicitlyStopped` flag, and
-  the one that lands second drops its copy.
+- **New (#238, `openspec/specs/session-replay-debug-properties/spec.md:386`):** "The queue-depth key is
+  attached only while the send queue is backed up". A mobile SDK SHOULD attach
+  `$sdk_debug_pending_queue_size` at or above its flush threshold and MAY omit it below. "While the queue
+  is not backed up, the SDK SHALL remove a registered or caller-supplied value of the same name …
+  While the queue is backed up, the SDK-computed depth replaces such a value" (`:411-416`).
+- **SDK currently (line references at 4.0.5):**
+  - **(a) open.** `replayDebugSnapshot()` takes the start from
+    `sessionManager.sessionStartTimestampSnapshot` (`PostHog/PostHogSDK.swift:777-788`, start at `:785`),
+    even when `buildProperties` uses a caller-supplied `$session_id` (`:812-815`). There is no UUIDv7
+    derivation or omission.
+  - **(b) open.** `buildProperties` (`:790` onward) never compares `timestamp` with the session start,
+    so a backdated `capture(..., timestamp:)` gets live `$recording_status`/`$sdk_debug_*` values.
+    Crash and OOM reports still bypass `buildProperties` and use the persisted snapshot, so the crash
+    arm of (b) is met; manual backdated captures are not.
+  - **(d) met since [PostHog/posthog-ios#1090](https://github.com/PostHog/posthog-ios/pull/1090)**
+    (shipped in 4.0.3). This is the requirement "Attach only the disabled shape while replay is
+    intentionally off" (#232, 2026-11-18). The integration's `isReplayOff`
+    (`PostHog/Replay/PostHogReplayIntegration.swift:465-476`) covers an explicit stop,
+    `sessionReplay` off and not started manually, and a cached remote config with
+    `sessionRecording == false` or the mobile recordings quota limit
+    (`PostHog/PostHogRemoteConfig.swift:1435-1441`). While replay is off, `debugSnapshot()` returns only
+    `$recording_status: disabled` (`PostHogReplayIntegration.swift:1859-1860`).
+  - **(d), SDK side.** The no-integration fallback is now just `$recording_status: disabled`, and
+    `$sdk_debug_session_start` is added only while replay is on (`PostHog/PostHogSDK.swift:777-788`).
+    The same snapshot feeds the crash-context build (`readOnlySession`, `:874-880`) and the
+    wrapper-deferred map (`:2251-2257`), and an event built while replay is off doesn't claim the
+    bundle window (`:876`). Opt-out uninstalls the integration, so the fallback applies.
+  - **Queue depth, partly met (#238).** Since
+    [PostHog/posthog-ios#1102](https://github.com/PostHog/posthog-ios/pull/1102), the SDK sets
+    `$sdk_debug_pending_queue_size` from `backedUpDepth` (`PostHog/PostHogSDK.swift:891`), which is nil
+    when the depth is 0 or below `flushAt` (`PostHog/PostHogQueue.swift:145-150`). That meets the
+    SHOULD/MAY. **Gap:** registered super properties (`PostHog/PostHogSDK.swift:896`) and caller
+    properties (`:941`) are merged after it. So a registered or caller `$sdk_debug_pending_queue_size`
+    is sent while the queue is healthy, and it beats the computed depth while the queue is backed up.
+    No later step strips the key; the only other reference is the crash-context strip list (`:4473`).
+    Read from code; not run.
 - **Backwards compatibility:** Backward-compatible; internal property-build changes that only
   correct or remove diagnostic keys.
 - **Remediation:** (a) When `propSessionId` is set and differs from the manager's id, derive the
   start from its UUIDv7 timestamp, or omit the key when it isn't v7. (b) Skip the required keys and
-  the bundle when `timestamp` is earlier than the current session start. (d) Gate the debug map,
-  the crash-context snapshot and the wrapper API on replay state, read remote-off from the cached
-  config value, and drop capture mode and session start from the no-integration fallback.
+  the bundle when `timestamp` is earlier than the current session start. #238: after the caller merge
+  in `buildProperties`, set `props["$sdk_debug_pending_queue_size"] = queue?.backedUpDepth` again (nil
+  removes the key), so the SDK value wins either way.
 
 ### n27 — Capture AI (✅ Pass; was ➖)
-- **Spec requires:** [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79` (with #147's
-  text) adds "posthog-ios 4.0 and posthog-android 4.0 (`captureAi`)" to Applicability. The AI method
-  uses capture's event-building order and "SHALL follow capture's 'Capture drops null-valued object
-  properties' requirement"; AI events ride their own lane to `/i/v1/ai/events` with their own queue,
+- **Spec requires:** Applicability in merged [#146](https://github.com/PostHog/sdk-specs/pull/146)
+  (`openspec/specs/capture-ai/spec.md:23`) covers "client SDKs on capture v1 that ship an AI method".
+  The `d387ab79` text this row was first scored on named posthog-ios 4.0 explicitly; the merged
+  revision (5d75baf) names only the server SDKs and keeps client rules in "Client SDKs:" notes. The AI
+  method uses capture's event-building order and follows capture's null-property rule, which merged
+  #146 made a MAY (4bd0b50; its omission scenarios are now `@null_property_omission_capable`). Client
+  SDKs "MAY use a smaller queue, a disk cap and a longer timeout"; AI events ride their own lane to `/i/v1/ai/events` with their own queue,
   retry state and lane-scoped options; "client SDKs start their durable queue at launch" (Behavior 3);
   the whole serialized event is capped at 8 MiB + 64 KiB, a configured cap above that is clamped or
   refused, and batches are byte-aware at 5 MiB.
-- **SDK currently:**
-  - **Met:** `captureAi` takes the same parameters as the fullest `capture` overload and returns the
-    uuid; a non-`$ai_` name is sent with a debug log (`PostHog/PostHogSDK.swift:2137-2141`), and
+- **SDK currently (`PostHogSDK.swift` and `PostHogConfig.swift` line references at 4.0.5; the queue, API
+  and endpoint files are unchanged since `e27cbe4cb`):**
+  - **Met:** `captureAi` (`PostHog/PostHogSDK.swift:1733`) takes the same parameters as the fullest `capture` overload and returns the
+    uuid; a non-`$ai_` name is sent with a debug log (`:2165`), and
     `capture` never reroutes `$ai_*` events. The lane has its own queue, retry state and request identity
-    (keyed by path, `PostHog/PostHogApi.swift:75`). The AI queue starts at setup (`PostHogSDK.swift:314-332`),
+    (keyed by path, `PostHog/PostHogApi.swift:75`). The AI queue starts at setup (`PostHogSDK.swift:314-319`),
     as Behavior 3 asks of client SDKs. `flush()` and `close()` signal both lanes. Options:
     `captureAiCompression` (gzip), `captureAiMaxQueueSize` (100), `captureAiTimeout` (60 s idle) and
-    `captureAiMaxEventBytes` (`PostHog/PostHogConfig.swift:483-516`), plus a fixed 50 MiB disk cap. A cap
+    `captureAiMaxEventBytes` (`PostHog/PostHogConfig.swift:497-527`), plus a fixed 50 MiB disk cap. A cap
     above the ceiling is clamped with a log (`PostHog/QueueEndpoint+Factories.swift:64-68`); an event over
     it is dropped with a name-and-size log (`PostHog/PostHogQueue.swift:416-419`). Batches use the 5 MiB
     window. `captureAiCompression` is the lane's own compression setting, which `http-client` now
     leaves out of the whole-client opt-out ([n22](#n22)).
-  - **Null properties:** `captureAi` builds properties like `capture` (`PostHogSDK.swift:1703-1730`,
-    `:2005`), and the AI queue's encoder and `captureV1JSON` drop null-valued members (#1047,
+  - **Null properties:** `captureAi` builds properties like `capture`, and the AI queue's encoder and `captureV1JSON` drop null-valued members, as the MAY permits (#1047,
     `PostHog/QueueEndpoint+Factories.swift:79`; see [n4](#n4)).
   - **Not applicable:** the full-AI-capture flag, built-in AI integrations and the OpenTelemetry bridge;
     iOS ships none of them.

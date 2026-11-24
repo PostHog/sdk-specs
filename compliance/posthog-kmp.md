@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-kmp](https://github.com/PostHog/posthog-kmp)
 **Audited commit:** `0a88aa7490c4bc51fb263c7f3619d62d838658a4` ([commit](https://github.com/PostHog/posthog-kmp/commit/0a88aa7490c4bc51fb263c7f3619d62d838658a4)), tag `1.0.0` — first audit, 2026-11-23
 **Audited against sdk-specs commit:** `795b69f`; re-checked at `44fe27a`, whose one later spec change (#233, local flag evaluation) is server-only and moves no row
-**Summary:** 19 ✅ · 32 🟡 · 8 ❌ · 11 ➖ · 0 ❓ (70 rows; first audit). On the shared 69-row basis (without Get Remote Config Payload, ➖): 19 ✅ · 32 🟡 · 8 ❌ · 10 ➖.
+**Summary:** 20 ✅ · 31 🟡 · 8 ❌ · 11 ➖ · 0 ❓ (70 rows; first audit). On the shared 69-row basis (without Get Remote Config Payload, ➖): 20 ✅ · 31 🟡 · 8 ❌ · 10 ➖.
 
 **Why this run:** posthog-kmp has no compliance file yet. 1.0.0 is its first stable release.
 
@@ -75,7 +75,7 @@ and JVM (`androidMain/.../PostHog.android.kt:30-31`, `jvmMain/.../PostHog.jvm.kt
 | 27 | Get Session ID | 🟡 | [n14] |
 | 28 | Group | 🟡 | [n15] |
 | 29 | Group Identify | 🟡 | [n15] |
-| 30 | Identify | 🟡 | [n16] |
+| 30 | Identify | ✅ | [n16] |
 | 31 | Is Feature Enabled | ✅ | `isFeatureEnabled(key, defaultValue, sendFeatureFlagEvent)`; empty variant reads disabled on every path |
 | 32 | Is Opt Out | ✅ | |
 | 33 | Is Session Replay Active | ❌ | [n17] KMP-owned |
@@ -209,9 +209,9 @@ and JVM (`androidMain/.../PostHog.android.kt:30-31`, `jvmMain/.../PostHog.jvm.kt
 - **SDK currently:** `group()` forwards without validation (`commonMain/.../PostHog.kt:300-307`). Apple ✅; Android/JVM inherit posthog-android n11/n12; web inherits posthog-js n10/n11 (no opt-out / `person_profiles: 'never'` guard). No standalone `groupIdentify`, which the spec allows for iOS/Android-style clients.
 - **Remediation:** Reject blank `type`/`key` in `commonMain` with a warning.
 
-### n16 — Identify (🟡 Partial)
+### n16 — Identify (✅ Pass)
 - **Spec requires:** while opted out, clients "MUST NOT capture or send the `$identify` or `$set` event, and MUST NOT update the person-properties dedup hash for an event it did not capture" (quoted in `compliance/posthog-android.md` n28).
-- **SDK currently:** Forwarded (`jvmCommonMain/.../PostHog.jvmCommon.kt:153-165`). Android/JVM inherit posthog-android n28; Apple and web ✅. Web drops identify's `eventOptions` (`jsMain/.../PostHog.js.kt:147-160`), as documented in the CHANGELOG.
+- **SDK currently:** Forwarded (`jvmCommonMain/.../PostHog.jvmCommon.kt:153-165`). Android/JVM ✅: the pinned `android-v4.0.2` / `core-v7.0.2` (`bf387d47`) already includes PostHog/posthog-android#967, which records the person-properties hash only once the event is queued (`posthog/src/main/java/com/posthog/PostHog.kt:1305`, `:2536`), as in posthog-android n28. Apple and web ✅. Web drops identify's `eventOptions` (`jsMain/.../PostHog.js.kt:147-160`, `wasmJsMain/.../PostHog.wasmJs.kt:122-135`), as documented in the KDoc and CHANGELOG: posthog-js 1.435.8 isn't on capture v1 and its `identify` takes no event options, so they aren't scored on web here (as with Capture AI, [n7](#n7)).
 
 ### n17 — Is Session Replay Active / Start Session Recording / Stop Session Recording (❌ Fail)
 - **Spec requires:** canonical client signatures `startSessionRecording(control?)`, `stopSessionRecording()` and an `isSessionReplayActive()` getter; the start spec lists every client SDK's variant (`openspec/specs/start-session-recording/spec.md`, Surface variants), and is-session-replay-active notes "Flutter and React Native expose a unified replay-status getter over native/browser replay implementations" (Interactions).

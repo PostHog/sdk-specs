@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-kmp](https://github.com/PostHog/posthog-kmp)
 **Audited commit:** `0a88aa7490c4bc51fb263c7f3619d62d838658a4` ([commit](https://github.com/PostHog/posthog-kmp/commit/0a88aa7490c4bc51fb263c7f3619d62d838658a4)), tag `1.0.0` — first audit, 2026-11-23
 **Audited against sdk-specs commit:** `795b69f`; re-checked at `44fe27a`, whose one later spec change (#233, local flag evaluation) is server-only and moves no row
-**Summary:** 17 ✅ · 34 🟡 · 8 ❌ · 11 ➖ · 0 ❓ (70 rows; first audit). On the shared 69-row basis (without Get Remote Config Payload, ➖): 17 ✅ · 34 🟡 · 8 ❌ · 10 ➖.
+**Summary:** 16 ✅ · 35 🟡 · 8 ❌ · 11 ➖ · 0 ❓ (70 rows; first audit). On the shared 69-row basis (without Get Remote Config Payload, ➖): 16 ✅ · 35 🟡 · 8 ❌ · 10 ➖.
 
 **Why this run:** posthog-kmp has no compliance file yet. 1.0.0 is its first stable release.
 
@@ -79,7 +79,7 @@ and JVM (`androidMain/.../PostHog.android.kt:30-31`, `jvmMain/.../PostHog.jvm.kt
 | 31 | Is Feature Enabled | ✅ | `isFeatureEnabled(key, defaultValue, sendFeatureFlagEvent)`; empty variant reads disabled on every path |
 | 32 | Is Opt Out | ✅ | |
 | 33 | Is Session Replay Active | ❌ | [n17] KMP-owned |
-| 34 | On Feature Flags | ✅ | `onFeatureFlags()` returns a subscription on every target; JS/Wasm queue listeners added before `init` |
+| 34 | On Feature Flags | 🟡 | [n41] JS/Wasm lose listeners across `close`/`setup` |
 | 35 | Opt In | 🟡 | [n18] |
 | 36 | Register | 🟡 | [n19] |
 | 37 | Reload Feature Flags | ✅ | [n20] |
@@ -400,3 +400,11 @@ and JVM (`androidMain/.../PostHog.android.kt:30-31`, `jvmMain/.../PostHog.jvm.kt
 - **SDK currently (KMP-owned, web):** `setPersonProperties` (`commonMain/.../PostHog.kt:279-285`) has no empty-input guard, and both web bridges substitute an empty object when `userPropertiesToSet` is `null` (`jsMain/.../PostHog.js.kt:535-544`, `userProperties?.toJsObject() ?: js("{}")`; `wasmJsMain/.../PostHog.wasmJs.kt:410-419`, `?: createJsObject()`). posthog-js 1.435.8 returns early only when both arguments are falsy (`packages/browser/src/posthog-core.ts:3459-3461`), and `{}` is truthy, so `PostHog.setPersonProperties(null)` on web updates the flag person properties with a reload and sends an empty `$set` event. Android, JVM and Apple forward to native SDKs that are ✅ on this row. Web also drops `eventOptions`, which isn't scored on web here (see [n16](#n16)).
 - **Backwards compatibility:** Backward-compatible — only calls with nothing to set change.
 - **Remediation:** Return early in `commonMain` when both maps are `null` or empty, and pass `undefined` instead of `{}` in the web bridges.
+
+<a id="n41"></a>
+
+### n41 — On Feature Flags (🟡 Partial)
+- **Spec requires:** "A runtime listener registration … SHALL stay active until the caller unsubscribes it, including across a `close()`/`setup()` cycle" (`openspec/specs/on-feature-flags/spec.md:178-180`, #161), which names posthog-js with no web carve-out.
+- **SDK currently:** `onFeatureFlags()` returns a subscription on every target, and JS/Wasm queue listeners added before `init`. Android, JVM, iOS and macOS keep a registration across `close`/`setup` ✅. **JS/Wasm fail:** `close()` calls `PostHogJs.shutdown()` (`jsMain/.../PostHog.js.kt:439-445`, `wasmJsMain/.../PostHog.wasmJs.kt:401-403`); posthog-js 1.435.8's `shutdown()` destroys feature flags but leaves `__loaded` set (`packages/browser/src/posthog-core.ts:3958-3983`), so the next `init()` returns early (`:849-864`) and active listeners are never re-attached (`jsMain/.../PostHog.js.kt:86-90`). The KDoc says so (`commonMain/.../PostHog.kt:387-389`). `compliance/posthog-js.md` still shows ✅ only because it predates #161.
+- **Backwards compatibility:** Backward-compatible.
+- **Remediation:** Fix teardown/re-init in posthog-js, then re-attach active listeners on a later `setup()` in both web bridges.

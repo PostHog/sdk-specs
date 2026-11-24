@@ -366,6 +366,145 @@ with no js analog; contract C8/C9 context, iOS `:89-97`).
 - **WHEN** the client captures a "$screen" event with no "$screen_name" property
 - **THEN** session recording should not be active
 
+### Requirement: Remembered screen (mobile)
+
+A mobile SDK has no current URL to read, so it SHALL remember the screen of the latest captured
+`$screen` event and check it against the screen legs at the points below. Each check SHALL use the
+rules of a live `$screen` event: the patterns of "Screen leg (mobile)", and the group-level filters
+with no event properties and the current stored person properties (see "Group-level property
+filters").
+
+1. **Remember every screen.** The SDK SHALL remember the screen of every captured `$screen` event,
+   also while the application has stopped replay, while no trigger group is loaded, and before
+   replay is installed.
+2. **Check a new session once.** When the session id changes, the SDK SHALL check the new session
+   against the remembered screen once, before the recording decision for that session.
+3. **A screen event that changes the session.** When a `$screen` event itself changes the session
+   id, the SDK SHALL check the new session against that event's own screen only, never against the
+   screen the application left.
+4. **Check on an explicit start.** `startSessionRecording()` SHALL check a remembered screen that
+   no group was checked against, once per `$screen` event.
+5. **Do not repeat a live check.** A screen that was evaluated live, when its `$screen` event was
+   captured, SHALL NOT be checked again in the same session by an explicit start or by a later
+   event.
+6. **Check on every load of trigger groups.** Every load of trigger groups from the remote config,
+   the first load and each reload, SHALL check the remembered screen against the loaded groups for
+   the current session, before the recording decision. This check also covers a screen that was
+   evaluated live. A feature flags reload is not a load of trigger groups.
+7. **No check while stopped.** None of these checks SHALL run while the application has stopped
+   replay (see "Explicit stop and start"); the next explicit start runs the check.
+
+A match found by one of these checks is stored like a live screen match (see "Group activation
+lasts for the session").
+
+Difference from web that remains: a screen that was evaluated live and did not match is not
+checked again when the person properties change inside one session, except through rule 6. The
+browser SDK reads the live page URL on each check, skips a URL it already checked, and forgets
+that URL when the recorder stops, so it checks the same URL again after a recorder restart.
+
+This requirement applies only to SDKs without a URL concept that capture `$screen` events
+(`posthog-ios`, `posthog-android`, and hybrid SDKs over them).
+
+Reference: mobile-only and decision-based, with no posthog-js reference. It stands in for the web
+URL check: posthog-js `origin/main` `f05a993f9d`
+`packages/browser/src/extensions/replay/external/lazy-loaded-session-recorder.ts:2004` calls
+`checkUrlTriggers` on recorder emissions; `recording-strategies.ts:428-455` checks every group with
+the group-level filters and no event properties; `triggerMatching.ts:370` reads the live URL
+(`getTargetingUrl`), `:377-380` skips a URL that was already checked, and `:402-404` forgets it on
+`stop()`. A mobile SDK has no live URL to read between `$screen` events, so the remembered screen
+takes its place.
+
+Covering test: No posthog-js test on `origin/main` covers this; decision-based (mobile adaptation
+with no js analog).
+
+#### Scenario: A screen captured while the application stopped replay is remembered
+- **GIVEN** a mobile SDK with session replay enabled
+- **AND** the remote config sets `version` to 2 and configures a trigger group with URL condition matching "Checkout" and a sample rate of 1.0
+- **AND** the application has called `stopSessionRecording()`
+- **WHEN** the client captures a "$screen" event with "$screen_name" set to "CheckoutScreen"
+- **THEN** session recording should not be active
+- **WHEN** the application calls `startSessionRecording()`
+- **THEN** session recording should be active
+
+#### Scenario: A screen captured before trigger groups load is remembered
+- **GIVEN** a mobile SDK with session replay enabled and no remote config loaded
+- **WHEN** the client captures a "$screen" event with "$screen_name" set to "CheckoutScreen"
+- **AND** the remote config then sets `version` to 2 and configures a trigger group with URL condition matching "Checkout" and a sample rate of 1.0
+- **THEN** session recording should be active
+
+#### Scenario: A new session is checked against the remembered screen
+- **GIVEN** a mobile SDK with session replay enabled
+- **AND** the remote config sets `version` to 2 and configures a trigger group with URL condition matching "Checkout" and a sample rate of 1.0
+- **AND** the client has captured a "$screen" event with "$screen_name" set to "CheckoutScreen"
+- **WHEN** the session id rotates to a new session and no "$screen" event is captured
+- **THEN** session recording should be active for the new session
+
+#### Scenario: The new-session check uses the current person properties
+- **GIVEN** a mobile SDK with session replay enabled
+- **AND** the remote config sets `version` to 2 and configures a trigger group with URL condition matching "Checkout", group-level filter on person property "plan" equal to "vip", and a sample rate of 1.0
+- **AND** the current person has property "plan" set to "free"
+- **AND** the client has captured a "$screen" event with "$screen_name" set to "CheckoutScreen"
+- **AND** session recording is not active
+- **WHEN** the person property "plan" is set to "vip"
+- **THEN** session recording should still not be active
+- **WHEN** the session id rotates to a new session
+- **THEN** session recording should be active for the new session
+
+#### Scenario: A screen event that changes the session is checked against its own screen
+- **GIVEN** a mobile SDK with session replay enabled
+- **AND** the remote config sets `version` to 2 and configures a trigger group with URL condition matching "Checkout" and a sample rate of 1.0
+- **AND** the client has captured a "$screen" event with "$screen_name" set to "CheckoutScreen"
+- **WHEN** the client captures a "$screen" event with "$screen_name" set to "HomeScreen" and that capture rotates the session id
+- **THEN** session recording should not be active for the new session
+
+#### Scenario: An explicit start checks a remembered screen once
+- **GIVEN** a mobile SDK with session replay enabled
+- **AND** the remote config sets `version` to 2 and configures a trigger group with URL condition matching "Checkout" and a sample rate of 1.0
+- **AND** the application has called `stopSessionRecording()`
+- **AND** the client has captured a "$screen" event with "$screen_name" set to "CheckoutScreen"
+- **WHEN** the application calls `startSessionRecording()`
+- **THEN** the remembered screen should be checked against the group once
+- **WHEN** the application calls `stopSessionRecording()` and then `startSessionRecording()` in the same session
+- **THEN** the remembered screen should not be checked again
+
+#### Scenario: A screen evaluated live is not checked again by a start
+- **GIVEN** a mobile SDK with session replay enabled
+- **AND** the remote config sets `version` to 2 and configures a trigger group with URL condition matching "Checkout", group-level filter on person property "plan" equal to "vip", and a sample rate of 1.0
+- **AND** the current person has property "plan" set to "free"
+- **AND** the client has captured a "$screen" event with "$screen_name" set to "CheckoutScreen"
+- **WHEN** the person property "plan" is set to "vip"
+- **AND** the application calls `stopSessionRecording()` and then `startSessionRecording()` in the same session
+- **THEN** session recording should not be active
+
+#### Scenario: A reload of trigger groups checks the remembered screen
+- **GIVEN** a mobile SDK with session replay enabled
+- **AND** the remote config sets `version` to 2 and configures a trigger group with URL condition matching "Settings" and a sample rate of 1.0
+- **AND** the client has captured a "$screen" event with "$screen_name" set to "CheckoutScreen"
+- **AND** session recording is not active
+- **WHEN** the remote config is reloaded and configures a trigger group with URL condition matching "Checkout" and a sample rate of 1.0
+- **THEN** session recording should be active
+
+#### Scenario: A feature flags reload does not check the remembered screen
+- **GIVEN** a mobile SDK with session replay enabled
+- **AND** the remote config sets `version` to 2 and configures a trigger group with URL condition matching "Checkout", group-level filter on person property "plan" equal to "vip", and a sample rate of 1.0
+- **AND** the current person has property "plan" set to "free"
+- **AND** the client has captured a "$screen" event with "$screen_name" set to "CheckoutScreen"
+- **WHEN** the person property "plan" is set to "vip"
+- **AND** feature flags reload without a load of trigger groups
+- **THEN** session recording should not be active
+
+#### Scenario: No remembered-screen check runs while the application stopped replay
+- **GIVEN** a mobile SDK with session replay enabled
+- **AND** the remote config sets `version` to 2 and configures a trigger group with URL condition matching "Settings" and a sample rate of 1.0
+- **AND** the application has called `stopSessionRecording()`
+- **AND** the client has captured a "$screen" event with "$screen_name" set to "CheckoutScreen"
+- **WHEN** the remote config is reloaded and configures a trigger group with URL condition matching "Checkout" and a sample rate of 1.0
+- **AND** the session id rotates to a new session
+- **THEN** the group should not be activated
+- **AND** session recording should not be active
+- **WHEN** the application calls `startSessionRecording()`
+- **THEN** session recording should be active
+
 ### Requirement: Flag leg
 
 A group's `flag` leg SHALL be satisfied by the same rules as the V1 linked flag in
@@ -688,7 +827,9 @@ NOT store a flag leg match: the flag leg SHALL be evaluated from the current fla
 whose activation depends on the flag returns to pending when the flag stops matching, and a flag
 that matches again re-satisfies it. A group's activation is the combination, per its match type, of
 its stored legs and the current flag leg. When the session id changes, the SDK
-SHALL re-arm every group: the new session needs its own matching event, URL, screen, or flag. Where
+SHALL re-arm every group: the new session needs its own matching event, URL, screen, or flag. On
+mobile, the screen of the new session can be the remembered one (see "Remembered screen
+(mobile)"). Where
 the SDK persists state across page loads or process restarts, the persisted activation SHALL be
 keyed on the session id so it is honored only for the session it belongs to.
 

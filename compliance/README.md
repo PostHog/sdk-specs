@@ -153,7 +153,7 @@ the single most widely-shared non-compliance in the matrix.
 |---|---|---|---|---|---|---|---|---|---|
 | posthog-js | 26/64 fully compliant (41%) | 26 | 21 | 12 | 5 | 0 | 2026-10-05 · `6538babc` (targeted re-audit; most of the 59 pre-existing rows carried from 2026-08-10, see file header) | 33 | [posthog-js.md](posthog-js.md) |
 | posthog-python | 13/64 fully compliant (20%; 30 contracts N/A on a server SDK) | 13 | 16 | 5 | 30 | 0 | 2026-10-12 · `509c8525` | 21 | [posthog-python.md](posthog-python.md) |
-| posthog-android | 45/70 fully compliant (64%) | 45 | 13 | 1 | 11 | 0 | 2026-11-24 · `1577cfa5` (tag `android-v4.0.3`; all 70 rows) | 14 | [posthog-android.md](posthog-android.md) |
+| posthog-android | 43/70 fully compliant (61%) | 43 | 15 | 1 | 11 | 0 | 2026-11-24 · `1577cfa5` (tag `android-v4.0.3`; all 70 rows) | 16 | [posthog-android.md](posthog-android.md) |
 | posthog-ios | 43/70 fully compliant (61%) | 43 | 15 | 1 | 11 | 0 | 2026-11-24 · `c8fcc2c06` (tag `4.0.5`) | 16 | [posthog-ios.md](posthog-ios.md) |
 | posthog-node | 9/64 fully compliant (14%; 29 contracts N/A on a server SDK) | 9 | 21 | 4 | 29 | 1 | 2026-10-12 · `4f590b36` (posthog-js monorepo; Traces row corrected 2026-10-19) | 25 (+1 ❓) | [posthog-node.md](posthog-node.md) |
 | posthog-flutter | 21/70 fully compliant (30%) | 21 | 32 | 4 | 13 | 0 | 2026-11-24 · `4cb4318b` (tag `6.0.0`; native rows at posthog-ios 4.0.5 / posthog-android 4.0.3) | 36 | [posthog-flutter.md](posthog-flutter.md) |
@@ -170,7 +170,7 @@ posthog-android `android-v4.0.3` and posthog_flutter `6.0.0` were re-audited at 
 (the 2026-11-10 runs scored unreleased branch heads), against sdk-specs `795b69f`, re-checked at
 `44fe27a`. **posthog-kmp `1.0.0` gets its first audit.** Every file gains a 70th row, Get Remote Config
 Payload ([#220](https://github.com/PostHog/sdk-specs/pull/220)), ➖ on client SDKs.
-- **posthog-android 42/16/1/10 → 45/13/1/11.** Identify 🟡→✅ (PostHog/posthog-android#967 stores the
+- **posthog-android 42/16/1/10 → 43/15/1/11.** Capture and Capture AI ✅→🟡: `disableGeoIp` (PostHog/posthog-android#971) overwrites a caller's `$geoip_disable` after the caller merge, against the client caller-precedence rule. Identify 🟡→✅ (PostHog/posthog-android#967 stores the
   person-properties hash only from the queued event, which also meets #208); Bootstrap and Register
   🟡→✅ (their only gaps were MAY-level). All 70 rows are now at 4.0.3, so the 31-row/38-row split is gone.
 - **posthog-ios 44/14/1/10 → 43/15/1/11.** Capture ✅→🟡: a Swift `Set`/`NSSet` property is dropped
@@ -495,7 +495,7 @@ stalest pointer and its only 59-row file.
 | posthog-js | Exception Event Metadata | Backward-compatible | **New this run** — the most complete producer envelope audited (full `exception_id`/`parent_id` linkage, canonical sources, correct nested-`handled` omission, spec-exact caps), missing only `$exception_source` and a capture category on the two global handlers, which fall back to `generic` — [posthog-js.md#n35](posthog-js.md) |
 | posthog-js | Session Replay Debug Properties | Backward-compatible | **New this run** — re-scored against `d078270` after #96; tiering, the `$`-prefix gate, and the 30 s throttle conform, but after `stopSessionRecording()` on a loaded recorder events keep `active`/`buffering` instead of `$recording_status: disabled` — [posthog-js.md#n36](posthog-js.md) |
 
-Full contract-by-contract detail (33 posthog-js, 21 posthog-python, 14 posthog-android, 16
+Full contract-by-contract detail (33 posthog-js, 21 posthog-python, 16 posthog-android, 16
 posthog-ios, 26 posthog-node, 36 posthog-flutter, 43 posthog-kmp, 30 posthog-react-native, 19 posthog-php, 21
 posthog-ruby, 23 posthog-go, 19 posthog-java, and 29 posthog-dotnet non-Pass/non-N/A cells) is in
 the respective per-SDK files.

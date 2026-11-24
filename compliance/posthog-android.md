@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-android](https://github.com/PostHog/posthog-android)
 **Audited commit:** release tag `android-v4.0.3` at commit `1577cfa53665670cd7c09a30abf11dc1d10798ad` ([tag](https://github.com/PostHog/posthog-android/releases/tag/android-v4.0.3)) — audited on 2026-11-24. All 70 rows are scored at this tag — see [4.0.3 re-audit](#403-re-audit-2026-11-24). Earlier runs: 2026-10-19 at `c5e788bd`, and 31 rows on 2026-11-10 at the unreleased 4.0 branch head `aaa23d39` ([PostHog/posthog-android#871](https://github.com/PostHog/posthog-android/pull/871))
 **Audited against sdk-specs commit:** `44fe27a`
-**Summary:** 45 ✅ · 13 🟡 · 1 ❌ · 11 ➖ · 0 ❓ (70 rows; previous 42/16/1/10/0 on 69 rows at `c5e788bd` + `aaa23d39`; 2026-10-19 at `c5e788bd` scored 37/16/5/6/0; previous full audit 2026-08-10 at `8659a7b4` scored 31/16/9/3/0 on 59 rows)
+**Summary:** 43 ✅ · 15 🟡 · 1 ❌ · 11 ➖ · 0 ❓ (70 rows; previous 42/16/1/10/0 on 69 rows at `c5e788bd` + `aaa23d39`; 2026-10-19 at `c5e788bd` scored 37/16/5/6/0; previous full audit 2026-08-10 at `8659a7b4` scored 31/16/9/3/0 on 59 rows)
 
 **Why the 2026-10-19 run:** rotation priority 3 — the pointer was ten weeks old, and android carries the
 mobile reference for Session Replay Debug Properties. It was also the cheapest third slot available:
@@ -51,9 +51,11 @@ Two claims were confirmed with throwaway JVM unit tests against the tag:
 | Bootstrap | 🟡 | ✅ | The only gap was `sessionID`, which `bootstrap/spec.md:145` makes a MAY ([n4](#n4)) |
 | Get Remote Config Payload | — | ➖ | **new row** (#220): server SDKs only; "A client SDK SHALL NOT expose it" |
 | Identify | 🟡 | ✅ | #967 stores the person-properties hash only from the queued event, as #208 requires ([n28](#n28)) |
+| Capture | ✅ | 🟡 | `disableGeoIp` (PostHog/posthog-android#971) stamps `$geoip_disable` after the caller merge, against the client caller-precedence rule ([n24](#n24)) |
+| Capture AI | ✅ | 🟡 | Inherits Capture's `$geoip_disable` override ([n25](#n25)) |
 | Register | 🟡 | ✅ | The only gap was blank keys, which `register/spec.md:42` makes optional ("may reject"); the #146 identity-event rule is implemented ([n16](#n16)) |
 
-android moves from 42/16/1/10 on 69 rows to **45/13/1/11** on 70 rows (61%→64%).
+android moves from 42/16/1/10 on 69 rows to **43/15/1/11** on 70 rows (61%→61%).
 
 **Spec changes since `752f899` that pass or don't apply here:**
 - **Pass:**
@@ -209,8 +211,8 @@ complete implementation of that contract outside the browser.
 | 5 | Autocapture | ✅ | [n2] |
 | 6 | Before Send Hook | ✅ | [n3] |
 | 7 | Bootstrap | ✅ | [n4] |
-| 8 | Capture | ✅ | [n24] |
-| 9 | Capture AI | ✅ | [n25] |
+| 8 | Capture | 🟡 | [n24]; `disableGeoIp` overrides a caller's `$geoip_disable` |
+| 9 | Capture AI | 🟡 | [n25]; inherits Capture's `$geoip_disable` override |
 | 10 | Capture Exception | ✅ | [n40] |
 | 11 | Consent Gating | ✅ | [n5] |
 | 12 | Create Person Profile | ➖ |  |
@@ -929,7 +931,7 @@ re-read at 4.0.3 and still conforms, but their line numbers were not re-pointed.
 
 <a id="n24"></a>
 
-### n24 — Capture (✅ Pass, re-audited for capture v1)
+### n24 — Capture (🟡 Partial, re-audited for capture v1)
 - **Spec requires:** the capture v1 requirements [#146](https://github.com/PostHog/sdk-specs/pull/146)
   adds to `capture/spec.md` (text at `d387ab79`): the wire contract, request headers, per-event results,
   per-event options with legacy-property hoisting, the layer order's steps 4 and 5 (which apply to client
@@ -954,7 +956,7 @@ re-read at 4.0.3 and still conforms, but their line numbers were not re-pointed.
     option beats every layer, and "SDK docs and migration guides SHALL show that call option on an
     identity call as the way to keep identifying under a layered `false`". **Superseded:** #146 as
     merged (`3fb33bf`) replaces this rule, see the 4.0.3 paragraph.
-- **4.0.3 (`1577cfa5`), against `44fe27a`:** conforms.
+- **4.0.3 (`1577cfa5`), against `44fe27a`:** conforms except the GeoIP stamp (below).
   - **Identity events skip the registered personless setting.** The merged #146 text in
     **Caller-supplied event properties take precedence** (`capture/spec.md:406`) says: "A registered
     `$process_person_profile`, and a `process_person_profile` option a wrapper SDK registers, SHALL
@@ -974,8 +976,12 @@ re-read at 4.0.3 and still conforms, but their line numbers were not re-pointed.
     `{"one":["a"],"many":["a","b","c"],"deque":["x","y","z"],"nested":{"inner":[{"keep":1}]}}`.
     Order is kept and the null member is dropped.
   - **GeoIP.** The new `disableGeoIp` option (PostHog/posthog-android#971, `PostHogConfig.kt:364-365`)
-    sets `$geoip_disable` after the caller merge (`PostHog.kt:1010-1012`). GeoIP control stays a
-    server-SDK requirement.
+    sets `$geoip_disable` after the caller merge (`PostHog.kt:1010-1012`), so a caller's
+    `$geoip_disable: false` is overwritten. **Gap:** client SDKs aren't required to offer GeoIP control,
+    but once they do, the stamp is an SDK-set value, and on clients the caller's properties win over
+    SDK-set ones, with `$lib`/`$lib_version` the only exception (`openspec/specs/capture/spec.md:394-400`).
+    posthog-flutter n3 scores the same override on Flutter IO; posthog-ios stamps it before the caller
+    merge (`PostHog/PostHogSDK.swift:869-871` at 4.0.5).
   - **Wire.** A `401` now logs one always-on warning
     (`internal/PostHogApi.kt:254-259`). Everything else in the `aaa23d39` paragraph below still holds.
 - **SDK currently (4.0, `aaa23d39`):** conforms.
@@ -1038,12 +1044,12 @@ re-read at 4.0.3 and still conforms, but their line numbers were not re-pointed.
   - **GeoIP.** The **Client-level GeoIP control** requirement, including #146's clarification that a
     call's own `$geoip_disable` beats a per-call argument, binds server SDKs; client SDKs are not
     required to have the option.
-- **Backwards compatibility:** No change needed.
-- **Remediation:** None.
+- **Backwards compatibility:** Backward-compatible — only changes events whose caller passes `$geoip_disable: false` with `disableGeoIp` on.
+- **Remediation:** Stamp `$geoip_disable` with the SDK-set values before the registered and caller layers, so a caller value wins, as posthog-ios 4.0.5 does (`PostHog/PostHogSDK.swift:869-871`).
 
 <a id="n25"></a>
 
-### n25 — Capture AI (✅ Pass, new applicability)
+### n25 — Capture AI (🟡 Partial, new applicability)
 - **Spec requires:** [#147](https://github.com/PostHog/sdk-specs/pull/147) extends Applicability to
   client SDKs on capture v1 that ship an AI method, posthog-android 4.0 among them, and adds four
   requirements:
@@ -1086,7 +1092,7 @@ re-read at 4.0.3 and still conforms, but their line numbers were not re-pointed.
   - **Compression.** `captureAiCompression` is independent of `compression`, as `capture-ai` requires.
     `http-client`'s whole-client opt-out excludes a delivery lane with its own compression setting, so
     the two rules agree.
-- **4.0.3 (`1577cfa5`), against `44fe27a`:** conforms. Two things changed.
+- **4.0.3 (`1577cfa5`), against `44fe27a`:** conforms on the AI lane itself; 🟡 only for the GeoIP stamp it shares with Capture. Two things changed.
   - **#146 as merged (`3fb33bf`) rewords capture-ai.**
     - It no longer names posthog-android. Applicability reads "`server`, and client SDKs on capture v1
       that ship an AI method", which still covers android.
@@ -1098,8 +1104,8 @@ re-read at 4.0.3 and still conforms, but their line numbers were not re-pointed.
   - **Code.** An AI event's nested values are now copied before `beforeSend`, even without hooks
     (`runBeforeSend(..., copyNested = aiLane)`, `posthog/src/main/java/com/posthog/PostHog.kt:1295`).
     A caller that reuses a list can no longer grow the event past the size check before it is written.
-- **Backwards compatibility:** No change needed.
-- **Remediation:** None.
+- **Backwards compatibility:** Backward-compatible; see [n24](#n24).
+- **Remediation:** Same as [n24](#n24): `captureAi` builds its properties through `captureInternal` (`posthog/src/main/java/com/posthog/PostHog.kt:1208-1222`, `:1264`) → `buildProperties` (`:1428`), so the `$geoip_disable` stamp after the caller merge applies to AI events too.
 
 <a id="n26"></a>
 

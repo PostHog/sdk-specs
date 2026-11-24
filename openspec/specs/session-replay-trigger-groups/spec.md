@@ -47,7 +47,7 @@ Reference shape: posthog-js `origin/main` `480395c443` `packages/browser-common/
 
 ## Behavior
 
-1. **Select the model.** Use trigger groups when `version` is `2` and `triggerGroups` is non-empty. Otherwise use the V1 fields of `session-replay-ingestion-controls`.
+1. **Select the model.** Use trigger groups when `version` is `2` and `triggerGroups` is non-empty. Otherwise use the V1 fields of `session-replay-ingestion-controls`. On mobile, a non-empty `triggerGroups` with no usable group keeps the trigger group model with no groups: the V1 fields stay ignored and nothing records.
 2. **Build the groups.** Read each group's conditions, match type, sample rate, and minimum duration. A group with no events, URLs, or flag activates at once.
 3. **Evaluate the legs.** Match captured events by name and property filters, URLs (web) or `$screen_name` (mobile) by regex, and the flag by the linked-flag rules. Combine a group's configured legs with AND (`all`) or OR (`any`). Group-level property filters gate the event and URL or screen legs only, never the flag leg or a group with no conditions.
 4. **Persist leg matches per group and session.** Store event, URL, and screen matches, never the flag leg, which follows the current flag value. Re-arm on a new session id.
@@ -76,7 +76,7 @@ Reference shape: posthog-js `origin/main` `480395c443` `packages/browser-common/
 
 ### Lifecycle behavior
 
-- **Remote-config update:** the model is re-selected and the groups are rebuilt. A changed group rate re-decides that group's sampling.
+- **Remote-config update:** the model is re-selected and the groups are rebuilt. On mobile, a non-empty `triggerGroups` with no usable group selects the trigger group model with no groups. A changed group rate re-decides that group's sampling.
 - **Capture:** each captured event is checked against every group's event and screen legs.
 - **Navigation (web):** each URL is checked against the URL blocklist and every group's URL leg.
 - **Session rotation:** activation is re-armed and sampling is re-decided for each group. On mobile, the new session is checked once against the remembered screen.
@@ -86,6 +86,7 @@ Reference shape: posthog-js `origin/main` `480395c443` `packages/browser-common/
 
 - The gating decision never throws into the host app.
 - A group the SDK cannot read is skipped. The server already drops groups that posthog-js cannot read.
+- On mobile, when `version` is `2` and every entry of a non-empty `triggerGroups` is skipped, the SDK does not return to the V1 fields: it records nothing and logs it.
 - A regex pattern that fails to compile never throws into the host app. A filter with such a pattern does not match under `regex` and matches under `not_regex`. A mobile SDK drops such a `urls` pattern and keeps the group.
 - A group sample rate that is not a number samples in. A blank string or JSON `null` is 0.
 - A missing or quota-limited flag leaves the flag leg unsatisfied.
@@ -120,7 +121,18 @@ switches the SDK between the two models. The server sends both shapes in one con
 groups receives `version: 2`, `triggerGroups`, and the V1 fields side by side, so an SDK that does
 not implement this capability keeps working on the V1 fields.
 
-This requirement applies to all replay-capable SDKs.
+The selection reads the array as the server sent it, not the groups the SDK could use. When
+`version` is `2` and `triggerGroups` is a non-empty array but the SDK finds no usable group in it
+(see "Trigger group shape"), a mobile SDK SHALL stay in the trigger group model with no groups: it
+SHALL NOT evaluate the V1 fields, the V1 gating fields SHALL stay ignored (see "Ignore the V1
+gating fields under trigger groups"), no session SHALL record because no group can activate, and
+the SDK SHALL log that the config has no usable trigger group. An absent or empty `triggerGroups`
+array still selects the V1 fields. The browser SDK selects by the length of the array alone and
+keeps a group without an `id`, so the mobile `id` rule of "Trigger group shape" does not apply to
+it.
+
+This requirement applies to all replay-capable SDKs. The rule for a config with no usable group
+applies to mobile SDKs and to hybrid SDKs over them.
 
 Reference: posthog-js `origin/main` `480395c443`
 (`packages/browser/src/extensions/replay/external/lazy-loaded-session-recorder.ts:1247-1268`:
@@ -138,6 +150,15 @@ Covering test: posthog-js `packages/browser/src/__tests__/extensions/replay/lazy
 covers this; decision-based (source only: `lazy-loaded-session-recorder.ts:1247-1268` and the server
 comment at `remote_config.py:231-235`).
 
+No usable group: the mobile rule is mobile-only and decision-based, with no posthog-js test. It
+stands in for the web selection, which tests only the length of the array
+(`lazy-loaded-session-recorder.ts:1250` at `origin/main` `f05a993f9d`:
+`config?.version === 2 && config?.triggerGroups && config.triggerGroups.length > 0`) and builds a
+matcher for every entry without a check of its `id` (`recording-strategies.ts:526`:
+`const groupId = group.id`, used as it is in the storage key at `:530`). A web config with a non-empty
+array therefore never returns to the V1 fields, and the mobile rule keeps that outcome when the
+mobile `id` rule leaves no group.
+
 #### Scenario: Version 2 with groups ignores the V1 sample rate
 - **GIVEN** session replay is enabled
 - **AND** the remote config sets `version` to 2 and a V1 `sampleRate` of 0.0
@@ -151,6 +172,29 @@ comment at `remote_config.py:231-235`).
 - **AND** the remote config sets the V1 `sampleRate` to 0.0
 - **WHEN** the SDK resolves whether to record the current session
 - **THEN** session recording should not be active
+
+#### Scenario: Version 2 with no usable group stays in the trigger group model on mobile
+- **GIVEN** a mobile SDK with session replay enabled
+- **AND** the remote config sets `version` to 2 and a `triggerGroups` array whose only entry has no `id`
+- **AND** the remote config sets the V1 `sampleRate` to 1.0 and no other V1 gating field
+- **WHEN** the SDK resolves whether to record the current session
+- **THEN** session recording should not be active
+- **AND** the SDK should not evaluate the V1 fields
+- **AND** the SDK should log that the config has no usable trigger group
+
+#### Scenario: A V1 event trigger does not record when no group is usable on mobile
+- **GIVEN** a mobile SDK with session replay enabled
+- **AND** the remote config sets `version` to 2 and a `triggerGroups` array whose only entry has no `id`
+- **AND** the remote config configures V1 event trigger "$pageview"
+- **WHEN** the client captures an event named "$pageview"
+- **THEN** session recording should not be active
+
+#### Scenario: A reload with a usable group records again on mobile
+- **GIVEN** a mobile SDK with session replay enabled
+- **AND** the remote config sets `version` to 2 and a `triggerGroups` array whose only entry has no `id`
+- **AND** session recording is not active
+- **WHEN** the remote config is reloaded and configures one trigger group with id "g1", a sample rate of 1.0, and no conditions
+- **THEN** session recording should be active
 
 ### Requirement: Ignore the V1 gating fields under trigger groups
 
@@ -256,7 +300,15 @@ unconfigured. The server normalizes bare event-name strings to `{ name }` and fl
 SDK form before sending, so the SDK does not need to accept bare strings in `events`; an SDK MAY
 accept them as a tolerance.
 
-This requirement applies to all replay-capable SDKs.
+A mobile SDK SHALL use only a usable group: an entry that is an object with an `id` that is a
+non-empty string. It SHALL skip every other entry, SHALL log the skipped entry, and SHALL keep the
+other groups of the array. The `id` keys the stored activation and the sampling decision of a
+group, so a mobile SDK does not evaluate a group without one. This `id` rule is mobile-only: the
+browser SDK keeps a group without an `id`. When the rule leaves no group, "Select trigger groups
+over the V1 fields" applies.
+
+This requirement applies to all replay-capable SDKs. The `id` rule applies to mobile SDKs and to
+hybrid SDKs over them.
 
 Reference: posthog-js `origin/main` `480395c443`
 (`packages/browser-common/src/types/remote-config.ts:19-50`: `SessionRecordingEventTrigger`,
@@ -272,6 +324,10 @@ to `{ "name": e }` and a stored flag object to the SDK flag form, and drops a gr
 `eb2f69258`), so a missing value means AND. For a missing `name`, posthog-js renders the pending
 debug entry from `matcher.group.name` (`recording-strategies.ts:656`), which prints `undefined`;
 reading it as the empty string is a debug-only difference that every mobile port already makes.
+The mobile `id` rule is mobile-only and decision-based, with no posthog-js reference: posthog-js
+builds a matcher for every entry and uses `group.id` as it is
+(`recording-strategies.ts:526` and `:530` at `origin/main` `f05a993f9d`), and the server validator
+already requires `id` on a stored group.
 
 Covering test: posthog-js `packages/browser/src/__tests__/extensions/replay/triggerGroups.test.ts:66`
 ("should create matcher with event triggers and ANY match type"), `:81` ("should create matcher
@@ -291,6 +347,13 @@ with URL triggers and ALL match type"), `:97` ("should create matcher with featu
 - **AND** the remote config sets `version` to 2 and configures a trigger group with id "g1", no name, no conditions, and a sample rate of 1.0
 - **WHEN** the SDK resolves whether to record the current session
 - **THEN** the SDK should track one trigger group whose name is the empty string
+- **AND** session recording should be active
+
+#### Scenario: A mobile SDK skips a group without an id and keeps the others
+- **GIVEN** a mobile SDK with session replay enabled
+- **AND** the remote config sets `version` to 2 and configures one trigger group with no `id` and one trigger group with id "g1", no conditions, and a sample rate of 1.0
+- **WHEN** the SDK resolves whether to record the current session
+- **THEN** the SDK should track one trigger group with id "g1"
 - **AND** session recording should be active
 
 #### Scenario: An omitted match type requires every configured leg

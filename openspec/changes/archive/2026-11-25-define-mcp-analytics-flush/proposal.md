@@ -19,15 +19,18 @@ that, so `flush()` means the same in every SDK.
 ## What Changes
 
 - **Observer-only instrumentation** defines flushing:
-  - The handle automatic instrumentation returns exposes `flush()`. It waits for the captures started
-    before the call, then flushes the PostHog client. Captures that start while it waits belong to the
+  - Automatic instrumentation gives the host a `flush()`, on the handle it returns or, where it
+    returns none (posthog-go), on the analytics object the host passes in. It waits for the captures
+    started before the call, then flushes the PostHog client. Captures that start while it waits belong to the
     next call, so steady traffic on a shared server cannot hold it open. It never raises or rejects; a
     failed client flush is logged.
-  - Where an SDK's PostHog client is itself the MCP wrapper (posthog-js's `PostHogMCP`), that client's
-    flush and shutdown wait for its pending MCP captures first.
-  - Flushing SHOULD be bounded: by a deadline where the language makes that natural, or else by the
-    platform's wait-until limit.
-  - One scenario for each style.
+  - Where an SDK's PostHog client is itself the MCP wrapper (`PostHogMCP` in posthog-js and
+    posthog-python), that client's flush and shutdown wait for its pending MCP captures first.
+  - Flushing SHOULD be bounded by a deadline where the language makes that natural; elsewhere the
+    platform's wait-until limit bounds it.
+  - "The SDK is flushed" in scenarios means this flush.
+  - One scenario for each style. Both only flush right after a call, so a harness can set them up in
+    every SDK; an SDK with synchronous capture passes the wait trivially.
 
 ## Capabilities
 
@@ -42,9 +45,14 @@ _None._
 ## Impact
 
 - posthog-js: `analytics.flush()` conforms (PostHog/posthog-js#5842). Left: `PostHogMCP` inherits
-  posthog-node's `flush()` and `shutdown()`, which do not wait for captures still in its MCP pipeline.
-- posthog-python: conforms with PostHog/posthog-python#1306. Known gap: `flush()` waits only for
-  captures on the event loop it runs on.
-- posthog-ruby already conforms. Its sink captures synchronously, so nothing is pending when
-  `Analytics#flush` flushes the client.
-- posthog-go and posthog-rs: check their flush against the new rule.
+  posthog-node's `flush()` and `shutdown()`, which do not wait for its MCP pipeline. Its events are
+  sent today only because that pipeline is microtask-only, the timing #5842 stopped relying on.
+- posthog-python: the handle conforms with PostHog/posthog-python#1306. Known gap: `flush()` waits
+  only for captures on the event loop it runs on. `PostHogMCP` waits for its captures in `flush()` and
+  `shutdown()`; `shutdown()` has no deadline.
+- posthog-ruby already conforms on waiting: its sink captures synchronously, so nothing is pending
+  when `Analytics#flush` flushes the client. Left: `Analytics#flush` neither rescues a failed client
+  flush nor passes `Client#flush`'s `timeout:`.
+- posthog-go and posthog-rs offer no MCP flush: posthog-go's `Instrument` returns nothing and
+  `posthogmcp.Analytics` has no `Flush`; posthog-rs's `instrument` returns the wrapped server. Both
+  need one.

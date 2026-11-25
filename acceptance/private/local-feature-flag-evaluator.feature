@@ -374,6 +374,20 @@ Feature: Local Feature Flag Evaluator
     And the person condition should not fall back to hashing the distinct id
 
   @server
+  Scenario Outline: A group filter without a group type index reads the condition's group type
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag "legacy-tier" has flag-level aggregation for group type "organization"
+    And its condition has a group property filter on "tier" with operator <operator> and value <value> that omits group_type_index
+    When local feature flag "legacy-tier" is evaluated for organization "acme" with group property "tier" set to "enterprise" and group property key "tier" listed as known absent for group type "organization"
+    Then the local evaluation result should be <result>
+    And the SDK should not require remote fallback
+
+    Examples:
+      | operator     | value        | result |
+      | "exact"      | "enterprise" | false  |
+      | "is_not_set" | none         | true   |
+
+  @server
   Scenario: A device-bucketed person flag without a device id is inconclusive
     Given the SDK is initialized with token "test-token" and local evaluation enabled
     And remote feature flag evaluation is enabled
@@ -408,6 +422,26 @@ Feature: Local Feature Flag Evaluator
     When local feature flag "banner" is evaluated
     Then local evaluation should be inconclusive for "banner"
     And remote evaluation should remain eligible
+
+  @server
+  Scenario: A dependency is evaluated with its own aggregation
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag "org-parent" has flag-level aggregation for group type "organization" and requires group property "region" equal to "us"
+    And person-aggregated local feature flag "person-child" requires flag "org-parent" to evaluate to true
+    When local feature flag "person-child" is evaluated for organization "acme" with person property "region" set to "us" and group property "region" set to "eu"
+    Then local feature flag "org-parent" should evaluate to false
+    And the local evaluation result should be false
+    And the SDK should not require remote fallback
+
+  @server
+  Scenario: A group dependency without its group resolves as false
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag "org-parent" has flag-level aggregation for group type "organization" and requires group property "tier" with operator "is_not_set"
+    And person-aggregated local feature flag "person-child" requires flag "org-parent" to evaluate to true
+    When local feature flag "person-child" is evaluated without an "organization" group and with group property key "tier" listed as known absent for group type "organization"
+    Then local feature flag "org-parent" should evaluate to false
+    And the local evaluation result should be false
+    And the SDK should not require remote fallback
 
   @server
   Scenario Outline: An inactive dependency resolves as false

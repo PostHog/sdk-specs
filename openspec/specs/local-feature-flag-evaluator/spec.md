@@ -663,6 +663,8 @@ A condition group MAY select its own aggregation with `aggregation_group_type_in
 
 Person conditions SHALL use person properties, and group conditions SHALL use properties for their selected group type. Cohort filters SHALL use person context, while flag-dependency filters SHALL use dependency results. All filters in the condition SHALL match before rollout is applied.
 
+A filter with property type `group` that omits `group_type_index` SHALL read the group type of the condition's effective aggregation, as the flags service does. That group type's properties and its known-absent keys SHALL apply to the filter. A filter that sets `group_type_index` SHALL read that group type, and the known-absent keys of another group type SHALL NOT apply to it.
+
 The condition's effective aggregation SHALL choose the identifier for its rollout and multivariate hashes. A person-aggregated condition SHALL use the flag's person bucketing identifier (`distinct_id` by default or the required device id for device-bucketed flags). A group-aggregated condition SHALL use the selected group key and SHALL NOT switch to device-id bucketing. Variant assignment after a match SHALL use the same effective aggregation as that matching condition.
 
 If context required by one condition cannot be resolved locally, the evaluator SHALL apply the existing inconclusive/remote-fallback rules for that condition without preventing another independently evaluable condition from matching.
@@ -698,6 +700,15 @@ If context required by one condition cannot be resolved locally, the evaluator S
 - **THEN** the group condition should determine the local evaluation result
 - **AND** the person condition should not fall back to hashing the distinct id
 
+#### Scenario: A group filter without a group type index reads the condition's group type (@server)
+- **GIVEN** a flag has flag-level aggregation for group type "organization"
+- **AND** its condition has a group property filter on "tier" that omits `group_type_index`
+- **WHEN** the flag is evaluated locally for organization "acme" with group property "tier" set to "enterprise" and group property key "tier" listed as known absent for group type "organization"
+- **THEN** the filter should treat "tier" as known absent for group type "organization"
+- **AND** an `exact` "enterprise" filter should not match
+- **AND** an `is_not_set` filter should match
+- **AND** remote evaluation should not be required
+
 #### Scenario: A device-bucketed person flag without a device id is inconclusive (@server)
 - **GIVEN** a device-bucketed flag has only person-aggregated conditions
 - **WHEN** the flag is evaluated locally without a device id
@@ -711,6 +722,8 @@ A condition filter with property type `flag` SHALL use the `flag_evaluates_to` o
 Dependency filters SHALL be ANDed with every other filter in their condition. A dependency filter's `key` SHALL identify the referenced feature-flag key.
 
 A missing definition, unresolved dependency, or cycle SHALL make the dependent flag locally inconclusive and eligible for remote fallback. An inactive or filtered referenced definition remains resolvable as boolean `false`: a dependency expecting `false` matches definitively, while one expecting `true` definitively does not match.
+
+The evaluator SHALL evaluate a referenced flag as if it were evaluated directly with the same inputs: the same distinct id, groups, person properties, group properties, and known-absent keys. The referenced flag SHALL use its own aggregation, so its conditions read the property context and bucketing identifier that its definition selects, not those of the condition that references it. A referenced flag aggregated by a group type absent from the supplied groups SHALL resolve as `false`, as the flags service resolves it. The dependency filter SHALL compare only that evaluated value. The flags service does the same: it evaluates flags in dependency order, each with the full request context, and a dependency filter reads the stored result.
 
 #### Scenario: Flag dependency filters compare evaluated values (@server)
 - **GIVEN** flag "banner" has a `flag_evaluates_to` condition referencing flag "checkout"
@@ -732,6 +745,22 @@ A missing definition, unresolved dependency, or cycle SHALL make the dependent f
 - **WHEN** "banner" is evaluated locally
 - **THEN** local evaluation should be inconclusive for "banner"
 - **AND** remote evaluation should remain eligible
+
+#### Scenario: A dependency is evaluated with its own aggregation (@server)
+- **GIVEN** flag "org-parent" has flag-level aggregation for group type "organization" and requires group property "region" equal to "us"
+- **AND** person-aggregated flag "person-child" requires "org-parent" to evaluate to true
+- **WHEN** "person-child" is evaluated locally for organization "acme" with person property "region" set to "us" and group property "region" set to "eu"
+- **THEN** "org-parent" should evaluate to false from the organization properties
+- **AND** the local evaluation result for "person-child" should be false
+- **AND** remote evaluation should not be required
+
+#### Scenario: A group dependency without its group resolves as false (@server)
+- **GIVEN** flag "org-parent" has flag-level aggregation for group type "organization" and requires group property "tier" with operator `is_not_set`
+- **AND** person-aggregated flag "person-child" requires "org-parent" to evaluate to true
+- **WHEN** "person-child" is evaluated locally without an "organization" group and with group property key "tier" listed as known absent for group type "organization"
+- **THEN** "org-parent" should evaluate to false
+- **AND** the local evaluation result for "person-child" should be false
+- **AND** remote evaluation should not be required
 
 #### Scenario: An inactive dependency resolves as false (@server)
 - **GIVEN** inactive flag `A` is retained as a dependency of active flags `B` and `C`

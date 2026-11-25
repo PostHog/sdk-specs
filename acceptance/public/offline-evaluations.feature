@@ -76,6 +76,11 @@ Feature: Offline Evaluations
 
   # Requirement: Authenticated app API routing
 
+  Scenario: One project secret key authenticates management requests
+    Given a client configured with a project ID and a project secret key with dataset:read, llm_analytics:read, and evaluation:write
+    When the caller lists datasets, lists scorers, and replaces an experiment's tags
+    Then the SDK sends the configured key as a bearer token on all three requests to the configured project
+
   Scenario: An ingestion host maps to the management host
     Given an isolated offline evaluation client configured with host "https://eu.i.posthog.com" and a test secret key
     When the caller creates an experiment

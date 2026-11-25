@@ -106,15 +106,17 @@ Requests use bearer authentication and JSON on the app API host. Known ingestion
 `app.posthog.com` maps to `us.posthog.com`. Custom hosts and path prefixes are preserved.
 Host URLs must be absolute HTTP(S), without credentials, query, or fragment.
 
-| Operations | Key/scope |
-|---|---|
-| Experiment create, upload, complete, fail | Personal or project secret key with `offline_evaluation_ingestion:write` |
-| Experiment tag read/update | Personal key with `evaluation:read` / `evaluation:write` |
-| [Item, result, and payload operations](#requirement-revision-checked-operations-on-experiment-handles) | Personal key with `evaluation:read` for revision reads or `evaluation:write` and editor access for mutations. Result revision reads, result and result-payload mutations, and item deletes also require `llm_analytics:read` and access to the affected scorers. |
-| Dataset read/write | Personal key with `dataset:read` / `dataset:write` |
-| Scorer read/write | Personal key with `llm_analytics:read` / `llm_analytics:write` |
+Configure a project secret API key or a personal API key. The server enforces a project secret key's scopes in its issuing project. Personal keys also require the user's resource permissions, including evaluation editor access for corrections.
 
-The backend enforces project/resource permissions and applicable feature availability.
+| Operations | Required scopes |
+|---|---|
+| Experiment create, upload, complete, fail | `offline_evaluation_ingestion:write` |
+| Experiment tag read/update | `evaluation:read` / `evaluation:write` |
+| [Item, result, and payload operations](#requirement-revision-checked-operations-on-experiment-handles) | `evaluation:read` for revision reads or `evaluation:write` for mutations. Result revision reads, result and result-payload mutations, and item deletes also require `llm_analytics:read`. |
+| Dataset read/write | `dataset:read` / `dataset:write` |
+| Scorer read/write | `llm_analytics:read` / `llm_analytics:write` |
+
+Dataset exports require a personal API key with `dataset:read`. The backend enforces project/resource permissions and applicable feature availability.
 This client is independent of analytics capture configuration, queues, and flush.
 
 ## Requirements
@@ -142,7 +144,12 @@ without whitespace. Sync/async surfaces SHALL preserve the same persistence beha
 The SDK SHALL apply the host mapping and authentication table above, retain project scope,
 and surface permission/feature rejections. It SHALL not follow HTTP redirects with the
 credential. Returned pagination URLs SHALL supply continuation data only, never replace the
-configured destination.
+configured destination. The SDK SHALL send the configured personal or project secret key as a bearer token for each operation and surface the service's permission error if its scopes are insufficient.
+
+#### Scenario: One project secret key authenticates management requests
+- **GIVEN** a client configured with a project ID and a project secret key with dataset:read, llm_analytics:read, and evaluation:write
+- **WHEN** the caller lists datasets, lists scorers, and replaces an experiment's tags
+- **THEN** the SDK sends the configured key as a bearer token on all three requests to the configured project
 
 #### Scenario: An ingestion host maps to the management host
 - **GIVEN** an isolated offline evaluation client configured with host "https://eu.i.posthog.com" and a test secret key
@@ -599,7 +606,7 @@ for that item in the same HTTP request, including exact retries.
 Previously stored inputs MAY be resubmitted with their original content.
 Using stored inputs without resubmission requires both evaluation:read and
 llm_analytics:read in addition to offline_evaluation_ingestion:write.
-Project secret keys cannot use stored inputs without resubmission.
+These scopes allow either key type to use stored inputs.
 Current access to the composite and every pinned input is required even on retries.
 Missing inputs reject the whole HTTP request; input ordering within it is arbitrary.
 
@@ -693,7 +700,7 @@ Every mutation SHALL require the caller's observed revision. PATCH SHALL send it
 
 The SDK SHALL send each mutation once. A stale revision SHALL surface as HTTP 409 `revision_conflict` with rejected persistence. After a lost response the caller SHALL receive an error with unknown persistence. The SDK SHALL NOT refresh the revision or replay a write on the caller's behalf. Revision reads follow the existing bounded retry policy.
 
-Reads require a personal key with `evaluation:read`. Writes require a personal key with `evaluation:write` and evaluation editor access. Reading a result revision, mutating a result or its payload, and deleting an item additionally require `llm_analytics:read` and access to the affected scorers and composite inputs. An ingestion-only key cannot authorize a mutation.
+Both key types require `evaluation:read` for reads and `evaluation:write` for writes. Personal keys also require evaluation editor access for writes. Reading a result revision, mutating a result or its payload, and deleting an item additionally require `llm_analytics:read` and access to the affected scorers and composite inputs. An ingestion-only key cannot authorize a mutation.
 
 #### Scenario: A result revision can be read without a stored payload
 - **GIVEN** a resumed experiment handle and a result whose payload was never provided

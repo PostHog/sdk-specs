@@ -11,7 +11,7 @@ Server SDKs implementing AI scorer management. Python exposes `OfflineEvaluation
 and `AsyncOfflineEvaluations.scorers` in `posthog.ai.evaluations`. Native names and async
 conventions can vary; observable behavior is shared. The client, authentication, tags, and
 structured error contract comes from [Offline Evaluations](../offline-evaluations/spec.md).
-Scorer reads/writes require a personal key with `llm_analytics:read` / `llm_analytics:write`.
+Scorer reads/writes require `llm_analytics:read` / `llm_analytics:write` on a project secret API key for the configured project or a personal API key with access to the scorer.
 
 ## Public surface
 

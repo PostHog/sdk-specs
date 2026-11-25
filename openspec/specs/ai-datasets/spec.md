@@ -11,8 +11,9 @@ Server SDKs that implement AI dataset management. The reference surface is
 `OfflineEvaluations.datasets` and `AsyncOfflineEvaluations.datasets` in Python's
 `posthog.ai.evaluations`. Other SDKs can use native names, collections, and async conventions.
 The shared client, authentication, tags, and structured error contract is defined in
-[Offline Evaluations](../offline-evaluations/spec.md). Dataset operations require a personal
-key with `dataset:read` or `dataset:write`, as appropriate, and dataset feature availability.
+[Offline Evaluations](../offline-evaluations/spec.md). Dataset operations require `dataset:read` or `dataset:write` and dataset feature availability.
+A project secret API key can manage datasets in its own project. Personal API keys use the same
+scopes with the user's access. The dataset export API requires a personal key with `dataset:read`.
 
 ## Public surface
 

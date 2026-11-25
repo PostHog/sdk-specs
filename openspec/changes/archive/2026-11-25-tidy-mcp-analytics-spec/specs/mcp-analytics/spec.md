@@ -318,6 +318,7 @@ whether it observes task stores ("Tool call event") as `@mcp_task_store_capable`
 - `$mcp_unknown_tool` for a call that names a tool the server does not have (see "Tool call event"),
   with the requested name as `$mcp_tool_name`; a call naming no tool emits nothing. It records what the
   agent looked for and did not find.
+- `$mcp_missing_capability` and `$mcp_feedback` from the virtual tools of "Virtual tools".
 - `$mcp_initialize` for a legacy `initialize`, unless the host turns the initialize event option
   off (see "Configuration"). With the option off, the SDK SHALL NOT send `$mcp_initialize`, and SHALL
   change nothing else: the session token, `$session_id`, and the client and server identity of later
@@ -360,9 +361,9 @@ whether it observes task stores ("Tool call event") as `@mcp_task_store_capable`
 ### Requirement: Virtual tools
 
 The SDK SHALL NOT advertise a virtual tool, a tool it adds itself, when the server already registers a
-tool of that name. An SDK MAY offer two (names configurable): `get_more_tools`, which emits
-`$mcp_missing_capability`, and `send_feedback`, which emits `$mcp_feedback`. Their events follow the
-rules of "Optional events". `get_more_tools` declares a required `context`
+tool of that name. There are two (names configurable): `get_more_tools`, whose call emits
+`$mcp_missing_capability`, and `send_feedback`, whose call emits `$mcp_feedback`; both events are
+optional events (see "Optional events"). `get_more_tools` declares a required `context`
 argument, the agent's report, which becomes `$mcp_intent`. `send_feedback` declares `feedback_type`
 and `summary` (required), and `details`, `friction_points`, `suggested_improvement`, `tool_name`,
 `sentiment`, and `task_completed`; they become the `$mcp_feedback_*` properties of "Property
@@ -375,8 +376,9 @@ uses (`type`, `tool`, `summary`, ...) or that reuses an injected argument's name
 arguments the tool does not declare, and SHALL send the event even when the host's report handler
 fails.
 
-A virtual tool gets every enabled injected argument except `context`, whose place its own report arguments take, follows
-"Session identity" like any tool call, and emits its own event, not `$mcp_tool_call`.
+A virtual tool gets every enabled injected argument except `context`, whose place its own report
+arguments take, follows "Session identity" and "Conversation anchoring" like any tool call, and emits
+its own event, not `$mcp_tool_call`.
 
 The SDK SHALL advertise each virtual tool with the annotations `readOnlyHint: false`,
 `destructiveHint: false`, `idempotentHint: false`, and `openWorldHint: false`, and SHALL NOT let host
@@ -398,9 +400,10 @@ another event. It reaches only that project, not open-ended external entities.
 
 ### Requirement: Client conversation ids
 
-The SDK SHALL read a client conversation id only under a key of this table, and a row's key only from
-a request that row's recognition rule recognizes, so an unprefixed key such as `sessionId` is read only
-from the client that defines it. A request matching a row's rule comes from a recognized client:
+The SDK SHALL read a row's key only from a request that row's recognition rule recognizes, so an
+unprefixed key such as `sessionId` is read only from the client that defines it. This table lists every
+key the SDK reads for a client conversation id, and a request comes from a recognized client when it
+matches a row's recognition rule:
 
 | Client | `_meta` key | Value | Recognized client when | Handle |
 |--------|-------------|-------|------------------------|--------|
@@ -421,9 +424,9 @@ So `openai-mcp/1.0.0 (ChatGPT)` and `openai-mcp/1.0.0 ( chatgpt; web)` are recog
 A value that is not a string of its row's value shape is not a client conversation id. The SDK SHALL derive `$session_id` from `<key> + ":" + <value>`, so ids from two clients
 never derive the same session, and SHALL NOT send the value itself in any property. A client
 conversation id wins over a conversation handle, because the client sends its id on every call while a
-handle groups calls only while the agent copies it into each one: the SDK SHALL ignore the handle of a
-call that carries both, and SHALL NOT set `$mcp_conversation_id`, which holds only SDK-minted handles,
-on a call with a client conversation id.
+handle groups calls only while the agent copies it into each one: when a call carries both, the SDK
+SHALL ignore the handle for `$session_id` and `$mcp_conversation_id`. A call with a client conversation
+id SHALL NOT set `$mcp_conversation_id`, which holds only SDK-minted handles.
 The SDK SHALL read client conversation ids whether or not conversation anchoring is enabled: reading
 one adds nothing the client sees. A handle-free client is a recognized client whose row's Handle is
 "none": the SDK leaves `conversation_id` out of its listing (see "Arguments the SDK injects") and mints

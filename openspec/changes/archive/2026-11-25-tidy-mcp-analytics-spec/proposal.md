@@ -17,17 +17,18 @@ each rule one home and splits Session identity. No rule changes.
     only a row stated (a resolver that returns nothing or throws falls through; only automatic
     instrumentation offers one) move into Session identity.
   - Session identity no longer redefines "client conversation id", which Terminology defines.
-  - "A client conversation id wins over a handle" is stated once instead of three times.
+  - The three sentences that say a client conversation id wins over a handle become two.
   - Optional events drops its own copy of the rule that every event carries client, server and session
     identity, which those requirements already state for every MCP event.
   - The model-source rule, which applies to every event that carries a model, moves from Tool call
     event to Arguments the SDK injects, next to the intent-source rule.
 - **Session identity splits in three.** Session identity keeps the ranking, the resolver, derivation,
   the session source, custom events, and the session token. **Client conversation ids** (new) holds
-  the client table, recognition, and handle-free clients. **Conversation anchoring** (new) holds
+  the client table, recognition, and handle-free clients; its SHALL sentence now comes first. **Conversation anchoring** (new) holds
   handles. Each scenario moves with its rule, unchanged.
 - **Virtual tool annotations becomes Virtual tools** and takes in the `get_more_tools` and
-  `send_feedback` rules and the virtual tool paragraph from Optional events.
+  `send_feedback` rules and the virtual tool paragraph from Optional events. Optional events still
+  lists their two events, so who may emit them, and the manual API's capture methods, stay the same.
 - The wrapper flush scenario loses a stray blank line between its AND and THEN steps.
 
 Library identity and Interface identity stay separate: `capture` refers to Library identity by name,

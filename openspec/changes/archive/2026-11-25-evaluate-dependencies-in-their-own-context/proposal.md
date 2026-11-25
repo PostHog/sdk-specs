@@ -12,17 +12,18 @@ Found while reviewing PostHog/posthog-ruby#369.
 
 - A referenced flag is evaluated as if it were evaluated directly with the same inputs, using its own aggregation, property context, bucketing identifier, and known-absent keys. A group-aggregated referenced flag whose group is not supplied resolves as `false`.
 - A `type: "group"` filter that omits `group_type_index` reads the group type of the condition's effective aggregation, including that group type's known-absent keys.
+- A group-aggregated condition whose group key isn't supplied doesn't match, so a group flag evaluated directly without its group key resolves as `false`, as the flags service returns. A supplied group key without the needed group properties stays inconclusive.
 - Acceptance scenarios cover a dependency on a flag with another aggregation, a group dependency without its group, and a group filter without an index.
 
 ## Capabilities
 
 ### Modified Capabilities
 
-- `local-feature-flag-evaluator`: the per-condition aggregation and flag-dependency requirements.
+- `local-feature-flag-evaluator`: the per-condition aggregation and flag-dependency requirements, and the canonical scenario for missing group context.
 
 ## Impact
 
-SDKs that evaluate a referenced flag with the caller's context need a change. This also changes results without known-absent keys: a cross-aggregation dependency now resolves locally to the value `/flags` returns, instead of reading the wrong properties. SDKs that ignored known-absent keys for a group filter without an index need a one-line change.
+SDKs that evaluate a referenced flag with the caller's context need a change. This also changes results without known-absent keys: a cross-aggregation dependency now resolves locally to the value `/flags` returns, instead of reading the wrong properties. SDKs that ignored known-absent keys for a group filter without an index need a one-line change. SDKs that returned inconclusive for a group flag evaluated without its group key now return `false`.
 
 ## Non-goals
 

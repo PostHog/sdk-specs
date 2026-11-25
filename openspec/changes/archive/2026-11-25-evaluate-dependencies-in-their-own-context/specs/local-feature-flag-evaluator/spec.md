@@ -10,6 +10,8 @@ A filter with property type `group` that omits `group_type_index` SHALL read the
 
 The condition's effective aggregation SHALL choose the identifier for its rollout and multivariate hashes. A person-aggregated condition SHALL use the flag's person bucketing identifier (`distinct_id` by default or the required device id for device-bucketed flags). A group-aggregated condition SHALL use the selected group key and SHALL NOT switch to device-id bucketing. Variant assignment after a match SHALL use the same effective aggregation as that matching condition.
 
+A group-aggregated condition whose group type has no key in the supplied groups SHALL NOT match, as the flags service skips it with the `NoGroupType` reason. This is a definitive non-match, not missing context, so a flag whose conditions are all skipped this way SHALL resolve as `false` locally without remote fallback, whether it is evaluated directly or as a dependency. A supplied group key that is not a string or number, or a supplied group key without the group properties a condition needs, is not a missing key: those cases SHALL follow the inconclusive rules below.
+
 If context required by one condition cannot be resolved locally, the evaluator SHALL apply the existing inconclusive/remote-fallback rules for that condition without preventing another independently evaluable condition from matching.
 
 #### Scenario: An omitted condition aggregation inherits the legacy flag aggregation (@server)
@@ -57,7 +59,6 @@ If context required by one condition cannot be resolved locally, the evaluator S
 - **WHEN** the flag is evaluated locally without a device id
 - **THEN** local evaluation should be inconclusive
 - **AND** remote evaluation should remain eligible when enabled
-
 ### Requirement: Flag dependency filters compare evaluated flag values
 
 A condition filter with property type `flag` SHALL use the `flag_evaluates_to` operator and compare its expected value with the referenced flag's evaluated value. Expected boolean `true` SHALL match boolean `true` and any multivariate variant string, but SHALL NOT match boolean `false`. Expected boolean `false` SHALL match only boolean `false`. An expected string SHALL match only the identical multivariate variant string, using a case-sensitive comparison.
@@ -113,3 +114,66 @@ The evaluator SHALL evaluate a referenced flag as if it were evaluated directly 
 - **THEN** the dependency criterion for `B` should match
 - **AND** the dependency criterion for `C` should not match
 
+### Requirement: Canonical local-feature-flag-evaluator behavior
+
+The SDK SHALL implement the canonical `local-feature-flag-evaluator` behavior described by this spec. Implementations MAY adapt method names, parameter casing, type syntax, and lifecycle hooks to platform idioms where this spec explicitly allows variation, but MUST preserve the observable outcomes in the scenarios below.
+
+#### Scenario: Evaluator returns true for a matching active boolean flag
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and local evaluation enabled
+- **AND** local feature flag definitions include a flag "beta-ui" rolled out to distinct id "user-123"
+- **WHEN** local feature flag "beta-ui" is evaluated for distinct id "user-123"
+- **THEN** the local evaluation result should be true
+
+#### Scenario: Evaluator returns a variant for a matching multivariate flag
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and local evaluation enabled
+- **AND** local feature flag definitions include a multivariate flag "checkout" with variant "blue" for distinct id "user-123"
+- **WHEN** local feature flag "checkout" is evaluated for distinct id "user-123"
+- **THEN** the local evaluation result should be "blue"
+
+#### Scenario: Evaluator resolves a group flag without its group key as false
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and local evaluation enabled
+- **AND** remote feature flag evaluation is enabled
+- **AND** local feature flag definitions include a group flag "company-beta" for group type "company"
+- **WHEN** local feature flag "company-beta" is evaluated without a "company" group
+- **THEN** the local evaluation result should be false
+- **WHEN** get feature flag "company-beta" is called for distinct id "user-123"
+- **THEN** no remote feature flag evaluation request should be sent for flag "company-beta"
+
+#### Scenario: Evaluator signals remote fallback when required group properties are missing
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and local evaluation enabled
+- **AND** remote feature flag evaluation is enabled
+- **AND** local feature flag definitions include a group flag "company-beta" for group type "company" that requires company property "tier"
+- **WHEN** local feature flag "company-beta" is evaluated for company "acme" without company properties
+- **THEN** local evaluation should be inconclusive
+- **WHEN** get feature flag "company-beta" is called for distinct id "user-123" and company "acme"
+- **THEN** a remote feature flag evaluation request should be sent for flag "company-beta"
+
+#### Scenario: Evaluator resolves payload from the matched value
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and local evaluation enabled
+- **AND** local feature flag definitions include a multivariate flag "checkout" with variant "blue" and payload:
+  | field | value |
+  | copy  | new   |
+- **WHEN** local feature flag "checkout" is evaluated for distinct id "user-123"
+- **THEN** the local evaluation payload should include:
+  | field | value |
+  | copy  | new   |

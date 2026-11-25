@@ -20,13 +20,22 @@ Feature: Local Feature Flag Evaluator
     When local feature flag "checkout" is evaluated for distinct id "user-123"
     Then the local evaluation result should be "blue"
 
-  Scenario: Evaluator signals remote fallback when required context is missing
+  Scenario: Evaluator resolves a group flag without its group key as false
     Given the SDK is initialized with token "test-token" and local evaluation enabled
     And remote feature flag evaluation is enabled
     And local feature flag definitions include a group flag "company-beta" for group type "company"
-    When local feature flag "company-beta" is evaluated without group context
-    Then local evaluation should be inconclusive
+    When local feature flag "company-beta" is evaluated without a "company" group
+    Then the local evaluation result should be false
     When get feature flag "company-beta" is called for distinct id "user-123"
+    Then no remote feature flag evaluation request should be sent for flag "company-beta"
+
+  Scenario: Evaluator signals remote fallback when required group properties are missing
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And remote feature flag evaluation is enabled
+    And local feature flag definitions include a group flag "company-beta" for group type "company" that requires company property "tier"
+    When local feature flag "company-beta" is evaluated for company "acme" without company properties
+    Then local evaluation should be inconclusive
+    When get feature flag "company-beta" is called for distinct id "user-123" and company "acme"
     Then a remote feature flag evaluation request should be sent for flag "company-beta"
 
   Scenario: Evaluator resolves payload from the matched value

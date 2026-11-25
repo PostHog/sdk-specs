@@ -114,7 +114,7 @@ The SDK SHALL implement the canonical `local-feature-flag-evaluator` behavior de
 - **WHEN** local feature flag "checkout" is evaluated for distinct id "user-123"
 - **THEN** the local evaluation result should be "blue"
 
-#### Scenario: Evaluator signals remote fallback when required context is missing
+#### Scenario: Evaluator resolves a group flag without its group key as false
 - **GIVEN** a fresh SDK acceptance test harness
 - **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
 - **AND** persistent storage is empty
@@ -122,9 +122,22 @@ The SDK SHALL implement the canonical `local-feature-flag-evaluator` behavior de
 - **GIVEN** the SDK is initialized with token "test-token" and local evaluation enabled
 - **AND** remote feature flag evaluation is enabled
 - **AND** local feature flag definitions include a group flag "company-beta" for group type "company"
-- **WHEN** local feature flag "company-beta" is evaluated without group context
-- **THEN** local evaluation should be inconclusive
+- **WHEN** local feature flag "company-beta" is evaluated without a "company" group
+- **THEN** the local evaluation result should be false
 - **WHEN** get feature flag "company-beta" is called for distinct id "user-123"
+- **THEN** no remote feature flag evaluation request should be sent for flag "company-beta"
+
+#### Scenario: Evaluator signals remote fallback when required group properties are missing
+- **GIVEN** a fresh SDK acceptance test harness
+- **AND** the SDK clock is fixed at "2025-01-01T00:00:00Z"
+- **AND** persistent storage is empty
+- **AND** the mock PostHog server is reset
+- **GIVEN** the SDK is initialized with token "test-token" and local evaluation enabled
+- **AND** remote feature flag evaluation is enabled
+- **AND** local feature flag definitions include a group flag "company-beta" for group type "company" that requires company property "tier"
+- **WHEN** local feature flag "company-beta" is evaluated for company "acme" without company properties
+- **THEN** local evaluation should be inconclusive
+- **WHEN** get feature flag "company-beta" is called for distinct id "user-123" and company "acme"
 - **THEN** a remote feature flag evaluation request should be sent for flag "company-beta"
 
 #### Scenario: Evaluator resolves payload from the matched value
@@ -666,6 +679,8 @@ Person conditions SHALL use person properties, and group conditions SHALL use pr
 A filter with property type `group` that omits `group_type_index` SHALL read the group type of the condition's effective aggregation, as the flags service does. That group type's properties and its known-absent keys SHALL apply to the filter. A filter that sets `group_type_index` SHALL read that group type, and the known-absent keys of another group type SHALL NOT apply to it.
 
 The condition's effective aggregation SHALL choose the identifier for its rollout and multivariate hashes. A person-aggregated condition SHALL use the flag's person bucketing identifier (`distinct_id` by default or the required device id for device-bucketed flags). A group-aggregated condition SHALL use the selected group key and SHALL NOT switch to device-id bucketing. Variant assignment after a match SHALL use the same effective aggregation as that matching condition.
+
+A group-aggregated condition whose group type has no key in the supplied groups SHALL NOT match, as the flags service skips it with the `NoGroupType` reason. This is a definitive non-match, not missing context, so a flag whose conditions are all skipped this way SHALL resolve as `false` locally without remote fallback, whether it is evaluated directly or as a dependency. A supplied group key that is not a string or number, or a supplied group key without the group properties a condition needs, is not a missing key: those cases SHALL follow the inconclusive rules below.
 
 If context required by one condition cannot be resolved locally, the evaluator SHALL apply the existing inconclusive/remote-fallback rules for that condition without preventing another independently evaluable condition from matching.
 

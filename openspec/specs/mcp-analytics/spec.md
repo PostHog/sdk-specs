@@ -131,7 +131,9 @@ means set whenever the SDK can determine the value. Events: "call" is `$mcp_tool
 
 Length limits count characters, keep the start of the string, include any truncation marker, and apply
 before the byte bound of "Event size bounds".
+
 ## Requirements
+
 ### Requirement: Observer-only instrumentation
 
 An SDK SHALL let a server be instrumented with one call taking the MCP server and a configured PostHog
@@ -149,11 +151,43 @@ many conversations does not grow without limit. On a server that lives for a sin
 SHALL let the host flush without delaying the response (for example through the platform's wait-until
 hook).
 
+Flushing means every event captured so far is sent, including events still being sanitized or passed
+through the before-send hook when the host asks:
+
+- Automatic instrumentation SHALL give the host a `flush()`, following platform idiom: on the handle
+  it returns, or on the analytics object the host passes in where it returns none. It SHALL wait until
+  every capture started before the call has been handed to the PostHog client or dropped, then flush
+  the PostHog client. Captures that start while it waits belong to the next call, so steady traffic on
+  a shared server cannot hold it open. `flush()` SHALL NOT raise or reject: a failed client flush is
+  logged. Without a working client it completes at once.
+- Where the SDK's PostHog client is itself the MCP wrapper (such as posthog-js's `PostHogMCP`), that
+  client's flush and shutdown SHALL first wait for its pending MCP captures the same way.
+- Flushing SHOULD be bounded by a deadline where the language makes that natural (a timeout argument,
+  a context, a cancellable future). Elsewhere the platform's wait-until limit bounds it.
+
+An SDK whose capture is synchronous already has nothing pending, so flushing the client satisfies the
+wait. In scenarios, "the SDK is flushed" means this flush.
+
 #### Scenario: A tool result reaches the client unchanged
 - **GIVEN** an MCP server instrumented by the SDK with conversation anchoring disabled and a tool "search_docs" that returns the text "Found 3 results"
 - **WHEN** an MCP client calls tool "search_docs" with arguments `{"query": "flags"}`
 - **THEN** the client should receive a result whose content is exactly one text block "Found 3 results"
 - **AND** the result should not be marked as an error
+
+#### Scenario: Instrumentation's flush right after a call sends that call
+- **GIVEN** an MCP server instrumented by the SDK with a tool "search_docs"
+- **WHEN** an MCP client calls tool "search_docs" with arguments `{"query": "flags"}`
+- **AND** the host calls instrumentation's `flush()` as soon as the client receives the result
+- **THEN** by the time `flush()` completes, exactly one event named "$mcp_tool_call" should be sent
+- **AND** its property "$mcp_tool_name" should be the string "search_docs"
+
+#### Scenario: A client wrapper's shutdown right after a call sends that call
+- **GIVEN** an SDK client that is itself the MCP wrapper
+- **WHEN** the host records a call to tool "search_docs" through it
+- **AND** the host shuts the client down right after
+
+- **THEN** by the time shutdown completes, exactly one event named "$mcp_tool_call" should be sent
+- **AND** its property "$mcp_tool_name" should be the string "search_docs"
 
 ### Requirement: Tool call event
 

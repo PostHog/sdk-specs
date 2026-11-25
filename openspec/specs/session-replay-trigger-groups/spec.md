@@ -1542,10 +1542,9 @@ trigger match, and a rotation: No posthog-js test on `origin/main` covers this; 
 
 ### Requirement: No group evaluation before replay is enabled or started
 
-While session replay is disabled in the local configuration (the browser
-`disable_session_recording`, the mobile `sessionReplay = false`) and the application has not called
-`startSessionRecording()`, the SDK SHALL NOT evaluate trigger groups: a captured event SHALL NOT
-match an event leg, and no remembered-screen check SHALL run (see "Remembered screen (mobile)"). A
+The SDK SHALL NOT evaluate trigger groups while session replay is disabled in the local
+configuration (the browser `disable_session_recording`, the mobile `sessionReplay = false`) and the
+application has not called `startSessionRecording()`: a captured event SHALL NOT match an event leg, and no remembered-screen check SHALL run (see "Remembered screen (mobile)"). A
 group that such an event would have matched stays pending. After `startSessionRecording()`, the SDK
 SHALL evaluate trigger groups as in the rest of this capability; the explicit start runs the
 remembered-screen check. With session replay enabled in the local configuration, this requirement

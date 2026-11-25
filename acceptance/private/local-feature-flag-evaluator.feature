@@ -29,6 +29,23 @@ Feature: Local Feature Flag Evaluator
     When get feature flag "company-beta" is called for distinct id "user-123"
     Then no remote feature flag evaluation request should be sent for flag "company-beta"
 
+  Scenario Outline: Evaluator treats an unusable group key as no group
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And remote feature flag evaluation is enabled
+    And local feature flag definitions include a group flag "company-beta" for group type "company"
+    When local feature flag "company-beta" is evaluated with group "company" set to <key>
+    Then the local evaluation result should be false
+    When get feature flag "company-beta" is called for distinct id "user-123" with group "company" set to <key>
+    Then no remote feature flag evaluation request should be sent for flag "company-beta"
+
+    Examples:
+      | key   |
+      | ""    |
+      | null  |
+      | true  |
+      | []    |
+      | {}    |
+
   Scenario: Evaluator signals remote fallback when required group properties are missing
     Given the SDK is initialized with token "test-token" and local evaluation enabled
     And remote feature flag evaluation is enabled

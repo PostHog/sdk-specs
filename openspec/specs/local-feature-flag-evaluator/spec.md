@@ -680,7 +680,7 @@ A filter with property type `group` that omits `group_type_index` SHALL read the
 
 The condition's effective aggregation SHALL choose the identifier for its rollout and multivariate hashes. A person-aggregated condition SHALL use the flag's person bucketing identifier (`distinct_id` by default or the required device id for device-bucketed flags). A group-aggregated condition SHALL use the selected group key and SHALL NOT switch to device-id bucketing. Variant assignment after a match SHALL use the same effective aggregation as that matching condition.
 
-A group-aggregated condition whose group type has no key in the supplied groups SHALL NOT match, as the flags service skips it with the `NoGroupType` reason. This is a definitive non-match, not missing context, so a flag whose conditions are all skipped this way SHALL resolve as `false` locally without remote fallback, whether it is evaluated directly or as a dependency. A supplied group key that is not a string or number, or a supplied group key without the group properties a condition needs, is not a missing key: those cases SHALL follow the inconclusive rules below.
+A group-aggregated condition whose group type has no usable key in the supplied groups SHALL NOT match, as the flags service skips it with the `NoGroupType` reason. A usable group key is a non-empty JSON string or a JSON number, as the flags service's `is_usable_group_key` defines it. An omitted group type, an empty string, JSON null, a boolean, an array, or an object SHALL count as no key. This is a definitive non-match, not missing context, so a flag whose conditions are all skipped this way SHALL resolve as `false` locally without remote fallback, whether it is evaluated directly or as a dependency. A usable group key supplied without the group properties a condition needs is not a missing key: that case SHALL follow the inconclusive rules below.
 
 If context required by one condition cannot be resolved locally, the evaluator SHALL apply the existing inconclusive/remote-fallback rules for that condition without preventing another independently evaluable condition from matching.
 
@@ -1308,9 +1308,9 @@ Holdouts SHALL use the flag-level bucketing identity: the person bucketing ident
 
 A group key reaches the evaluator through an untyped map, so it is not necessarily a string. Before using the selected group key as a bucketing identifier, the evaluator SHALL render it with the same canonical representation the flags service uses for `hashed_identifier`: a JSON string contributes its unquoted contents, and a JSON number contributes its canonical JSON encoding, the same bytes the SDK would send to `/flags` for that key. A numeric group key SHALL therefore bucket identically whether the flag is evaluated locally or remotely. Where the host runtime collapses distinct numeric kinds, the limitation already described by the backend-compatible property-filter stringification requirement applies unchanged.
 
-A group key of any other type SHALL be treated as unresolved context for the conditions that depend on it: the evaluator SHALL return inconclusive for those conditions and remote evaluation SHALL remain eligible when enabled. The evaluator SHALL NOT render such a key with a host-specific spelling, because those spellings do not agree with the service across languages.
+An empty string and a group key of any other type, such as JSON null, a boolean, an array, or an object, are not usable group keys. The evaluator SHALL treat the group as not supplied, as the per-condition aggregation requirement defines: a condition aggregated on that group type SHALL NOT match, and a flag whose conditions are all skipped this way SHALL resolve as `false` locally without remote fallback. The evaluator SHALL NOT render such a key with a host-specific spelling or use it as a bucketing identifier.
 
-An unrenderable group key SHALL NOT crash, panic, or raise out of any caller-facing surface that evaluates flags locally, including single-flag and bulk evaluation and a capture call that evaluates flags as a side effect. It SHALL NOT cause the affected condition to be skipped as a non-match, which would answer the flag locally without a fallback.
+An unusable group key SHALL NOT crash, panic, or raise out of any caller-facing surface that evaluates flags locally, including single-flag and bulk evaluation and a capture call that evaluates flags as a side effect.
 
 #### Scenario: A numeric group key buckets like its decimal form (@server)
 - **GIVEN** a group-aggregated flag with a partial rollout percentage
@@ -1325,13 +1325,19 @@ An unrenderable group key SHALL NOT crash, panic, or raise out of any caller-fac
 - **WHEN** an event is captured with feature flag evaluation enabled
 - **THEN** the capture should complete without raising
 
-#### Scenario: An unsupported group key type is inconclusive (@server)
-- **GIVEN** a group-aggregated flag whose condition would otherwise match
-- **AND** group "company" is supplied with the boolean true
+#### Scenario Outline: An unusable group key counts as no group (@server)
+- **GIVEN** a group-aggregated flag for group type "company" whose condition would otherwise match
+- **AND** group "company" is supplied with <key>
 - **WHEN** the flag is evaluated locally
-- **THEN** local evaluation should be inconclusive for that condition
-- **AND** remote evaluation should remain eligible when enabled
-- **AND** the condition should not be skipped as a non-match
+- **THEN** the local evaluation result should be false
+- **AND** no remote flag evaluation request should be made
+
+  | key |
+  | an empty string |
+  | JSON null |
+  | the boolean true |
+  | an array |
+  | an object |
 
 ### Requirement: Feature enrollment precedes holdouts and release conditions
 

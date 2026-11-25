@@ -1430,6 +1430,37 @@ trigger match, and a rotation: No posthog-js test on `origin/main` covers this; 
 - **WHEN** the client captures an event named "$exception"
 - **THEN** session recording should be active
 
+### Requirement: No group evaluation before replay is enabled or started
+
+While session replay is disabled in the local configuration (the browser
+`disable_session_recording`, the mobile `sessionReplay = false`) and the application has not called
+`startSessionRecording()`, the SDK SHALL NOT evaluate trigger groups: a captured event SHALL NOT
+match an event leg, and no remembered-screen check SHALL run (see "Remembered screen (mobile)"). A
+group that such an event would have matched stays pending. After `startSessionRecording()`, the SDK
+SHALL evaluate trigger groups as in the rest of this capability; the explicit start runs the
+remembered-screen check. With session replay enabled in the local configuration, this requirement
+does not apply.
+
+This requirement applies to all replay-capable SDKs.
+
+Reference: posthog-js `origin/main` `6cd9664513`
+(`packages/browser/src/extensions/replay/session-recording.ts:155-160`: `_isRecordingEnabled` is
+false while `disable_session_recording` is set; `:172-205`: `startIfEnabledOrStop` then stops
+without loading the recorder; `external/lazy-loaded-session-recorder.ts:1357-1361`: the
+`eventCaptured` trigger listener exists only in the loaded recorder).
+
+Covering test: no posthog-js test on `origin/main` covers an event captured before the start;
+the behavior follows from the code path above.
+
+#### Scenario: An event before the explicit start does not activate a group
+- **GIVEN** session replay is disabled in the local configuration
+- **AND** the remote config sets `version` to 2 and configures a trigger group with event condition "checkout_started" and a sample rate of 1.0
+- **WHEN** the client captures an event named "checkout_started"
+- **AND** the application calls `startSessionRecording()`
+- **THEN** session recording should not be active because the group is pending
+- **WHEN** the client captures an event named "checkout_started"
+- **THEN** session recording should be active
+
 ### Requirement: Hybrid SDKs
 
 The layer that owns the analytics capture pipeline SHALL evaluate trigger groups in a hybrid SDK

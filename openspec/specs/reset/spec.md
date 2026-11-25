@@ -62,7 +62,7 @@ Unity awaits anonymous-context feature-flag reload before the returned task comp
    - registered / super properties
    - group memberships
    - cached person properties and group properties used for feature-flag evaluation
-   - feature-flag values / payloads / remote-config caches
+   - feature-flag values / payloads / remote-config caches, except project-scoped replay masking (see session-replay-privacy)
    - person-processing / identified flags
    - survey / replay / other persisted client caches where the SDK stores them
    - opt-out state in the SDKs audited here
@@ -86,7 +86,7 @@ Across the audited client SDKs, `reset` clears or invalidates all persisted stat
 - session state
 - opt-out persistence
 
-Client SDKs with extra persisted modules also clear those user-scoped caches during reset (for example remote config, surveys, replay state, and feature-flag person/group-property caches on iOS / React Native / Unity).
+Client SDKs with extra persisted modules also clear those user-scoped caches during reset (for example remote config, surveys, replay state, and feature-flag person/group-property caches on iOS / React Native / Unity), except project-scoped replay masking (see session-replay-privacy).
 
 ### State preserved by reset
 

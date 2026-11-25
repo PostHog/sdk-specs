@@ -10,8 +10,13 @@ ignored on mobile, even when they are present.
 
 `maskAllText` maps to the local all-text flag: `maskAllTextInputs` in posthog-ios, posthog-android,
 posthog-react-native and posthog-kmp, and `maskAllTexts` in posthog-flutter. `maskAllImages` maps to
-the local `maskAllImages` flag. Every other mobile masking flag, such as `maskAllSandboxedViews` and
-`maskCustomPaint`, stays local.
+the local `maskAllImages` flag. Every other mobile masking setting, such as `maskAllSandboxedViews`,
+`maskCustomPaint` and the posthog-flutter `textMaskPolicy`, stays local.
+
+In posthog-flutter, a server `maskAllText: true` only turns the local `maskAllTexts` flag on. It MUST
+NOT change `textMaskPolicy` or its precedence. When a `textMaskPolicy` is set, the policy decides how
+text in the Flutter widget tree is masked, and `maskAllTexts` does not apply to those text nodes
+(`posthog_flutter/lib/src/posthog_config.dart:813-817`, posthog-flutter `e2b720c012`).
 
 This is new mobile behavior with no reference implementation yet. It diverges from the browser in key
 names by decision: the browser reads the web keys (`packages/browser/src/extensions/replay/external/lazy-loaded-session-recorder.ts:682-713`, posthog-js `origin/main` `f05a993f9`).
@@ -29,6 +34,13 @@ names by decision: the browser reads the web keys (`packages/browser/src/extensi
 - **WHEN** a replay frame is captured
 - **THEN** the resolved all-text flag is `false`
 - **AND** the resolved all-images flag is `false`
+
+#### Scenario: A Flutter text mask policy keeps its precedence over a server flag
+- **GIVEN** a Flutter app sets `maskAllTexts: true` and a `textMaskPolicy` that masks digits only
+- **AND** the remote config has `masking.mobile.maskAllText: true`
+- **WHEN** Dart captures a frame of Flutter content with the text "Balance 2450"
+- **THEN** the digits are masked
+- **AND** the word "Balance" is not masked
 
 ### Requirement: The stricter side wins, per flag
 
@@ -109,16 +121,26 @@ frame the SDK keeps MUST carry a fresh meta event and a full snapshot, as at the
 recording, so the recording still plays back. The SDK MUST reset any state that marks the meta event
 or full snapshot as already sent, and any duplicate-frame detection, so an unchanged screen still
 produces that full snapshot. A wrapper that captures frames itself, such as posthog-flutter for
-Flutter content, MUST reset its own duplicate-frame detection too.
+Flutter content, MUST do the same for its own capture when a resolved flag changes or the native SDK
+drops its buffer:
+
+- reset its own state that marks the meta event as already sent, and its duplicate-frame detection
+- drop each of its own frames that it captured under the looser flags and did not yet hand to the
+  native SDK
+- capture a fresh frame of an unchanged screen after a flag goes from `false` to `true`
+
+`masking.mobile` is project-scoped config, not user-scoped state. `reset()` MUST NOT clear the
+cached `masking.mobile` flags or the resolved masking flags. A session that starts after `reset()`
+keeps the server masking until a later remote config update changes it.
 
 This is new mobile behavior with no reference implementation yet. It diverges from the browser by
 decision: the browser reads the masking config once, when the recorder starts
 (`lazy-loaded-session-recorder.ts:2980-2985`), and does not re-resolve it mid-session.
 
-In-progress implementations, not merged and not the reference: posthog-android branch
-`feat/replay-remote-masking-config` at `9788d4b2a1` stamps each frame with a masking generation and
-drops a stale frame in `PostHogReplayQueue` (`isMaskingStale`). posthog-ios branch
-`feat/replay-remote-masking-config` at `507ad33a5e` stamps `RRScreenshotFrame.maskingGeneration` and
+In-progress implementations, not merged and not the reference: posthog-android
+[PostHog/posthog-android#1008](https://github.com/PostHog/posthog-android/pull/1008) stamps each frame with a masking generation and
+drops a stale frame in `PostHogReplayQueue` (`isMaskingStale`). posthog-ios
+[PostHog/posthog-ios#1124](https://github.com/PostHog/posthog-ios/pull/1124) stamps `RRScreenshotFrame.maskingGeneration` and
 drops a stale frame in `PostHogReplayQueue`.
 
 #### Scenario: The cached config applies at start
@@ -177,17 +199,33 @@ drops a stale frame in `PostHogReplayQueue`.
 - **AND** the next frame the SDK keeps includes a meta event and a full snapshot with text masked
 - **AND** the recording plays back from that frame
 
+#### Scenario: A Flutter wrapper recovers after a flag gets stricter
+- **GIVEN** a Flutter app is recording Flutter content with both resolved flags `false`
+- **AND** Dart holds a frame captured under those flags that it did not yet hand to the native SDK
+- **AND** the screen does not change after that
+- **WHEN** a remote config update arrives with `masking.mobile.maskAllText: true`
+- **THEN** that frame is not uploaded
+- **AND** Dart captures a fresh frame of the unchanged screen with text masked
+- **AND** that frame carries a meta event and a full snapshot
+
 #### Scenario: Frames buffered before the first live config are kept when nothing gets stricter
 - **GIVEN** the SDK has buffered replay frames captured before the first live remote config response
 - **AND** the cached resolved flags are `true` and `false`
 - **WHEN** the first live response resolves to the same two values
 - **THEN** the buffered frames are kept and uploaded
 
+#### Scenario: Server masking survives reset
+- **GIVEN** the applied remote config has `masking.mobile.maskAllText: true`
+- **AND** the local all-text flag is `false`
+- **WHEN** the app calls `reset()`
+- **AND** replay captures a frame in the next session
+- **THEN** all text in the frame is masked
+
 ### Requirement: Log once when the server turns on a mask the local value had off
 
 A debug log entry for a mask that the server turned on SHALL name the flag. A mobile SDK SHOULD
 write one debug-level log entry when a resolved flag is `true` only because the server value is
-`true` and the local value is `false`. It is written once per flag per process and MUST NOT be written when the local value is already `true`.
+`true` and the local value is `false`. It is written once per flag per SDK instance and MUST NOT be written when the local value is already `true`.
 It MUST NOT be a warning or an error and MUST NOT change capture.
 
 This is new mobile behavior with no reference implementation yet. The browser warns once when a client value shadows a different project value (`lazy-loaded-session-recorder.ts:721-764`, tests `lazy-sessionrecording.test.ts:6729-6799`). That warning is for the opposite case, because there the client value wins. Mobile logs when the server adds a mask, because the app's local value no longer decides.

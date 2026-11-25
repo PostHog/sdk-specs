@@ -350,13 +350,13 @@ on its pre-existing empty-event-name gap.
 - **Spec requires:** Mask text inputs, images, and sandboxed/secure views by default; honour `ph-no-capture` containers including their children; explicit unmask markers take precedence over explicit mask markers where an SDK offers both.
 - **SDK currently (plugin 3.0, `210bf35d8`):** RN passes `maskAllTextInputs`, `maskAllImages` and `maskAllSandboxedViews`, all defaulting to `true`, and the plugin copies them onto the native config (`packages/react-native-plugin/ios/PosthogReactNativePlugin.swift:389-396`, `PosthogReactNativePluginModule.kt:166-177`). `PostHogMaskView` sets `accessibilityLabel="ph-no-capture"` (`packages/react-native/src/PostHogMaskView.tsx:42`). The 2026-10-19 🟡 came from posthog-ios's default wireframe mode recording the children of a `ph-no-capture` container. posthog-ios 4.0 and posthog-android 4.0 record masked screenshots only, so that path is gone. Both mask a `ph-no-capture` view and everything inside it: posthog-ios passes `maskChildren || view.isNoCapture()` down the walk (posthog-ios `e27cbe4cb` `PostHog/Replay/PostHogReplayIntegration.swift:917`, `:1077`), and posthog-android uses `insideNoCapture` (posthog-android `aaa23d39` `PostHogReplayIntegration.kt:1603-1606`, `:2875-2878`). An unmask marker winning or losing against a mask marker can't arise here, because RN has no unmask marker.
 - **Gap (2026-11-24, sdk-specs change `add-mobile-remote-masking`): remote mobile masking.** The
-  requirement "Wrapper SDKs get the resolved flags from native" (`openspec/specs/session-replay-privacy/spec.md:494`)
+  requirement "Wrapper SDKs get the resolved flags from native" (`openspec/specs/session-replay-privacy/spec.md:532`)
   says React Native keeps passing its local flags and the native SDK combines them with
   `sessionRecording.masking.mobile`. The plugin already passes both flags at `origin/main` `f05a993f9d`
   (`packages/react-native-plugin/android/src/main/java/com/posthogreactnativeplugin/PosthogReactNativePluginModule.kt:189-190,209-210`,
   `packages/react-native-plugin/ios/PosthogReactNativePlugin.swift:413-417`). No native release
-  resolves remote masking yet: posthog-android and posthog-ios have it on unmerged
-  `feat/replay-remote-masking-config` branches (`9788d4b2a1`, `507ad33a5e`).
+  resolves remote masking yet: posthog-android and posthog-ios have it in unmerged
+  [PostHog/posthog-android#1008](https://github.com/PostHog/posthog-android/pull/1008) and [PostHog/posthog-ios#1124](https://github.com/PostHog/posthog-ios/pull/1124).
 - **Backwards compatibility:** Backward-compatible; no JS API change.
 - **Remediation:** After the native release, raise the plugin's native version pins to it.
 

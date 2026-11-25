@@ -205,7 +205,7 @@ complete implementation of that contract outside the browser.
 | 55 | Session Manager | ✅ |  |
 | 56 | Session Replay Debug Properties | 🟡 | [n17]; off-state shape open (posthog-android#992) |
 | 57 | Session Replay Ingestion Controls | 🟡 | [n18] |
-| 58 | Session Replay Privacy | 🟡 | [n19]; remote mobile masking open (feat/replay-remote-masking-config) |
+| 58 | Session Replay Privacy | 🟡 | [n19]; remote mobile masking open ([#1008](https://github.com/PostHog/posthog-android/pull/1008)) |
 | 59 | Set Group Properties For Flags | ✅ |  |
 | 60 | Set Person Properties | ✅ |  |
 | 61 | Set Person Properties For Flags | ✅ |  |
@@ -656,12 +656,12 @@ Notes [n1](#n1), [n3](#n3), [n5](#n5), [n6](#n6)-[n10](#n10), [n13](#n13), [n14]
   frame, and drops frames not yet handed to the upload queue when a flag gets stricter. At `origin/main` `85a681537f` the remote
   config parser leaves `masking` as a TODO
   (`posthog/src/main/java/com/posthog/internal/PostHogRemoteConfig.kt:619-621`), so masking comes from
-  local config only. Fix in progress: branch `feat/replay-remote-masking-config` at `9788d4b2a1`
-  (unmerged), which also stamps each frame with a masking generation and drops a stale frame in
+  local config only. Fix in progress:
+  [#1008](https://github.com/PostHog/posthog-android/pull/1008) (unmerged), which also stamps each frame with a masking generation and drops a stale frame in
   `PostHogReplayQueue`.
 - **Backwards compatibility:** Backward-compatible. No project has the mobile keys until a project
   owner turns a toggle on, and the server can only add masking.
-- **Remediation:** Land `feat/replay-remote-masking-config`.
+- **Remediation:** Land [#1008](https://github.com/PostHog/posthog-android/pull/1008).
 
 <a id="n20"></a>
 

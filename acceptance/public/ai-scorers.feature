@@ -129,3 +129,43 @@ Feature: AI Scorers
     When the caller creates a scorer
     Then the caller receives an invalid-response error with unknown persistence
     And the service receives no automatic replay
+
+  Scenario: An experiment formula survives a read and a new version
+    Given an experiment scorer using category_rate for category correct with version policy combine
+    When the caller fetches the scorer and creates a version from its returned composition
+    Then both version responses retain the scope, statistic, category, and version policy
+    And the request preserves the full composition and anchor UUID
+
+  Scenario: Experiment scope is retained in validation and list requests
+    When the caller validates an experiment formula and lists experiment scorers by tag and offset
+    Then both requests carry experiment scope and the list request retains tag and offset
+
+  Scenario: Scorer responses without scope remain readable
+    When a scorer or version response from an older service omits scope
+    Then the returned scope is item
+
+  Scenario: Publishing with omitted suite keys preserves the assignment
+    Given a current experiment scorer version with an assigned suite
+    When the caller creates a new version with omitted suite keys
+    Then the previous version keeps the assignment
+
+  Scenario: Publishing with an empty selection releases the previous current version's suites
+    Given a current experiment scorer version with an assigned suite
+    When the caller creates a new version with an empty selection
+    Then the SDK sends an empty list and the assignments on the previous current version are released
+
+  Scenario: A historical version can own an environment default
+    Given an experiment scorer with a historical version and an available suite
+    When the caller updates the scorer with the historical version UUID and that suite
+    Then the exact version and scorer detail report the assignment
+    And the scorer's current version suite keys exclude it
+
+  Scenario: A suite default cannot be taken from another scorer
+    Given a suite assigned to another experiment scorer in the same environment
+    When the caller attempts to assign it to a different scorer
+    Then the caller receives a structured validation error and the assignment is retained
+
+  Scenario: Archiving clears defaults for all versions
+    Given suite defaults on current and historical versions of an experiment scorer
+    When the caller archives the scorer
+    Then every version's suite assignments are cleared

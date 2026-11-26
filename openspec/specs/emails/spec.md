@@ -378,8 +378,8 @@ A `2xx` with a message ID that doesn't confirm the scheduled time SHALL produce 
 
 #### Scenario: An unconfirmed schedule with a generated key says not to send again
 - **GIVEN** a send with a scheduled time and no idempotency key from the caller
-- **WHEN** the response is `202` with `{"message_id": "msg_1"}`
-- **THEN** the fix says to read the status of `msg_1` with `get`
+- **WHEN** the response is `202` with `{"message_id": "0190f6d2-7c1e-7b3a-9f5e-1c2d3e4f5a6b"}`
+- **THEN** the fix says to read the status of `0190f6d2-7c1e-7b3a-9f5e-1c2d3e4f5a6b` with `get`
 - **AND** the fix says not to send the email again
 - **AND** the fix doesn't advise sending it with another idempotency key
 
@@ -446,6 +446,13 @@ The SDK SHALL retry a batch's request as "Retryable responses" and "Retry timing
 - **AND** the SDK sends no retry
 - **AND** both recipients are Unconfirmed
 
+#### Scenario: Shutdown after a refused attempt fails every recipient
+- **GIVEN** a batch of two recipients whose first attempt was answered `429` with code `throttled`, and a controlled clock that the test does not advance
+- **WHEN** the caller shuts the client down while the batch waits to retry
+- **THEN** the batch call ends before the clock advances
+- **AND** the SDK sends no retry
+- **AND** both recipients are Failed with `client_closed`
+
 ### Requirement: Batch recipient results
 
 A `200` with one result per recipient, in request order, SHALL settle each recipient as one of three statuses. Each result SHALL carry the recipient's position, `to`, idempotency key, status, the message ID when PostHog named one as a nonempty string, and an error unless the recipient is Queued. A `message_id` of any other type SHALL be left out of the result.
@@ -454,7 +461,7 @@ A `200` with one result per recipient, in request order, SHALL settle each recip
 - **Unconfirmed**: the result's error has code `delivery_unavailable` or `idempotency_key_in_flight`, or no code, or the result is neither Queued nor an error. PostHog may still send the email.
 - **Failed**: the result's error has any other code, such as `recipient_suppressed`. The error SHALL carry that code, a message from `detail`, and the status from the result's error.
 
-With `idempotency_key_reused`, the message ID is the ID of the email that first used the key, which may have gone to another address or with other content. The recipient's error SHALL say that this ID belongs to the earlier email, not to this recipient's.
+PostHog derives a recipient's message ID from its idempotency key, so the ID on a Failed or Unconfirmed result names whatever email that key sent, if any, which may be an earlier email to another address. Only a Queued result's ID is this recipient's email for sure. With `idempotency_key_reused`, the ID is the email that first used the key, and the recipient's error SHALL say that this ID belongs to the earlier email, not to this recipient's.
 
 When an earlier attempt of the same call got no usable answer, as in "Batch refusal after a lost answer", a result that would be Failed SHALL leave the recipient Unconfirmed instead, under "Unconfirmed recipient wording". Only a Queued result settles such a recipient, except that `idempotency_key_reused` MAY fail it, since sending it again with the same key can't succeed.
 

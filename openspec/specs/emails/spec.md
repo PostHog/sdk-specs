@@ -18,7 +18,7 @@ Names below use posthog-node spelling, then posthog-python spelling.
 |---|---|---|
 | `send` | Required `to`, `templateId` / `template_id`; optional `templateData` / `template_data`, `distinctId` / `distinct_id`, `idempotencyKey` / `idempotency_key` (default: a UUID v4 for the call), `maxRetries` (default: the client's), `scheduledAt` / `scheduled_at` | Send result: `id`, `replayed`, `warnings`, and for a scheduled send the confirmed scheduled time, or none when the email goes out now |
 | `batch` | Required `templateId` / `template_id` and 1 to 100 `recipients`, each with required `to` and optional `distinctId` / `distinct_id`, `templateData` / `template_data` and `idempotencyKey` / `idempotency_key` (default: a UUID v4 for the recipient); optional shared `templateData` / `template_data`, `maxRetries` (default: the client's) | Batch result: one result per recipient, in order, with its position, `to`, idempotency key, status (`queued`, `failed` or `unconfirmed`), message ID, `replayed` and error; and `warnings` |
-| `get` | Message ID from a send result | Status record: `id`, `status`, `createdAt` / `created_at`, `statusAt` / `status_at`, `reason` |
+| `get` | Message ID from a send or batch result | Status record: `id`, `status`, `createdAt` / `created_at`, `statusAt` / `status_at`, `reason` |
 
 | Client option | posthog-node | posthog-python | Default |
 |---|---|---|---|
@@ -66,15 +66,15 @@ How a batch's request fails as a whole. A recipient is Failed when PostHog didn'
 | What happened | Recipients | The error |
 |---|---|---|
 | A failure before the request, such as a failed argument check, `missing_secret_key`, `missing_app_host`, `client_disabled` or `client_closed` | Every recipient fails, and no request is made | The check's code |
-| `409` with `batch_unavailable` | Every recipient Failed | `batch_unavailable`: batch sends aren't available for the project, so send each recipient on its own with `send` |
+| `409` with `batch_unavailable` | Every recipient Failed | `batch_unavailable`: batch sends aren't available for the project, so send each recipient on its own with `send`, with its key and the email the batch would have sent |
 | `409` with any other code, or with no code | Every recipient Unconfirmed | PostHog's code, or `api_error`; `idempotency_key_in_flight` is retried first |
-| `413` | Every recipient Failed | `content_too_large`, with advice to split the recipients into smaller batches |
+| `413` | Every recipient Failed | PostHog's code, or `content_too_large` when it has none, with advice to split the recipients into smaller batches |
 | `400` with `content_too_large` | Every recipient Failed | `content_too_large`, with PostHog's message and no advice to split |
 | `404` that names no field, with code `not_found`, `api_error`, or none | Every recipient Failed, and nothing was sent | `not_found` with status 404: no template with this ID, or batch sends aren't available for this project |
 | Any other refusal, such as a `400`, `403`, `422`, or `429` once the retries are spent | Every recipient Failed | PostHog's code |
 | A network error, a timeout or a `5xx`, once the retries are spent | Every recipient Unconfirmed | The last attempt's error |
 | A `2xx` without a result for each recipient | Every recipient Unconfirmed | `api_error`, not retried |
-| Any refusal of a retry after an earlier attempt of the same call got no usable answer | Every recipient Unconfirmed | Says some emails may have gone out, never that nothing was sent, and advises sending each recipient again with the same key |
+| Any refusal of a retry after an earlier attempt of the same call got no usable answer, of the whole batch or of one recipient | Every recipient not Queued stays Unconfirmed | Says some emails may have gone out, never that nothing was sent, and advises sending the batch again unchanged, with the same keys |
 
 ## Requirements
 
@@ -293,7 +293,7 @@ After the client shuts down, it SHALL send no email request and SHALL report the
 
 ### Requirement: Scheduled send request
 
-`send` SHALL take an optional scheduled time, `scheduledAt` / `scheduled_at`, as the language's date-time or an ISO 8601 time with a UTC offset. The SDK SHALL round the time up to the next millisecond and send it in the body as `scheduled_at`, an RFC 3339 time in UTC with milliseconds. A send without a scheduled time SHALL carry no `scheduled_at`. A time without a UTC offset SHALL fail the argument check with `invalid_scheduled_at`. The SDK SHALL NOT refuse a time for being in the past or more than 7 days ahead: PostHog sends a passed time now, and refuses a time more than 7 days after the request with `400` and `scheduled_too_far`.
+`send` SHALL take an optional scheduled time, `scheduledAt` / `scheduled_at`, as the language's date-time or an ISO 8601 time with a UTC offset. The SDK SHALL round the time up to the next millisecond and send it in the body as `scheduled_at`, an RFC 3339 time in UTC with milliseconds. A send without a scheduled time SHALL carry no `scheduled_at`. A time without a UTC offset, or one that isn't a real calendar time, such as `2026-02-30T09:00:00Z`, SHALL fail the argument check with `invalid_scheduled_at`, and SHALL NOT be normalized into another time. The SDK SHALL NOT refuse a time for being in the past or more than 7 days ahead: PostHog sends a passed time now, and refuses a time more than 7 days after the request with `400` and `scheduled_too_far`.
 
 #### Scenario: A scheduled time rounds up to the next millisecond
 - **WHEN** the caller sends an email with scheduled time `2026-11-20T09:00:00.000400Z`
@@ -305,6 +305,11 @@ After the client shuts down, it SHALL send no email request and SHALL report the
 
 #### Scenario: A time without an offset sends nothing
 - **WHEN** the caller sends an email with scheduled time `2026-11-20T09:00:00`
+- **THEN** the SDK reports the error code `invalid_scheduled_at`
+- **AND** no request is made
+
+#### Scenario: A date that doesn't exist sends nothing
+- **WHEN** the caller sends an email with scheduled time `2026-02-30T09:00:00Z`
 - **THEN** the SDK reports the error code `invalid_scheduled_at`
 - **AND** no request is made
 
@@ -344,7 +349,7 @@ For a send with a scheduled time, a `2xx` with a message ID SHALL count as a suc
 
 ### Requirement: Grace window for a passed time
 
-PostHog answers `"status": "queued"` with `"scheduled_at": null` when the time had passed by its clock, and sends the email now. Because the two clocks can drift apart, the SDK SHALL accept that answer as an immediate send when the scheduled time, rounded up to the millisecond, is at most 60 seconds after the send's first attempt, by the client's clock. The first attempt is the moment the SDK sends the first request of the send to the send route, after any upload. The SDK SHALL NOT measure the window from when the answer arrives or from a retry. A later time with that answer SHALL fail with `schedule_not_confirmed`.
+PostHog answers `"status": "queued"` with `"scheduled_at": null` when the time had passed by its clock, and sends the email now. Because the two clocks can drift apart, the SDK SHALL accept that answer as an immediate send when the scheduled time, rounded up to the millisecond, is at most 60 seconds after the send's first attempt, by the client's clock. The first attempt is the moment the SDK sends the first request of the send to the send route. The SDK SHALL NOT measure the window from when the answer arrives or from a retry. A later time with that answer SHALL fail with `schedule_not_confirmed`.
 
 #### Scenario: A slow answer doesn't stretch the window
 - **GIVEN** a send whose scheduled time is 62 seconds after its first attempt
@@ -357,9 +362,14 @@ PostHog answers `"status": "queued"` with `"scheduled_at": null` when the time h
 - **WHEN** the first attempt fails with a `503`, and the retry's response arrives 30 seconds after the first attempt and is `202` with `{"message_id": "msg_1", "status": "queued", "scheduled_at": null}`
 - **THEN** the result has ID `msg_1` and shows that the email goes out now
 
+#### Scenario: A retry doesn't restart the window
+- **GIVEN** a send whose scheduled time is 62 seconds after its first attempt
+- **WHEN** the first attempt fails with a `503`, and the retry starts 5 seconds after the first attempt and is answered `202` with `{"message_id": "msg_1", "status": "queued", "scheduled_at": null}`
+- **THEN** the SDK reports the error code `schedule_not_confirmed`
+
 ### Requirement: Unconfirmed schedule
 
-A `2xx` with a message ID that doesn't confirm the scheduled time SHALL produce the error `schedule_not_confirmed`, and SHALL NOT be retried. That includes a response with no `status` or no `scheduled_at`, as from a PostHog that ignored the time. The error SHALL carry the response's HTTP status, the scheduled time field, and the message ID, because PostHog accepted the email and it may go out at another time. Its fix SHALL say to read the email's status with `get` and that message ID before sending it again, and SHALL NOT advise sending it with another idempotency key. The SDK SHALL still log the response's warnings.
+A `2xx` with a message ID that doesn't confirm the scheduled time SHALL produce the error `schedule_not_confirmed`, and SHALL NOT be retried. That includes a response with no `status` or no `scheduled_at`, as from a PostHog that ignored the time. The error SHALL carry the response's HTTP status, the scheduled time field, and the message ID, because PostHog accepted the email and it may go out at another time. Its fix SHALL say to read the email's status with `get` and that message ID before sending it again, and SHALL NOT advise sending it with another idempotency key. When the SDK generated the send's key, the fix SHALL say not to send the email again, since any new send makes a second email. The SDK SHALL still log the response's warnings.
 
 #### Scenario: An acceptance that ignores the time is not a success
 - **GIVEN** a send with a scheduled time
@@ -376,16 +386,16 @@ The status read SHALL pass through `scheduled`, the status of an email that wait
 
 ### Requirement: Batch request
 
-`batch` SHALL take a template ID, optional shared template data, a list of recipients, and an optional per-call maximum number of retries. Each recipient SHALL take `to`, and optionally a distinct ID, its own template data and an idempotency key. One call SHALL send one request: `POST {app host}/api/messaging/send/email_batch/` with a JSON body holding `template_id` (in lowercase), `message_data` (the shared template data, or an empty object), and `recipients`, each with `to`, `idempotency_key`, and `distinct_id` and `message_data` only when the caller passed them. The request SHALL use the authentication and host rules of a send, and SHALL carry no `Idempotency-Key` header. Each attempt SHALL wait at least 45 seconds for the answer, or the client's request timeout when that is longer. A batch SHALL NOT take a scheduled time.
+`batch` SHALL take a template ID, optional shared template data, a list of recipients, and an optional per-call maximum number of retries. Each recipient SHALL take `to`, and optionally a distinct ID, its own template data and an idempotency key. Each attempt SHALL send one request for every recipient, and a call SHALL NOT split its recipients across requests: `POST {app host}/api/messaging/send/email_batch/` with a JSON body holding `template_id` (in lowercase), `message_data` (the shared template data, or an empty object), and `recipients`, each with `to`, `idempotency_key`, and `distinct_id` and `message_data` only when the caller passed them. The request SHALL use the authentication and host rules of a send, SHALL carry `Content-Type: application/json`, `Accept: application/json` and the SDK's user agent, and SHALL carry no `Idempotency-Key` header. Each attempt SHALL wait at least 45 seconds for the answer, or the client's request timeout when that is longer. A batch SHALL NOT take a scheduled time.
 
 #### Scenario: A batch is one request with a key per recipient
 - **WHEN** the caller sends a batch with template ID `0190F6D2-7C1E-7B3A-9F5E-1C2D3E4F5A6B`, shared template data `{"plan": "pro"}`, and recipients `ada@example.com` with key `key_ada` and template data `{"name": "Ada"}`, and `bob@example.com` with no key
-- **THEN** the SDK makes one request, `POST {app host}/api/messaging/send/email_batch/`
+- **THEN** the SDK makes one request, `POST {app host}/api/messaging/send/email_batch/` with `Content-Type: application/json`
 - **AND** the body is `{"template_id": "0190f6d2-7c1e-7b3a-9f5e-1c2d3e4f5a6b", "message_data": {"plan": "pro"}, "recipients": [{"to": "ada@example.com", "idempotency_key": "key_ada", "message_data": {"name": "Ada"}}, {"to": "bob@example.com", "idempotency_key": "<a UUID v4>"}]}`
 
 ### Requirement: Batch argument checks
 
-Before any request, the SDK SHALL check that the batch has 1 to 100 recipients, and SHALL check each recipient as "Argument checks" checks a send. A recipient without an idempotency key SHALL get a UUID v4. Two recipients with the same key SHALL fail the check with `invalid_idempotency_key`. More than 100 recipients SHALL fail with `invalid_recipients` and a fix that says to split them into batches of at most 100. A failed check SHALL send no request.
+Before any request, the SDK SHALL check the template ID, shared template data and retry limit as "Argument checks" checks a send, that the batch has 1 to 100 recipients, and each recipient as "Argument checks" checks a send. A recipient without an idempotency key SHALL get a UUID v4. Two recipients with the same key SHALL fail the check with `invalid_idempotency_key`. No recipients SHALL fail with `invalid_recipients`, and more than 100 SHALL fail with `invalid_recipients` and a fix that says to split them into batches of at most 100. A failed check SHALL send no request.
 
 #### Scenario: More than 100 recipients sends nothing
 - **WHEN** the caller sends a batch with 101 recipients
@@ -397,9 +407,19 @@ Before any request, the SDK SHALL check that the batch has 1 to 100 recipients, 
 - **THEN** the SDK reports the error code `invalid_idempotency_key`
 - **AND** no request is made
 
+#### Scenario: A batch without recipients sends nothing
+- **WHEN** the caller sends a batch with no recipients
+- **THEN** the SDK reports the error code `invalid_recipients`
+- **AND** no request is made
+
+#### Scenario: A template ID that is not a UUID sends no batch
+- **WHEN** the caller sends a batch with template ID `welcome`
+- **THEN** the SDK reports an argument error
+- **AND** no request is made
+
 ### Requirement: Batch retries
 
-The SDK SHALL retry a batch's request as "Retryable responses" and "Retry timing" retry a send, with the same body, so every recipient keeps its idempotency key on every attempt. After the client shuts down, a batch SHALL send no retry. A recipient that was Unconfirmed then stays Unconfirmed, and every other recipient fails with `client_closed`.
+The SDK SHALL retry a batch's request as "Retryable responses" and "Retry timing" retry a send, with the same body, so every recipient keeps its idempotency key on every attempt. Unlike a send, a batch SHALL send no retry once shutdown has started: a batch that waits to retry ends at once. A recipient that was Unconfirmed then stays Unconfirmed, and every other recipient fails with `client_closed`.
 
 #### Scenario: A retry reuses each recipient's key
 - **GIVEN** a batch of two recipients without idempotency keys
@@ -410,9 +430,11 @@ The SDK SHALL retry a batch's request as "Retryable responses" and "Retry timing
 
 A `200` with one result per recipient, in request order, SHALL settle each recipient as one of three statuses. Each result SHALL carry the recipient's position, `to`, idempotency key, status, the message ID when PostHog named one, and an error unless the recipient is Queued.
 
-- **Queued**: the result has `"status": "queued"`, a message ID and no error. The result SHALL carry the message ID and `replayed`.
-- **Unconfirmed**: the result's error has code `delivery_unavailable` or `idempotency_key_in_flight`, or no code, or the result is neither queued nor an error. PostHog may still send the email.
+- **Queued**: the result has `"status": "queued"`, a message ID that is a nonempty string, and no error. The result SHALL carry the message ID and `replayed`.
+- **Unconfirmed**: the result's error has code `delivery_unavailable` or `idempotency_key_in_flight`, or no code, or the result is neither Queued nor an error. PostHog may still send the email.
 - **Failed**: the result's error has any other code, such as `recipient_suppressed`. The error SHALL carry that code, a message from `detail`, and the status from the result's error.
+
+When an earlier attempt of the same call got no usable answer, as in "Batch refusal after a lost answer", a result that would be Failed SHALL leave the recipient Unconfirmed instead, under "Unconfirmed recipient wording". Only a Queued result settles such a recipient.
 
 A `2xx` without a result for each recipient SHALL produce the error `api_error`, leave every recipient Unconfirmed, and SHALL NOT be retried. The SDK SHALL log the response's warnings.
 
@@ -429,12 +451,17 @@ A `2xx` without a result for each recipient SHALL produce the error `api_error`,
 - **THEN** the SDK makes 1 attempt and reports the error code `api_error`
 - **AND** both recipients are Unconfirmed
 
+#### Scenario: A queued result without a string message ID is not Queued
+- **GIVEN** a batch of one recipient
+- **WHEN** the response is `200` with `{"results": [{"message_id": 42, "status": "queued"}]}`
+- **THEN** the recipient is Unconfirmed
+
 ### Requirement: Batch refusals
 
 When the batch fails as a whole, the SDK SHALL report the error through "Error channel", and the error SHALL carry every recipient's result once the request was sent. Which recipients fail and which stay Unconfirmed SHALL follow the Batch errors table of this spec. In particular:
 
 - A failure before the request, such as a failed argument check, `missing_secret_key`, `missing_app_host`, `client_disabled` or `client_closed`, SHALL send nothing and fail every recipient.
-- A `409` with `batch_unavailable` SHALL fail every recipient: PostHog sent nothing. Its error SHALL say that batch sends aren't available for the project, and its fix SHALL say to send each recipient on its own with `send`. The fix SHOULD say to use each recipient's idempotency key.
+- A `409` with `batch_unavailable` SHALL fail every recipient: PostHog sent nothing. Its error SHALL say that batch sends aren't available for the project, and its fix SHALL say to send each recipient on its own with `send`. The fix SHOULD say to send each with the same template, `to`, distinct ID and idempotency key, and the recipient's template data merged over the shared data at the top level, which is the email the batch would have sent.
 - A `409` with any other code, or with no code, SHALL leave every recipient Unconfirmed, with their keys and the same-key advice of "Unconfirmed recipient wording". Only `batch_unavailable` says that a `409` sent nothing.
 - A network error, a timeout or a `5xx`, once the retries are spent, SHALL leave every recipient Unconfirmed.
 
@@ -466,7 +493,7 @@ When the batch fails as a whole, the SDK SHALL report the error through "Error c
 
 ### Requirement: Batch 404 without a field
 
-PostHog answers an unknown template, batch sends that are off for the project, and a server without the batch route with the same `404`. So a `404` that names no field and whose code is `not_found`, `api_error`, blank or missing SHALL fail every recipient: PostHog sent nothing. The error SHALL keep code `not_found` and status 404. Its message SHALL say that PostHog found no template with this ID, or batch sends aren't available for this project, so it sent no email of this request. Its fix SHALL say to check the template ID and, if it is right, to send each recipient on its own with `send` until batch sends are available. The fix SHOULD say to use each recipient's idempotency key. The error SHALL NOT advise updating PostHog or say that batch sends are unavailable on this server, and the SDK SHALL NOT key on PostHog's `detail` text.
+PostHog answers an unknown template, batch sends that are off for the project, and a server without the batch route with the same `404`. So a `404` that names no field and whose code is `not_found`, `api_error`, blank or missing SHALL fail every recipient: PostHog sent nothing. The error SHALL keep code `not_found` and status 404. Its message SHALL say that PostHog found no template with this ID, or batch sends aren't available for this project, so it sent no email of this request. Its fix SHALL say to check the template ID and, if it is right, to send each recipient on its own with `send` until batch sends are available. The fix SHOULD say to send each as "Batch refusals" says for `batch_unavailable`. The error SHALL NOT advise updating PostHog or say that batch sends are unavailable on this server, and the SDK SHALL NOT key on PostHog's `detail` text.
 
 #### Scenario: A 404 without a field names both causes
 - **GIVEN** a batch of two recipients
@@ -478,7 +505,7 @@ PostHog answers an unknown template, batch sends that are off for the project, a
 
 ### Requirement: Batch content too large
 
-A `413` SHALL fail every recipient with code `content_too_large`, PostHog's own code when it gave one, and a fix that says to split the recipients into smaller batches: the request is more than PostHog takes at once. A `400` with code `content_too_large` SHALL fail every recipient without that advice: the content or data sent to every recipient is over PostHog's limit for a batch, so splitting doesn't help, and the error SHALL keep PostHog's message and fix.
+A `413` SHALL fail every recipient with PostHog's code, or `content_too_large` when the response has none, and a fix that says to split the recipients into smaller batches: the request is more than PostHog takes at once. A `400` with code `content_too_large` SHALL fail every recipient without that advice: the content or data sent to every recipient is over PostHog's limit for a batch, so splitting doesn't help, and the error SHALL keep PostHog's message and fix.
 
 #### Scenario: A 413 says to split the batch
 - **GIVEN** a batch of two recipients
@@ -500,7 +527,7 @@ A `413` SHALL fail every recipient with code `content_too_large`, PostHog's own 
 
 ### Requirement: Batch refusal after a lost answer
 
-When an earlier attempt of the same call got no usable answer, such as a network error, a timeout, a `5xx`, or a `409` that left recipients Unconfirmed, that attempt may have queued every email. A refusal of a later attempt, such as a `400`, a `404`, a `409` with `batch_unavailable` or a `413` with `content_too_large`, SHALL then leave every recipient Unconfirmed. Its error SHALL NOT say that PostHog sent nothing, and SHALL NOT advise splitting the batch or sending with new keys. Its message SHALL say that some emails may have gone out, and its fix SHALL say to send each recipient again with the same idempotency key, within 24 hours of the first request that used it, and to read each recipient's result. The error of the call SHALL carry this advice, not only the recipients' results.
+When an earlier attempt of the same call got no usable answer, such as a network error, a timeout, a `5xx`, or a `409` that left recipients Unconfirmed, that attempt may have queued every email. A refusal of a later attempt, such as a `400`, a `404`, a `409` with `batch_unavailable` or a `413` with `content_too_large`, SHALL then leave every recipient Unconfirmed. Its error SHALL NOT say that PostHog sent nothing, and SHALL NOT advise splitting the batch or sending with new keys. Its message SHALL say that some emails may have gone out, and its fix SHALL say to send the batch again unchanged, with the same idempotency key for each recipient, within 24 hours of the first request that used it, and to read each recipient's result. The error of the call SHALL carry this advice, not only the recipients' results.
 
 #### Scenario: A refused retry after a lost answer never says nothing was sent
 - **GIVEN** a batch of two recipients
@@ -518,7 +545,7 @@ When an earlier attempt of the same call got no usable answer, such as a network
 
 ### Requirement: Unconfirmed recipient wording
 
-An Unconfirmed recipient's error SHALL say that PostHog didn't confirm the email and that it may still go out, and its fix SHALL say to send that recipient again with the same idempotency key within 24 hours of the first request that used it, so it goes out once. It SHALL NOT say that the email wasn't queued, wasn't sent or failed. When a later answer refuses a recipient that is already Unconfirmed, the SDK SHALL keep the recipient's first cause as its error, and MAY keep the later answer in a separate field. A later `idempotency_key_reused` MAY fail the recipient instead, since sending it again with the same key can't succeed.
+An Unconfirmed recipient's error SHALL say that PostHog didn't confirm the email and that it may still go out, and its fix SHALL say to send that recipient again unchanged, with the same idempotency key, within 24 hours of the first request that used it, so it goes out once. It SHALL NOT say that the email wasn't queued, wasn't sent or failed. When a later answer refuses a recipient that is already Unconfirmed, the SDK SHALL keep the recipient's first cause as its error, and MAY keep the later answer in a separate field. A later `idempotency_key_reused` MAY fail the recipient instead, since sending it again with the same key can't succeed.
 
 #### Scenario: An unconfirmed recipient is never told its email wasn't queued
 - **GIVEN** a batch of one recipient
@@ -526,4 +553,3 @@ An Unconfirmed recipient's error SHALL say that PostHog didn't confirm the email
 - **THEN** the recipient is Unconfirmed
 - **AND** its error says PostHog didn't confirm the email and it may still go out
 - **AND** its error doesn't say the email wasn't sent
-

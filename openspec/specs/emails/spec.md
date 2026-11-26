@@ -445,9 +445,9 @@ The SDK SHALL retry a batch's request as "Retryable responses" and "Retry timing
 
 #### Scenario: Shutdown keeps the results of an attempt in flight
 - **GIVEN** a batch of two recipients whose request PostHog has received but not answered yet
-- **WHEN** the caller shuts the client down
+- **WHEN** the caller shuts the client down with a timeout of 30 seconds
 - **THEN** shutdown doesn't finish while PostHog hasn't answered
-- **WHEN** PostHog then answers `200` with both recipients queued
+- **WHEN** PostHog then answers `200` with both recipients queued, 1 second later
 - **THEN** shutdown finishes
 - **AND** the batch call returns both recipients Queued with their message IDs
 - **AND** no recipient fails with `client_closed`
@@ -480,7 +480,7 @@ A `200` with one result per recipient, in request order, SHALL settle each recip
 - **Unconfirmed**: the result's error has code `delivery_unavailable` or `idempotency_key_in_flight`, or no code, or the result is neither Queued nor an error. PostHog may still send the email.
 - **Failed**: the result's error has any other code, such as `recipient_suppressed`. The error SHALL carry that code, a message from `detail`, and the status from the result's error.
 
-PostHog derives a recipient's message ID from its idempotency key, so the ID names the email PostHog keeps for that key, if any. When the key was also used for another email, that may be the other email, whatever the recipient's status: Queued means PostHog accepted the request, not that the ID is this recipient's email. With `idempotency_key_reused`, the recipient's error SHALL say that the ID belongs to an earlier request that used this key, not to this recipient's email, and SHALL NOT say whether that email went out: its status is for `get` to tell.
+PostHog derives a recipient's message ID from its idempotency key, so the ID names the email PostHog keeps for that key, if any. When the key was also used for another email, that may be the other email, whatever the recipient's status: Queued means PostHog accepted the request, not that the ID is this recipient's email. With `idempotency_key_reused`, the recipient's error SHALL carry that code whether or not the result has a message ID. When it has one, the recipient's error SHALL say that the ID belongs to an earlier request that used this key, not to this recipient's email, and SHALL NOT say whether that email went out: its status is for `get` to tell. When it has none, the error SHALL NOT name an ID.
 
 When an earlier attempt of the same call got no usable answer, as in "Batch refusal after a lost answer", a result that would be Failed SHALL leave the recipient Unconfirmed instead, under "Unconfirmed recipient wording". Only a Queued result settles such a recipient, except that `idempotency_key_reused` MAY fail it, since sending it again with the same key can't succeed.
 

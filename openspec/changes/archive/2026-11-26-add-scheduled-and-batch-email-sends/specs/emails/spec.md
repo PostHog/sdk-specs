@@ -172,6 +172,13 @@ The SDK SHALL retry a batch's request as "Retryable responses" and "Retry timing
 - **AND** the batch call returns both recipients Queued with their message IDs
 - **AND** no recipient fails with `client_closed`
 
+#### Scenario: Shutdown that times out before PostHog answers keeps recipients Unconfirmed
+- **GIVEN** a batch of two recipients whose request PostHog has received but not answered yet, in an SDK whose shutdown takes a timeout
+- **WHEN** the caller shuts the client down with a timeout of 100 milliseconds, and PostHog doesn't answer within it
+- **THEN** shutdown finishes within about 100 milliseconds
+- **AND** the SDK sends no retry
+- **AND** if the batch call ends without PostHog's answer, both recipients are Unconfirmed, and none fails with `client_closed`
+
 #### Scenario: Shutdown keeps an uncertain answer of an attempt in flight Unconfirmed
 - **GIVEN** a batch of two recipients whose request PostHog has received but not answered yet
 - **WHEN** the caller shuts the client down, and PostHog then answers `503`
@@ -194,7 +201,7 @@ The SDK SHALL retry a batch's request as "Retryable responses" and "Retry timing
 
 ### Requirement: Batch recipient results
 
-A `200` with one result per recipient, in request order, SHALL settle each recipient as one of three statuses. Each result SHALL carry the recipient's position, `to`, idempotency key, status, the message ID when PostHog named one as a nonempty string, and an error unless the recipient is Queued. A `message_id` of any other type SHALL be left out of the result.
+A `200` with one result per recipient, in request order, SHALL settle each recipient as one of three statuses. Each result SHALL carry the recipient's position, `to`, idempotency key, status, the message ID when PostHog named one as a nonempty string, and an error unless the recipient is Queued. Any other `message_id`, an empty string included, SHALL be left out of the result.
 
 - **Queued**: the result has `"status": "queued"`, a message ID that is a nonempty string, and no error. The result SHALL carry the message ID and `replayed`.
 - **Unconfirmed**: the result's error has code `delivery_unavailable` or `idempotency_key_in_flight`, or no code, or the result is neither Queued nor an error. PostHog may still send the email.
@@ -215,7 +222,7 @@ A `2xx` without a result for each recipient SHALL produce the error `api_error`,
 
 #### Scenario: A key conflict after a lost answer warns in either outcome
 - **GIVEN** a batch of one recipient, `bob@example.com` with key `key_1`
-- **WHEN** the first attempt times out, and the retry is answered `200` with `{"results": [{"message_id": "7d1c4a2e-5b3f-4e8a-9c6d-2f1e0a9b8c7d", "error": {"code": "idempotency_key_reused", "detail": "This key was already used.", "status": 422, "retryable": false}}]}`
+- **WHEN** the first attempt times out, and the retry is answered `200` with `{"results": [{"message_id": "7d1c4a2e-5b3f-4e8a-9c6d-2f1e0a9b8c7d", "error": {"code": "idempotency_key_reused", "detail": "This Idempotency-Key was already used for a different request. Use a new key for a new email.", "status": 422, "retryable": false}}]}`
 - **THEN** the recipient is either Failed with code `idempotency_key_reused`, or Unconfirmed with the timeout as its cause and an error that names the key conflict
 - **AND** in either case its error says the message ID belongs to an earlier request that used this key, not to this recipient's email
 - **AND** its fix doesn't say to send it again with `key_1`
@@ -252,6 +259,12 @@ A `2xx` without a result for each recipient SHALL produce the error `api_error`,
 - **WHEN** the response is `200` with `{"results": [{"message_id": 42, "error": {"code": "idempotency_key_reused", "detail": "This key was already used.", "status": 422, "retryable": false}}]}`
 - **THEN** the recipient is Failed with code `idempotency_key_reused`
 - **AND** its result and error name no message ID
+
+#### Scenario: A queued result with an empty message ID is not Queued
+- **GIVEN** a batch of one recipient
+- **WHEN** the response is `200` with `{"results": [{"message_id": "", "status": "queued"}]}`
+- **THEN** the recipient is Unconfirmed
+- **AND** its result has no message ID
 
 #### Scenario: A queued result without a string message ID is not Queued
 - **GIVEN** a batch of one recipient

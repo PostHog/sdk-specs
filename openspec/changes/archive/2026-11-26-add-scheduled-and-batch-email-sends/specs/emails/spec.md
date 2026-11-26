@@ -159,6 +159,12 @@ The SDK SHALL retry a batch's request as "Retryable responses" and "Retry timing
 - **THEN** the batch call returns both recipients Queued with their message IDs
 - **AND** no recipient fails with `client_closed`
 
+#### Scenario: Shutdown keeps an uncertain answer of an attempt in flight Unconfirmed
+- **GIVEN** a batch of two recipients whose request PostHog has received but not answered yet
+- **WHEN** the caller shuts the client down, and PostHog then answers `503`
+- **THEN** the SDK sends no retry
+- **AND** both recipients are Unconfirmed, and none fails with `client_closed`
+
 #### Scenario: Shutdown ends a batch's wait to retry at once
 - **GIVEN** a batch of two recipients whose first attempt failed with a `503`, and a controlled clock that the test does not advance
 - **WHEN** the caller shuts the client down while the batch waits to retry
@@ -181,11 +187,17 @@ A `200` with one result per recipient, in request order, SHALL settle each recip
 - **Unconfirmed**: the result's error has code `delivery_unavailable` or `idempotency_key_in_flight`, or no code, or the result is neither Queued nor an error. PostHog may still send the email.
 - **Failed**: the result's error has any other code, such as `recipient_suppressed`. The error SHALL carry that code, a message from `detail`, and the status from the result's error.
 
-PostHog derives a recipient's message ID from its idempotency key, so the ID names the email PostHog keeps for that key, if any. When the key was also used for another email, that may be the other email, whatever the recipient's status: Queued means PostHog accepted the request, not that the ID is this recipient's email. With `idempotency_key_reused`, the ID is the email that first used the key, and the recipient's error SHALL say that this ID belongs to the earlier email, not to this recipient's.
+PostHog derives a recipient's message ID from its idempotency key, so the ID names the email PostHog keeps for that key, if any. When the key was also used for another email, that may be the other email, whatever the recipient's status: Queued means PostHog accepted the request, not that the ID is this recipient's email. With `idempotency_key_reused`, the recipient's error SHALL say that the ID belongs to another email sent with this key, not to this recipient's.
 
 When an earlier attempt of the same call got no usable answer, as in "Batch refusal after a lost answer", a result that would be Failed SHALL leave the recipient Unconfirmed instead, under "Unconfirmed recipient wording". Only a Queued result settles such a recipient, except that `idempotency_key_reused` MAY fail it, since sending it again with the same key can't succeed.
 
 A `2xx` without a result for each recipient SHALL produce the error `api_error`, leave every recipient Unconfirmed, and SHALL NOT be retried. The SDK SHALL log the response's warnings.
+
+#### Scenario: A retry after a lost answer settles only the Queued recipients
+- **GIVEN** a batch of two recipients
+- **WHEN** the first attempt times out, and the retry is answered `200` with `{"results": [{"message_id": "m0", "status": "queued", "replayed": true}, {"message_id": "m1", "error": {"code": "recipient_unreachable", "detail": "Unreachable.", "status": 422, "retryable": false}}]}`
+- **THEN** the first recipient is Queued with message ID `m0`
+- **AND** only the second recipient is Unconfirmed
 
 #### Scenario: Each recipient gets its own outcome
 - **GIVEN** a batch of three recipients
@@ -204,7 +216,7 @@ A `2xx` without a result for each recipient SHALL produce the error `api_error`,
 - **GIVEN** a batch of one recipient, `bob@example.com` with key `key_1`, after an earlier send to `ada@example.com` with key `key_1`
 - **WHEN** the response is `200` with `{"results": [{"message_id": "m_ada", "error": {"code": "idempotency_key_reused", "detail": "This key was already used.", "status": 422, "retryable": false}}]}`
 - **THEN** the recipient is Failed with code `idempotency_key_reused`
-- **AND** its error says the message ID `m_ada` belongs to the email that first used the key, not to this recipient's
+- **AND** its error says the message ID `m_ada` belongs to another email sent with this key, not to this recipient's
 
 #### Scenario: A queued result without a string message ID is not Queued
 - **GIVEN** a batch of one recipient

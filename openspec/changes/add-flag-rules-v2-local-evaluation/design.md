@@ -149,7 +149,7 @@ Contract 10.1.0 pins `flag_disabled` with `null` for supported documents. It doe
 
 ### 10. The harness capability `feature_flags_local_evaluation_v2`
 
-**Choice.** The capability follows the harness's `feature_flags_local_evaluation_v1`, and its suffix is the definitions feed version the SDK requests, as `flags_response_v4` names `/flags?v=4`. An SDK declares it only in a release that requests `v=2`, after the in-process replay and the black-box suite pass. The in-process replay covers the cases that a public API cannot reach: complete property maps and the white-box hash cases.
+**Choice.** The capability follows the harness's `feature_flags_local_evaluation_v1`, and its suffix is the definitions feed version the SDK requests, as `flags_response_v4` names `/flags?v=4`. An SDK declares it only in a release that requests `v=2`, after the in-process replay and the black-box suite pass. The in-process replay covers the cases that a public API cannot reach: complete property maps, timezones other than UTC and the white-box hash cases.
 
 **Alternative.** `flag_rules_v2`. Rejected: it is shorter but does not say "local", although remote-only SDKs also read rules v2 results.
 

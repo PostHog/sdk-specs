@@ -246,7 +246,7 @@ A read of a locally evaluated config version 2 flag SHALL send the events that a
 
 ### Requirement: Dates are read in UTC
 
-The config version 2 evaluator SHALL read a date, or a date and time, without an offset in UTC, in a filter value and in a property value, and SHALL resolve a relative date from the current time in UTC. A value with `Z` or an offset denotes that instant. The SDK SHALL pass UTC to the evaluator and SHALL NOT use the host's timezone.
+The config version 2 evaluator SHALL read a date, or a date and time, without an offset in UTC, in a filter value and in a property value, and SHALL resolve a relative date from the current time in UTC. A value with `Z` or an offset denotes that instant. The SDK SHALL pass UTC to the evaluator and SHALL NOT use the host's timezone. The only exception is the in-process replay of "Evidence for the harness capability", which passes each case's own timezone.
 
 The flags service reads such values in the project's timezone, and the definitions feed does not carry it. In a project that is not on UTC, a local and a remote result can therefore differ for a person whose date lies within the project's UTC offset of a boundary. Config version 1 local evaluation behaves the same way when it has no project timezone. A later change can add the project's timezone to the feed as an optional field.
 
@@ -269,7 +269,7 @@ The flags service reads such values in the project's timezone, and the definitio
 
 ### Requirement: Evidence for the harness capability
 
-An SDK SHALL replay in process, through its config version 2 evaluator, every case of the contract's boolean, value, experiment and local evaluation corpora and its hash vectors, and SHALL check each case against the local outcome that `rules/local_outcomes.json` gives it. The replay includes the cases with a complete property map and, through a private test seam, the white-box hash cases. The SDK SHALL declare the harness capability `feature_flags_local_evaluation_v2` only in a release that requests `v=2`, and only when that replay and the harness's black-box local evaluation suite pass.
+An SDK SHALL replay in process, through its config version 2 evaluator, every case of the contract's boolean, value, experiment and local evaluation corpora and its hash vectors, and SHALL check each case against the local outcome that `rules/local_outcomes.json` gives it. The replay evaluates each case with its own context, through a private test seam where the public API cannot pass it: a complete property map, the case's timezone and current time, and the hash that a white-box hash case fixes. The SDK SHALL declare the harness capability `feature_flags_local_evaluation_v2` only in a release that requests `v=2`, and only when that replay and the harness's black-box local evaluation suite pass.
 
 #### Scenario: The capability is declared with the version 2 request (@server)
 - **GIVEN** an SDK release that evaluates config version 2 flags but does not yet request `v=2`

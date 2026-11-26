@@ -22,7 +22,7 @@ No spec says when an SDK may ask for the new feed, what it does with an entry it
   - The harness capability `feature_flags_local_evaluation_v2` is declared only in a release that requests `v=2`, after an in-process corpus replay and the black-box suite pass.
 - `local-feature-flag-evaluator`: `filters.version` selects the evaluator on every path, the flag-dependency path included. A version other than absent, `1` or `2` is unsupported, and a config version 1 flag that depends on a flag of another version is inconclusive.
 - `flag-definition-loader`: the shared definition cache keeps config version 1 entries in `flags` and every other entry in a new field, `flags_v2`, so an older SDK on the same cache never reads a config version 2 document.
-- Acceptance: a new `acceptance/private/flag-rules-v2-local-evaluation.feature` built on the contract's mixed-feed fixture and local cases; the two local scenarios of `experiment-exposure.feature` rewritten with concrete definitions and `@requires:feature_flags_local_evaluation_v2`; shared-cache scenarios in `flag-definition-loader.feature`.
+- Acceptance: a new `acceptance/private/flag-rules-v2-local-evaluation.feature` built on the contract's mixed-feed fixture and local cases; the two local scenarios of `experiment-exposure.feature` rewritten with concrete definitions and `@requires:feature_flags_local_evaluation_v2`; shared-cache scenarios and a poll with a conditional request in `flag-definition-loader.feature`.
 
 No breaking change. Config version 1 flags, their evaluator and their events do not change, and an SDK that does not request `v=2` sees no difference.
 

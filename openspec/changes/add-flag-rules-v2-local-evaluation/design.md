@@ -165,7 +165,7 @@ Contract 10.1.0 pins `flag_disabled` with `null` for supported documents. It doe
 
 The scenarios keep the legacy `@server` tag and add `@requires:feature_flags_local_evaluation_v2`. They move to `@sdk:server` once the steps are bound and a real SDK adapter passes them.
 
-The shared-cache scenarios in `flag-definition-loader.feature` use that feature's own phrasing. The harness cannot run any scenario of that feature yet, because most of its steps are unbound, so these scenarios also wait for those bindings.
+The shared-cache scenarios and the poll with a conditional request in `flag-definition-loader.feature` use that feature's own phrasing. The harness cannot run any scenario of that feature yet, because most of its steps are unbound, so these scenarios also wait for those bindings.
 
 ## Risks / Trade-offs
 

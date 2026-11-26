@@ -1192,6 +1192,78 @@ Feature: Local Feature Flag Evaluator
       | unknown group type "XOR"                   |
 
   @server
+  Scenario Outline: A person_metadata cohort leaf is inconclusive regardless of caller properties
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And remote feature flag evaluation is enabled
+    And local feature flag "first-seen" requires membership in a dynamic cohort with one leaf of type "person_metadata", key "created_at", operator "is_date_after", and condition value "2025-01-01"
+    When local feature flag "first-seen" is evaluated <property_context>
+    Then local evaluation should be inconclusive for "first-seen"
+    And the unresolved reason should be "unsupported_definition"
+    And remote evaluation should remain eligible
+
+    Examples:
+      | property_context                                             |
+      | with person property "created_at" equal to "2026-06-01"      |
+      | with person property "created_at" equal to "2020-06-01"      |
+      | without person properties                                    |
+      | with person property key "created_at" listed as known absent |
+
+  @server
+  Scenario Outline: A person filter on created_at still matches caller properties
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag "created-person-prop" has a condition filter with <type_state> on key "created_at", operator "is_date_after", and condition value "2025-01-01"
+    When local feature flag "created-person-prop" is evaluated with person property "created_at" equal to "2026-06-01"
+    Then the local evaluation result should be true
+
+    Examples:
+      | type_state               |
+      | type "person"            |
+      | the "type" field omitted |
+      | a JSON null type         |
+      | an empty-string type     |
+
+  @server
+  Scenario Outline: Negation does not turn an unsupported cohort leaf into a match
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And remote feature flag evaluation is enabled
+    And local feature flag "first-seen" requires membership in a dynamic cohort with one "person_metadata" leaf on key "created_at"
+    And <negation>
+    When local feature flag "first-seen" is evaluated with person property "created_at" equal to "2020-06-01"
+    Then local evaluation should be inconclusive for "first-seen"
+    And the negation should not turn it into a match
+
+    Examples:
+      | negation                               |
+      | the leaf sets negation to true         |
+      | the flag's cohort operator is "not_in" |
+
+  @server
+  Scenario: Another cohort leaf can still decide the group
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag "first-seen-pro" requires membership in a dynamic cohort whose "AND" group has a "person_metadata" leaf on key "created_at" and a "person" leaf requiring "plan" to equal "pro"
+    When local feature flag "first-seen-pro" is evaluated with person property "plan" equal to "free"
+    Then the local evaluation result should be false
+    And the SDK should not require remote fallback
+
+  @server
+  Scenario: An unrecognized filter type in a flag condition defers only that flag
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag "future-type" has a condition filter of type "future_type" on key "plan" with operator "exact" and condition value "pro"
+    And local feature flag definitions include a flag "beta-ui" rolled out to distinct id "user-123"
+    When local feature flag "future-type" is evaluated for distinct id "user-123" with person property "plan" equal to "pro"
+    And local feature flag "beta-ui" is evaluated for distinct id "user-123"
+    Then local evaluation should be inconclusive for "future-type"
+    And the local evaluation result for "beta-ui" should be true
+
+  @server
+  Scenario: A definitively false filter decides a condition with an unsupported filter
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag "future-type-plan" has one condition with a filter of type "future_type" on key "region" and a "person" filter requiring "plan" to equal "pro"
+    When local feature flag "future-type-plan" is evaluated with person property "plan" equal to "free"
+    Then the local evaluation result should be false
+    And the SDK should not require remote fallback
+
+  @server
   Scenario Outline: V2 preserves safe numeric ambiguity fallback
     Given the SDK is initialized with token "test-token" and local evaluation enabled
     And the loaded definitions response has top-level "property_matching_version" 2

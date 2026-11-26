@@ -491,6 +491,7 @@ A `2xx` without a result for each recipient SHALL produce the error `api_error`,
 - **WHEN** the first attempt times out, and the retry is answered `200` with `{"results": [{"message_id": "m0", "status": "queued", "replayed": true}, {"message_id": "m1", "error": {"code": "recipient_unreachable", "detail": "Unreachable.", "status": 422, "retryable": false}}]}`
 - **THEN** the first recipient is Queued with message ID `m0`
 - **AND** only the second recipient is Unconfirmed
+- **AND** the second recipient's error keeps the timeout as its cause, not `recipient_unreachable`, and its fix says to send it again with the same email and idempotency key
 
 #### Scenario: Each recipient gets its own outcome
 - **GIVEN** a batch of three recipients
@@ -515,6 +516,12 @@ A `2xx` without a result for each recipient SHALL produce the error `api_error`,
 #### Scenario: A key conflict without a message ID keeps its code
 - **GIVEN** a batch of one recipient
 - **WHEN** the response is `200` with `{"results": [{"error": {"code": "idempotency_key_reused", "detail": "This key was already used.", "status": 422, "retryable": false}}]}`
+- **THEN** the recipient is Failed with code `idempotency_key_reused`
+- **AND** its result and error name no message ID
+
+#### Scenario: A key conflict with a message ID that isn't a string names no ID
+- **GIVEN** a batch of one recipient
+- **WHEN** the response is `200` with `{"results": [{"message_id": 42, "error": {"code": "idempotency_key_reused", "detail": "This key was already used.", "status": 422, "retryable": false}}]}`
 - **THEN** the recipient is Failed with code `idempotency_key_reused`
 - **AND** its result and error name no message ID
 

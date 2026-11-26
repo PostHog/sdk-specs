@@ -316,6 +316,7 @@ When an earlier attempt of the same call got no usable answer, such as a network
 - **AND** the message says some emails may have gone out, and never that nothing was sent
 - **AND** the fix says to check the template ID first
 - **AND** the fix says to then send each recipient with `send`, with the same idempotency key, and doesn't say to send the batch again
+- **AND** each recipient's fix says the same, the template check first
 
 #### Scenario: batch_unavailable on a retry after a lost answer
 - **GIVEN** a batch with shared template data `{"plan": "pro", "user": {"name": "there", "tier": "free"}}` and two recipients, one with template data `{"user": {"name": "Ada"}}`
@@ -324,11 +325,12 @@ When an earlier attempt of the same call got no usable answer, such as a network
 - **AND** the error says some emails may have gone out
 - **AND** the fix says to send each recipient with `send`, with the same template, `to`, distinct ID and idempotency key, and its template data merged over the shared data at the top level, such as `{"plan": "pro", "user": {"name": "Ada"}}`, where the recipient's `user` replaces the shared one whole
 - **AND** the fix doesn't say to send the batch again
-- **AND** each recipient's fix says to send it with `send` and the same idempotency key, and its error keeps the `503` as its cause
+- **AND** each recipient's fix says to send it with `send` and the same idempotency key, and never to send the batch again
+- **AND** each recipient's error keeps the `503`'s code and status as its cause
 
 ### Requirement: Unconfirmed recipient wording
 
-An Unconfirmed recipient's error SHALL say that PostHog didn't confirm the email and that it may still go out, and its fix SHALL say to send that recipient again with the same email and idempotency key, within 24 hours of the first request that used it, so it goes out once. It SHALL NOT say that the email wasn't queued, wasn't sent or failed. When a later answer refuses a recipient that is already Unconfirmed, the SDK SHALL keep the recipient's first cause as its error, and MAY keep the later answer in a separate field. A later `idempotency_key_reused` MAY fail the recipient instead, since sending it again with the same key can't succeed. After a later refusal that says batch sends aren't available, as in "Batch refusal after a lost answer", each Unconfirmed recipient's fix SHALL say to send it with `send`, with the same email and idempotency key, not with another batch, while its error keeps its first cause.
+An Unconfirmed recipient's error SHALL say that PostHog didn't confirm the email and that it may still go out, and its fix SHALL say to send that recipient again with the same email and idempotency key, within 24 hours of the first request that used it, so it goes out once. It SHALL NOT say that the email wasn't queued, wasn't sent or failed. When a later answer refuses a recipient that is already Unconfirmed, the SDK SHALL keep the recipient's first cause as its error, and MAY keep the later answer in a separate field. A later `idempotency_key_reused` MAY fail the recipient instead, since sending it again with the same key can't succeed. After a later refusal that says batch sends aren't available, as in "Batch refusal after a lost answer", each Unconfirmed recipient's fix SHALL match the fix of the call, the template check after a `404` included: send it with `send`, with the same email and idempotency key, not with another batch. Its error SHALL keep its first cause's code and status, and SHALL NOT keep advice from that cause that conflicts with this fix, such as sending the batch again.
 
 #### Scenario: An unconfirmed recipient is never told its email wasn't queued
 - **GIVEN** a batch of one recipient

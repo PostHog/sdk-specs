@@ -140,8 +140,8 @@ Before any request, the SDK SHALL check the template ID, shared template data an
 - **AND** no request is made
 
 #### Scenario: A template ID that is not a UUID sends no batch
-- **WHEN** the caller sends a batch with template ID `welcome`
-- **THEN** the SDK reports an argument error
+- **WHEN** the caller sends a batch with template ID `welcome` and one recipient, `ada@example.com`
+- **THEN** the SDK reports an argument error that names the template ID
 - **AND** no request is made
 
 ### Requirement: Batch retries
@@ -187,7 +187,7 @@ A `200` with one result per recipient, in request order, SHALL settle each recip
 - **Unconfirmed**: the result's error has code `delivery_unavailable` or `idempotency_key_in_flight`, or no code, or the result is neither Queued nor an error. PostHog may still send the email.
 - **Failed**: the result's error has any other code, such as `recipient_suppressed`. The error SHALL carry that code, a message from `detail`, and the status from the result's error.
 
-PostHog derives a recipient's message ID from its idempotency key, so the ID names the email PostHog keeps for that key, if any. When the key was also used for another email, that may be the other email, whatever the recipient's status: Queued means PostHog accepted the request, not that the ID is this recipient's email. With `idempotency_key_reused`, the recipient's error SHALL say that the ID belongs to another email sent with this key, not to this recipient's.
+PostHog derives a recipient's message ID from its idempotency key, so the ID names the email PostHog keeps for that key, if any. When the key was also used for another email, that may be the other email, whatever the recipient's status: Queued means PostHog accepted the request, not that the ID is this recipient's email. With `idempotency_key_reused`, the recipient's error SHALL say that the ID belongs to an earlier request that used this key, not to this recipient's email, and SHALL NOT say whether that email went out: its status is for `get` to tell.
 
 When an earlier attempt of the same call got no usable answer, as in "Batch refusal after a lost answer", a result that would be Failed SHALL leave the recipient Unconfirmed instead, under "Unconfirmed recipient wording". Only a Queued result settles such a recipient, except that `idempotency_key_reused` MAY fail it, since sending it again with the same key can't succeed.
 
@@ -216,7 +216,8 @@ A `2xx` without a result for each recipient SHALL produce the error `api_error`,
 - **GIVEN** a batch of one recipient, `bob@example.com` with key `key_1`, after an earlier send to `ada@example.com` with key `key_1`
 - **WHEN** the response is `200` with `{"results": [{"message_id": "m_ada", "error": {"code": "idempotency_key_reused", "detail": "This key was already used.", "status": 422, "retryable": false}}]}`
 - **THEN** the recipient is Failed with code `idempotency_key_reused`
-- **AND** its error says the message ID `m_ada` belongs to another email sent with this key, not to this recipient's
+- **AND** its error says the message ID `m_ada` belongs to an earlier request that used this key, not to this recipient's email
+- **AND** its error doesn't say whether that email was sent
 
 #### Scenario: A queued result without a string message ID is not Queued
 - **GIVEN** a batch of one recipient
@@ -323,10 +324,11 @@ When an earlier attempt of the same call got no usable answer, such as a network
 - **AND** the error says some emails may have gone out
 - **AND** the fix says to send each recipient with `send`, with the same template, `to`, distinct ID and idempotency key, and its template data merged over the shared data at the top level, such as `{"plan": "pro", "user": {"name": "Ada"}}`, where the recipient's `user` replaces the shared one whole
 - **AND** the fix doesn't say to send the batch again
+- **AND** each recipient's fix says to send it with `send` and the same idempotency key, and its error keeps the `503` as its cause
 
 ### Requirement: Unconfirmed recipient wording
 
-An Unconfirmed recipient's error SHALL say that PostHog didn't confirm the email and that it may still go out, and its fix SHALL say to send that recipient again with the same email and idempotency key, within 24 hours of the first request that used it, so it goes out once. It SHALL NOT say that the email wasn't queued, wasn't sent or failed. When a later answer refuses a recipient that is already Unconfirmed, the SDK SHALL keep the recipient's first cause as its error, and MAY keep the later answer in a separate field. A later `idempotency_key_reused` MAY fail the recipient instead, since sending it again with the same key can't succeed.
+An Unconfirmed recipient's error SHALL say that PostHog didn't confirm the email and that it may still go out, and its fix SHALL say to send that recipient again with the same email and idempotency key, within 24 hours of the first request that used it, so it goes out once. It SHALL NOT say that the email wasn't queued, wasn't sent or failed. When a later answer refuses a recipient that is already Unconfirmed, the SDK SHALL keep the recipient's first cause as its error, and MAY keep the later answer in a separate field. A later `idempotency_key_reused` MAY fail the recipient instead, since sending it again with the same key can't succeed. After a later refusal that says batch sends aren't available, as in "Batch refusal after a lost answer", each Unconfirmed recipient's fix SHALL say to send it with `send`, with the same email and idempotency key, not with another batch, while its error keeps its first cause.
 
 #### Scenario: An unconfirmed recipient is never told its email wasn't queued
 - **GIVEN** a batch of one recipient

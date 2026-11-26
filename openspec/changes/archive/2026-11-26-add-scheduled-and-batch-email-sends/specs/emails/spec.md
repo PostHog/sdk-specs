@@ -154,6 +154,11 @@ Before any request, the SDK SHALL check the template ID, shared template data an
 - **THEN** the SDK reports an argument error
 - **AND** no request is made
 
+#### Scenario: A fractional retry limit sends no batch
+- **WHEN** the caller sends a batch with a maximum of 0.5 retries and one recipient, `ada@example.com`, in an SDK whose retry limit can take a fraction
+- **THEN** the SDK reports an argument error
+- **AND** no request is made
+
 ### Requirement: Batch retries
 
 The SDK SHALL retry a batch's request as "Retryable responses" and "Retry timing" retry a send, with the same body, so every recipient keeps its idempotency key on every attempt. Unlike a send, a batch SHALL send no retry once shutdown has started: a batch that waits to retry ends at once. A recipient that was Unconfirmed then stays Unconfirmed, and every other recipient fails with `client_closed`.
@@ -173,11 +178,12 @@ The SDK SHALL retry a batch's request as "Retryable responses" and "Retry timing
 - **AND** no recipient fails with `client_closed`
 
 #### Scenario: Shutdown that times out before PostHog answers keeps recipients Unconfirmed
-- **GIVEN** a batch of two recipients whose request PostHog has received but not answered yet, in an SDK whose shutdown takes a timeout
-- **WHEN** the caller shuts the client down with a timeout of 100 milliseconds, and PostHog doesn't answer within it
+- **GIVEN** a batch of two recipients whose request PostHog has received and never answers, in an SDK whose shutdown takes a timeout, and a controlled clock
+- **WHEN** the caller shuts the client down with a timeout of 100 milliseconds
 - **THEN** shutdown finishes within about 100 milliseconds
-- **AND** the SDK sends no retry
-- **AND** if the batch call ends without PostHog's answer, both recipients are Unconfirmed, and none fails with `client_closed`
+- **WHEN** the clock passes the attempt's timeout
+- **THEN** the batch call ends, with no retry
+- **AND** both recipients are Unconfirmed with their idempotency keys, and none fails with `client_closed`
 
 #### Scenario: Shutdown keeps an uncertain answer of an attempt in flight Unconfirmed
 - **GIVEN** a batch of two recipients whose request PostHog has received but not answered yet
@@ -191,6 +197,12 @@ The SDK SHALL retry a batch's request as "Retryable responses" and "Retry timing
 - **THEN** the batch call ends before the clock advances
 - **AND** the SDK sends no retry
 - **AND** both recipients are Unconfirmed
+
+#### Scenario: Shutdown after a lost answer and a refused retry keeps recipients Unconfirmed
+- **GIVEN** a batch of two recipients whose first attempt failed with a `503` and whose retry was answered `429` with code `throttled`, and a controlled clock that the test does not advance
+- **WHEN** the caller shuts the client down while the batch waits to retry again
+- **THEN** the batch call ends before the clock advances, with no further retry
+- **AND** both recipients are Unconfirmed with the `503` as their cause, and none fails with `client_closed`
 
 #### Scenario: Shutdown after a refused attempt fails every recipient
 - **GIVEN** a batch of two recipients whose first attempt was answered `429` with code `throttled`, and a controlled clock that the test does not advance
@@ -207,7 +219,7 @@ A `200` with one result per recipient, in request order, SHALL settle each recip
 - **Unconfirmed**: the result's error has code `delivery_unavailable` or `idempotency_key_in_flight`, or no code, or the result is neither Queued nor an error. PostHog may still send the email.
 - **Failed**: the result's error has any other code, such as `recipient_suppressed`. The error SHALL carry that code, a message from `detail`, and the status from the result's error.
 
-PostHog derives a recipient's message ID from its idempotency key, so the ID names the email PostHog keeps for that key, if any. When the key was also used for another email, that may be the other email, whatever the recipient's status: Queued means PostHog accepted the request, not that the ID is this recipient's email. When a result has `idempotency_key_reused`, whether the recipient is Failed or, after a lost answer, stays Unconfirmed, its error SHALL name that conflict whether or not the result has a message ID, and its fix SHALL NOT say to send it again with that key, since PostHog holds the key for another request. An Unconfirmed one's error and fix SHALL NOT advise sending it again with a new key either, even when PostHog's `detail` does, since its first attempt may still have queued it. A Failed recipient's error carries the code itself. When the result has a message ID, the error SHALL say that the ID belongs to an earlier request that used this key, not to this recipient's email, and SHALL NOT say whether that email went out: its status is for `get` to tell. When it has none, the error SHALL NOT name an ID.
+PostHog derives a recipient's message ID from its idempotency key, so the ID names the email PostHog keeps for that key, if any. When the key was also used for another email, that may be the other email, whatever the recipient's status: Queued means PostHog accepted the request, not that the ID is this recipient's email. When a result has `idempotency_key_reused`, whether the recipient is Failed or, after a lost answer, stays Unconfirmed, its error SHALL name that conflict whether or not the result has a message ID, and its fix SHALL NOT say to send it again with that key, since PostHog holds the key for another request. After a lost answer, in either outcome, its error and fix SHALL NOT advise sending it again with a new key either, even when PostHog's `detail` does, since the first attempt may still have queued it. A Failed recipient's error carries the code itself. When the result has a message ID, the error SHALL say that the ID belongs to an earlier request that used this key, not to this recipient's email, and SHALL NOT say whether that email went out: its status is for `get` to tell. When it has none, the error SHALL NOT name an ID.
 
 When an earlier attempt of the same call got no usable answer, as in "Batch refusal after a lost answer", a result that would be Failed SHALL leave the recipient Unconfirmed instead, under "Unconfirmed recipient wording". Only a Queued result settles such a recipient, except that `idempotency_key_reused` MAY fail it, since sending it again with the same key can't succeed. A recipient that stays Unconfirmed keeps its first cause and its same-key advice, as "Unconfirmed recipient wording" says, except after `idempotency_key_reused`, as above.
 
@@ -226,7 +238,7 @@ A `2xx` without a result for each recipient SHALL produce the error `api_error`,
 - **THEN** the recipient is either Failed with code `idempotency_key_reused`, or Unconfirmed with the timeout as its cause and an error that names the key conflict
 - **AND** in either case its error says the message ID belongs to an earlier request that used this key, not to this recipient's email
 - **AND** its fix doesn't say to send it again with `key_1`
-- **AND** when it is Unconfirmed, neither its error nor its fix says to send it again with a new key
+- **AND** in either case, neither its error nor its fix says to send it again with a new key
 
 #### Scenario: Each recipient gets its own outcome
 - **GIVEN** a batch of three recipients

@@ -6,7 +6,7 @@ Feature: Local evaluation of config version 2 flags
   off. Local results send the config version 2 events with locally_evaluated true.
 
   # The mixed feed is fixtures/wire/definitions_feed.json of the rules v2 contract
-  # (posthog-sdk-test-harness#111, contract 10.1.0), read with its context: distinct id
+  # (contract 10.1.0, posthog-sdk-test-harness 1.36.0), read with its context: distinct id
   # "person-example" and person properties {"plan": "pro"}. The "example-display-key"
   # documents come from corpus/v2_local_evaluation.json of the same contract.
   #

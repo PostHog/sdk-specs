@@ -11,10 +11,10 @@ The flags service is adding a second feed for exactly `v=2` ([PostHog/posthog#13
 - For a project without config version 2 flags the service answers `v=2` from the legacy entry, so the body and ETag are the ones the SDK gets today.
 - Every other `v`, a repeated `v` and no `v` keep the legacy feed. A service without the change ignores `v`.
 
-The public rules v2 contract (`contracts/feature_flag_rules_v2` in posthog-sdk-test-harness) defines what an evaluator does:
+The public rules v2 contract (`contracts/feature_flag_rules_v2` in posthog-sdk-test-harness) defines what an evaluator does. This change reads contract 10.1.0 as released in [posthog-sdk-test-harness 1.36.0](https://github.com/PostHog/posthog-sdk-test-harness/releases/tag/1.36.0). Harness 1.35.0 also reports contract 10.1.0 but lacks the local evaluation files, so the harness release is the reference.
 
-- In contract 10.0.0 (harness 1.34.0): the config schema, the literal registry and its version rule, the boolean (135 cases), value (49) and experiment (73) corpora, and the hash vectors.
-- In contract 10.1.0, [posthog-sdk-test-harness#111](https://github.com/PostHog/posthog-sdk-test-harness/pull/111), a draft:
+- The config schema, the literal registry and its version rule, the boolean (135 cases), value (49) and experiment (73) corpora, and the hash vectors.
+- Added by [posthog-sdk-test-harness#111](https://github.com/PostHog/posthog-sdk-test-harness/pull/111) in harness 1.36.0:
   - `rules/local_outcomes.json` maps each case's expected status to a local outcome (`conclusive`, `inconclusive` with an unresolved reason, or `not_applicable`).
   - `corpus/v2_local_evaluation.json` adds six `flag_disabled` cases and two ordered missing-context cases.
   - `fixtures/wire/definitions_feed.json` is one whole feed of twelve entries with the outcome of each.
@@ -116,7 +116,7 @@ The reason is the cause that ended the evaluation. The SDK never substitutes `fa
 - `null` renders as `false` in the legacy getters, which is what an inactive config version 1 flag returns locally. A typed read gets the caller's default, as for a flag the flags service leaves out.
 - An inactive flag is off whatever its document says. The flags service omits it, so a fallback cannot return a value for it, and both reference SDKs check `active` before anything else today.
 
-The contract pins `flag_disabled` with `null` for supported documents. It does not yet pin the unsupported case; task 2.3 adds it.
+Contract 10.1.0 pins `flag_disabled` with `null` for supported documents. It does not pin the unsupported case; task 2.3 adds it.
 
 **Alternatives.** `false` for every return type: a typed string read would then report a type mismatch. The flag's default value: an inactive flag with default `true` would be on.
 
@@ -156,7 +156,7 @@ The contract pins `flag_disabled` with `null` for supported documents. It does n
 
 **Choice.** The closed parser covers `filters`. An unknown top-level field, or an unknown entry field outside `filters`, is ignored.
 
-**Why.** Entry fields outside `filters` describe the row, not its rules. Rejecting a flag for one would turn a harmless addition on the server into a fallback in every released SDK. The contract does not pin this yet; task 2.3 adds it.
+**Why.** Entry fields outside `filters` describe the row, not its rules. Rejecting a flag for one would turn a harmless addition on the server into a fallback in every released SDK. Contract 10.1.0 does not pin this. Its definitions entry schema is closed, but that schema checks what the flags service sends, not what a reader does with it. Task 2.3 adds a feed entry.
 
 ## Acceptance features
 
@@ -177,7 +177,7 @@ The shared-cache scenarios in `flag-definition-loader.feature` use that feature'
 ## Migration Plan
 
 1. Review this change and settle the decisions, above all the two names.
-2. Release contract 10.1.0 (posthog-sdk-test-harness#111) and point this change at it.
+2. Done: contract 10.1.0 shipped in harness 1.36.0 with posthog-sdk-test-harness#111, and this change points at it. A later contract release pins decisions 6 and 11 (task 2.3).
 3. The harness binds the three steps and adds the suite behind `feature_flags_local_evaluation_v2`.
 4. Apply and archive this change in this PR, as the repository requires.
 5. SDKs implement in three releases: the evaluator with the in-process replay, which nothing calls; the dispatch and the cache field, inert because no config version 2 document arrives yet; then the `v=2` request and the capability. posthog-python first, then posthog-node.

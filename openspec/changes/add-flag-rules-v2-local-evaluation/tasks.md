@@ -1,14 +1,14 @@
 ## 1. Evidence and proposal
 
-- [x] 1.1 Read the public rules v2 contract in posthog-sdk-test-harness 1.34.0 (contract 10.0.0): the config schema, the literal registry and its version rule, the boolean, value and experiment corpora, the hash vectors and the definitions schemas.
-- [x] 1.2 Read posthog-sdk-test-harness#111 (contract 10.1.0, draft): `rules/local_outcomes.json`, `corpus/v2_local_evaluation.json` and `fixtures/wire/definitions_feed.json`.
+- [x] 1.1 Read the public rules v2 contract in posthog-sdk-test-harness 1.36.0 (contract 10.1.0): the config schema, the literal registry and its version rule, the boolean, value and experiment corpora, the hash vectors and the definitions schemas.
+- [x] 1.2 Read the files that posthog-sdk-test-harness#111 adds in that release: `rules/local_outcomes.json`, `corpus/v2_local_evaluation.json` and `fixtures/wire/definitions_feed.json`.
 - [x] 1.3 Read the existing specs: `local-feature-flag-evaluator`, `flag-definition-loader`, `evaluate-flags`, `get-feature-flag-result`, `feature-flag-called-tracker` and `experiment-exposure`.
 - [x] 1.4 Write the proposal, the design and the delta specs, and run `openspec validate add-flag-rules-v2-local-evaluation --strict`.
 
 ## 2. Settle the decisions
 
 - [ ] 2.1 Settle the decisions in `design.md`, above all the cache field name (decision 9) and the harness capability name (decision 10), and update the delta specs and features for any change.
-- [ ] 2.2 Release contract 10.1.0 (posthog-sdk-test-harness#111) and point this change at the release.
+- [x] 2.2 Release contract 10.1.0 (posthog-sdk-test-harness#111) and point this change at the release: harness 1.36.0. The acceptance feature's copies of the feed fixture and the local cases match it.
 - [ ] 2.3 Pin in the contract the two outcomes this change decides beyond it: an inactive entry whose document is unsupported is `flag_disabled` (decision 6), and an unknown entry field outside `filters` is ignored (decision 11).
 
 ## 3. Acceptance and discoverability

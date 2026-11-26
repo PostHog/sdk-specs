@@ -144,6 +144,16 @@ Before any request, the SDK SHALL check the template ID, shared template data an
 - **THEN** the SDK reports an argument error that names the template ID
 - **AND** no request is made
 
+#### Scenario: Shared template data that isn't a mapping sends no batch
+- **WHEN** the caller sends a batch with shared template data `[]` and one recipient, `ada@example.com`
+- **THEN** the SDK reports an argument error
+- **AND** no request is made
+
+#### Scenario: A negative retry limit sends no batch
+- **WHEN** the caller sends a batch with a maximum of -1 retries and one recipient, `ada@example.com`
+- **THEN** the SDK reports an argument error
+- **AND** no request is made
+
 ### Requirement: Batch retries
 
 The SDK SHALL retry a batch's request as "Retryable responses" and "Retry timing" retry a send, with the same body, so every recipient keeps its idempotency key on every attempt. Unlike a send, a batch SHALL send no retry once shutdown has started: a batch that waits to retry ends at once. A recipient that was Unconfirmed then stays Unconfirmed, and every other recipient fails with `client_closed`.
@@ -155,8 +165,11 @@ The SDK SHALL retry a batch's request as "Retryable responses" and "Retry timing
 
 #### Scenario: Shutdown keeps the results of an attempt in flight
 - **GIVEN** a batch of two recipients whose request PostHog has received but not answered yet
-- **WHEN** the caller shuts the client down, and PostHog then answers `200` with both recipients queued
-- **THEN** the batch call returns both recipients Queued with their message IDs
+- **WHEN** the caller shuts the client down
+- **THEN** shutdown doesn't finish while PostHog hasn't answered
+- **WHEN** PostHog then answers `200` with both recipients queued
+- **THEN** shutdown finishes
+- **AND** the batch call returns both recipients Queued with their message IDs
 - **AND** no recipient fails with `client_closed`
 
 #### Scenario: Shutdown keeps an uncertain answer of an attempt in flight Unconfirmed
@@ -214,9 +227,9 @@ A `2xx` without a result for each recipient SHALL produce the error `api_error`,
 
 #### Scenario: A key conflict's message ID names the earlier email
 - **GIVEN** a batch of one recipient, `bob@example.com` with key `key_1`, after an earlier send to `ada@example.com` with key `key_1`
-- **WHEN** the response is `200` with `{"results": [{"message_id": "m_ada", "error": {"code": "idempotency_key_reused", "detail": "This key was already used.", "status": 422, "retryable": false}}]}`
+- **WHEN** the response is `200` with `{"results": [{"message_id": "7d1c4a2e-5b3f-4e8a-9c6d-2f1e0a9b8c7d", "error": {"code": "idempotency_key_reused", "detail": "This key was already used.", "status": 422, "retryable": false}}]}`
 - **THEN** the recipient is Failed with code `idempotency_key_reused`
-- **AND** its error says the message ID `m_ada` belongs to an earlier request that used this key, not to this recipient's email
+- **AND** its error says the message ID `7d1c4a2e-5b3f-4e8a-9c6d-2f1e0a9b8c7d` belongs to an earlier request that used this key, not to this recipient's email
 - **AND** its error doesn't say whether that email was sent
 
 #### Scenario: A queued result without a string message ID is not Queued
@@ -230,7 +243,7 @@ A `2xx` without a result for each recipient SHALL produce the error `api_error`,
 When the batch fails as a whole, the SDK SHALL report the error through "Error channel", and the error SHALL carry every recipient's result once the request was sent. Which recipients fail and which stay Unconfirmed SHALL follow the Batch errors table of this spec. In particular:
 
 - A failure before the request, such as a failed argument check, `missing_secret_key`, `missing_app_host`, `client_disabled` or `client_closed`, SHALL send nothing and fail every recipient.
-- A `409` with `batch_unavailable` SHALL fail every recipient: PostHog sent nothing. Its error SHALL say that batch sends aren't available for the project, and its fix SHALL say to send each recipient on its own with `send`. The fix SHOULD say to send each with the same template, `to`, distinct ID and idempotency key, and the recipient's template data merged over the shared data at the top level, which is the email the batch would have sent.
+- A `409` with `batch_unavailable` SHALL fail every recipient: PostHog sent nothing. Its error SHALL say that batch sends aren't available for the project, and its fix SHALL say to send each recipient on its own with `send`, with the same template, `to`, distinct ID and idempotency key, and the recipient's template data merged over the shared data at the top level, which is the email the batch would have sent.
 - A `409` with any other code, or with no code, SHALL leave every recipient Unconfirmed, with their keys and the same-key advice of "Unconfirmed recipient wording". Only `batch_unavailable` says that a `409` sent nothing.
 - A network error, a timeout or a `5xx`, once the retries are spent, SHALL leave every recipient Unconfirmed.
 
@@ -241,7 +254,7 @@ When the call fails with any recipient Unconfirmed, the error of the call SHALL 
 - **WHEN** the response is `409` with code `batch_unavailable`
 - **THEN** the SDK makes 1 attempt and reports the error code `batch_unavailable` with name `application_error`
 - **AND** both recipients are Failed
-- **AND** the fix says to send each recipient on its own with `send`
+- **AND** the fix says to send each recipient on its own with `send`, with the same template, `to`, distinct ID and idempotency key, and its template data merged over the shared data at the top level
 
 #### Scenario: Another 409 leaves every recipient unconfirmed
 - **GIVEN** a batch of two recipients and a maximum of 0 retries
@@ -272,7 +285,7 @@ When the call fails with any recipient Unconfirmed, the error of the call SHALL 
 
 ### Requirement: Batch 404 without a field
 
-PostHog answers an unknown template, batch sends that are off for the project, and a server without the batch route with the same `404`. So a `404` that names no field and whose code is `not_found`, `api_error`, blank or missing SHALL fail every recipient: PostHog sent nothing. The error SHALL keep code `not_found` and status 404. Its message SHALL say that PostHog found no template with this ID, or batch sends aren't available for this project, so it sent no email of this request. Its fix SHALL say to check the template ID and, if it is right, to send each recipient on its own with `send` until batch sends are available. The fix SHOULD say to send each as "Batch refusals" says for `batch_unavailable`. The error SHALL NOT advise updating PostHog or say that batch sends are unavailable on this server, and the SDK SHALL NOT key on PostHog's `detail` text.
+PostHog answers an unknown template, batch sends that are off for the project, and a server without the batch route with the same `404`. So a `404` that names no field and whose code is `not_found`, `api_error`, blank or missing SHALL fail every recipient: PostHog sent nothing. The error SHALL keep code `not_found` and status 404. Its message SHALL say that PostHog found no template with this ID, or batch sends aren't available for this project, so it sent no email of this request. Its fix SHALL say to check the template ID and, if it is right, to send each recipient on its own with `send` until batch sends are available. The fix SHALL say to send each as "Batch refusals" says for `batch_unavailable`. The error SHALL NOT advise updating PostHog or say that batch sends are unavailable on this server, and the SDK SHALL NOT key on PostHog's `detail` text.
 
 #### Scenario: A 404 without a field names both causes
 - **GIVEN** a batch of two recipients

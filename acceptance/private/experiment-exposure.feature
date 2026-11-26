@@ -268,7 +268,8 @@ Feature: Experiment Exposure
   # The config version 2 definition of "checkout-flow" below assigns distinct id
   # "user-123" the variant "test" (value true) when person property "plan" is "pro".
   # Without "plan", local evaluation cannot decide the rule and the SDK asks /flags.
-  # See flag-rules-v2-local-evaluation.feature for the step that serves a v=2 document.
+  # See flag-rules-v2-local-evaluation.feature for the steps that serve a v=2 document
+  # and allow that remote fallback.
   @server @requires:feature_flags_local_evaluation_v2
   Scenario: A remote result after the same local assignment is not a second exposure
     Given the definitions service serves this typed document for v=2 requests:
@@ -279,7 +280,7 @@ Feature: Experiment Exposure
       """application/json
       {"errorsWhileComputingFlags":false,"flags":{"checkout-flow":{"key":"checkout-flow","value":true,"reason":{"code":"experiment_split","condition_index":0},"metadata":{"id":501,"version":3,"config_version":2,"has_experiment":true,"payload":null,"rule_type":"experiment","rule_id":"3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13","variant_key":"test"}}},"requestId":"9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d","evaluatedAt":1800000000000}
       """
-    And the SDK is initialized for native local evaluation with JSON arguments:
+    And the SDK is initialized for native local evaluation with remote fallback and JSON arguments:
       """application/json
       {"project_token":"phc_test_key","config":{"secret_key":"phx_test_key"}}
       """

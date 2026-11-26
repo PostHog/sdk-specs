@@ -10,12 +10,18 @@ Feature: Local evaluation of config version 2 flags
   # "person-example" and person properties {"plan": "pro"}. The "example-display-key"
   # documents come from corpus/v2_local_evaluation.json of the same contract.
   #
-  # Three steps need harness bindings that the local evaluation suite adds:
+  # Four steps need harness bindings that the local evaluation suite adds:
   # - "the definitions service serves this typed document for v=2 requests:" serves its
   #   document to a definitions request with exactly one v parameter, equal to 2. Every
   #   other definitions request gets the document of "the definitions service serves
   #   this typed document:", and so does a v=2 request when no v=2 document is set, as
   #   the flags service does for a project without config version 2 flags.
+  # - "the SDK is initialized for native local evaluation with remote fallback and JSON
+  #   arguments:" initializes the SDK as "the SDK is initialized for native local
+  #   evaluation with JSON arguments:" does, but allows /flags requests. The native step
+  #   fails a scenario that sends any /flags request, so each Rule below, which holds a
+  #   fallback scenario, uses this step, and its scenarios assert /flags traffic
+  #   themselves.
   # - "every flag definitions request query parameter "v" should equal "2"".
   # - "no received event named "<name>" should have property "<property>"".
 
@@ -283,7 +289,7 @@ Feature: Local evaluation of config version 2 flags
           "cohorts": {}
         }}
         """
-      And the SDK is initialized for native local evaluation with JSON arguments:
+      And the SDK is initialized for native local evaluation with remote fallback and JSON arguments:
         """application/json
         {"project_token":"phc_test_key","config":{"secret_key":"phx_test_key"}}
         """
@@ -362,7 +368,7 @@ Feature: Local evaluation of config version 2 flags
           "property_matching_version": 2
         }}
         """
-      And the SDK is initialized for native local evaluation with JSON arguments:
+      And the SDK is initialized for native local evaluation with remote fallback and JSON arguments:
         """application/json
         {"project_token":"phc_test_key","config":{"secret_key":"phx_test_key"}}
         """

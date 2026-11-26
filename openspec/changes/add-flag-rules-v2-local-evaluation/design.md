@@ -36,7 +36,7 @@ The existing specs this change builds on:
 - A local result for a config version 2 flag equals the flags service's result for the same inputs, or there is no local result.
 - Nothing changes for config version 1 flags, for SDKs that do not ask for the new feed, or for projects without config version 2 flags.
 - A fleet of mixed SDK releases on one shared definition cache stays safe.
-- A local evaluation feature and experiment exposure scenarios that the harness can run once it binds three new steps.
+- A local evaluation feature and experiment exposure scenarios that the harness can run once it binds four new steps.
 
 **Non-Goals:**
 
@@ -160,7 +160,7 @@ Contract 10.1.0 pins `flag_disabled` with `null` for supported documents. It doe
 
 ## Acceptance features
 
-`acceptance/private/flag-rules-v2-local-evaluation.feature` is black-box: it serves typed definitions, calls public getters and evaluated snapshots, flushes, and checks received events and `/flags` traffic. Most of its steps are bound today. It needs three new bindings, which the harness's local evaluation suite adds; the feature's header comment names each step and what it does.
+`acceptance/private/flag-rules-v2-local-evaluation.feature` is black-box: it serves typed definitions, calls public getters and evaluated snapshots, flushes, and checks received events and `/flags` traffic. Most of its steps are bound today. It needs four new bindings, which the harness's local evaluation suite adds; the feature's header comment names each step and what it does. One is a local evaluation setup that allows `/flags` requests: the harness's native local evaluation setup fails a scenario that sends one, and the fallback scenarios must.
 
 The scenarios keep the legacy `@server` tag and add `@requires:feature_flags_local_evaluation_v2`. They move to `@sdk:server` once the steps are bound and a real SDK adapter passes them.
 
@@ -178,7 +178,7 @@ The shared-cache scenarios in `flag-definition-loader.feature` use that feature'
 
 1. Review this change and settle the decisions, above all the two names.
 2. Done: contract 10.1.0 shipped in harness 1.36.0 with posthog-sdk-test-harness#111, and this change points at it. A later contract release pins decisions 6 and 11 (task 2.3).
-3. The harness binds the three steps and adds the suite behind `feature_flags_local_evaluation_v2`.
+3. The harness binds the four steps and adds the suite behind `feature_flags_local_evaluation_v2`.
 4. Apply and archive this change in this PR, as the repository requires.
 5. SDKs implement in three releases: the evaluator with the in-process replay, which nothing calls; the dispatch and the cache field, inert because no config version 2 document arrives yet; then the `v=2` request and the capability. posthog-python first, then posthog-node.
 6. Rollback of an SDK release: restore the unversioned request.

@@ -41,7 +41,7 @@ No breaking change. Config version 1 flags, their evaluator and their events do 
 
 - Specs and acceptance features only. No SDK code changes in this repository.
 - posthog-python is first: its config version 2 evaluator is a draft that nothing calls yet ([PostHog/posthog-python#1250](https://github.com/PostHog/posthog-python/pull/1250)). The dispatch on `filters.version` and the cache field follow, and the `v=2` request comes last, in its own release. posthog-node follows the same steps.
-- posthog-sdk-test-harness binds three new steps and adds the black-box suite behind `feature_flags_local_evaluation_v2`: the mock serves a separate definitions document for `v=2` requests and records the query.
+- posthog-sdk-test-harness binds four new steps and adds the black-box suite behind `feature_flags_local_evaluation_v2`: the mock serves a separate definitions document for `v=2` requests and records the query, and a local evaluation setup allows a remote fallback.
 - No change to the `/flags` contract, the event schemas or the bootstrap format.
 
 ## Out of scope

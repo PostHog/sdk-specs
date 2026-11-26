@@ -573,15 +573,19 @@ A group's `flag` leg SHALL be satisfied by the same rules as the V1 linked flag 
 `session-replay-ingestion-controls`: a boolean flag key is satisfied when the flag is `true`; a
 `{ flag, variant }` object is satisfied only when the flag resolves to that variant; a flag key
 string pointing at a multivariate flag is satisfied for any present variant; a missing or
-quota-limited flag is not satisfied. Where the SDK tracks feature-flag usage, evaluating the leg
-SHALL report the flag as called. The leg is re-evaluated when feature flags change.
+quota-limited flag is not satisfied. The SDK SHALL read the flag value from the loaded flags and
+SHALL NOT capture `$feature_flag_called` when it evaluates the leg. The leg is re-evaluated when
+feature flags change.
 
 This requirement applies to all replay-capable SDKs.
 
 Reference: posthog-js `origin/main` `480395c443`
 (`packages/browser/src/extensions/replay/external/triggerMatching.ts:580` constructs a
 `LinkedFlagMatching` per group and `:605` feeds it `linkedFlag: group.conditions.flag`, so the
-group reuses the V1 matcher unchanged).
+group reuses the V1 matcher unchanged). At posthog-js `origin/main` `c8f17c663a`,
+`triggerMatching.ts:447` reads the flag from the `variants` map that `onFeatureFlags` passes to
+its callback. `$feature_flag_called` is captured only by `getFeatureFlag` (`posthog-core.ts:2771`,
+`send_event`), and nothing under `packages/browser/src/extensions/replay/` calls it.
 
 Covering test: posthog-js `packages/browser/src/__tests__/extensions/replay/triggerGroups.test.ts:97`
 ("should create matcher with feature flag" — boolean form). The `{ flag, variant }` form inside a
@@ -601,6 +605,14 @@ group: No posthog-js test on `origin/main` covers this; decision-based (the sour
 - **AND** feature flag "replay-flag" resolves to variant "control" for the user
 - **WHEN** the SDK resolves whether to record the current session
 - **THEN** session recording should not be active
+
+#### Scenario: Evaluating a flag leg captures no $feature_flag_called event
+- **GIVEN** session replay is enabled
+- **AND** the remote config sets `version` to 2 and configures a trigger group with boolean flag condition "replay-flag" and a sample rate of 1.0
+- **AND** feature flag "replay-flag" is enabled for the user
+- **WHEN** the SDK resolves whether to record the current session
+- **THEN** session recording should be active
+- **AND** no `$feature_flag_called` event for "replay-flag" should be captured
 
 ### Requirement: Group-level property filters
 

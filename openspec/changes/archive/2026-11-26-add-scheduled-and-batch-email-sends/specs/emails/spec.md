@@ -172,9 +172,10 @@ The SDK SHALL retry a batch's request as "Retryable responses" and "Retry timing
 - **GIVEN** a batch of two recipients whose request PostHog has received but not answered yet
 - **WHEN** the caller shuts the client down
 - **THEN** shutdown doesn't finish while PostHog hasn't answered
-- **WHEN** PostHog then answers `200` with both recipients queued, 1 second later and within any shutdown timeout the SDK has
+- **WHEN** PostHog then answers `200`, 1 second later and within any shutdown timeout the SDK has, with `{"results": [{"message_id": "m0", "status": "queued", "replayed": false}, {"message_id": "m1", "error": {"code": "recipient_suppressed", "detail": "Suppressed.", "status": 422, "retryable": false}}]}`
 - **THEN** shutdown finishes
-- **AND** the batch call returns both recipients Queued with their message IDs
+- **AND** the batch call returns the first recipient Queued with message ID `m0`
+- **AND** the second recipient Failed with code `recipient_suppressed`
 - **AND** no recipient fails with `client_closed`
 
 #### Scenario: Shutdown that times out before PostHog answers keeps recipients Unconfirmed
@@ -365,7 +366,7 @@ A `413` SHALL fail every recipient with PostHog's code, or `content_too_large` w
 
 ### Requirement: Batch refusal after a lost answer
 
-When an earlier attempt of the same call got no usable answer, such as a network error, a timeout, a `5xx`, or a `409` that left recipients Unconfirmed, that attempt may have queued every email. A refusal of a later attempt, such as a `400`, a `404`, a `409` with `batch_unavailable` or a `413` with `content_too_large`, SHALL then leave every recipient Unconfirmed. Its error SHALL NOT say that PostHog sent nothing, and SHALL NOT advise splitting the batch or sending with new keys. Its message SHALL say that some emails may have gone out, and its fix SHALL say to send each recipient again with the same email and idempotency key, within 24 hours of the first request that used it, and to read each recipient's result. After a refusal that says batch sends aren't available, `batch_unavailable` or a `404` that names no field and whose code is `not_found`, `api_error`, blank or missing, as "Batch 404 without a field" defines it, the fix SHALL say to send each recipient with `send` as "Batch refusals" says, since another batch would be refused too. After such a `404`, the fix SHALL first say to check the template ID, since the template may be gone, as "Batch 404 without a field" says. The error of the call SHALL carry this advice, not only the recipients' results.
+When an earlier attempt of the same call got no usable answer, such as a network error, a timeout, a `5xx`, or a `409` that left recipients Unconfirmed, that attempt may have queued every email. A refusal of a later attempt, such as a `400`, a `404`, a `409` with `batch_unavailable` or a `413` with `content_too_large`, SHALL then leave every recipient Unconfirmed. Its error SHALL NOT say that PostHog sent nothing, and SHALL NOT advise splitting the batch or sending with new keys. Its message SHALL say that some emails may have gone out, and its fix SHALL say to send each recipient again with the same email and idempotency key, within 24 hours of the first request that used it, and to read each recipient's result. After a refusal that says batch sends aren't available, `batch_unavailable` or a `404` that names no field and whose code is `not_found`, `api_error`, blank or missing, as "Batch 404 without a field" defines it, the fix SHALL say to send each recipient with `send` as "Batch refusals" says, since another batch would be refused too. After such a `404`, the fix SHALL first say to check the template ID, since the template may be gone, as "Batch 404 without a field" says. The error of the call SHALL carry this advice, not only the recipients' results, and every field of it, `detail` and `why` included, SHALL agree with that fix: for such text this rule overrides "Error fields", and the SDK SHALL leave out or replace any that says PostHog sent nothing or advises another route, such as sending the batch again.
 
 #### Scenario: A refused retry after a lost answer never says nothing was sent
 - **GIVEN** a batch of two recipients
@@ -376,6 +377,7 @@ When an earlier attempt of the same call got no usable answer, such as a network
 - **AND** the fix says to check the template ID first
 - **AND** the fix says to then send each recipient with `send`, with the same idempotency key, and doesn't say to send the batch again
 - **AND** each recipient's fix says the same, the template check first
+- **AND** no field of the call's error, `why` included, says to send the batch again
 
 #### Scenario: batch_unavailable on a retry after a lost answer
 - **GIVEN** a batch with shared template data `{"plan": "pro", "user": {"name": "there", "tier": "free"}}` and two recipients, one with template data `{"user": {"name": "Ada"}}`

@@ -34,16 +34,15 @@ The reference implementations are posthog-rs and posthog-node. Where they differ
 
 ## Disagreements found while writing this spec
 
-Each is for the SDK's own pull request. This change edits no SDK.
+Checked against posthog-rs#398 at 26a8938, posthog-js#5847 at e73e4ed and posthog-python#1240 at acb6c2f. Each is for the SDK's own pull request. This change edits no SDK.
 
-- posthog-python counted the grace from when the answer arrived, as reported on posthog-rs#398. The first-attempt rule above wins.
-- posthog-node treats a `409` with a code other than `batch_unavailable` and `api_error`, such as `conflict`, as failing every recipient. **Batch refusals** leaves them unconfirmed.
 - posthog-node treats a recipient result whose error has no code as failed unless its status is `409`. **Batch recipient results** leaves it unconfirmed, as posthog-rs does.
 - posthog-node keeps a `413` without a code as `api_error` with no split advice. **Batch content too large** names it `content_too_large` with split advice, as posthog-rs does.
-- posthog-node, after a lost answer, can give an unconfirmed recipient PostHog's refusal text for the retry as its message, and that text can say the email wasn't sent. **Unconfirmed recipient wording** keeps that text out of the recipient's message.
 - posthog-node fails a recipient whose result is `idempotency_key_reused` after a lost answer, and posthog-rs keeps it unconfirmed. Both are allowed: a retry with the same key can't send it.
 - posthog-rs names `scheduling_requires_cloud` `validation_error`. The Error names table names it `application_error`, as posthog-node does.
 - posthog-rs checks for a missing app host before the Cloud check, and posthog-node checks the other way round. Both send nothing, and both orders are allowed.
+
+posthog-python counted the grace from when the answer arrived, as reported on posthog-rs#398. It now counts it from the first attempt, as this spec does.
 
 ## Risks / Trade-offs
 

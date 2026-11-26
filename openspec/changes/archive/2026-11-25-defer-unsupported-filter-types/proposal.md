@@ -6,10 +6,10 @@ The spec says unsupported cohort criteria are inconclusive and that unsupported 
 
 ## What Changes
 
-- A new requirement lists the property-filter types a local evaluator matches: `person` and `group` against caller-supplied properties, `cohort` through cohort membership, and `flag` through dependency evaluation. A filter without a `type` field keeps its existing person-filter handling.
+- A new requirement lists the property-filter types a local evaluator matches: `person` and `group` against caller-supplied properties, `cohort` through cohort membership, and `flag` through dependency evaluation. A filter without a `type` field, or with a JSON `null` or empty-string `type`, keeps its existing person-filter handling.
 - Any other type, including `person_metadata` and a type added after the SDK shipped, is inconclusive with the `unsupported_definition` cause. The SDK never matches it against a caller-supplied property with the same key, and known absence doesn't resolve it.
 - The rule applies to flag conditions and to dynamic-cohort leaves. Cohort negation and `not_in` don't turn the inconclusive leaf into a match, and three-valued composition still lets another leaf decide the group.
-- Acceptance scenarios cover a `person_metadata` cohort leaf with and without a same-named caller property, a negated leaf, an unknown type in a flag condition, and a group where another leaf decides the result.
+- Acceptance scenarios cover a `person_metadata` cohort leaf with and without a same-named caller property, a negated leaf and an outer `not_in`, an omitted, null, or empty `type`, an unknown type in a flag condition, and a group or condition where another filter decides the result.
 
 ## Capabilities
 

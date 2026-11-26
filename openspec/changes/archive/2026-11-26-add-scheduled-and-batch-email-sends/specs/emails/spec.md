@@ -214,7 +214,7 @@ When the batch fails as a whole, the SDK SHALL report the error through "Error c
 - A `409` with any other code, or with no code, SHALL leave every recipient Unconfirmed, with their keys and the same-key advice of "Unconfirmed recipient wording". Only `batch_unavailable` says that a `409` sent nothing.
 - A network error, a timeout or a `5xx`, once the retries are spent, SHALL leave every recipient Unconfirmed.
 
-When the call fails with any recipient Unconfirmed, the error of the call SHALL NOT say that the emails weren't sent or weren't queued, and SHALL NOT advise new idempotency keys, even when the response's `detail` or `fix` says so. It SHALL say that PostHog didn't confirm them, so they may still go out, and its fix SHALL say to send each Unconfirmed recipient again with the same email and idempotency key, within 24 hours of the first request that used it.
+When the call fails with any recipient Unconfirmed, the error of the call SHALL NOT say that the emails weren't sent or weren't queued, and SHALL NOT advise new idempotency keys, even when the response's `detail`, `why` or `fix` says so. For such text this rule overrides "Error fields": the SDK SHALL leave it out or replace it. It SHALL say that PostHog didn't confirm them, so they may still go out, and its fix SHALL say to send each Unconfirmed recipient again with the same email and idempotency key, within 24 hours of the first request that used it.
 
 #### Scenario: batch_unavailable fails every recipient
 - **GIVEN** a batch of two recipients
@@ -237,10 +237,10 @@ When the call fails with any recipient Unconfirmed, the error of the call SHALL 
 
 #### Scenario: The error of a call with Unconfirmed recipients never says they weren't sent
 - **GIVEN** a batch of two recipients and a maximum of 0 retries
-- **WHEN** the response is `409` with `{"detail": "No emails were sent.", "fix": "Send them again with new idempotency keys."}` and no code
+- **WHEN** the response is `409` with `{"detail": "No emails were sent.", "why": "No emails were sent.", "fix": "Send them again with new idempotency keys."}` and no code
 - **THEN** both recipients are Unconfirmed
 - **AND** the error of the call says PostHog didn't confirm the emails, so they may still go out
-- **AND** the error doesn't say the emails weren't sent or weren't queued
+- **AND** no field of the error, `why` included, says the emails weren't sent or weren't queued
 - **AND** its fix says to send each recipient again with the same email and idempotency key, and never with new keys
 
 #### Scenario: A failed check before the request fails every recipient
@@ -295,7 +295,7 @@ When an earlier attempt of the same call got no usable answer, such as a network
 - **AND** both recipients are Unconfirmed
 - **AND** the message says some emails may have gone out, and never that nothing was sent
 - **AND** the fix says to check the template ID first
-- **AND** the fix says to send each recipient again with the same idempotency key
+- **AND** the fix says to then send each recipient with `send`, with the same idempotency key, and doesn't say to send the batch again
 
 #### Scenario: batch_unavailable on a retry after a lost answer
 - **GIVEN** a batch with shared template data `{"plan": "pro", "user": {"name": "there", "tier": "free"}}` and two recipients, one with template data `{"user": {"name": "Ada"}}`

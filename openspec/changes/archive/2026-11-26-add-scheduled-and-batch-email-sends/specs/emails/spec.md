@@ -146,6 +146,13 @@ The SDK SHALL retry a batch's request as "Retryable responses" and "Retry timing
 - **WHEN** the first attempt fails with a `503` and the retry is answered `200` with a result for each
 - **THEN** both attempts send the same body, with the same `idempotency_key` for each recipient
 
+#### Scenario: Shutdown ends a batch's wait to retry at once
+- **GIVEN** a batch of two recipients whose first attempt failed with a `503`, and a controlled clock that the test does not advance
+- **WHEN** the caller shuts the client down while the batch waits to retry
+- **THEN** the batch call ends before the clock advances
+- **AND** the SDK sends no retry
+- **AND** both recipients are Unconfirmed
+
 ### Requirement: Batch recipient results
 
 A `200` with one result per recipient, in request order, SHALL settle each recipient as one of three statuses. Each result SHALL carry the recipient's position, `to`, idempotency key, status, the message ID when PostHog named one, and an error unless the recipient is Queued.
@@ -154,7 +161,7 @@ A `200` with one result per recipient, in request order, SHALL settle each recip
 - **Unconfirmed**: the result's error has code `delivery_unavailable` or `idempotency_key_in_flight`, or no code, or the result is neither Queued nor an error. PostHog may still send the email.
 - **Failed**: the result's error has any other code, such as `recipient_suppressed`. The error SHALL carry that code, a message from `detail`, and the status from the result's error.
 
-When an earlier attempt of the same call got no usable answer, as in "Batch refusal after a lost answer", a result that would be Failed SHALL leave the recipient Unconfirmed instead, under "Unconfirmed recipient wording". Only a Queued result settles such a recipient.
+When an earlier attempt of the same call got no usable answer, as in "Batch refusal after a lost answer", a result that would be Failed SHALL leave the recipient Unconfirmed instead, under "Unconfirmed recipient wording". Only a Queued result settles such a recipient, except that `idempotency_key_reused` MAY fail it, since sending it again with the same key can't succeed.
 
 A `2xx` without a result for each recipient SHALL produce the error `api_error`, leave every recipient Unconfirmed, and SHALL NOT be retried. The SDK SHALL log the response's warnings.
 
@@ -247,7 +254,7 @@ A `413` SHALL fail every recipient with PostHog's code, or `content_too_large` w
 
 ### Requirement: Batch refusal after a lost answer
 
-When an earlier attempt of the same call got no usable answer, such as a network error, a timeout, a `5xx`, or a `409` that left recipients Unconfirmed, that attempt may have queued every email. A refusal of a later attempt, such as a `400`, a `404`, a `409` with `batch_unavailable` or a `413` with `content_too_large`, SHALL then leave every recipient Unconfirmed. Its error SHALL NOT say that PostHog sent nothing, and SHALL NOT advise splitting the batch or sending with new keys. Its message SHALL say that some emails may have gone out, and its fix SHALL say to send the batch again unchanged, with the same idempotency key for each recipient, within 24 hours of the first request that used it, and to read each recipient's result. The error of the call SHALL carry this advice, not only the recipients' results.
+When an earlier attempt of the same call got no usable answer, such as a network error, a timeout, a `5xx`, or a `409` that left recipients Unconfirmed, that attempt may have queued every email. A refusal of a later attempt, such as a `400`, a `404`, a `409` with `batch_unavailable` or a `413` with `content_too_large`, SHALL then leave every recipient Unconfirmed. Its error SHALL NOT say that PostHog sent nothing, and SHALL NOT advise splitting the batch or sending with new keys. Its message SHALL say that some emails may have gone out, and its fix SHALL say to send each recipient again with the same email and idempotency key, within 24 hours of the first request that used it, and to read each recipient's result. After a refusal that says batch sends aren't available, such as `batch_unavailable` or a `404` without a field, the fix SHALL say to send each recipient with `send` as "Batch refusals" says, since another batch would be refused too. The error of the call SHALL carry this advice, not only the recipients' results.
 
 #### Scenario: A refused retry after a lost answer never says nothing was sent
 - **GIVEN** a batch of two recipients
@@ -265,7 +272,7 @@ When an earlier attempt of the same call got no usable answer, such as a network
 
 ### Requirement: Unconfirmed recipient wording
 
-An Unconfirmed recipient's error SHALL say that PostHog didn't confirm the email and that it may still go out, and its fix SHALL say to send that recipient again unchanged, with the same idempotency key, within 24 hours of the first request that used it, so it goes out once. It SHALL NOT say that the email wasn't queued, wasn't sent or failed. When a later answer refuses a recipient that is already Unconfirmed, the SDK SHALL keep the recipient's first cause as its error, and MAY keep the later answer in a separate field. A later `idempotency_key_reused` MAY fail the recipient instead, since sending it again with the same key can't succeed.
+An Unconfirmed recipient's error SHALL say that PostHog didn't confirm the email and that it may still go out, and its fix SHALL say to send that recipient again with the same email and idempotency key, within 24 hours of the first request that used it, so it goes out once. It SHALL NOT say that the email wasn't queued, wasn't sent or failed. When a later answer refuses a recipient that is already Unconfirmed, the SDK SHALL keep the recipient's first cause as its error, and MAY keep the later answer in a separate field. A later `idempotency_key_reused` MAY fail the recipient instead, since sending it again with the same key can't succeed.
 
 #### Scenario: An unconfirmed recipient is never told its email wasn't queued
 - **GIVEN** a batch of one recipient

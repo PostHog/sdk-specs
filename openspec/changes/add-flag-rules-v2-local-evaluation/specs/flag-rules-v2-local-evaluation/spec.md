@@ -88,7 +88,7 @@ Rules are tried in stored order, and the predicates of a rule are checked in sto
 The SDK SHALL evaluate with these inputs:
 
 - the identifier: the distinct ID, as a string;
-- the person properties that the caller supplied, as a partial map. A key that the caller did not supply is unknown, not absent, so no predicate on it can be decided, including `is_not_set`;
+- the person properties that the caller supplied, as a partial map. A key that the caller did not supply is unknown, not absent, so no predicate on it can be decided, including `is_not_set`. In an SDK that accepts the known-absence input of `local-feature-flag-evaluator`, a key that the caller lists as known absent cannot be decided either, and the SDK SHALL NOT read a value that the caller also supplied for it. The remote fallback carries the listing, as "Remote fallback carries known-absent keys" in `local-feature-flag-evaluator` defines;
 - explicit exact matching when the definitions snapshot's `property_matching_version` is `2`, as "Definition snapshots retain the property matching version" in `flag-definition-loader` defines;
 - UTC as the timezone (see "Dates are read in UTC").
 
@@ -111,6 +111,12 @@ A predicate also cannot be decided when the supplied value is one that the contr
 - **WHEN** it is read locally with person properties `{"plan": "pro"}`
 - **THEN** local evaluation is inconclusive with the reason `missing_context`
 
+#### Scenario: A key listed as known absent is not decided locally (@server)
+- **GIVEN** the same flag "beta-opt-in", in an SDK that accepts known-absent property keys
+- **WHEN** it is read with person properties `{"opted_out": true}` and person property key "opted_out" listed as known absent
+- **THEN** local evaluation is inconclusive with the reason `missing_context`
+- **AND** the remote fallback request carries `person_property_keys_known_absent` equal to `["opted_out"]`
+
 ### Requirement: Local outcomes use the existing fallback paths
 
 Each local outcome of a config version 2 flag SHALL use a path that the SDK already has for config version 1 flags:
@@ -118,7 +124,7 @@ Each local outcome of a config version 2 flag SHALL use a path that the SDK alre
 | Local outcome | Auto mode | Local-only mode | Unresolved reason |
 | --- | --- | --- | --- |
 | Conclusive | The local record. No remote evaluation request for this flag. | The local record. | none |
-| A predicate cannot be decided: a missing property, or a supplied value that "Ordered evaluation of config version 2 flags" leaves undecided | Remote fallback for this flag | No value: the flag is unresolved | `missing_context` |
+| A predicate cannot be decided: a missing property, a key listed as known absent, or a supplied value that "Ordered evaluation of config version 2 flags" leaves undecided | Remote fallback for this flag | No value: the flag is unresolved | `missing_context` |
 | Unsupported document, or an invalid regular expression | Remote fallback for this flag | No value: the flag is unresolved | `unsupported_definition` |
 | Inactive flag | The `flag_disabled` record of "Inactive config version 2 flags" | The same record | none |
 

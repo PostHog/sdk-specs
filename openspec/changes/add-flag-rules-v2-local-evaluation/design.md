@@ -88,6 +88,7 @@ The existing specs this change builds on:
 - An earlier matching rule is terminal. Config version 1 local evaluators skip an undecidable condition and try the next one, which is safe only because conditions there are alternatives; for ordered rules it can return a later rule's value where the flags service returns an earlier one's. The contract's `context` cases pin this.
 - The order inside a rule is the flags service's order. Checking every predicate first could turn some fallbacks into local misses, but then SDKs would differ on which reads reach `/flags`.
 - A caller's map is partial by nature: the SDK cannot know that a key is absent rather than unsent. The contract's cases with a complete map stay in the in-process replay.
+- The known-absence input of `local-feature-flag-evaluator` lists keys that the caller knows are absent. The contract has no such input yet, so a listed key cannot be decided here either, and the SDK does not read a value supplied for it. The fallback carries the listing, so the flags service decides with the same inputs, and a local result never disagrees with it.
 
 ### 5. Each outcome uses an existing path
 
@@ -188,3 +189,4 @@ The shared-cache scenarios in `flag-definition-loader.feature` use that feature'
 - When the contract pins decisions 6 and 11 (task 2.3).
 - A config version 1 flag that depends on a config version 2 flag (decision 2): unsupported locally here. Should it instead evaluate the target once the contract has cases for it?
 - The project's timezone in the feed (decision 8): when to add it.
+- Known-absent keys (decision 4): they fall back here. Should a listed key instead be read as absent, as the contract's complete-map cases read a missing key, once the contract has cases for it?

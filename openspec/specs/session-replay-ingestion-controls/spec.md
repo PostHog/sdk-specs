@@ -92,7 +92,7 @@ Local replay configuration (e.g. browser `session_recording`, native `sessionRep
 ## Interactions
 
 - **remote config** — delivers the `sessionRecording` controls, resolved together with feature flags.
-- **feature flags** — supply the linked-flag value; the SDK reads it from the loaded flags and evaluating the linked flag captures no `$feature_flag_called` event.
+- **feature flags** — supply the linked-flag value; evaluating the linked flag reports the flag as called where usage is tracked.
 - **session manager** — supplies the session id that keys sampling and trigger activation; rotation re-arms triggers and re-decides sampling.
 - **before-send hook** — runs inside the capture pipeline before an event reaches event-trigger matching, so an event it drops cannot activate a trigger; see the before-send hook spec.
 - **`start-session-recording` / `stop-session-recording`** — the manual control surface. The browser start API can override specific local start gates for the next attempt; mobile manual start still respects event triggers.

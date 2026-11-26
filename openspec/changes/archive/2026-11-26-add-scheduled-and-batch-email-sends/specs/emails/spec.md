@@ -200,7 +200,7 @@ A `200` with one result per recipient, in request order, SHALL settle each recip
 - **Unconfirmed**: the result's error has code `delivery_unavailable` or `idempotency_key_in_flight`, or no code, or the result is neither Queued nor an error. PostHog may still send the email.
 - **Failed**: the result's error has any other code, such as `recipient_suppressed`. The error SHALL carry that code, a message from `detail`, and the status from the result's error.
 
-PostHog derives a recipient's message ID from its idempotency key, so the ID names the email PostHog keeps for that key, if any. When the key was also used for another email, that may be the other email, whatever the recipient's status: Queued means PostHog accepted the request, not that the ID is this recipient's email. When a result has `idempotency_key_reused`, whether the recipient is Failed or, after a lost answer, stays Unconfirmed, its error SHALL name that conflict whether or not the result has a message ID, and its fix SHALL NOT say to send it again with that key, since PostHog holds the key for another request. A Failed recipient's error carries the code itself. When the result has a message ID, the error SHALL say that the ID belongs to an earlier request that used this key, not to this recipient's email, and SHALL NOT say whether that email went out: its status is for `get` to tell. When it has none, the error SHALL NOT name an ID.
+PostHog derives a recipient's message ID from its idempotency key, so the ID names the email PostHog keeps for that key, if any. When the key was also used for another email, that may be the other email, whatever the recipient's status: Queued means PostHog accepted the request, not that the ID is this recipient's email. When a result has `idempotency_key_reused`, whether the recipient is Failed or, after a lost answer, stays Unconfirmed, its error SHALL name that conflict whether or not the result has a message ID, and its fix SHALL NOT say to send it again with that key, since PostHog holds the key for another request. An Unconfirmed one's error and fix SHALL NOT advise sending it again with a new key either, even when PostHog's `detail` does, since its first attempt may still have queued it. A Failed recipient's error carries the code itself. When the result has a message ID, the error SHALL say that the ID belongs to an earlier request that used this key, not to this recipient's email, and SHALL NOT say whether that email went out: its status is for `get` to tell. When it has none, the error SHALL NOT name an ID.
 
 When an earlier attempt of the same call got no usable answer, as in "Batch refusal after a lost answer", a result that would be Failed SHALL leave the recipient Unconfirmed instead, under "Unconfirmed recipient wording". Only a Queued result settles such a recipient, except that `idempotency_key_reused` MAY fail it, since sending it again with the same key can't succeed. A recipient that stays Unconfirmed keeps its first cause and its same-key advice, as "Unconfirmed recipient wording" says, except after `idempotency_key_reused`, as above.
 
@@ -219,6 +219,7 @@ A `2xx` without a result for each recipient SHALL produce the error `api_error`,
 - **THEN** the recipient is either Failed with code `idempotency_key_reused`, or Unconfirmed with the timeout as its cause and an error that names the key conflict
 - **AND** in either case its error says the message ID belongs to an earlier request that used this key, not to this recipient's email
 - **AND** its fix doesn't say to send it again with `key_1`
+- **AND** when it is Unconfirmed, neither its error nor its fix says to send it again with a new key
 
 #### Scenario: Each recipient gets its own outcome
 - **GIVEN** a batch of three recipients
@@ -358,7 +359,7 @@ When an earlier attempt of the same call got no usable answer, such as a network
 - **AND** the error says some emails may have gone out
 - **AND** the fix says to send each recipient with `send`, with the same template, `to`, distinct ID and idempotency key, and its template data merged over the shared data at the top level, such as `{"plan": "pro", "user": {"name": "Ada"}}`, where the recipient's `user` replaces the shared one whole
 - **AND** the fix doesn't say to send the batch again
-- **AND** each recipient's fix says to send it with `send` and the same idempotency key, and never to send the batch again
+- **AND** each recipient's fix says to send it with `send` and the same idempotency key, with its template data merged over the shared data at the top level, and never to send the batch again
 - **AND** each recipient's error keeps the `503`'s code and status as its cause
 
 ### Requirement: Unconfirmed recipient wording

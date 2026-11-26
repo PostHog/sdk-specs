@@ -96,6 +96,13 @@ A `2xx` with a message ID that doesn't confirm the scheduled time SHALL produce 
 - **WHEN** the response is `202` with `{"message_id": "msg_1"}`
 - **THEN** the SDK makes 1 attempt and reports the error code `schedule_not_confirmed` with status 202 and message ID `msg_1`
 
+#### Scenario: An unconfirmed schedule with a generated key says not to send again
+- **GIVEN** a send with a scheduled time and no idempotency key from the caller
+- **WHEN** the response is `202` with `{"message_id": "msg_1"}`
+- **THEN** the fix says to read the status of `msg_1` with `get`
+- **AND** the fix says not to send the email again
+- **AND** the fix doesn't advise sending it with another idempotency key
+
 ### Requirement: Scheduled delivery status
 
 The status read SHALL pass through `scheduled`, the status of an email that waits for its scheduled time. An SDK that models statuses as a closed type SHALL have a member for `scheduled`, and SHALL still pass through statuses it doesn't know.
@@ -265,10 +272,12 @@ When an earlier attempt of the same call got no usable answer, such as a network
 - **AND** the fix says to send each recipient again with the same idempotency key
 
 #### Scenario: batch_unavailable on a retry after a lost answer
-- **GIVEN** a batch of two recipients
+- **GIVEN** a batch with shared template data `{"plan": "pro"}` and two recipients, one with template data `{"name": "Ada"}`
 - **WHEN** the first attempt fails with a `503`, and the retry is answered `409` with code `batch_unavailable`
 - **THEN** both recipients are Unconfirmed
-- **AND** the error says some emails may have gone out, with a fix to send each recipient again with the same idempotency key
+- **AND** the error says some emails may have gone out
+- **AND** the fix says to send each recipient with `send`, with the same template, `to`, distinct ID and idempotency key, and its template data merged over the shared data, such as `{"plan": "pro", "name": "Ada"}`
+- **AND** the fix doesn't say to send the batch again
 
 ### Requirement: Unconfirmed recipient wording
 

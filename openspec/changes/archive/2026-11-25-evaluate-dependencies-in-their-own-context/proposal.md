@@ -10,21 +10,24 @@ Found while reviewing PostHog/posthog-ruby#369.
 
 ## What Changes
 
-- A referenced flag is evaluated as if it were evaluated directly with the same inputs, using its own aggregation, property context, bucketing identifier, and known-absent keys. A group-aggregated referenced flag whose group is not supplied resolves as `false`.
+- A referenced flag is evaluated as if it were evaluated directly with the same inputs, using its own aggregation, property context, bucketing identifier, and known-absent keys. The per-condition rules below apply to it unchanged.
 - A `type: "group"` filter that omits `group_type_index` reads the group type of the condition's effective aggregation, including that group type's known-absent keys.
-- A group-aggregated condition whose group key isn't supplied doesn't match, so a group flag evaluated directly without its group key resolves as `false`, as the flags service returns. A supplied group key without the needed group properties stays inconclusive.
-- A usable group key is a non-empty string or a number, as in the flags service. An empty string, null, a boolean, an array or an object counts as no key, so the flag resolves `false` instead of inconclusive.
-- Acceptance scenarios cover a dependency on a flag with another aggregation, a group dependency without its group, and a group filter without an index.
+- A condition whose effective aggregation is a group type without a usable key doesn't match, and the remaining conditions still evaluate, as the flags service does. A flag is `false` only when no condition matches and none is inconclusive, so a person condition on a flag with flag-level group aggregation can still match. There is no flag-level `false` rule. A supplied group key without the needed group properties stays inconclusive.
+- A usable group key is a non-empty string or a number, as in the flags service. An empty string, null, a boolean, an array or an object counts as no key.
+- A flag with a holdout above 0% whose flag-level group has no usable key is inconclusive with `missing_context`, because the flags service hashes an empty identifier for the holdout and may return `holdout-<id>`.
+- The evaluate-flags `missing_context` reason covers a missing or unusable group key only for such a holdout.
+- Acceptance scenarios cover a dependency on a flag with another aggregation (matching and not matching), a dependency whose only condition needs a missing group key, a person condition on a flag whose flag-level group is missing (directly and as a dependency), the holdout case, a group filter without an index (inheriting the flag-level aggregation and following a condition-level aggregation), and usable and unusable group keys. Non-string group keys are tagged `@json_group_keys_capable`.
 
 ## Capabilities
 
 ### Modified Capabilities
 
 - `local-feature-flag-evaluator`: the per-condition aggregation and flag-dependency requirements, the canonical scenario for missing group context, and the group key rendering requirement.
+- `evaluate-flags`: the `missing_context` unresolved reason in snapshot unresolved flag reporting.
 
 ## Impact
 
-SDKs that evaluate a referenced flag with the caller's context need a change. This also changes results without known-absent keys: a cross-aggregation dependency now resolves locally to the value `/flags` returns, instead of reading the wrong properties. SDKs that ignored known-absent keys for a group filter without an index need a one-line change. SDKs that returned inconclusive for a group flag evaluated without its group key now return `false`.
+SDKs that evaluate a referenced flag with the caller's context need a change. This also changes results without known-absent keys: a cross-aggregation dependency now resolves locally to the value `/flags` returns, instead of reading the wrong properties. SDKs that ignored known-absent keys for a group filter without an index need a one-line change. SDKs that returned inconclusive for a group flag evaluated without its group key now return `false`, unless a holdout needs the key. SDKs that return `false` from the flag-level aggregation before checking conditions (for example posthog-js) need to skip per condition instead. Elixir on main returns `missing_context` for a flag without its group key; PostHog/posthog-elixir#261 changes it.
 
 ## Non-goals
 

@@ -20,31 +20,46 @@ Feature: Local Feature Flag Evaluator
     When local feature flag "checkout" is evaluated for distinct id "user-123"
     Then the local evaluation result should be "blue"
 
-  Scenario: Evaluator resolves a group flag without its group key as false
+  Scenario: Evaluator resolves a flag whose only condition needs a missing group key as false
     Given the SDK is initialized with token "test-token" and local evaluation enabled
     And remote feature flag evaluation is enabled
-    And local feature flag definitions include a group flag "company-beta" for group type "company"
+    And local feature flag definitions include a group flag "company-beta" returning true for group type "company"
     When local feature flag "company-beta" is evaluated without a "company" group
     Then the local evaluation result should be false
     When get feature flag "company-beta" is called for distinct id "user-123"
     Then no remote feature flag evaluation request should be sent for flag "company-beta"
 
-  Scenario Outline: Evaluator treats an unusable group key as no group
+  @server
+  Scenario Outline: An unusable group key counts as no group
     Given the SDK is initialized with token "test-token" and local evaluation enabled
     And remote feature flag evaluation is enabled
-    And local feature flag definitions include a group flag "company-beta" for group type "company"
+    And local feature flag definitions include a group flag "company-beta" returning true for group type "company"
+    When local feature flag "company-beta" is evaluated with group "company" set to <key>
+    Then the local evaluation result should be <result>
+    When get feature flag "company-beta" is called for distinct id "user-123" with group "company" set to <key>
+    Then no remote feature flag evaluation request should be sent for flag "company-beta"
+
+    Examples:
+      | key    | result |
+      | ""     | false  |
+      | "acme" | true   |
+
+  @server @json_group_keys_capable
+  Scenario Outline: A non-string group key counts as no group
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And remote feature flag evaluation is enabled
+    And local feature flag definitions include a group flag "company-beta" returning true for group type "company"
     When local feature flag "company-beta" is evaluated with group "company" set to <key>
     Then the local evaluation result should be false
     When get feature flag "company-beta" is called for distinct id "user-123" with group "company" set to <key>
     Then no remote feature flag evaluation request should be sent for flag "company-beta"
 
     Examples:
-      | key   |
-      | ""    |
-      | null  |
-      | true  |
-      | []    |
-      | {}    |
+      | key  |
+      | null |
+      | true |
+      | []   |
+      | {}   |
 
   Scenario: Evaluator signals remote fallback when required group properties are missing
     Given the SDK is initialized with token "test-token" and local evaluation enabled
@@ -378,6 +393,50 @@ Feature: Local Feature Flag Evaluator
     Then the condition should match using person context and person bucketing
 
   @server
+  Scenario Outline: A person condition matches without the flag-level group key
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And remote feature flag evaluation is enabled
+    And local feature flag "company-mixed" has flag-level aggregation for group type "company"
+    And its condition sets the aggregation group type index to null
+    And the condition requires person property "plan" equal to "pro"
+    And person-aggregated local feature flag "person-child" requires flag "company-mixed" to evaluate to true
+    When local feature flag <flag> is evaluated with person property "plan" equal to "pro" and without a "company" group
+    Then the local evaluation result should be true
+    And the SDK should not require remote fallback
+
+    Examples:
+      | flag            |
+      | "company-mixed" |
+      | "person-child"  |
+
+  @server
+  Scenario: A holdout without a usable flag-level group key is inconclusive
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And remote feature flag evaluation is enabled
+    And local feature flag definitions include a group flag "company-beta" returning true for group type "company"
+    And local feature flag "company-beta" has holdout id 727 with exclusion percentage 50
+    When local feature flag "company-beta" is evaluated without a "company" group
+    Then local evaluation should be inconclusive
+    And the flag should remain unresolved with reason "missing_context"
+    And remote evaluation should remain eligible
+
+  @server
+  Scenario Outline: A holdout that needs no group key leaves a group flag unchanged
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And remote feature flag evaluation is enabled
+    And local feature flag definitions include a group flag "company-beta" returning true for group type "company"
+    And local feature flag "company-beta" has holdout id 727 with exclusion percentage <percentage>
+    When local feature flag "company-beta" is evaluated with group "company" set to <key>
+    Then the local evaluation result should be <result>
+    And the SDK should not require remote fallback
+
+    # The holdout hash for "acme" is about 0.9269703562845474, above 0.5.
+    Examples:
+      | percentage | key    | result |
+      | 0          | ""     | false  |
+      | 50         | "acme" | true   |
+
+  @server
   Scenario: The matching condition selects the multivariate hash identity
     Given the SDK is initialized with token "test-token" and local evaluation enabled
     And local feature flag definitions include a multivariate flag "mixed-checkout" with a group-aggregated condition followed by a person-aggregated condition
@@ -411,7 +470,22 @@ Feature: Local Feature Flag Evaluator
     Examples:
       | operator     | value        | result |
       | "exact"      | "enterprise" | false  |
-      | "is_not_set" | none         | true   |
+      | "is_not_set" | omitted      | true   |
+
+  @server
+  Scenario Outline: An index-less group filter follows the condition's aggregation over the flag's
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag "legacy-tier" has flag-level aggregation for group type "project"
+    And its condition sets the aggregation group type index to group type "organization"
+    And its condition has a group property filter on "tier" with operator <operator> and value <value> that omits group_type_index
+    When local feature flag "legacy-tier" is evaluated for project "web" and organization "acme", both with group property "tier" set to "enterprise", and with group property key "tier" listed as known absent for group type "organization" only
+    Then the local evaluation result should be <result>
+    And the SDK should not require remote fallback
+
+    Examples:
+      | operator     | value        | result |
+      | "exact"      | "enterprise" | false  |
+      | "is_not_set" | omitted      | true   |
 
   @server
   Scenario: A device-bucketed person flag without a device id is inconclusive
@@ -460,7 +534,17 @@ Feature: Local Feature Flag Evaluator
     And the SDK should not require remote fallback
 
   @server
-  Scenario: A group dependency without its group resolves as false
+  Scenario: A dependency on a matching group flag reads the group's properties
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And local feature flag "org-parent" has flag-level aggregation for group type "organization" and requires group property "region" equal to "us"
+    And person-aggregated local feature flag "person-child" requires flag "org-parent" to evaluate to true
+    When local feature flag "person-child" is evaluated for organization "acme" with person property "region" set to "eu" and group property "region" set to "us"
+    Then local feature flag "org-parent" should evaluate to true
+    And the local evaluation result should be true
+    And the SDK should not require remote fallback
+
+  @server
+  Scenario: A dependency whose only condition needs a missing group key resolves as false
     Given the SDK is initialized with token "test-token" and local evaluation enabled
     And local feature flag "org-parent" has flag-level aggregation for group type "organization" and requires group property "tier" with operator "is_not_set"
     And person-aggregated local feature flag "person-child" requires flag "org-parent" to evaluate to true

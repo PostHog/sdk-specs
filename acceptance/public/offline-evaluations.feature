@@ -443,3 +443,24 @@ Feature: Offline Evaluations
     When the caller deletes one reported input at its current revision
     Then the call returns no value and the deleted input, its payload, and the composite are removed
     And the item and the other reported input remain
+
+  Scenario: An explicit scorer version survives creation recovery
+    Given an experiment creation declaration with an explicit scorer version and a different suite default
+    When the caller retries the prepared creation after losing its response
+    Then both requests carry the same experiment UUID and explicit scorer version UUID
+    And the acknowledged experiment uses the explicit version
+
+  Scenario: A suite default is pinned only on first creation
+    Given a suite default of version 1 and an experiment accepted with the override omitted
+    When the default moves to version 2 and the caller replays the submission
+    Then the original experiment retains version 1
+    And a new experiment for the same suite with an explicit null override uses version 2
+
+  Scenario: A suite default does not backfill an existing run
+    Given an experiment accepted when its suite had no default
+    When a default is set and the caller replays the submission
+    Then the original experiment still has no pinned experiment scorer
+
+  Scenario: An item scorer version cannot override an experiment scorer
+    When the caller creates an experiment with an item scorer version as the override
+    Then the caller receives a structured validation error for experiment_scorer_version_id

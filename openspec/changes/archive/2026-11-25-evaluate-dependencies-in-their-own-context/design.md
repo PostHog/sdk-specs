@@ -1,0 +1,25 @@
+## Context
+
+`rust/feature-flags/src/flags/flag_matching.rs` in PostHog/posthog:
+
+- `evaluate_all_feature_flags` builds a dependency graph and `evaluate_flags_with_overrides` evaluates `evaluation_stages` in dependency order.
+- `get_match` evaluates each flag with the full request context. A condition selects its property map and bucketing key from its effective aggregation. A group condition whose group has no usable key in the request is skipped (`continue`, reason `NoGroupType`, around lines 2044-2069), and later conditions still run. A flag with no matching condition is `enabled: false`. `FlagPropertyGroup::effective_aggregation` in `flag_property_group.rs` uses the condition's own `aggregation_group_type_index` when present (null means person) and the flag-level value otherwise.
+- `is_holdout_condition_match` runs before the conditions. `get_holdout_hash` hashes the flag-level identifier from `hashed_identifier`, which returns `""` when the group key is missing or unusable (a code comment keeps `""` only for hash parity with the old service). The hash of `holdout-` is about 0.9269, so a holdout of 92.7% or more puts every request without a key in the holdout.
+- The result is stored in `flag_evaluation_results`. A `flag_evaluates_to` filter compares only that stored value.
+- `get_person_properties` and `get_group_properties` remove known-absent keys per scope.
+- `PropertyFilter::group_filter_index` in `property_filter.rs` returns `self.group_type_index.or(effective_aggregation)`.
+
+## Decisions
+
+1. Evaluate a referenced flag with the top-level inputs and its own aggregation. This matches the service and the posthog-js implementation, and keeps a listing for one scope from resolving a filter on another.
+2. A dependency follows the same per-condition rules as a flag evaluated directly. There is no rule that resolves a referenced flag as `false` from its flag-level aggregation. A referenced flag with flag-level `company` aggregation and a person condition can be `true` without a company group, as on `/flags`. posthog-js returns `false` at the flag level for that case and differs from the service.
+3. Resolve a group filter without an index to the condition's effective aggregation. This mirrors `group_filter_index`.
+4. Alternative considered: make a cross-aggregation dependency inconclusive. It is safe but adds a `/flags` request for flags that can resolve locally, and still differs from the service.
+
+5. A condition whose effective aggregation is a group type without a usable key is skipped, and the flag is `false` only when no condition matches and none is inconclusive, as the flags service returns. `get_match` skips such a condition (`has_group_key`, reason `NoGroupType`) and keeps evaluating, and a flag with no matching condition is `enabled: false`. The Python, Node, and Ruby SDKs already return `false` for a flag whose only conditions need the missing key. Elixir on main returns `missing_context` for it; PostHog/posthog-elixir#261 changes it. A supplied group key without the group properties a condition needs stays inconclusive, because the service would load stored properties that a local evaluator doesn't have. The scenario "Evaluator signals remote fallback when required context is missing" said a group flag evaluated "without group context" was inconclusive. It is replaced by one scenario for a missing group key (`false`) and one for a supplied key without the needed properties (inconclusive).
+
+6. Use the flags service's definition of a usable group key. `is_usable_group_key` in `flag_matching.rs` accepts a non-empty JSON string or a JSON number. An omitted group type, an empty string, JSON null, a boolean, an array, or an object counts as no key, so a condition aggregated on that group type is skipped and a flag with no other matching condition is `false`. The earlier spec text made a non-string, non-number key inconclusive and treated an empty string as a key, which disagreed with the service and made the PHP and Python SDKs evaluate an empty-string key locally.
+
+7. A flag with a holdout above 0% whose flag-level group has no usable key is inconclusive with `missing_context`. The service hashes `""` for the holdout and may return `holdout-<id>`, so resolving the flag `false` locally can disagree with it. Copying the `""` hash would match the service today, but the service keeps `""` only for hash parity with the old service, and a spec that requires hashing an empty identifier would lock SDKs into that artifact. Reporting inconclusive sends these rare requests to `/flags`, which returns whatever the service decides. A 0% holdout, or a usable key, needs no change.
+
+8. Narrow the evaluate-flags `missing_context` reason instead of dropping "group key" from it. A missing or unusable group key no longer makes a flag unresolved, except through the holdout in decision 7.

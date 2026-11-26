@@ -16,7 +16,7 @@ detail — evidence, code references, and remediation for every non-Pass cell �
 - ❓ **Unknown** — could not verify from available evidence; needs human review.
 
 In-scope SDKs (referenced across `openspec/specs/`): posthog-js, posthog-python, posthog-node,
-posthog-android, posthog-ios, posthog-flutter, posthog-react-native, posthog-php, posthog-ruby,
+posthog-android, posthog-ios, posthog-flutter, posthog-kmp, posthog-react-native, posthog-php, posthog-ruby,
 posthog-go, posthog-java, posthog-dotnet. **64 contracts** are now tracked per SDK: the 64
 capabilities listed in the root `README.md` table, including **MCP Analytics**, added this cycle by
 PR [#87](https://github.com/PostHog/sdk-specs/pull/87), and **Bootstrap**, added to the table by PR
@@ -153,16 +153,45 @@ the single most widely-shared non-compliance in the matrix.
 |---|---|---|---|---|---|---|---|---|---|
 | posthog-js | 26/64 fully compliant (41%) | 26 | 21 | 12 | 5 | 0 | 2026-10-05 · `6538babc` (targeted re-audit; most of the 59 pre-existing rows carried from 2026-08-10, see file header) | 33 | [posthog-js.md](posthog-js.md) |
 | posthog-python | 13/64 fully compliant (20%; 30 contracts N/A on a server SDK) | 13 | 16 | 5 | 30 | 0 | 2026-10-12 · `509c8525` | 21 | [posthog-python.md](posthog-python.md) |
-| posthog-android | 43/69 fully compliant (62%; 43/64 = 67% on the shared basis) | 43 | 15 | 1 | 10 | 0 | 2026-11-10 · `aaa23d39` (4.0: 31 rows); other rows 2026-10-19 · `c5e788bd` — see file header | 16 | [posthog-android.md](posthog-android.md) |
-| posthog-ios | 44/69 fully compliant (64%; 44/64 = 69% on the shared basis) | 44 | 14 | 1 | 10 | 0 | 2026-11-10 · `e27cbe4cb` (4.0 release branch, before 4.0.0 is published; capture v1 rows against #146 at `d387ab79` as merged; see below) | 15 | [posthog-ios.md](posthog-ios.md) |
+| posthog-android | 43/70 fully compliant (61%) | 43 | 15 | 1 | 11 | 0 | 2026-11-24 · `1577cfa5` (tag `android-v4.0.3`; all 70 rows) | 16 | [posthog-android.md](posthog-android.md) |
+| posthog-ios | 43/70 fully compliant (61%) | 43 | 15 | 1 | 11 | 0 | 2026-11-24 · `c8fcc2c06` (tag `4.0.5`) | 16 | [posthog-ios.md](posthog-ios.md) |
 | posthog-node | 9/64 fully compliant (14%; 29 contracts N/A on a server SDK) | 9 | 21 | 4 | 29 | 1 | 2026-10-12 · `4f590b36` (posthog-js monorepo; Traces row corrected 2026-10-19) | 25 (+1 ❓) | [posthog-node.md](posthog-node.md) |
-| posthog-flutter | 23/69 fully compliant (33%; 23/64 = 36% on the shared basis) | 23 | 30 | 4 | 12 | 0 | 2026-11-10 · `82123e6` (6.0 release PR, before 6.0.0 is published; capture v1 rows against #146 as merged; see below) | 34 | [posthog-flutter.md](posthog-flutter.md) |
+| posthog-flutter | 20/70 fully compliant (29%) | 20 | 33 | 4 | 13 | 0 | 2026-11-24 · `4cb4318b` (tag `6.0.0`; native rows at posthog-ios 4.0.5 / posthog-android 4.0.3) | 37 | [posthog-flutter.md](posthog-flutter.md) |
+| posthog-kmp | 15/70 fully compliant (21%) | 15 | 36 | 8 | 11 | 0 | 2026-11-24 · `0a88aa7` (tag `1.0.0`; first audit) | 44 | [posthog-kmp.md](posthog-kmp.md) |
 | posthog-react-native | 29/64 fully compliant (45%) | 29 | 28 | 2 | 5 | 0 | 2026-11-10 · `210bf35d8` (react-native-plugin 3.0: six session replay rows, Opt In, Capture Exception, Exception Event Metadata only); other rows 2026-10-19 · `3ddaa654` — see file header | 30 | [posthog-react-native.md](posthog-react-native.md) |
 | posthog-php | 11/63 fully compliant (17%; 33 contracts N/A on a server SDK; **needs +1: MCP Analytics**) | 11 | 11 | 8 | 33 | 0 | 2026-09-28 · `5451f4e0` | 19 | [posthog-php.md](posthog-php.md) |
 | posthog-ruby | 9/63 fully compliant (14%; 33 contracts N/A on a server SDK; **needs +1: MCP Analytics**) | 9 | 13 | 8 | 33 | 0 | 2026-09-28 · `185060ab` | 21 | [posthog-ruby.md](posthog-ruby.md) |
 | posthog-go | 8/64 fully compliant (13%; 33 contracts N/A on a server SDK) | 8 | 14 | 9 | 33 | 0 | 2026-10-05 · `08549f42` | 23 | [posthog-go.md](posthog-go.md) |
 | posthog-java | 12/59 fully compliant (20%; **59 rows, needs +5 new contracts**) | 12 | 13 | 6 | 28 | 0 | 2026-08-10 · `8659a7b4` (posthog-android monorepo) | 19 | [posthog-java.md](posthog-java.md) |
 | posthog-dotnet | 5/64 fully compliant (8%; 30 contracts N/A on a server SDK) | 5 | 19 | 10 | 30 | 0 | 2026-10-05 · `ae4d019c` | 29 | [posthog-dotnet.md](posthog-dotnet.md) |
+
+**2026-11-24 out-of-cycle refresh — mobile majors at their released tags:** posthog-ios `4.0.5`,
+posthog-android `android-v4.0.3` and posthog_flutter `6.0.0` were re-audited at the published tags
+(the 2026-11-10 runs scored unreleased branch heads), against sdk-specs `795b69f`, re-checked at
+`44fe27a`. **posthog-kmp `1.0.0` gets its first audit.** Every file gains a 70th row, Get Remote Config
+Payload ([#220](https://github.com/PostHog/sdk-specs/pull/220)), ➖ on client SDKs.
+- **posthog-android 42/16/1/10 → 43/15/1/11.** Capture and Capture AI ✅→🟡: `disableGeoIp` (PostHog/posthog-android#971) overwrites a caller's `$geoip_disable` after the caller merge, against the client caller-precedence rule. Identify 🟡→✅ (PostHog/posthog-android#967 stores the
+  person-properties hash only from the queued event, which also meets #208); Bootstrap and Register
+  🟡→✅ (their only gaps were MAY-level). All 70 rows are now at 4.0.3, so the 31-row/38-row split is gone.
+- **posthog-ios 44/14/1/10 → 43/15/1/11.** Capture and Capture AI ✅→🟡: a Swift `Set`/`NSSet` property is dropped
+  instead of serialized as an array ([#215](https://github.com/PostHog/sdk-specs/pull/215)). Bootstrap 🟡→✅
+  (its only gap was MAY-level, as on Android). No ❌ or 🟡 row was fixed in 4.0.1–4.0.5; #211, #153/#202, #181/#226, #224 and #232 are met.
+- **posthog-flutter 23/30/4/12 → 20/33/4/13.** Register 🟡→✅ (its only gap was MAY-level, as on Android). Capture Exception ✅→🟡 (#224: synthesized stacks are trimmed
+  by package name, which fails in obfuscated and web builds); Get Feature Flag and Is Feature Enabled ✅→🟡
+  (web ignores the client-level `sendFeatureFlagEvent`, a gap already in `752f899`); Feature Flag Cache
+  ✅→🟡 (web forwards posthog-js's raw malformed-payload string, #170, as on posthog-kmp). The merged
+  event-batcher, http-client and retry-queue text says Flutter has no Dart transport, which is wrong for
+  Windows/Linux; that is a spec fix, not scored here.
+- **posthog-kmp 15/36/8/11 (first audit).** A facade over posthog-android 4.0.2 (Android), its JVM core
+  7.0.2 (JVM), posthog-ios 4.0.3 (Apple) and posthog-js 1.435.8 (JS/Wasm). Seven of its eight ❌ are
+  native capabilities KMP doesn't expose (logs, tracing headers, bootstrap, exception steps, replay
+  start/stop/status); the eighth is Traces. Its highest-impact 🟡s are KMP-owned: web never sets
+  `disable_session_recording`, JS sends `Long` values as `{low_1, high_1}` objects, and the exact
+  posthog-ios 4.0.3 pin keeps the 4.0.4 GPU-replay privacy fixes out.
+
+**Parity read.** iOS and Android now share a single ❌ (Traces). Flutter's ✅ count fell on stricter
+spec text and corrected scores, not on code regressions. KMP trails mostly on surface it hasn't wrapped.
+Details in each per-SDK file.
 
 **2026-09-28 contract correction (retained):** posthog-js n31 is withdrawn: custom network callbacks
 intentionally replace default body-content scrubbing after mandatory header/path/size cleaning. That
@@ -338,13 +367,16 @@ stalest pointer and its only 59-row file.
 | posthog-python | Logs | Backward-compatible | No `/i/v1/logs` OTLP pipeline — [posthog-python.md#n1](posthog-python.md) |
 | posthog-python | Set/Reset Person/Group Properties For Flags (×4) | Backward-compatible | No persistent property-override cache, despite `@both`-tagged acceptance scenarios — [posthog-python.md#n10](posthog-python.md) |
 | posthog-android | Traces | Backward-compatible | No OTLP traces/spans implementation — [posthog-android.md#n23](posthog-android.md#n23) |
-| posthog-ios | Traces | Backward-compatible | No OTLP span/traces implementation anywhere — [posthog-ios.md#n2](posthog-ios.md) |
+| posthog-ios | Traces | Backward-compatible | No OTLP span/traces implementation anywhere — [posthog-ios.md#n2](posthog-ios.md#n2) |
 | posthog-node | Traces | ~~Backward-compatible~~ **corrected to ❓** | The ❌ was a **false negative**: `packages/core/src/traces/` merged 2026-09-10 and posthog-node wires it (`client.ts:698-703`). Moved to ❓ pending a real scoring pass — [posthog-node.md#n2](posthog-node.md#n2) |
 | posthog-node | Set/Reset Person/Group Properties For Flags (×4) | Backward-compatible | Zero implementation; methods exist only on the client-only base class node doesn't extend — [posthog-node.md#n15](posthog-node.md) |
 | posthog-flutter | Get Anonymous ID | Backward-compatible | Method still doesn't exist in the Dart API at all — [posthog-flutter.md#n12](posthog-flutter.md#n12) |
 | posthog-flutter | Exception Event Metadata | Needs deprecation path | **New this run** — no `exception_id`/`parent_id` linkage at all, causes inherit the outermost `handled`, `$exception_level` hardcoded, caller property bag overrides SDK-owned keys, and the chain caps at 10 where the spec says 50 — [posthog-flutter.md#n9](posthog-flutter.md#n9) |
 | posthog-flutter | Traces | Backward-compatible | No implementation; net-new, pre-GA — [posthog-flutter.md#n36](posthog-flutter.md#n36) |
 | posthog-flutter | Tracing Headers | Backward-compatible | No implementation; Flutter has no Dart-side HTTP client of its own to intercept app traffic with — [posthog-flutter.md#n37](posthog-flutter.md#n37) |
+| posthog-kmp | Logs / Tracing Headers / Bootstrap / Exception Steps | Backward-compatible | **First audit** — the native SDKs support all four, but KMP's public API exposes none of them (web hard-codes `bootstrap: {}`) — [posthog-kmp.md#n1](posthog-kmp.md#n1) |
+| posthog-kmp | Start / Stop Session Recording, Is Session Replay Active | Backward-compatible | **First audit** — no replay control API on any target — [posthog-kmp.md#n17](posthog-kmp.md#n17) |
+| posthog-kmp | Traces | Backward-compatible | No implementation, as in every delegate — [posthog-kmp.md#n2](posthog-kmp.md#n2) |
 | posthog-react-native | Is Opt Out | Backward-compatible | No callable `isOptOut()`; only the `optedOut` getter property, unlike every other audited client SDK. Re-confirmed 2026-10-19 — [posthog-react-native.md#n17](posthog-react-native.md#n17) |
 | posthog-react-native | Session Replay Debug Properties | Backward-compatible | **Plugin 3.0 re-audit (2026-11-10), upgraded from ❌** — tiers, the 30 s window, `screenshot` capture mode and the minimal `$feature_flag_called` strip conform; the SDK-computed keys overwrite registered and caller values, against the client precedence rule — [posthog-react-native.md#n24](posthog-react-native.md#n24) |
 | posthog-react-native | Traces | Backward-compatible | Still unwired — but `packages/core/src/traces/` and `_sendTracesBatch` now exist on the very base class RN extends, so this is wiring, not new subsystem work — [posthog-react-native.md#n31](posthog-react-native.md#n31) |
@@ -400,26 +432,33 @@ stalest pointer and its only 59-row file.
 | posthog-node | Evaluate Flags | Backward-compatible | **Downgraded from ✅ on new spec text** — no negative-knowledge retention, the sixth server SDK in a row to lack it — [posthog-node.md#n10](posthog-node.md) |
 | posthog-node | MCP Analytics | Backward-compatible | **New this run** — `@posthog/mcp` emits neither optional event and misreports an unknown tool as a failed `$mcp_tool_call`; see the ownership question above about whether this row belongs to node or js — [posthog-node.md#n26](posthog-node.md) |
 | posthog-node | Local Feature Flag Evaluator | Backward-compatible | Holdouts **are** implemented in `@posthog/core`, and the acceptance-asset sync gap is unchanged; new this run, a non-scalar group key buckets on `"true"` / `"[object Object]"` instead of going inconclusive — [posthog-node.md#n24](posthog-node.md) |
-| posthog-ios | Exception Event Metadata | Backward-compatible | Chain linkage, 50-entry cap, `$exception_source`, empty `value` and UUID-less image filtering landed in PostHog/posthog-ios#931 (merged in 4.0); caller properties can still override `$exception_level`/`$exception_source` on purpose (no typed level parameter yet, and Android/JS behave the same) — [posthog-ios.md#n19](posthog-ios.md) |
-| posthog-android | Exception Event Metadata | Needs deprecation path | Nested entries copy the outermost `handled`, suppressed entries have no `mechanism.source`, a single-entry list has no `exception_id: 0`, no `$exception_source`, and `$exception_level` is a documented caller override (re-audited at 4.0 `aaa23d39`) — [posthog-android.md#n7](posthog-android.md#n7) |
-| posthog-android | Identify | Backward-compatible | While opted out, `identify` updates the person-properties dedup hash for a `$set` it dropped, so the same properties are skipped after opt-in (4.0 `aaa23d39`) — [posthog-android.md#n28](posthog-android.md#n28) |
-| posthog-android | Get Feature Flags / Get Feature Flags And Payloads | Backward-compatible | `getAllFeatureFlags()` is the spec's android 4.0 form but returns `null` after a restart until the disk cache is loaded (4.0 `aaa23d39`) — [posthog-android.md#n9](posthog-android.md#n9) |
-| posthog-android | Surveys | Backward-compatible | Submit and dismiss move the last-seen survey date (#102), and a survey with an unknown question type blocks later surveys until reset (4.0 `aaa23d39`) — [posthog-android.md#n22](posthog-android.md#n22) |
-| posthog-ios | Session Replay Privacy | Backward-compatible | **Upgraded from ❌** — 4.0's screenshot-only replay removes the leaking wireframe path; SwiftUI's `postHogMask()` still wins over an enclosing `postHogNoMask()`, the reverse of the spec's precedence (over-masks, no leak) — [posthog-ios.md#n24](posthog-ios.md) |
-| posthog-ios | Get Feature Flags / Get Feature Flags And Payloads | Backward-compatible | **Upgraded from ❌** — the specs now record iOS 4.0's `getAllFeatureFlags()` result list (payloads decoded per entry) as its surface; still not the canonical map shape — [posthog-ios.md#n9](posthog-ios.md) |
-| posthog-ios | Session Replay Debug Properties | Backward-compatible | **New row** — tiers, 30 s window and crash-context snapshot conform; gaps on caller-supplied `$session_id` and backdated events (the `active`-after-timeout gap is fixed in 4.0) — [posthog-ios.md#n26](posthog-ios.md) |
+| posthog-ios | Exception Event Metadata | Backward-compatible | Chain linkage, 50-entry cap, `$exception_source`, empty `value` and UUID-less image filtering landed in PostHog/posthog-ios#931 (merged in 4.0); caller properties can still override `$exception_level`/`$exception_source` on purpose (no typed level parameter yet, and Android/JS behave the same) — [posthog-ios.md#n19](posthog-ios.md#n19) |
+| posthog-android | Exception Event Metadata | Needs deprecation path | Nested entries copy the outermost `handled`, suppressed entries have no `mechanism.source`, a single-entry list has no `exception_id: 0`, no `$exception_source`, and `$exception_level` is a documented caller override (re-verified at 4.0.3 `1577cfa5`) — [posthog-android.md#n7](posthog-android.md#n7) |
+| posthog-android | Get Feature Flags / Get Feature Flags And Payloads | Backward-compatible | `getAllFeatureFlags()` is the spec's android 4.0 form but returns `null` after a restart until the disk cache is loaded (4.0.3 `1577cfa5`) — [posthog-android.md#n9](posthog-android.md#n9) |
+| posthog-android | Surveys | Backward-compatible | Submit and dismiss move the last-seen survey date (#102), and a survey with an unknown question type blocks later surveys until reset (4.0.3 `1577cfa5`) — [posthog-android.md#n22](posthog-android.md#n22) |
+| posthog-ios | Session Replay Privacy | Backward-compatible | **Upgraded from ❌** — 4.0's screenshot-only replay removes the leaking wireframe path; SwiftUI's `postHogMask()` still wins over an enclosing `postHogNoMask()`, the reverse of the spec's precedence (over-masks, no leak) — [posthog-ios.md#n24](posthog-ios.md#n24) |
+| posthog-ios | Get Feature Flags / Get Feature Flags And Payloads | Backward-compatible | **Upgraded from ❌** — the specs now record iOS 4.0's `getAllFeatureFlags()` result list (payloads decoded per entry) as its surface; still not the canonical map shape — [posthog-ios.md#n9](posthog-ios.md#n9) |
+| posthog-ios | Session Replay Debug Properties | Backward-compatible | **New row** — tiers, 30 s window and crash-context snapshot conform; gaps on caller-supplied `$session_id`, backdated events and a registered or caller `$sdk_debug_pending_queue_size` winning over the SDK's (#238) (the `active`-after-timeout gap is fixed in 4.0) — [posthog-ios.md#n26](posthog-ios.md#n26) |
 | posthog-ios | Exception Steps | Backward-compatible | **Downgraded from ✅** — steps are byte-counted, buffered and persisted with `NSNull` members that the analytics queue and capture v1 wire later strip, so the representations the spec requires to be identical differ — [posthog-ios.md#n30](posthog-ios.md#n30) |
+| posthog-ios | Capture | Backward-compatible | **Downgraded from ✅ (4.0.5)** — a Swift `Set`/`NSSet` property is dropped instead of serialized as a JSON array (#215) — [posthog-ios.md#n4](posthog-ios.md#n4) |
 | posthog-node | Flush / Retry Queue (v1 pipeline) | Needs deprecation path | `V1CaptureSender` never throws on exhausted retry, so failed batches are evicted from the queue as if delivered — [posthog-node.md#n8](posthog-node.md) |
 | posthog-node | Feature Flag Called Tracker | Backward-compatible | Allowlist itself is fully compliant (inherited from posthog-js via shared `@posthog/core`), but capacity eviction is a full clear rather than incremental, violating the spec's anti-thundering-herd requirement — [posthog-node.md#n19](posthog-node.md) |
 | posthog-flutter | Session Replay Privacy | Backward-compatible | Independent Dart replay pipeline still has no no-capture marker (a nested `PostHogUnmaskWidget` can reveal anything inside `PostHogMaskWidget`); the unmask primitive, shared sensitive-input detection, and fail-closed mask walk have all landed since the previous audit — [posthog-flutter.md#n29](posthog-flutter.md#n29) |
 | posthog-flutter | Remote Config | Backward-compatible | **Resolved from ❓** — mobile delegates to the native SDK (✅ there), but the new Dart desktop core never fetches remote config at all, so Windows/Linux clients get no server-side replay or survey gating — [posthog-flutter.md#n26](posthog-flutter.md#n26) |
 | posthog-flutter | Get Feature Flag Payload / Result | Backward-compatible | **6.0** — payloads are read through `getFeatureFlagResult`, and posthog-ios 4.0 returns no payload for malformed JSON; on web posthog-js still returns the raw string — [posthog-flutter.md#n15](posthog-flutter.md#n15) |
 | posthog-flutter | Get Feature Flags / Get Feature Flags And Payloads | Backward-compatible | **Upgraded from ❌ (6.0)** — the specs now record `getAllFeatureFlags()`'s result list as the flutter 6.0 surface; still not the canonical map shape, and on web an empty variant reads as enabled and a malformed payload is the raw string — [posthog-flutter.md#n16](posthog-flutter.md#n16) |
-| posthog-flutter | Session Replay Debug Properties | Backward-compatible | **6.0** — mobile events are built by posthog-ios/posthog-android 4.x and carry their bundles (posthog-ios 🟡); desktop sends `$recording_status: disabled`, but the Dart core also puts `$sdk_debug_session_start` and `$sdk_debug_current_session_duration` on every event, custom events included, and no SDK may send the duration — [posthog-flutter.md#n28](posthog-flutter.md#n28) |
+| posthog-flutter | Session Replay Debug Properties | Backward-compatible | **6.0** — mobile events are built by posthog-ios/posthog-android 4.x and carry their bundles (posthog-ios and posthog-android 🟡); desktop sends `$recording_status: disabled` and no longer adds the session-start and duration keys (#733, #736), but a registered or caller `$sdk_debug_pending_queue_size` still wins over the SDK's queue depth (#238) — [posthog-flutter.md#n28](posthog-flutter.md#n28) |
 | posthog-flutter | Retry Queue | Needs deprecation path (inherited) | **Resolved from ❓** — desktop and mobile keep failed batches queued, but Flutter Web uses posthog-js's `RetryQueue`, which drops a 429; clears with posthog-js n28 — [posthog-flutter.md#n38](posthog-flutter.md#n38) |
 | posthog-flutter | Capture / Capture AI | Backward-compatible | **6.0, against #146** — the Windows/Linux Dart core replaces an empty or non-string caller `$session_id` with its own session id, so it is never lifted or dropped with a warning; native paths keep the caller's value — [posthog-flutter.md#n41](posthog-flutter.md#n41) |
 | posthog-flutter | Identify | Backward-compatible | **Downgraded on new spec text (6.0)** — the Windows/Linux Dart core returns early from `identify()` while opted out, so the distinct id and flags don't follow until opt-in; #167 says opt-out is not a guard — [posthog-flutter.md#n40](posthog-flutter.md#n40) |
 | posthog-flutter | Surveys | Backward-compatible | **6.0** — posthog-android still moves the last-seen survey date on submit and dismiss (#102); posthog-ios now writes it on show — [posthog-flutter.md#n35](posthog-flutter.md#n35) |
+| posthog-flutter | Capture Exception | Backward-compatible | **Downgraded from ✅ (6.0.0)** — synthesized stacks drop SDK frames by package name, so obfuscated and web builds end on SDK frames (#224) — [posthog-flutter.md#n5](posthog-flutter.md#n5) |
+| posthog-flutter | Get Feature Flag / Is Feature Enabled | Backward-compatible | **Downgraded from ✅ (6.0.0)** — web ignores the client-level `sendFeatureFlagEvent` default (#153) — [posthog-flutter.md#n13](posthog-flutter.md#n13) |
+| posthog-flutter | Feature Flag Cache | Backward-compatible | **Downgraded from ✅ (6.0.0)** — web forwards posthog-js's raw malformed-payload string without a log (#170), as on posthog-kmp — [posthog-flutter.md#n15](posthog-flutter.md#n15) |
+| posthog-kmp | Session Replay Ingestion Controls | Backward-compatible | **First audit** — web never sets `disable_session_recording`, so the project's remote setting turns replay on even when KMP config leaves it off — [posthog-kmp.md#n36](posthog-kmp.md#n36) |
+| posthog-kmp | Capture | Backward-compatible | **First audit** — JS sends `Long` values as `{low_1, high_1}` objects; Wasm stringifies sets; Apple drops them (via posthog-ios) — [posthog-kmp.md#n6](posthog-kmp.md#n6) |
+| posthog-kmp | Session Replay Privacy | Backward-compatible | **First audit** — the exact posthog-ios 4.0.3 pin keeps the 4.0.4 GPU-capture privacy fixes out while KMP exposes GPU capture — [posthog-kmp.md#n37](posthog-kmp.md#n37) |
+| posthog-kmp | Setup / Autocapture / Capture Exception | Backward-compatible | **First audit** — a second `setup()` orphans a live client on Android/JVM; Android ignores `autocapture`; Apple flattens the cause chain — [posthog-kmp.md#n24](posthog-kmp.md#n24) |
 | posthog-react-native | Bootstrap | Backward-compatible | Flag-merge spread order is inverted — previously-persisted flags win over a fresh bootstrap value, the opposite of the spec's required precedence — [posthog-react-native.md#n4](posthog-react-native.md) |
 | posthog-react-native | Flush / Retry Queue | Backward-compatible | Shared-core catch handler evicts an exhausted-retry HTTP failure as if delivered instead of preserving it — same defect class as posthog-node, and precisely what posthog-flutter's new Dart core gets right — [posthog-react-native.md#n9](posthog-react-native.md#n9) |
 | posthog-react-native | Setup | Backward-compatible | **Downgraded on new spec text** — `PostHogProvider` still takes only `apiKey`; PR [#108](https://github.com/PostHog/sdk-specs/pull/108) names it explicitly and prescribes the non-breaking fix (add `projectToken`, deprecate `apiKey` in the same release) — [posthog-react-native.md#n27](posthog-react-native.md#n27) |
@@ -458,8 +497,8 @@ stalest pointer and its only 59-row file.
 | posthog-js | Exception Event Metadata | Backward-compatible | **New this run** — the most complete producer envelope audited (full `exception_id`/`parent_id` linkage, canonical sources, correct nested-`handled` omission, spec-exact caps), missing only `$exception_source` and a capture category on the two global handlers, which fall back to `generic` — [posthog-js.md#n35](posthog-js.md) |
 | posthog-js | Session Replay Debug Properties | Backward-compatible | **New this run** — re-scored against `d078270` after #96; tiering, the `$`-prefix gate, and the 30 s throttle conform, but after `stopSessionRecording()` on a loaded recorder events keep `active`/`buffering` instead of `$recording_status: disabled` — [posthog-js.md#n36](posthog-js.md) |
 
-Full contract-by-contract detail (33 posthog-js, 21 posthog-python, 16 posthog-android, 15
-posthog-ios, 26 posthog-node, 34 posthog-flutter, 30 posthog-react-native, 19 posthog-php, 21
+Full contract-by-contract detail (33 posthog-js, 21 posthog-python, 16 posthog-android, 17
+posthog-ios, 26 posthog-node, 36 posthog-flutter, 44 posthog-kmp, 30 posthog-react-native, 19 posthog-php, 21
 posthog-ruby, 23 posthog-go, 19 posthog-java, and 29 posthog-dotnet non-Pass/non-N/A cells) is in
 the respective per-SDK files.
 
@@ -582,7 +621,7 @@ breaking callers silently. node additionally hardcodes `$exception_level: 'error
 terminates the process, where the spec says `fatal`. Because node's builder is shared, one fix in
 `@posthog/core` closes the matching posthog-js and posthog-react-native gaps too. See
 [posthog-python.md#n14](posthog-python.md), [posthog-node.md#n20](posthog-node.md), and
-[posthog-ios.md#n19](posthog-ios.md).
+[posthog-ios.md#n19](posthog-ios.md#n19).
 
 **A requirement was withdrawn this run, and one SDK was right all along.** sdk-specs PR
 [#103](https://github.com/PostHog/sdk-specs/pull/103) made `$exception_list[0].type`/`.value` the
@@ -678,7 +717,7 @@ against directly-cited code, and no new Unknown was introduced by an audit.
 
 ## Pending initial audit
 
-None — all 12 in-scope SDKs have at least one full audit on file.
+None — all 13 in-scope SDKs have at least one full audit on file.
 
 ## Queued for next run
 

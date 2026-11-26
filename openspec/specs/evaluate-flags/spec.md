@@ -947,7 +947,7 @@ The snapshot SHALL expose each unresolved key with a reason (member name and sha
 
 - `experience_continuity`: the flag's definition has experience continuity enabled. Local evaluation never resolves it; the fix is to change the flag.
 - `unsupported_definition`: the flag's definition uses something the local evaluator does not support, such as a static cohort, an unrecognized operator, a malformed value, a dependency with no loaded definition, or a circular dependency. The fix is to change the flag or upgrade the SDK.
-- `missing_context`: the call did not supply a property, group key, group property or device id the flag needs, or supplied it in a form the evaluator cannot use. The fix is to pass it.
+- `missing_context`: the call did not supply a property, group property or device id the flag needs, or supplied it in a form the evaluator cannot use. The fix is to pass it. A missing or unusable group key is a `missing_context` cause only for a flag whose holdout needs it, as the local evaluator spec defines. Otherwise a condition that needs a missing or unusable group key does not match, and the flag is not unresolved for that reason.
 - `unresolved_dependency`: a flag the definition depends on has a loaded definition but was unresolved. The dependency's own entry carries its reason when the dependency is in the requested scope.
 
 When more than one cause applies to a flag, the SDK SHALL report the first applicable reason in this order: `experience_continuity`, `unsupported_definition`, `unresolved_dependency`, `missing_context`. An SDK SHALL NOT report a reason this spec does not define. A new cause lands in this spec before an SDK reports it.

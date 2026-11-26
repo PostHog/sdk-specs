@@ -28,3 +28,13 @@ Feature: Stop Session Recording
     When stop session recording is called
     Then the call should not throw
     And session recording should remain inactive
+
+  Scenario: A remote config load does not resume a stopped recording
+    Given the SDK is initialized with token "test-token"
+    And session replay is configured and eligible to start
+    And session recording is active
+    When stop session recording is called
+    And remote config is reloaded
+    Then session recording should remain inactive
+    When start session recording is called
+    Then session recording should be active

@@ -153,6 +153,12 @@ The SDK SHALL retry a batch's request as "Retryable responses" and "Retry timing
 - **WHEN** the first attempt fails with a `503` and the retry is answered `200` with a result for each
 - **THEN** both attempts send the same body, with the same `idempotency_key` for each recipient
 
+#### Scenario: Shutdown keeps the results of an attempt in flight
+- **GIVEN** a batch of two recipients whose request PostHog has received but not answered yet
+- **WHEN** the caller shuts the client down, and PostHog then answers `200` with both recipients queued
+- **THEN** the batch call returns both recipients Queued with their message IDs
+- **AND** no recipient fails with `client_closed`
+
 #### Scenario: Shutdown ends a batch's wait to retry at once
 - **GIVEN** a batch of two recipients whose first attempt failed with a `503`, and a controlled clock that the test does not advance
 - **WHEN** the caller shuts the client down while the batch waits to retry
@@ -162,7 +168,7 @@ The SDK SHALL retry a batch's request as "Retryable responses" and "Retry timing
 
 ### Requirement: Batch recipient results
 
-A `200` with one result per recipient, in request order, SHALL settle each recipient as one of three statuses. Each result SHALL carry the recipient's position, `to`, idempotency key, status, the message ID when PostHog named one, and an error unless the recipient is Queued.
+A `200` with one result per recipient, in request order, SHALL settle each recipient as one of three statuses. Each result SHALL carry the recipient's position, `to`, idempotency key, status, the message ID when PostHog named one as a nonempty string, and an error unless the recipient is Queued. A `message_id` of any other type SHALL be left out of the result.
 
 - **Queued**: the result has `"status": "queued"`, a message ID that is a nonempty string, and no error. The result SHALL carry the message ID and `replayed`.
 - **Unconfirmed**: the result's error has code `delivery_unavailable` or `idempotency_key_in_flight`, or no code, or the result is neither Queued nor an error. PostHog may still send the email.
@@ -189,6 +195,7 @@ A `2xx` without a result for each recipient SHALL produce the error `api_error`,
 - **GIVEN** a batch of one recipient
 - **WHEN** the response is `200` with `{"results": [{"message_id": 42, "status": "queued"}]}`
 - **THEN** the recipient is Unconfirmed
+- **AND** its result has no message ID
 
 ### Requirement: Batch refusals
 
@@ -198,6 +205,8 @@ When the batch fails as a whole, the SDK SHALL report the error through "Error c
 - A `409` with `batch_unavailable` SHALL fail every recipient: PostHog sent nothing. Its error SHALL say that batch sends aren't available for the project, and its fix SHALL say to send each recipient on its own with `send`. The fix SHOULD say to send each with the same template, `to`, distinct ID and idempotency key, and the recipient's template data merged over the shared data at the top level, which is the email the batch would have sent.
 - A `409` with any other code, or with no code, SHALL leave every recipient Unconfirmed, with their keys and the same-key advice of "Unconfirmed recipient wording". Only `batch_unavailable` says that a `409` sent nothing.
 - A network error, a timeout or a `5xx`, once the retries are spent, SHALL leave every recipient Unconfirmed.
+
+When the call fails with any recipient Unconfirmed, the error of the call SHALL NOT say that the emails weren't sent or weren't queued. It SHALL say that PostHog didn't confirm them, so they may still go out, and its fix SHALL say to send each Unconfirmed recipient again with the same email and idempotency key, within 24 hours of the first request that used it.
 
 #### Scenario: batch_unavailable fails every recipient
 - **GIVEN** a batch of two recipients
@@ -217,6 +226,14 @@ When the batch fails as a whole, the SDK SHALL report the error through "Error c
 - **WHEN** the response is `409` with a body that isn't JSON
 - **THEN** the SDK reports the error code `api_error`
 - **AND** both recipients are Unconfirmed
+
+#### Scenario: The error of a call with Unconfirmed recipients never says they weren't sent
+- **GIVEN** a batch of two recipients and a maximum of 0 retries
+- **WHEN** the response is `409` with no code
+- **THEN** both recipients are Unconfirmed
+- **AND** the error of the call says PostHog didn't confirm the emails, so they may still go out
+- **AND** the error doesn't say the emails weren't sent or weren't queued
+- **AND** its fix says to send each recipient again with the same email and idempotency key
 
 #### Scenario: A failed check before the request fails every recipient
 - **GIVEN** a client created without a secret key
@@ -272,11 +289,11 @@ When an earlier attempt of the same call got no usable answer, such as a network
 - **AND** the fix says to send each recipient again with the same idempotency key
 
 #### Scenario: batch_unavailable on a retry after a lost answer
-- **GIVEN** a batch with shared template data `{"plan": "pro"}` and two recipients, one with template data `{"name": "Ada"}`
+- **GIVEN** a batch with shared template data `{"plan": "pro", "user": {"name": "there", "tier": "free"}}` and two recipients, one with template data `{"user": {"name": "Ada"}}`
 - **WHEN** the first attempt fails with a `503`, and the retry is answered `409` with code `batch_unavailable`
 - **THEN** both recipients are Unconfirmed
 - **AND** the error says some emails may have gone out
-- **AND** the fix says to send each recipient with `send`, with the same template, `to`, distinct ID and idempotency key, and its template data merged over the shared data, such as `{"plan": "pro", "name": "Ada"}`
+- **AND** the fix says to send each recipient with `send`, with the same template, `to`, distinct ID and idempotency key, and its template data merged over the shared data at the top level, such as `{"plan": "pro", "user": {"name": "Ada"}}`, where the recipient's `user` replaces the shared one whole
 - **AND** the fix doesn't say to send the batch again
 
 ### Requirement: Unconfirmed recipient wording

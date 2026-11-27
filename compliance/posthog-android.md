@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-android](https://github.com/PostHog/posthog-android)
 **Audited commit:** release tag `android-v4.0.3` at commit `1577cfa53665670cd7c09a30abf11dc1d10798ad` ([tag](https://github.com/PostHog/posthog-android/releases/tag/android-v4.0.3)) — audited on 2026-11-24. All 70 rows are scored at this tag — see [4.0.3 re-audit](#403-re-audit-2026-11-24). Earlier runs: 2026-10-19 at `c5e788bd`, and 31 rows on 2026-11-10 at the unreleased 4.0 branch head `aaa23d39` ([PostHog/posthog-android#871](https://github.com/PostHog/posthog-android/pull/871))
 **Audited against sdk-specs commit:** `44fe27a`
-**Summary:** 43 ✅ · 15 🟡 · 1 ❌ · 11 ➖ · 0 ❓ (70 rows; previous 42/16/1/10/0 on 69 rows at `c5e788bd` + `aaa23d39`; 2026-10-19 at `c5e788bd` scored 37/16/5/6/0; previous full audit 2026-08-10 at `8659a7b4` scored 31/16/9/3/0 on 59 rows)
+**Summary:** 42 ✅ · 16 🟡 · 1 ❌ · 11 ➖ · 0 ❓ (70 rows; previous 42/16/1/10/0 on 69 rows at `c5e788bd` + `aaa23d39`; 2026-10-19 at `c5e788bd` scored 37/16/5/6/0; previous full audit 2026-08-10 at `8659a7b4` scored 31/16/9/3/0 on 59 rows)
 
 **Why the 2026-10-19 run:** rotation priority 3 — the pointer was ten weeks old, and android carries the
 mobile reference for Session Replay Debug Properties. It was also the cheapest third slot available:
@@ -262,7 +262,7 @@ complete implementation of that contract outside the browser.
 | 56 | Session Manager | ✅ |  |
 | 57 | Session Replay Debug Properties | 🟡 | [n17]; #992 cleared the main off-state gap; remote-off persistence, the wrapper bridge and #238 queue-depth precedence remain |
 | 58 | Session Replay Ingestion Controls | 🟡 | [n18] |
-| 59 | Session Replay Privacy | ✅ | [n19] |
+| 59 | Session Replay Privacy | 🟡 | [n19]; remote mobile masking open ([#1008](https://github.com/PostHog/posthog-android/pull/1008)) |
 | 60 | Set Group Properties For Flags | ✅ |  |
 | 61 | Set Person Properties | ✅ |  |
 | 62 | Set Person Properties For Flags | ✅ |  |
@@ -799,7 +799,7 @@ re-read at 4.0.3 and still conforms, but their line numbers were not re-pointed.
 
 <a id="n19"></a>
 
-### n19 — Session Replay Privacy (✅ Pass; was 🟡)
+### n19 — Session Replay Privacy (🟡 Partial; was ✅)
 - **Spec requires:** `client`. Mask explicitly masked elements and every match in a subtree, exclude
   no-capture elements and their descendants, redact passwords by default, and redact before queueing
   (`session-replay-privacy/spec.md:111-161`). Explicit unmask beats mask markers and category masks (`:54`,
@@ -817,8 +817,19 @@ re-read at 4.0.3 and still conforms, but their line numbers were not re-pointed.
     (`:2775-2783`). Touches on a secure window are dispatched but not recorded (`:845-859`).
   - **Not scored.** An explicit unmask on a password field leaves it unmasked on both paths; the spec
     doesn't rank unmask against password masking.
-- **Backwards compatibility:** No change needed.
-- **Remediation:** None.
+- **Gap (2026-11-24, sdk-specs change `add-mobile-remote-masking`): remote mobile masking.** The new
+  requirements from "Mobile SDKs read dedicated mobile masking keys" (`openspec/specs/session-replay-privacy/spec.md:290`)
+  onward say the SDK combines `maskAllTextInputs` and `maskAllImages` with
+  `sessionRecording.masking.mobile` so the stricter side wins, applies the cached and live config per
+  frame, and drops frames not yet handed to the upload queue when a flag gets stricter. At `origin/main` `85a681537f` the remote
+  config parser leaves `masking` as a TODO
+  (`posthog/src/main/java/com/posthog/internal/PostHogRemoteConfig.kt:619-621`), so masking comes from
+  local config only. Fix in progress:
+  [#1008](https://github.com/PostHog/posthog-android/pull/1008) (unmerged), which also stamps each frame with a masking generation and drops a stale frame in
+  `PostHogReplayQueue`.
+- **Backwards compatibility:** Backward-compatible. No project has the mobile keys until a project
+  owner turns a toggle on, and the server can only add masking.
+- **Remediation:** Land [#1008](https://github.com/PostHog/posthog-android/pull/1008).
 
 <a id="n20"></a>
 

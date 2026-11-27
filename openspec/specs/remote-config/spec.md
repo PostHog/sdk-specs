@@ -47,7 +47,7 @@ In js-core-based SDKs, remote config is partially intertwined with feature-flag 
 6. **Allow wrapper SDKs to configure and observe an underlying remote-config manager without owning the fetch path.** Flutter forwards remote-config-relevant setup options like `preloadFeatureFlags`, `sendFeatureFlagEvent`, `sessionReplay`, `sessionReplayConfig`, `surveys`, and `errorTrackingConfig` to the native SDKs, and exposes the `Posthog().onFeatureFlags(callback)` listener as its main callback surface rather than a first-class remote-config API.
 7. **Prefer cached values when needed.** On startup, the manager may preload cached remote config into memory so dependent integrations can make early decisions before the network returns.
 8. **Avoid duplicate in-flight loads.** Concurrent remote-config fetches are typically deduplicated or ignored while one is already in progress.
-9. **Clear config on reset or teardown when user-scoped data must be invalidated.** Cached remote-config-derived state may be removed as part of reset/clear flows.
+9. **Clear config on reset or teardown when user-scoped data must be invalidated.** Cached remote-config-derived state may be removed as part of reset/clear flows, except project-scoped replay masking (see session-replay-privacy).
 
 ## State & lifecycle
 
@@ -70,7 +70,7 @@ In js-core-based SDKs, remote config is partially intertwined with feature-flag 
 - Remote config is often preloaded during SDK startup.
 - Cached values may be applied before the first network fetch completes.
 - Fresh network responses replace cached config and may immediately enable/disable integrations.
-- Reset/clear flows remove remote-config-derived caches to avoid stale behavior after identity changes.
+- Reset/clear flows remove remote-config-derived caches to avoid stale behavior after identity changes, except project-scoped replay masking (see session-replay-privacy).
 - Wrapper SDKs may treat remote config as part of setup rather than as an explicit user-facing subsystem. Flutter configures remote-config-relevant options up front and then reacts to underlying feature-flag/config updates through native notifications or browser callbacks.
 
 ## Error handling
@@ -95,7 +95,7 @@ In js-core-based SDKs, remote config is partially intertwined with feature-flag 
 - **error tracking / capture performance** — remote config gates whether those subsystems should run.
 - **wrapper setup surfaces** — Flutter maps Dart config fields onto the native/browser SDKs' remote-config-relevant options and observes resulting updates through `onFeatureFlags` / native notifications.
 - **persistent-storage** — caches remote config and derived config slices across restarts.
-- **reset** — clears remote-config-derived user-scoped caches in audited client SDKs.
+- **reset** — clears remote-config-derived user-scoped caches in audited client SDKs, except project-scoped replay masking (see session-replay-privacy).
 ## Requirements
 ### Requirement: Canonical remote-config behavior
 

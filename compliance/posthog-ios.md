@@ -743,10 +743,20 @@ apply.
   [#966](https://github.com/PostHog/posthog-ios/pull/966) and masking fixes #1097, #1103, #1109,
   #1110, #1115), which is opt-in (`captureMethod = .gpu`; the default is `.standard`,
   `PostHog/Replay/PostHogSessionReplayConfig.swift:95`).
+- **Gap (2026-11-24, sdk-specs change `add-mobile-remote-masking`): remote mobile masking.** The new
+  requirements from "Mobile SDKs read dedicated mobile masking keys" (`openspec/specs/session-replay-privacy/spec.md:290`)
+  onward say the SDK combines `maskAllTextInputs` and `maskAllImages` with
+  `sessionRecording.masking.mobile` so the stricter side wins, applies the cached and live config per
+  frame, drops frames not yet handed to the upload queue when a flag gets stricter, and exposes the resolved flags to wrappers. At
+  `origin/main` `2702ea6364` nothing under `PostHog/` reads a `masking` key, so masking comes from
+  local config only. Fix in progress:
+  [#1124](https://github.com/PostHog/posthog-ios/pull/1124) (unmerged), which also stamps `RRScreenshotFrame.maskingGeneration` and drops a stale frame in
+  `PostHogReplayQueue`.
 - **Backwards compatibility:** The leak fix ships in 4.0's breaking replay change (screenshot-only),
   already called out in the changeset. Letting `postHogNoMask()` win would reveal content apps mask today.
-- **Remediation:** None in the SDK is proposed; revealing more content is not wanted. Either keep the row
-  🟡 or have the spec permit the conservative SwiftUI variant (explicit mask wins).
+- **Remediation:** None in the SDK is proposed for the SwiftUI precedence; revealing more content is not
+  wanted. Either keep the row 🟡 or have the spec permit the conservative SwiftUI variant (explicit mask
+  wins). For remote mobile masking, land [#1124](https://github.com/PostHog/posthog-ios/pull/1124).
 
 <a id="n25"></a>
 

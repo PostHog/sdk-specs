@@ -3,7 +3,7 @@
 **Repo:** [PostHog/posthog-react-native](https://github.com/PostHog/posthog-react-native) (archived; code lives in `packages/react-native` + `packages/react-native-plugin` of the `posthog-js` monorepo)
 **Audited commit:** `3ddaa65402896c91dcb7b04cfe433e0b1d2f3313` ([commit](https://github.com/PostHog/posthog-js/commit/3ddaa65402896c91dcb7b04cfe433e0b1d2f3313)) — audited on 2026-10-19. **Nine rows re-audited on 2026-11-10 for `@posthog/react-native-plugin` 3.0** at `210bf35d8c19a15003d0643999ae63bcc2102fb6` ([commit](https://github.com/PostHog/posthog-js/commit/210bf35d8c19a15003d0643999ae63bcc2102fb6), head of [PostHog/posthog-js#5194](https://github.com/PostHog/posthog-js/pull/5194)) — see [react-native-plugin 3.0](#react-native-plugin-30-re-audit-2026-11-10)
 **Audited against sdk-specs commit:** `c72e367` (2026-10-19 rows); `752f899` plus [#146](https://github.com/PostHog/sdk-specs/pull/146) at `d387ab79`, treated as merged, for the nine plugin 3.0 rows
-**Summary:** 29 ✅ · 28 🟡 · 2 ❌ · 5 ➖ · 0 ❓ (64 rows; 2026-10-19 at `3ddaa654` scored 29/27/3/5/0; previous full audit 2026-08-06 at `e1efa57` scored 31/23/2/2/1 on 59 rows)
+**Summary:** 28 ✅ · 29 🟡 · 2 ❌ · 5 ➖ · 0 ❓ (64 rows; 2026-10-19 at `3ddaa654` scored 29/27/3/5/0; previous full audit 2026-08-06 at `e1efa57` scored 31/23/2/2/1 on 59 rows)
 
 **Repo layout (unchanged, re-confirmed):** `PostHog/posthog-react-native` is archived; the SDK lives at
 `packages/react-native/src` (`PostHog extends PostHogCore`, `posthog-rn.ts`, now 3,345 lines — up from
@@ -174,7 +174,7 @@ on its pre-existing empty-event-name gap.
 | 50 | Session Manager | ✅ | |
 | 51 | Session Replay Debug Properties | 🟡 | [n24] |
 | 52 | Session Replay Ingestion Controls | 🟡 | [n25] |
-| 53 | Session Replay Privacy | ✅ | [n26] |
+| 53 | Session Replay Privacy | 🟡 | [n26]; remote mobile masking needs a native release and raised pins |
 | 54 | Set Group Properties For Flags | ✅ | |
 | 55 | Set Person Properties | ✅ | |
 | 56 | Set Person Properties For Flags | ✅ | |
@@ -346,11 +346,19 @@ on its pre-existing empty-event-name gap.
 - **Backwards compatibility:** Backward-compatible — following the current project rate is what an app without a local rate already expects.
 - **Remediation:** Pass native only the app's local rate and let native read the project rate from its own remote config, or re-send the rate when remote config changes.
 
-### n26 — Session Replay Privacy (✅ Pass; was 🟡)
+### n26 — Session Replay Privacy (🟡 Partial; was ✅)
 - **Spec requires:** Mask text inputs, images, and sandboxed/secure views by default; honour `ph-no-capture` containers including their children; explicit unmask markers take precedence over explicit mask markers where an SDK offers both.
 - **SDK currently (plugin 3.0, `210bf35d8`):** RN passes `maskAllTextInputs`, `maskAllImages` and `maskAllSandboxedViews`, all defaulting to `true`, and the plugin copies them onto the native config (`packages/react-native-plugin/ios/PosthogReactNativePlugin.swift:389-396`, `PosthogReactNativePluginModule.kt:166-177`). `PostHogMaskView` sets `accessibilityLabel="ph-no-capture"` (`packages/react-native/src/PostHogMaskView.tsx:42`). The 2026-10-19 🟡 came from posthog-ios's default wireframe mode recording the children of a `ph-no-capture` container. posthog-ios 4.0 and posthog-android 4.0 record masked screenshots only, so that path is gone. Both mask a `ph-no-capture` view and everything inside it: posthog-ios passes `maskChildren || view.isNoCapture()` down the walk (posthog-ios `e27cbe4cb` `PostHog/Replay/PostHogReplayIntegration.swift:917`, `:1077`), and posthog-android uses `insideNoCapture` (posthog-android `aaa23d39` `PostHogReplayIntegration.kt:1603-1606`, `:2875-2878`). An unmask marker winning or losing against a mask marker can't arise here, because RN has no unmask marker.
-- **Backwards compatibility:** No change needed.
-- **Remediation:** None.
+- **Gap (2026-11-24, sdk-specs change `add-mobile-remote-masking`): remote mobile masking.** The
+  requirement "Wrapper SDKs get the resolved flags from native" (`openspec/specs/session-replay-privacy/spec.md:532`)
+  says React Native keeps passing its local flags and the native SDK combines them with
+  `sessionRecording.masking.mobile`. The plugin already passes both flags at `origin/main` `f05a993f9d`
+  (`packages/react-native-plugin/android/src/main/java/com/posthogreactnativeplugin/PosthogReactNativePluginModule.kt:189-190,209-210`,
+  `packages/react-native-plugin/ios/PosthogReactNativePlugin.swift:413-417`). No native release
+  resolves remote masking yet: posthog-android and posthog-ios have it in unmerged
+  [PostHog/posthog-android#1008](https://github.com/PostHog/posthog-android/pull/1008) and [PostHog/posthog-ios#1124](https://github.com/PostHog/posthog-ios/pull/1124).
+- **Backwards compatibility:** Backward-compatible; no JS API change.
+- **Remediation:** After the native release, raise the plugin's native version pins to it.
 
 ### n27 — Setup (🟡 Partial)
 - **Spec requires:** `openspec/specs/setup/spec.md:163` and `:179` — the configuration option carrying the project token SHALL be named `projectToken` (platform-cased). An SDK still naming it `apiKey` SHALL **add `projectToken` and keep `apiKey` as a deprecated alias in the same release**, so the rename needs no major version; where a surface accepts both at once, `projectToken` SHALL win. The spec names React Native's `PostHogProvider` `apiKey` prop explicitly as one of two client SDKs that have not adopted it.

@@ -48,3 +48,23 @@ Feature: Register
       | plan     | pro   |
     Then the enqueued event property "plan" should equal "pro"
     And registered property "plan" should equal "free"
+
+  Scenario: Runtime register, unregister, and reset mutate setup-seeded super properties
+    Given setup is called with token "test-token" and super properties:
+      | property    | value      |
+      | environment | production |
+      | plan        | free       |
+      | campaign    | launch     |
+    When register is called with properties:
+      | property | value |
+      | plan     | pro   |
+    And unregister is called for property "campaign"
+    And capture is called with event "After Mutation"
+    Then the enqueued "After Mutation" event properties should include:
+      | property    | value      |
+      | environment | production |
+      | plan        | pro        |
+    And the enqueued "After Mutation" event should omit property "campaign"
+    When reset is called
+    And capture is called with event "After Reset"
+    Then the enqueued "After Reset" event should omit properties "environment" and "plan"

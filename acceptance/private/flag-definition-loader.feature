@@ -328,24 +328,3 @@ Feature: Flag Definition Loader
     Then the local evaluation result should be true
     And no direct flag definition API request should be sent
     And no remote feature flag evaluation request should have been sent
-
-  # The version 2 feed on a poll that sends a conditional request
-  # (flag-rules-v2-local-evaluation). A poll without v=2 would get the legacy feed, which
-  # leaves "layout-preview" out.
-
-  @requires:feature_flags_local_evaluation_v2
-  Scenario: A poll with a conditional request keeps asking for the version 2 feed
-    Given the SDK is initialized with token "test-token" and local evaluation enabled
-    And the SDK supports conditional flag definition requests
-    And the flag definition polling interval is "30 seconds"
-    And the mock server will return v=2 flag definitions with config version 1 flag "legacy-banner" and config version 2 flag "layout-preview", with ETag "current"
-    When the flag definition loader refreshes
-    Then local feature flag definitions should include flag "layout-preview"
-    Given the mock server will return status 304 with ETag "current" and no definition body
-    When the SDK clock advances by "30 seconds"
-    Then the flag definition loader should request fresh definitions
-    And the definition request should include If-None-Match "current"
-    And every flag definitions request query parameter "v" should equal "2"
-    When local feature flag "layout-preview" is evaluated with person property "plan" equal to "pro"
-    Then the local evaluation result should be true
-    And no remote feature flag evaluation request should have been sent

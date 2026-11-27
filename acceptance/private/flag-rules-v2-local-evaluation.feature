@@ -6,16 +6,19 @@ Feature: Local evaluation of config version 2 flags
   off. Local results send the config version 2 events with locally_evaluated true.
 
   # The mixed feed is fixtures/wire/definitions_feed.json of the rules v2 contract
-  # (contract 10.1.0, posthog-sdk-test-harness 1.36.0), read with its context: distinct id
+  # (contract 10.2.0, posthog-sdk-test-harness 1.37.0), read with its context: distinct id
   # "person-example" and person properties {"plan": "pro"}. The "example-display-key"
   # documents come from corpus/v2_local_evaluation.json of the same contract.
   #
-  # Four steps need harness bindings that the local evaluation suite adds:
+  # Six steps need harness bindings that the local evaluation suite adds
+  # (posthog-sdk-test-harness#123):
   # - "the definitions service serves this typed document for v=2 requests:" serves its
   #   document to a definitions request with exactly one v parameter, equal to 2. Every
   #   other definitions request gets the document of "the definitions service serves
   #   this typed document:", and so does a v=2 request when no v=2 document is set, as
-  #   the flags service does for a project without config version 2 flags.
+  #   the flags service does for a project without config version 2 flags. In both steps
+  #   an optional "etag" next to "definitions" is the ETag of that document: a definitions
+  #   request whose If-None-Match matches it gets 304 with no body.
   # - "the SDK is initialized for native local evaluation with remote fallback and JSON
   #   arguments:" initializes the SDK as "the SDK is initialized for native local
   #   evaluation with JSON arguments:" does, but allows /flags requests. The native step
@@ -24,6 +27,12 @@ Feature: Local evaluation of config version 2 flags
   #   themselves.
   # - "every flag definitions request query parameter "v" should equal "2"".
   # - "no received event named "<name>" should have property "<property>"".
+  # - "local definitions are publicly reloaded within 5000 milliseconds and the
+  #   definitions service answers 304" reloads as "local definitions are publicly
+  #   reloaded within 5000 milliseconds" does, but every definitions request of the
+  #   reload must get 304.
+  # - "the definition request should include If-None-Match "<etag>"" checks the latest
+  #   definitions request.
 
   Background:
     Given an isolated SDK with empty persistent storage
@@ -60,7 +69,9 @@ Feature: Local evaluation of config version 2 flags
           {"id":309,"name":"Unknown rule field after a rule that matches","key":"future-rule-field","filters":{"version":2,"return_type":"string","default_value":"standard","rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"targeted_release","targeting":{"properties":[]},"value":"compact"},{"id":"22222222-2222-4222-8222-222222222222","rule_type":"percentage_rollout","targeting":{"properties":[]},"value":"short","rollout_percentage":100,"on_rollout_miss":"return_default","assignment_algorithm":"sha1_60_v1","seed":"future-rule-field-rollout","assign_by":"person","schedule":{"starts_at":"2030-01-01"}}]},"deleted":false,"active":true,"ensure_experience_continuity":false,"version":1,"evaluation_runtime":"all","bucketing_identifier":"distinct_id","evaluation_contexts":[],"has_experiment":false},
           {"id":310,"name":"Offer for the paying cohort","key":"legacy-cohort-offer","filters":{"groups":[{"properties":[{"key":"id","type":"cohort","value":41}],"rollout_percentage":100}]},"deleted":false,"active":true,"ensure_experience_continuity":false,"version":6,"evaluation_runtime":"all","bucketing_identifier":"distinct_id","evaluation_contexts":[],"has_experiment":false},
           {"id":311,"name":"Search ranking model","key":"search-ranking","filters":{"version":2,"return_type":"object","default_value":{"model":"baseline"},"rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"targeted_release","targeting":{"properties":[{"key":"plan","type":"person","operator":"exact","value":["pro","enterprise"],"negation":false}]},"value":{"model":"semantic","boost":1.5}}]},"deleted":false,"active":true,"ensure_experience_continuity":false,"version":8,"evaluation_runtime":"all","bucketing_identifier":"distinct_id","evaluation_contexts":[],"has_experiment":false},
-          {"id":312,"name":"Seasonal theme","key":"seasonal-theme","filters":{"version":2,"return_type":"string","default_value":"plain","rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"targeted_release","targeting":{"properties":[]},"value":"winter"}]},"deleted":false,"active":false,"ensure_experience_continuity":false,"version":4,"evaluation_runtime":"all","bucketing_identifier":"distinct_id","evaluation_contexts":[],"has_experiment":false}
+          {"id":312,"name":"Seasonal theme","key":"seasonal-theme","filters":{"version":2,"return_type":"string","default_value":"plain","rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"targeted_release","targeting":{"properties":[]},"value":"winter"}]},"deleted":false,"active":false,"ensure_experience_continuity":false,"version":4,"evaluation_runtime":"all","bucketing_identifier":"distinct_id","evaluation_contexts":[],"has_experiment":false},
+          {"id":313,"name":"Retired banner with an unknown rule type","key":"retired-future-rule-type","filters":{"version":2,"return_type":"boolean","default_value":true,"rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"scheduled_release","targeting":{"properties":[]},"value":true}]},"deleted":false,"active":false,"ensure_experience_continuity":false,"version":3,"evaluation_runtime":"all","bucketing_identifier":"distinct_id","evaluation_contexts":[],"has_experiment":false},
+          {"id":314,"name":"Unknown entry field","key":"future-entry-field","filters":{"version":2,"return_type":"boolean","default_value":false,"rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"targeted_release","targeting":{"properties":[]},"value":true}]},"deleted":false,"active":true,"ensure_experience_continuity":false,"version":1,"evaluation_runtime":"all","bucketing_identifier":"distinct_id","evaluation_contexts":[],"has_experiment":false,"tags":["checkout"]}
         ],
         "group_type_mapping": {"0":"workspace"},
         "cohorts": {"41":{"type":"OR","values":[{"type":"AND","values":[{"key":"plan","type":"person","operator":"exact","value":["pro"]}]}]}},
@@ -115,7 +126,54 @@ Feature: Local evaluation of config version 2 flags
     And every flag definitions request query parameter "v" should equal "2"
     And no remote flag evaluation path should have been requested
 
-  # Inactive flags: corpus/v2_local_evaluation.json, family "flag_disabled"
+  Scenario: A poll with a conditional request keeps asking for the version 2 feed
+    A reload that left out v=2 would send the ETag of the version 2 feed to the legacy
+    feed, get the legacy body, and lose "layout-preview".
+
+    Given the definitions service serves this typed document:
+      """application/json
+      {"definitions": {
+        "flags": [
+          {"id":301,"name":"Banner for every person","key":"legacy-banner","filters":{"groups":[{"properties":[],"rollout_percentage":100}]},"deleted":false,"active":true,"ensure_experience_continuity":false,"version":4,"evaluation_runtime":"all","bucketing_identifier":"distinct_id","evaluation_contexts":[],"has_experiment":false}
+        ],
+        "group_type_mapping": {},
+        "cohorts": {}
+      },
+      "etag": "definitions-legacy"}
+      """
+    And the definitions service serves this typed document for v=2 requests:
+      """application/json
+      {"definitions": {
+        "flags": [
+          {"id":301,"name":"Banner for every person","key":"legacy-banner","filters":{"groups":[{"properties":[],"rollout_percentage":100}]},"deleted":false,"active":true,"ensure_experience_continuity":false,"version":4,"evaluation_runtime":"all","bucketing_identifier":"distinct_id","evaluation_contexts":[],"has_experiment":false},
+          {"id":302,"name":"Layout preview for paying plans","key":"layout-preview","filters":{"version":2,"return_type":"boolean","default_value":false,"rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"targeted_release","targeting":{"properties":[{"key":"plan","type":"person","operator":"exact","value":["pro"],"negation":false,"label":"Plan"}]},"description":"Preview for paying plans.","metadata":{"display_color":"blue"},"value":true}]},"deleted":false,"active":true,"ensure_experience_continuity":false,"version":7,"evaluation_runtime":"all","bucketing_identifier":"distinct_id","evaluation_contexts":[],"has_experiment":false}
+        ],
+        "group_type_mapping": {},
+        "cohorts": {}
+      },
+      "etag": "definitions-v2"}
+      """
+    And the SDK is initialized for native local evaluation with JSON arguments:
+      """application/json
+      {"project_token":"phc_test_key","config":{"secret_key":"phx_test_key"}}
+      """
+    When the local flag getter is called with JSON arguments:
+      """application/json
+      {"key":"layout-preview","distinct_id":"person-example","person_properties":{"plan":"pro"}}
+      """
+    Then the local flag getter should return JSON true
+    When local definitions are publicly reloaded within 5000 milliseconds and the definitions service answers 304
+    Then the definition request should include If-None-Match "definitions-v2"
+    And every flag definitions request query parameter "v" should equal "2"
+    When the local flag getter is called with JSON arguments:
+      """application/json
+      {"key":"layout-preview","distinct_id":"person-example","person_properties":{"plan":"pro"}}
+      """
+    Then the local flag getter should return JSON true
+    And no remote flag evaluation path should have been requested
+
+  # Inactive flags: corpus/v2_local_evaluation.json, family "flag_disabled", and the document
+  # of the feed entry "retired-future-rule-type" (fixtures/wire/definitions_feed.json)
 
   @case:<case_id>
   Scenario Outline: An inactive flag is off whatever its document says
@@ -134,7 +192,7 @@ Feature: Local evaluation of config version 2 flags
     Then the local flag getter should return JSON false
     And no remote flag evaluation path should have been requested
 
-    Examples: The contract's flag_disabled cases
+    Examples: The contract's inactive flags
       | case_id                         | config                                                                                                                                                                                                                                                                                                                                                                                                                                         |
       | inactive-boolean                | {"version":2,"return_type":"boolean","default_value":true,"rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"targeted_release","targeting":{"properties":[]},"value":true}]}                                                                                                                                                                                                                                                   |
       | inactive-string                 | {"version":2,"return_type":"string","default_value":"standard","rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"targeted_release","targeting":{"properties":[]},"value":"compact"}]}                                                                                                                                                                                                                                         |
@@ -142,10 +200,7 @@ Feature: Local evaluation of config version 2 flags
       | inactive-object                 | {"version":2,"return_type":"object","default_value":{"columns":2},"rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"targeted_release","targeting":{"properties":[]},"value":{"columns":3,"dense":true}}]}                                                                                                                                                                                                                     |
       | inactive-experiment             | {"version":2,"return_type":"string","default_value":"standard","rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"experiment","targeting":{"properties":[]},"paused":false,"rollout_percentage":100,"on_rollout_miss":"continue","assignment_algorithm":"sha1_60_v1","seed":"example-split","assign_by":"person","variants":[{"key":"control","weight":50,"value":"standard"},{"key":"test","weight":50,"value":"compact"}]}]} |
       | inactive-before-missing-context | {"version":2,"return_type":"boolean","default_value":true,"rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"targeted_release","targeting":{"properties":[{"key":"color","type":"person","operator":"exact","value":["blue"],"negation":false}]},"value":true}]}                                                                                                                                                               |
-
-    Examples: An unsupported document, which the contract does not pin yet
-      | case_id                       | config                                                                                                                                                                                        |
-      | inactive-unsupported-document | {"version":2,"return_type":"boolean","default_value":true,"rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"scheduled_release","targeting":{"properties":[]},"value":true}]} |
+      | inactive-unsupported-document   | {"version":2,"return_type":"boolean","default_value":true,"rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"scheduled_release","targeting":{"properties":[]},"value":true}]}                                                                                                                                                                                                                                                  |
 
   # Dates
 
@@ -387,7 +442,9 @@ Feature: Local evaluation of config version 2 flags
             {"id":309,"name":"Unknown rule field after a rule that matches","key":"future-rule-field","filters":{"version":2,"return_type":"string","default_value":"standard","rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"targeted_release","targeting":{"properties":[]},"value":"compact"},{"id":"22222222-2222-4222-8222-222222222222","rule_type":"percentage_rollout","targeting":{"properties":[]},"value":"short","rollout_percentage":100,"on_rollout_miss":"return_default","assignment_algorithm":"sha1_60_v1","seed":"future-rule-field-rollout","assign_by":"person","schedule":{"starts_at":"2030-01-01"}}]},"deleted":false,"active":true,"ensure_experience_continuity":false,"version":1,"evaluation_runtime":"all","bucketing_identifier":"distinct_id","evaluation_contexts":[],"has_experiment":false},
             {"id":310,"name":"Offer for the paying cohort","key":"legacy-cohort-offer","filters":{"groups":[{"properties":[{"key":"id","type":"cohort","value":41}],"rollout_percentage":100}]},"deleted":false,"active":true,"ensure_experience_continuity":false,"version":6,"evaluation_runtime":"all","bucketing_identifier":"distinct_id","evaluation_contexts":[],"has_experiment":false},
             {"id":311,"name":"Search ranking model","key":"search-ranking","filters":{"version":2,"return_type":"object","default_value":{"model":"baseline"},"rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"targeted_release","targeting":{"properties":[{"key":"plan","type":"person","operator":"exact","value":["pro","enterprise"],"negation":false}]},"value":{"model":"semantic","boost":1.5}}]},"deleted":false,"active":true,"ensure_experience_continuity":false,"version":8,"evaluation_runtime":"all","bucketing_identifier":"distinct_id","evaluation_contexts":[],"has_experiment":false},
-            {"id":312,"name":"Seasonal theme","key":"seasonal-theme","filters":{"version":2,"return_type":"string","default_value":"plain","rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"targeted_release","targeting":{"properties":[]},"value":"winter"}]},"deleted":false,"active":false,"ensure_experience_continuity":false,"version":4,"evaluation_runtime":"all","bucketing_identifier":"distinct_id","evaluation_contexts":[],"has_experiment":false}
+            {"id":312,"name":"Seasonal theme","key":"seasonal-theme","filters":{"version":2,"return_type":"string","default_value":"plain","rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"targeted_release","targeting":{"properties":[]},"value":"winter"}]},"deleted":false,"active":false,"ensure_experience_continuity":false,"version":4,"evaluation_runtime":"all","bucketing_identifier":"distinct_id","evaluation_contexts":[],"has_experiment":false},
+            {"id":313,"name":"Retired banner with an unknown rule type","key":"retired-future-rule-type","filters":{"version":2,"return_type":"boolean","default_value":true,"rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"scheduled_release","targeting":{"properties":[]},"value":true}]},"deleted":false,"active":false,"ensure_experience_continuity":false,"version":3,"evaluation_runtime":"all","bucketing_identifier":"distinct_id","evaluation_contexts":[],"has_experiment":false},
+            {"id":314,"name":"Unknown entry field","key":"future-entry-field","filters":{"version":2,"return_type":"boolean","default_value":false,"rules":[{"id":"11111111-1111-4111-8111-111111111111","rule_type":"targeted_release","targeting":{"properties":[]},"value":true}]},"deleted":false,"active":true,"ensure_experience_continuity":false,"version":1,"evaluation_runtime":"all","bucketing_identifier":"distinct_id","evaluation_contexts":[],"has_experiment":false,"tags":["checkout"]}
           ],
           "group_type_mapping": {"0":"workspace"},
           "cohorts": {"41":{"type":"OR","values":[{"type":"AND","values":[{"key":"plan","type":"person","operator":"exact","value":["pro"]}]}]}},
@@ -412,14 +469,29 @@ Feature: Local evaluation of config version 2 flags
       And no remote flag evaluation path should have been requested
 
       Examples:
-        | case_id               | key                   | legacy_value |
-        | mixed-v1-active       | legacy-banner         | true         |
-        | mixed-v1-inactive     | legacy-retired-banner | false        |
-        | mixed-v2-boolean      | layout-preview        | true         |
-        | mixed-v2-string       | checkout-copy         | "short"      |
-        | mixed-v2-number-split | results-per-page      | true         |
-        | mixed-v2-object       | search-ranking        | true         |
-        | mixed-v2-inactive     | seasonal-theme        | false        |
+        | case_id                       | key                      | legacy_value |
+        | mixed-v1-active               | legacy-banner            | true         |
+        | mixed-v1-inactive             | legacy-retired-banner    | false        |
+        | mixed-v2-boolean              | layout-preview           | true         |
+        | mixed-v2-string               | checkout-copy            | "short"      |
+        | mixed-v2-number-split         | results-per-page         | true         |
+        | mixed-v2-object               | search-ranking           | true         |
+        | mixed-v2-inactive             | seasonal-theme           | false        |
+        | mixed-v2-inactive-unsupported | retired-future-rule-type | false        |
+        | mixed-v2-unknown-entry-field  | future-entry-field       | true         |
+
+    Scenario: An entry field outside filters that the contract does not define is ignored
+      "future-entry-field" has the entry field "tags". In local-only mode it still has a value.
+
+      When evaluate flags and read is called with JSON arguments:
+        """application/json
+        {"distinct_id":"person-example","options":{"only_evaluate_locally":true,"person_properties":{"plan":"pro"}},"reads":[{"method":"get_flag","key":"future-entry-field"}]}
+        """
+      Then the public snapshot outcomes should have these semantics:
+        """application/json
+        {"results":[{"value":true}]}
+        """
+      And no remote flag evaluation path should have been requested
 
     Scenario: Number and object values are the payload of the legacy rendering
       When evaluate flags and read is called with JSON arguments:
@@ -573,3 +645,56 @@ Feature: Local evaluation of config version 2 flags
       And a received event named "$experiment_exposure" should have property "$feature_flag_response" equal to JSON true
       And a received event named "$feature_flag_called" should have property "$feature_flag_variant_key" equal to JSON "control"
       And no remote flag evaluation path should have been requested
+
+  Rule: A locally evaluated experiment split sends one exposure
+
+    The config version 2 definition of "checkout-flow" assigns distinct id "user-123" the
+    variant "test" (value true) when person property "plan" is "pro". Without "plan", local
+    evaluation cannot decide the rule and the SDK asks /flags.
+
+    Background:
+      Given the definitions service serves this typed document for v=2 requests:
+        """application/json
+        {"definitions":{"flags":[{"id":501,"key":"checkout-flow","active":true,"version":3,"has_experiment":true,"filters":{"version":2,"return_type":"boolean","default_value":false,"rules":[{"id":"3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13","rule_type":"experiment","targeting":{"properties":[{"key":"plan","type":"person","operator":"exact","value":["pro"],"negation":false}]},"paused":false,"rollout_percentage":100,"on_rollout_miss":"continue","assignment_algorithm":"sha1_60_v1","seed":"checkout-flow-test","assign_by":"person","variants":[{"key":"control","weight":50,"value":false},{"key":"test","weight":50,"value":true}]}]}}],"group_type_mapping":{},"cohorts":{}}}
+        """
+
+    @experiment_exposure
+    Scenario: A locally evaluated split is exposed
+      Given the SDK is initialized for native local evaluation with JSON arguments:
+        """application/json
+        {"project_token":"phc_test_key","config":{"secret_key":"phx_test_key"}}
+        """
+      When the local flag getter is called with JSON arguments:
+        """application/json
+        {"key":"checkout-flow","distinct_id":"user-123","person_properties":{"plan":"pro"}}
+        """
+      Then the local flag getter should return JSON true
+      When pending captures are flushed
+      Then exactly 1 received events should be named "$experiment_exposure"
+      And a received event named "$experiment_exposure" should have property "locally_evaluated" equal to JSON true
+      And a received event named "$experiment_exposure" should have property "$feature_flag_variant_key" equal to JSON "test"
+      And a received event named "$experiment_exposure" should have property "$feature_flag_rule_id" equal to JSON "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13"
+      And no remote flag evaluation path should have been requested
+
+    @experiment_exposure
+    Scenario: A remote result after the same local assignment is not a second exposure
+      Given the mock serves this /flags response body:
+        """application/json
+        {"errorsWhileComputingFlags":false,"flags":{"checkout-flow":{"key":"checkout-flow","value":true,"reason":{"code":"experiment_split","condition_index":0},"metadata":{"id":501,"version":3,"config_version":2,"has_experiment":true,"payload":null,"rule_type":"experiment","rule_id":"3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13","variant_key":"test"}}},"requestId":"9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d","evaluatedAt":1800000000000}
+        """
+      And the SDK is initialized for native local evaluation with remote fallback and JSON arguments:
+        """application/json
+        {"project_token":"phc_test_key","config":{"secret_key":"phx_test_key"}}
+        """
+      When the local flag getter is called with JSON arguments:
+        """application/json
+        {"key":"checkout-flow","distinct_id":"user-123","person_properties":{"plan":"pro"}}
+        """
+      And get feature flag is called with JSON arguments:
+        """application/json
+        {"key":"checkout-flow","distinct_id":"user-123"}
+        """
+      And pending captures are flushed
+      Then exactly 1 requests containing /flags should have been received
+      And exactly 1 received events should be named "$experiment_exposure"
+      And a received event named "$experiment_exposure" should have property "locally_evaluated" equal to JSON true

@@ -11,13 +11,13 @@ The flags service is adding a second feed for exactly `v=2` ([PostHog/posthog#13
 - For a project without config version 2 flags the service answers `v=2` from the legacy entry, so the body and ETag are the ones the SDK gets today.
 - Every other `v`, a repeated `v` and no `v` keep the legacy feed. A service without the change ignores `v`.
 
-The public rules v2 contract (`contracts/feature_flag_rules_v2` in posthog-sdk-test-harness) defines what an evaluator does. This change reads contract 10.1.0 as released in [posthog-sdk-test-harness 1.36.0](https://github.com/PostHog/posthog-sdk-test-harness/releases/tag/1.36.0). Harness 1.35.0 also reports contract 10.1.0 but lacks the local evaluation files, so the harness release is the reference.
+The public rules v2 contract (`contracts/feature_flag_rules_v2` in posthog-sdk-test-harness) defines what an evaluator does. This change reads contract 10.2.0 as released in [posthog-sdk-test-harness 1.37.0](https://github.com/PostHog/posthog-sdk-test-harness/releases/tag/1.37.0). Harness 1.35.0 and 1.36.0 both report contract 10.1.0 with different files, so the harness release is the reference.
 
 - The config schema, the literal registry and its version rule, the boolean (135 cases), value (49) and experiment (73) corpora, and the hash vectors.
-- Added by [posthog-sdk-test-harness#111](https://github.com/PostHog/posthog-sdk-test-harness/pull/111) in harness 1.36.0:
+- Added by [posthog-sdk-test-harness#111](https://github.com/PostHog/posthog-sdk-test-harness/pull/111) in harness 1.36.0, and by [posthog-sdk-test-harness#122](https://github.com/PostHog/posthog-sdk-test-harness/pull/122) in harness 1.37.0:
   - `rules/local_outcomes.json` maps each case's expected status to a local outcome (`conclusive`, `inconclusive` with an unresolved reason, or `not_applicable`).
   - `corpus/v2_local_evaluation.json` adds six `flag_disabled` cases and two ordered missing-context cases.
-  - `fixtures/wire/definitions_feed.json` is one whole feed of twelve entries with the outcome of each.
+  - `fixtures/wire/definitions_feed.json` is one whole feed of fourteen entries with the outcome of each. #122 adds the last two: an inactive entry with an unsupported document, and an entry with an unknown field outside `filters`.
 
 This change turns the contract into SDK behavior: when to ask for the feed, what to do with each entry and each outcome, what the local record looks like, and how it reaches the getters, snapshots and events. The acceptance feature reuses the contract's fixture and cases, so a reviewer can check each expectation against the contract.
 
@@ -36,7 +36,7 @@ The existing specs this change builds on:
 - A local result for a config version 2 flag equals the flags service's result for the same inputs, or there is no local result.
 - Nothing changes for config version 1 flags, for SDKs that do not ask for the new feed, or for projects without config version 2 flags.
 - A fleet of mixed SDK releases on one shared definition cache stays safe.
-- A local evaluation feature and experiment exposure scenarios that the harness can run once it binds four new steps.
+- A local evaluation feature, with the experiment exposure scenarios for a local split, that the harness can run once it binds the new steps.
 
 **Non-Goals:**
 
@@ -117,7 +117,7 @@ The reason is the cause that ended the evaluation. The SDK never substitutes `fa
 - `null` renders as `false` in the legacy getters, which is what an inactive config version 1 flag returns locally. A typed read gets the caller's default, as for a flag the flags service leaves out.
 - An inactive flag is off whatever its document says. The flags service omits it, so a fallback cannot return a value for it, and both reference SDKs check `active` before anything else today.
 
-Contract 10.1.0 pins `flag_disabled` with `null` for supported documents. It does not pin the unsupported case; task 2.3 adds it.
+Contract 10.2.0 pins both: the `flag_disabled` cases for supported documents, and the feed entry `retired-future-rule-type` for an unsupported one.
 
 **Alternatives.** `false` for every return type: a typed string read would then report a type mismatch. The flag's default value: an inactive flag with default `true` would be on.
 
@@ -157,15 +157,17 @@ Contract 10.1.0 pins `flag_disabled` with `null` for supported documents. It doe
 
 **Choice.** The closed parser covers `filters`. An unknown top-level field, or an unknown entry field outside `filters`, is ignored.
 
-**Why.** Entry fields outside `filters` describe the row, not its rules. Rejecting a flag for one would turn a harmless addition on the server into a fallback in every released SDK. Contract 10.1.0 does not pin this. Its definitions entry schema is closed, but that schema checks what the flags service sends, not what a reader does with it. Task 2.3 adds a feed entry.
+**Why.** Entry fields outside `filters` describe the row, not its rules. Rejecting a flag for one would turn a harmless addition on the server into a fallback in every released SDK. Contract 10.2.0 pins this with the feed entry `future-entry-field`. Its definitions entry schema stays closed, because that schema checks what the flags service sends, not what a reader does with it.
 
 ## Acceptance features
 
-`acceptance/private/flag-rules-v2-local-evaluation.feature` is black-box: it serves typed definitions, calls public getters and evaluated snapshots, flushes, and checks received events and `/flags` traffic. Most of its steps are bound today. It needs four new bindings, which the harness's local evaluation suite adds; the feature's header comment names each step and what it does. One is a local evaluation setup that allows `/flags` requests: the harness's native local evaluation setup fails a scenario that sends one, and the fallback scenarios must.
+`acceptance/private/flag-rules-v2-local-evaluation.feature` is black-box: it serves typed definitions, calls public getters and evaluated snapshots, flushes, and checks received events and `/flags` traffic. Most of its steps are bound today. It needs six new bindings, which the harness's local evaluation suite adds ([posthog-sdk-test-harness#123](https://github.com/PostHog/posthog-sdk-test-harness/pull/123)); the feature's header comment names each step and what it does. One is a local evaluation setup that allows `/flags` requests: the harness's native local evaluation setup fails a scenario that sends one, and the fallback scenarios must.
 
 The scenarios keep the legacy `@server` tag and add `@requires:feature_flags_local_evaluation_v2`. They move to `@sdk:server` once the steps are bound and a real SDK adapter passes them.
 
-The shared-cache scenarios and the poll with a conditional request in `flag-definition-loader.feature` use that feature's own phrasing. The harness cannot run any scenario of that feature yet, because most of its steps are unbound, so these scenarios also wait for those bindings.
+The feature also holds the poll with a conditional request, and the two `experiment-exposure` scenarios for a locally evaluated split, in a Rule: `experiment-exposure.feature`'s Background needs fixture controls that no black-box adapter offers.
+
+The shared-cache scenarios in `flag-definition-loader.feature` use that feature's own phrasing. The harness cannot run any scenario of that feature yet, because most of its steps are unbound, so these scenarios also wait for those bindings.
 
 ## Risks / Trade-offs
 
@@ -178,15 +180,14 @@ The shared-cache scenarios and the poll with a conditional request in `flag-defi
 ## Migration Plan
 
 1. Review this change and settle the decisions, above all the two names.
-2. Done: contract 10.1.0 shipped in harness 1.36.0 with posthog-sdk-test-harness#111, and this change points at it. A later contract release pins decisions 6 and 11 (task 2.3).
-3. The harness binds the four steps and adds the suite behind `feature_flags_local_evaluation_v2`.
+2. Done: contract 10.1.0 shipped in harness 1.36.0 with posthog-sdk-test-harness#111, and contract 10.2.0, which pins decisions 6 and 11, in harness 1.37.0 with posthog-sdk-test-harness#122. This change points at 1.37.0.
+3. The harness binds the steps and adds the suite behind `feature_flags_local_evaluation_v2` (posthog-sdk-test-harness#123).
 4. Apply and archive this change in this PR, as the repository requires.
 5. SDKs implement in three releases: the evaluator with the in-process replay, which nothing calls; the dispatch and the cache field, inert because no config version 2 document arrives yet; then the `v=2` request and the capability. posthog-python first, then posthog-node.
 6. Rollback of an SDK release: restore the unversioned request.
 
 ## Open Questions
 
-- When the contract pins decisions 6 and 11 (task 2.3).
 - A config version 1 flag that depends on a config version 2 flag (decision 2): unsupported locally here. Should it instead evaluate the target once the contract has cases for it?
 - The project's timezone in the feed (decision 8): when to add it.
 - Known-absent keys (decision 4): they fall back here. Should a listed key instead be read as absent, as the contract's complete-map cases read a missing key, once the contract has cases for it?

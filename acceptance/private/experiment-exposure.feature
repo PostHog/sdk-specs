@@ -265,17 +265,6 @@ Feature: Experiment Exposure
     Then exactly one event named "$feature_flag_called" should be enqueued for flag "checkout-flow"
     And exactly one event named "$experiment_exposure" should be enqueued for flag "checkout-flow"
 
-  @server @v2_local_evaluation_capable
-  Scenario: A remote result after the same local assignment is not a second exposure
-    Given the SDK is initialized with token "test-token"
-    And local feature flag definitions resolve "checkout-flow" for distinct id "user-123" as a complete experiment split with value true, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
-    When get feature flag "checkout-flow" is called for distinct id "user-123"
-    And the local definitions for "checkout-flow" can no longer resolve distinct id "user-123"
-    And the flags response for distinct id "user-123" has request id "9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d" and a complete experiment split for "checkout-flow" with value true, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
-    And get feature flag "checkout-flow" is called for distinct id "user-123"
-    Then exactly one event named "$experiment_exposure" should be enqueued for flag "checkout-flow"
-    And the enqueued "$experiment_exposure" event property "locally_evaluated" should equal "true"
-
   Scenario: A flags reload does not repeat an exposure
     Given the SDK is initialized with token "test-token"
     And the flags response for distinct id "user-123" has a complete experiment split for "checkout-flow" with value true, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
@@ -401,17 +390,9 @@ Feature: Experiment Exposure
 
   # Local evaluation
 
-  @server @v2_local_evaluation_capable
-  Scenario: A locally evaluated split is exposed
-    Given the SDK is initialized with token "test-token"
-    And local feature flag definitions resolve "checkout-flow" for distinct id "user-123" as a complete experiment split with value true, rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
-    When get feature flag "checkout-flow" is called for distinct id "user-123"
-    Then exactly one event named "$experiment_exposure" should be enqueued for flag "checkout-flow"
-    And the enqueued "$experiment_exposure" event properties should include:
-      | property                  | value |
-      | locally_evaluated         | true  |
-      | $feature_flag_variant_key | test  |
-    And no remote feature flag evaluation request should have been sent
+  # The two config version 2 scenarios, "A locally evaluated split is exposed" and "A remote
+  # result after the same local assignment is not a second exposure", are in
+  # flag-rules-v2-local-evaluation.feature, whose Background needs no fixture controls.
 
   @server
   Scenario: A locally evaluated config version 1 flag gets no SDK exposure

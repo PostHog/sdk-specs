@@ -357,6 +357,8 @@ The snapshot SHALL retain available payloads paired with its evaluated flag reco
 
 Payload representation MAY follow platform convention: decoded JSON values, a host JSON document, a validated serialized JSON string, or an additional typed decoding helper are all conformant. A missing flag, absent payload, or failed optional typed decode SHALL return the platform's documented empty/nullish result and SHALL NOT make value access unsafe.
 
+Payload presence SHALL be decided by whether the evaluation source supplied a payload, never by the payload's truthiness. A payload of `false`, `0`, an empty string, `[]`, or `{}` is a present payload and SHALL be retained and returned like any other. This holds for every evaluation source. In particular, a flag resolved from loaded local definitions SHALL keep such a payload, including when the SDK builds the snapshot by enumerating every locally evaluated flag, so that path and a per-key payload read of the same flag agree.
+
 Serialized payloads SHALL be validated as JSON before public payload access, including accessors that return serialized strings without a typed decoding helper. Malformed, empty, or whitespace-only serialized JSON SHALL be logged and treated as an absent payload, returning the same documented empty/nullish result used for a known flag with no payload, never the malformed raw string. JavaScript and TypeScript snapshot payload getters SHALL use `null` for this case, not the unavailable-flag `undefined` sentinel. A valid serialized string representation remains permitted; this requirement does not force raw-string snapshot APIs to change their valid-payload return types. Already-decoded strings MUST NOT be decoded again. Payload failure MUST NOT discard the snapshot, the flag's evaluated value, or healthy sibling payloads, and MUST NOT add network or tracking side effects.
 
 #### Scenario: Payload read is a silent snapshot lookup
@@ -391,6 +393,29 @@ Serialized payloads SHALL be validated as JSON before public payload access, inc
   | remote evaluation | "{broken" |
   | remote evaluation | ""        |
   | remote evaluation | "   "     |
+
+#### Scenario Outline: Snapshot payload reads preserve falsy payloads
+- **GIVEN** feature flags are supplied through <source> with these payloads:
+  | key      | value | payload_json        |
+  | checkout | blue  | <payload>           |
+  | beta-ui  | true  | {"color":"green"}   |
+- **WHEN** evaluate flags is called for distinct id "user-123"
+- **AND** snapshot payload is read for "checkout"
+- **THEN** the returned payload should represent JSON <payload> in the platform's documented representation
+- **AND** the language's no-payload value should not be returned for "checkout"
+- **AND** reading the payload should not send a feature flag network request
+- **AND** the snapshot should retain the payload for "beta-ui" in the platform's documented representation
+
+**Examples:**
+  | source            | payload |
+  | local evaluation  | false   |
+  | local evaluation  | 0       |
+  | local evaluation  | []      |
+  | local evaluation  | {}      |
+  | remote evaluation | false   |
+  | remote evaluation | 0       |
+  | remote evaluation | []      |
+  | remote evaluation | {}      |
 
 ### Requirement: Snapshot evaluation runtime access
 

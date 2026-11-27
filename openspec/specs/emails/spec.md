@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Send one transactional email, such as a password reset or a receipt, to one recipient — from a transactional template in PostHog, or from content the caller's code rendered — and read the email's delivery status by its message ID. Every attempt of one call uses the same idempotency key so PostHog can deduplicate retries, and an error keeps PostHog's stable code.
+Send one email, such as a password reset, a receipt or, from code, a newsletter in a marketing message category, to one recipient — from a transactional template in PostHog, or from content the caller's code rendered — and read the email's delivery status by its message ID. Every attempt of one call uses the same idempotency key so PostHog can deduplicate retries, and an error keeps PostHog's stable code.
 
 ## Applicability
 
 Server SDKs only. Both operations need a secret key (a project secret API key), which must never reach a client. The reference surfaces are `posthog.emails` in posthog-node and `client.emails`, `Emails` and `AsyncEmails` in posthog-python's `posthog.emails`. Other SDKs can use native names, async conventions, and error channels, as the requirements allow.
 
-Not covered: local templates (template data on a code send, the content hash, the upload by key), `cc`, `bcc`, custom headers, tags and attachments, which the send API does not accept yet.
+Not covered: local templates (template data on a code send, the content hash, the upload by key), `cc`, `bcc`, custom headers, tags and attachments, which the send API does not accept yet, and managing message categories and recipients' opt-outs outside a send.
 
 ## Public surface
 
@@ -17,7 +17,7 @@ Names below use posthog-node spelling, then posthog-python spelling.
 | Operation | Inputs and defaults | Result |
 |---|---|---|
 | `send`, template form | Required `to`, `templateId` / `template_id`; optional `templateData` / `template_data`, `distinctId` / `distinct_id`, `idempotencyKey` / `idempotency_key` (default: a UUID v4 for the call), `maxRetries` (default: the client's) | Send result: `id`, `replayed`, `warnings` |
-| `send`, code form | Required `to`, `templateKey` / `template_key`, `subject`, and `html`, `text` or both; optional `from` / `from_`, `replyTo` / `reply_to`, `captureEngagement` / `capture_engagement` (default: true), plus the same `distinctId`, `idempotencyKey` and `maxRetries` | Send result: `id`, `replayed`, `warnings` |
+| `send`, code form | Required `to`, `templateKey` / `template_key`, `subject`, and `html`, `text` or both; optional `from` / `from_`, `replyTo` / `reply_to`, `captureEngagement` / `capture_engagement` (default: true), `category` (default: none sent), plus the same `distinctId`, `idempotencyKey` and `maxRetries` | Send result: `id`, `replayed`, `warnings` |
 | `get` | Message ID from a send result | Status record: `id`, `status`, `createdAt` / `created_at`, `statusAt` / `status_at`, `reason` |
 
 | Client option | posthog-node | posthog-python | Default |
@@ -33,7 +33,7 @@ Names below use posthog-node spelling, then posthog-python spelling.
 | Operation | Request | Success |
 |---|---|---|
 | `send`, template form | `POST {app host}/api/projects/@current/messaging/send/email/` with `{"template_id", "to", "message_data", "distinct_id"}` | `2xx` with `{"message_id", "replayed", "warnings"}` |
-| `send`, code form | the same route, with `{"template_key", "subject", "html" and/or "text", "to", "capture_engagement", "from", "reply_to", "distinct_id"}` | `2xx` with `{"message_id", "replayed", "warnings"}` |
+| `send`, code form | the same route, with `{"template_key", "subject", "html" and/or "text", "to", "capture_engagement", "from", "reply_to", "distinct_id", "category"}` | `2xx` with `{"message_id", "replayed", "warnings"}` |
 | `get` | `GET {app host}/api/projects/@current/messaging/emails/{message_id}/` | `200` with `{"id", "status", "created_at", "status_at", "reason"}` |
 
 The status is one of `queued`, `sent`, `failed`, `delivered`, `bounced`, or `complained` today, and new statuses can appear.
@@ -130,7 +130,7 @@ For a client host that is not PostHog Cloud and no caller-set app host, the SDK 
 
 The template form SHALL hold `template_id` (the template ID in lowercase), `to`, `message_data` (the template data, or an empty object), and `distinct_id` only when the caller passed a distinct ID.
 
-The code form SHALL hold `template_key`, `subject`, `to`, `capture_engagement`, and `html`, `text` or both. It SHALL hold `from`, `reply_to` and `distinct_id` only when the caller passed them. A reply-to given as one address SHALL be sent as a one-item list, and an empty reply-to list SHALL be left out of the body.
+The code form SHALL hold `template_key`, `subject`, `to`, `capture_engagement`, and `html`, `text` or both. It SHALL hold `from`, `reply_to`, `distinct_id` and `category` only when the caller passed them. A reply-to given as one address SHALL be sent as a one-item list, and an empty reply-to list SHALL be left out of the body.
 
 #### Scenario: The template and its data reach the send route
 - **WHEN** the caller sends to `user@example.com` with template ID `0190F6D2-7C1E-7B3A-9F5E-1C2D3E4F5A6B`, template data `{"name": "Ada"}` and distinct ID `user_123`
@@ -159,11 +159,11 @@ A send SHALL carry `Content-Type: application/json`, `Accept: application/json`,
 
 ### Requirement: Send code form
 
-The code form SHALL take a required template key and subject, with `html`, `text` or both, and SHALL take an optional sender address, an optional reply-to of one address or a list of addresses, and an optional capture-engagement flag that defaults to true. The template key names the email so PostHog can group its metrics, logs and status under it; it is not a template stored in PostHog. PostHog sends the content as given and does not store it.
+The code form SHALL take a required template key and subject, with `html`, `text` or both, and SHALL take an optional sender address, an optional reply-to of one address or a list of addresses, an optional capture-engagement flag that defaults to true, and an optional message category, as **Send message category** says. The template key names the email so PostHog can group its metrics, logs and status under it; it is not a template stored in PostHog. PostHog sends the content as given and does not store it.
 
 The shared send inputs — the recipient, the distinct ID, the idempotency key and the per-send retry limit — apply to both forms.
 
-One call SHALL carry exactly one form. The SDK SHALL refuse, before any request, a call that names neither form, a call that names both, and a call that sets a field belonging to the other form, such as template data on a code send or a subject on a template send. Capture engagement belongs to the code form only: a template made in PostHog follows the project's engagement setting.
+One call SHALL carry exactly one form. The SDK SHALL refuse, before any request, a call that names neither form, a call that names both, and a call that sets a field belonging to the other form, such as template data on a code send or a subject on a template send. Capture engagement and the message category belong to the code form only: a template made in PostHog follows the project's engagement setting and sends in its own category. An SDK whose types already keep a field off the template form refuses it through its types.
 
 #### Scenario: Capture engagement defaults to true
 - **WHEN** the caller sends a code-form email without a capture-engagement value
@@ -177,6 +177,11 @@ One call SHALL carry exactly one form. The SDK SHALL refuse, before any request,
 #### Scenario: A template send refuses a code-form field
 - **WHEN** the caller sends an email with a template ID and a subject
 - **THEN** the SDK reports an argument error
+- **AND** no request is made
+
+#### Scenario: A template send refuses a message category
+- **WHEN** the caller sends an email with a template ID and a message category
+- **THEN** the SDK refuses the call, through its types or with an argument error
 - **AND** no request is made
 
 ### Requirement: Argument checks
@@ -258,7 +263,7 @@ An error from a PostHog response SHALL carry the response's `code` unchanged, or
 
 ### Requirement: Error names
 
-An error SHALL carry a `name`, a coarse category for callers that branch on the kind of failure rather than the exact code. The name SHALL follow the mapping in the Error names table of this spec, which keys on the HTTP status and, for `409`, `422` and `429`, on the code. A local argument error with an `invalid_*` code and no HTTP status SHALL be named `validation_error`.
+An error SHALL carry a `name`, a coarse class for callers that branch on the kind of failure rather than on the exact code. The name SHALL follow the mapping in the Error names table of this spec, which keys on the HTTP status and, for `409`, `422` and `429`, on the code. A local argument error with an `invalid_*` code and no HTTP status SHALL be named `validation_error`.
 
 #### Scenario: A quota error has the quota name
 - **WHEN** the response is `429` with code `quota_limited`
@@ -326,3 +331,25 @@ After the client shuts down, it SHALL send no email request and SHALL report the
 - **WHEN** the caller sends an email
 - **THEN** the SDK reports the error code `client_closed`
 - **AND** no request is made
+
+### Requirement: Send message category
+
+The code form SHALL take an optional message category: the key of one of the project's message categories, such as `newsletter`, as a string. The message category belongs to the code form only, as **Send code form** says.
+
+In the body, `category` SHALL be the key as the caller gave it. A category counts as left out when the caller didn't pass it, or passed the unset value of an SDK that marks unset options that way, such as null, nil or None. The SDK SHALL NOT send a default category.
+
+PostHog sends the email in the category with that key. A marketing category skips recipients who opted out of it or of all marketing email, fills `{{ unsubscribe_url }}` with the recipient's preferences link, and adds List-Unsubscribe headers. A skipped recipient is not a send error: PostHog accepts the send. A transactional category only files the email. Without a category, the email is transactional with no category, as before. When the project has no verified sending domain, a send in a transactional category goes out from the PostHog test sender with the `sandbox_sender` warning, as a send without a category does, and a send in a marketing category is refused with `sandbox_fields_unsupported`.
+
+PostHog can refuse a send in a message category with `400` and one of these codes: `category_not_found` when the project has no category with that key or it is deleted, `marketing_copies_unsupported` when a marketing email has copies, and `sandbox_fields_unsupported` when a marketing email would go out from the PostHog test sender because the project has no verified sending domain. **Error fields**, **Error names** and **Retryable responses** apply to them as to any other code. An SDK that types PostHog's error codes as a closed set, such as an enum or a union, SHALL include these three. `marketing_copies_unsupported` answers a marketing send with `cc` or `bcc`, which the code form doesn't take yet.
+
+#### Scenario: A category key reaches the send route
+- **WHEN** the caller sends a code-form email with category `newsletter`
+- **THEN** the body holds `"category": "newsletter"`
+
+#### Scenario: No category leaves the field out
+- **WHEN** the caller sends a code-form email without a category
+- **THEN** the body has no `category`
+
+#### Scenario: An unknown category keeps PostHog's code
+- **WHEN** a code-form send with category `newsletter` fails with a `400` and code `category_not_found`
+- **THEN** the SDK makes 1 attempt and reports the error code `category_not_found` with the name `validation_error`

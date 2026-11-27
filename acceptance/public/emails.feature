@@ -28,6 +28,28 @@ Feature: Emails
     And the request body should equal JSON {"template_key":"password-reset","subject":"Reset your password","html":"<p>Hi</p>","capture_engagement":true,"to":"user@example.com","distinct_id":"user_123"}
     And the send result should have ID "msg_1" and replayed false
 
+  # Requirement: Send message category
+
+  Scenario: A code-form send carries its message category key
+    Given the SDK is initialized with token "test-token", host "https://us.i.posthog.com" and secret key "phs_test"
+    And the mock server will accept the next email send with message ID "msg_1"
+    When the caller sends to "user@example.com" with template key "monthly-news", subject "This month", HTML "<p>News {{ unsubscribe_url }}</p>" and message category "newsletter"
+    Then the mock server should receive 1 email send request
+    And the request body field "category" should equal JSON "newsletter"
+
+  Scenario Outline: A refused category send keeps PostHog's code and is not retried
+    Given the SDK is initialized with token "test-token", host "https://us.i.posthog.com" and secret key "phs_test"
+    And the mock server will fail the next email send with status 400 and code "<code>"
+    And the mock server will accept the next email send with message ID "msg_1"
+    When the caller sends to "user@example.com" with template key "monthly-news", subject "This month", HTML "<p>News {{ unsubscribe_url }}</p>" and message category "newsletter"
+    Then the mock server should receive 1 email send request
+    And the send should fail with error code "<code>", name "validation_error" and status 400
+
+    Examples:
+      | code                       |
+      | category_not_found         |
+      | sandbox_fields_unsupported |
+
   # Requirement: Custom host refusal
 
   Scenario: A custom host without an app host never receives the secret key
@@ -90,7 +112,7 @@ Feature: Emails
 
   # Requirements: Error fields, Error names
 
-  Scenario Outline: Errors keep PostHog's code and carry a category name
+  Scenario Outline: Errors keep PostHog's code and carry an error name
     Given the SDK is initialized with token "test-token", host "https://us.i.posthog.com" and secret key "phs_test"
     And the mock server will fail the next email send with status <status> and code "<code>"
     When the caller sends to "user@example.com" with template ID "0190f6d2-7c1e-7b3a-9f5e-1c2d3e4f5a6b" and a per-send retry limit of 0

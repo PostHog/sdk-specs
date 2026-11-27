@@ -299,6 +299,56 @@ Feature: Feature Flag Called Tracker
       | shipping the winner        | checkout-flow | true  | "experiment_split" | 2                    | "experiment"    | "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" | "test"            | "targeting_match"   | "targeted_release" | "d2b8c6f4-1e3a-4c5d-9f07-6a8b2c4e0d13" | absent           | $feature_flag_rule_id        | d2b8c6f4-1e3a-4c5d-9f07-6a8b2c4e0d13 |
       | moving to config version 2 | beta-ui       | true  | absent             | 1                    | absent          | absent                                 | absent            | "targeting_match"   | "targeted_release" | "c41f9e07-2d6b-4a83-b5e1-7f0a3c8d2e96" | absent           | $feature_flag_config_version | 2                                    |
 
+  # Values the record did not supply are sent as for config version 1, even when they
+  # equal the record's value.
+
+  @server @payload_flag_events_capable
+  Scenario Outline: A caller-supplied match value is reported as config version 1
+    Given the SDK is initialized with token "test-token"
+    And the flags response for distinct id "user-123" has a complete experiment split for "checkout-flow" with value "<record_value>", rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
+    When get feature flag payload "checkout-flow" is called for distinct id "user-123" with match value "annual" and flag events turned on
+    Then exactly one event named "$feature_flag_called" should be enqueued for flag "checkout-flow"
+    And the enqueued event property "$feature_flag_response" should equal "annual"
+    And the enqueued event properties should not include "$feature_flag_config_version"
+    And the enqueued event properties should not include "$feature_flag_reason_code"
+    And the enqueued event properties should not include "$feature_flag_rule_id"
+    And the enqueued event properties should not include "$feature_flag_rule_type"
+    And the enqueued event properties should not include "$feature_flag_variant_key"
+    And no event named "$experiment_exposure" should be enqueued
+    When get feature flag "checkout-flow" is called for distinct id "user-123"
+    Then two "$feature_flag_called" events should be enqueued for flag "checkout-flow"
+    And the last enqueued "$feature_flag_called" event property "$feature_flag_config_version" should equal "2"
+    And the last enqueued "$feature_flag_called" event property "$feature_flag_variant_key" should equal "test"
+    And exactly one event named "$experiment_exposure" should be enqueued for flag "checkout-flow"
+
+    Examples:
+      | case             | record_value |
+      | equal values     | annual       |
+      | different values | monthly      |
+
+  @server @flag_fallback_cache_capable
+  Scenario Outline: A stale cached value is reported as config version 1
+    Given the SDK is initialized with token "test-token" and a cache of earlier flag results
+    And that cache holds the value "annual" for flag "checkout-flow" and distinct id "user-123"
+    And the flags response for distinct id "user-123" has a complete experiment split for "checkout-flow" with value "<record_value>", rule id "3f6b1c2e-7a4d-4b8e-9c21-5d0e8f7a6b13" and variant key "test"
+    And <failure>
+    When get feature flag "checkout-flow" is called for distinct id "user-123"
+    Then the returned feature flag value should be "annual"
+    And exactly one event named "$feature_flag_called" should be enqueued for flag "checkout-flow"
+    And the enqueued event property "$feature_flag_response" should equal "annual"
+    And the enqueued event properties should not include "$feature_flag_config_version"
+    And the enqueued event properties should not include "$feature_flag_reason_code"
+    And the enqueued event properties should not include "$feature_flag_rule_id"
+    And the enqueued event properties should not include "$feature_flag_rule_type"
+    And the enqueued event properties should not include "$feature_flag_variant_key"
+    And no event named "$experiment_exposure" should be enqueued
+
+    Examples:
+      | case                                | record_value | failure                                               |
+      | failed flags request                | annual       | the next remote feature flag evaluation request fails |
+      | failed cache write                  | annual       | writing the flags result to that cache fails          |
+      | failed cache write, different value | monthly      | writing the flags result to that cache fails          |
+
   # Minimal-event mode
 
   @both

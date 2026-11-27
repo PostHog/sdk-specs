@@ -292,6 +292,36 @@ Feature: Local Feature Flag Evaluator
     And the local evaluation result should be true from the second condition
 
   @server
+  Scenario: A later filter that does not match rules out a condition with missing context
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And remote feature flag evaluation is enabled
+    And local feature flag "beta-ui" has a single condition requiring person property "plan" equal to "pro" and person property "region" equal to "US"
+    When local feature flag "beta-ui" is evaluated with person property "region" equal to "EU" and no "plan" property
+    Then the condition should be a definitive no-match
+    And the local evaluation result should be false
+    And local evaluation should not be inconclusive
+
+  @server
+  Scenario: A condition stays inconclusive when every checkable filter matches
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And remote feature flag evaluation is enabled
+    And local feature flag "beta-ui" has a single condition requiring person property "plan" equal to "pro" and person property "region" equal to "US"
+    When local feature flag "beta-ui" is evaluated with person property "region" equal to "US" and no "plan" property
+    Then local evaluation should be inconclusive
+    And remote evaluation should remain eligible
+
+  @server
+  Scenario: A ruled-out condition does not keep the flag inconclusive
+    Given the SDK is initialized with token "test-token" and local evaluation enabled
+    And remote feature flag evaluation is enabled
+    And local feature flag "beta-ui" has a first condition requiring person property "plan" equal to "pro" and person property "region" equal to "US"
+    And its second condition requires person property "region" equal to "APAC"
+    When local feature flag "beta-ui" is evaluated with person property "region" equal to "EU" and no "plan" property
+    Then the first condition should be a definitive no-match
+    And the local evaluation result should be false
+    And local evaluation should not be inconclusive
+
+  @server
   Scenario: Early exit stops after a targeted rollout exclusion
     Given the SDK is initialized with token "test-token" and local evaluation enabled
     And local feature flag "beta-ui" has early exit enabled

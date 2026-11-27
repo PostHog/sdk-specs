@@ -1,10 +1,9 @@
 ## 1. Spec delta
 
-- [x] 1.1 Add **Send message category** with the optional `category` of the code form, its wire shape, the left-out rule, its meaning on the server, and its refusal codes
+- [x] 1.1 Add **Send message category** with the optional `category` key of the code form, its wire shape, the left-out rule, its meaning on the server, and its refusal codes
 - [x] 1.2 Modify **Send code form** so the message category is a code-form input that a template send refuses
 - [x] 1.3 Modify **Send request** so the code form holds `category` only when the caller passed one
-- [x] 1.4 Modify **Argument checks** so the SDK checks the category's shape and leaves the key's format and the lengths to PostHog
-- [x] 1.5 Modify **Error names** so the error name is not called a category
+- [x] 1.4 Modify **Error names** so the error name is not called a category
 
 ## 2. Prose alignment (applied at archive, outside the requirement delta)
 
@@ -16,5 +15,5 @@
 
 ## 4. Validation
 
-- [x] 4.1 Check the delta against the contract in PostHog/posthog#132118 and the eight SDK changes
+- [x] 4.1 Check the delta against the contract in PostHog/posthog#142574 and PostHog/posthog#142564, and the eight SDK changes
 - [x] 4.2 Run `openspec validate --specs --strict` and archive the change into `specs/emails/spec.md`

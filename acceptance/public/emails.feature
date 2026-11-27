@@ -30,40 +30,25 @@ Feature: Emails
 
   # Requirement: Send message category
 
-  Scenario Outline: A code-form send carries its message category as given
+  Scenario: A code-form send carries its message category key
     Given the SDK is initialized with token "test-token", host "https://us.i.posthog.com" and secret key "phs_test"
     And the mock server will accept the next email send with message ID "msg_1"
-    When the caller sends to "user@example.com" with template key "monthly-news", subject "This month", HTML "<p>News {{ unsubscribe_url }}</p>" and message category <category>
+    When the caller sends to "user@example.com" with template key "monthly-news", subject "This month", HTML "<p>News {{ unsubscribe_url }}</p>" and message category "newsletter"
     Then the mock server should receive 1 email send request
-    And the request body field "category" should equal JSON <sent>
-
-    Examples:
-      | category                                                                                         | sent                                                                                             |
-      | {"key":"newsletter","type":"marketing","name":"Newsletter","description":"Monthly product news"} | {"key":"newsletter","type":"marketing","name":"Newsletter","description":"Monthly product news"} |
-      | {"key":"receipts","type":"transactional","name":"Receipts"}                                      | {"key":"receipts","type":"transactional","name":"Receipts"}                                      |
-      | {"key":"newsletter","type":"marketing","name":"Newsletter","description":""}                     | {"key":"newsletter","type":"marketing","name":"Newsletter","description":""}                     |
-
-  Scenario: The built-in transactional value is sent as a string
-    Given the SDK is initialized with token "test-token", host "https://us.i.posthog.com" and secret key "phs_test"
-    And the mock server will accept the next email send with message ID "msg_1"
-    When the caller sends to "user@example.com" with template key "password-reset", subject "Reset your password", HTML "<p>Hi</p>" and the built-in transactional value as message category
-    Then the mock server should receive 1 email send request
-    And the request body field "category" should equal JSON "transactional"
+    And the request body field "category" should equal JSON "newsletter"
 
   Scenario Outline: A refused category send keeps PostHog's code and is not retried
     Given the SDK is initialized with token "test-token", host "https://us.i.posthog.com" and secret key "phs_test"
-    And the mock server will fail the next email send with status <status> and code "<code>"
+    And the mock server will fail the next email send with status 400 and code "<code>"
     And the mock server will accept the next email send with message ID "msg_1"
-    When the caller sends to "user@example.com" with template key "monthly-news", subject "This month", HTML "<html>" and message category {"key":"newsletter","type":"marketing","name":"Newsletter"}
+    When the caller sends to "user@example.com" with template key "monthly-news", subject "This month", HTML "<p>News {{ unsubscribe_url }}</p>" and message category "newsletter"
     Then the mock server should receive 1 email send request
-    And the send should fail with error code "<code>", name "validation_error" and status <status>
+    And the send should fail with error code "<code>", name "validation_error" and status 400
 
     Examples:
-      | status | code                      | html                              |
-      | 400    | category_mismatch         | <p>News {{ unsubscribe_url }}</p> |
-      | 400    | too_many_categories       | <p>News {{ unsubscribe_url }}</p> |
-      | 400    | unsubscribe_link_required | <p>News</p>                       |
-      | 422    | recipient_opted_out       | <p>News {{ unsubscribe_url }}</p> |
+      | code                       |
+      | category_not_found         |
+      | sandbox_fields_unsupported |
 
   # Requirement: Custom host refusal
 

@@ -13,7 +13,7 @@ Deferring a condition that is already ruled out costs a `/flags` request the SDK
 
 - Add an **Every filter in a condition is checked** requirement to `local-feature-flag-evaluator`: an inconclusive filter does not stop the condition; a filter that definitively does not match makes the whole condition a definitive no-match; a condition is inconclusive only when nothing in it definitively failed.
 - Record that such a condition behaves like any other mismatch — evaluation continues with the next condition group, and the flag can still resolve definitively.
-- Add acceptance scenarios for the ruled-out condition, the still-inconclusive condition, and a later condition resolving the flag.
+- Add acceptance scenarios for the ruled-out condition, the still-inconclusive condition, and a ruled-out condition that leaves the flag definitively false when no later condition matches.
 
 ## Capabilities
 

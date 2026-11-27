@@ -23,9 +23,11 @@ A condition ruled out this way SHALL behave like any other condition mismatch. E
 - **THEN** local evaluation should be inconclusive
 - **AND** remote evaluation should remain eligible
 
-#### Scenario: A later condition resolves a flag whose first condition was ruled out (@server)
+#### Scenario: A ruled-out condition does not keep the flag inconclusive (@server)
 - **GIVEN** a flag's first condition requires person property "plan" equal to "pro" and person property "region" equal to "US"
-- **AND** its second condition is a catch-all with rollout percentage `100.0`
+- **AND** its second condition requires person property "region" equal to "APAC"
+- **AND** remote feature flag evaluation is enabled
 - **WHEN** the flag is evaluated locally with person property "region" equal to "EU" and no "plan" property
 - **THEN** the first condition should be a definitive no-match
-- **AND** the local evaluation result should be true from the second condition
+- **AND** the local evaluation result should be false
+- **AND** local evaluation should not be inconclusive

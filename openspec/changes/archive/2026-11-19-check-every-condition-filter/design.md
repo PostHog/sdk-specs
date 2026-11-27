@@ -8,7 +8,7 @@ Pinned sources, all carrying the same loop shape — collect the inconclusive re
 - [Go](https://github.com/PostHog/posthog-go/blob/f0916de8da9a/featureflags.go#L1864-L1908)
 - [Node](https://github.com/PostHog/posthog-js/blob/04b89402b336/packages/node/src/extensions/feature-flags/feature-flags.ts#L767-L830)
 - [Ruby](https://github.com/PostHog/posthog-ruby/blob/d6d1efcb30f9/lib/posthog/feature_flags.rb#L1570-L1608)
-- [PHP](https://github.com/PostHog/posthog-php/blob/03b635f91a65/lib/FeatureFlag.php#L1439-L1490)
+- [PHP](https://github.com/PostHog/posthog-php/blob/03b635f91a65/lib/FeatureFlag.php#L1439-L1494)
 - [.NET](https://github.com/PostHog/posthog-dotnet/blob/883a6e4bbf0f/src/PostHog/Features/LocalEvaluator.cs#L544-L607)
 - [Elixir](https://github.com/PostHog/posthog-elixir/blob/e2f134777f77/lib/posthog/feature_flags/local_evaluator.ex#L593-L615)
 - [Rust](https://github.com/PostHog/posthog-rs/blob/eaeeff8c5adf/src/feature_flags.rs#L893-L909), aligned by [PostHog/posthog-rs#384](https://github.com/PostHog/posthog-rs/pull/384)

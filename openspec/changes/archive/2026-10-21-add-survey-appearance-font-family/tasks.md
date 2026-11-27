@@ -1,7 +1,7 @@
 ## 1. Spec delta
 
 - [x] 1.1 Add the **Survey appearance font family** requirement to the `surveys` delta
-- [x] 1.2 Define the unset cases and the `inherit` sentinel
+- [x] 1.2 Define the first-family reading, the unset cases, and the `inherit` and `system-ui` keywords
 - [x] 1.3 Define the unresolvable-family fallback and the delegated pass-through
 
 ## 2. Acceptance coverage

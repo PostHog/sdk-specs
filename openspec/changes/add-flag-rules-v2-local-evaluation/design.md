@@ -161,11 +161,11 @@ Contract 10.2.0 pins both: the `flag_disabled` cases for supported documents, an
 
 ## Acceptance features
 
-`acceptance/private/flag-rules-v2-local-evaluation.feature` is black-box: it serves typed definitions, calls public getters and evaluated snapshots, flushes, and checks received events and `/flags` traffic. Most of its steps are bound today. It needs six new bindings, which the harness's local evaluation suite adds ([posthog-sdk-test-harness#123](https://github.com/PostHog/posthog-sdk-test-harness/pull/123)); the feature's header comment names each step and what it does. One is a local evaluation setup that allows `/flags` requests: the harness's native local evaluation setup fails a scenario that sends one, and the fallback scenarios must.
+`acceptance/private/flag-rules-v2-local-evaluation.feature` is black-box: it serves typed definitions, calls public getters and evaluated snapshots, flushes, and checks received events and `/flags` traffic. Most of its steps are bound today. It needs seven new bindings, which the harness's local evaluation suite adds ([posthog-sdk-test-harness#123](https://github.com/PostHog/posthog-sdk-test-harness/pull/123)); the feature's header comment names each step and what it does. One is a local evaluation setup that allows `/flags` requests: the harness's native local evaluation setup fails a scenario that sends one, and the fallback scenarios must.
 
 The scenarios keep the legacy `@server` tag and add `@requires:feature_flags_local_evaluation_v2`. They move to `@sdk:server` once the steps are bound and a real SDK adapter passes them.
 
-The feature also holds the poll with a conditional request, and the two `experiment-exposure` scenarios for a locally evaluated split, in a Rule: `experiment-exposure.feature`'s Background needs fixture controls that no black-box adapter offers.
+The feature also holds a manual reload with a conditional request and, in a Rule, the two `experiment-exposure` scenarios for a locally evaluated split: `experiment-exposure.feature`'s Background needs fixture controls that no black-box adapter offers. A timed poll has no black-box scenario yet, because the harness has no public polling-interval setting.
 
 The shared-cache scenarios in `flag-definition-loader.feature` use that feature's own phrasing. The harness cannot run any scenario of that feature yet, because most of its steps are unbound, so these scenarios also wait for those bindings.
 

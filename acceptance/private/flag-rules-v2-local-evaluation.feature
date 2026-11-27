@@ -10,7 +10,7 @@ Feature: Local evaluation of config version 2 flags
   # "person-example" and person properties {"plan": "pro"}. The "example-display-key"
   # documents come from corpus/v2_local_evaluation.json of the same contract.
   #
-  # Six steps need harness bindings that the local evaluation suite adds
+  # Seven steps need harness bindings that the local evaluation suite adds
   # (posthog-sdk-test-harness#123):
   # - "the definitions service serves this typed document for v=2 requests:" serves its
   #   document to a definitions request with exactly one v parameter, equal to 2. Every
@@ -33,6 +33,8 @@ Feature: Local evaluation of config version 2 flags
   #   reload must get 304.
   # - "the definition request should include If-None-Match "<etag>"" checks the latest
   #   definitions request.
+  # - "every flag definitions request after the first should have been answered with 304"
+  #   needs at least one definitions request and a 304 for every later one.
 
   Background:
     Given an isolated SDK with empty persistent storage
@@ -126,9 +128,10 @@ Feature: Local evaluation of config version 2 flags
     And every flag definitions request query parameter "v" should equal "2"
     And no remote flag evaluation path should have been requested
 
-  Scenario: A poll with a conditional request keeps asking for the version 2 feed
-    A reload that left out v=2 would send the ETag of the version 2 feed to the legacy
-    feed, get the legacy body, and lose "layout-preview".
+  Scenario: A manual reload with a conditional request asks for the version 2 feed and keeps its definitions
+    The reload sends the ETag of the version 2 feed. Without v=2 it would reach the legacy
+    feed, get the legacy body and lose "layout-preview". After the 304 the SDK reads the flag
+    from what it holds, with no second download.
 
     Given the definitions service serves this typed document:
       """application/json
@@ -170,6 +173,7 @@ Feature: Local evaluation of config version 2 flags
       {"key":"layout-preview","distinct_id":"person-example","person_properties":{"plan":"pro"}}
       """
     Then the local flag getter should return JSON true
+    And every flag definitions request after the first should have been answered with 304
     And no remote flag evaluation path should have been requested
 
   # Inactive flags: corpus/v2_local_evaluation.json, family "flag_disabled", and the document

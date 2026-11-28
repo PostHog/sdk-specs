@@ -22,7 +22,7 @@ It is mainly used when callers need stronger delivery guarantees before a bounda
 | Primary use | Best-effort immediate upload of queued events before app/lifecycle transitions. | Drain the in-process event queue before process/request shutdown. |
 | Return type | Often `void` on native/mobile SDKs; Promise on js-core-based SDKs. | Often Promise / blocking call until the queue drains. |
 | Replay/snapshot queues | Some SDKs flush both the normal analytics queue and replay/snapshot queues. | Usually just the analytics/event queue. |
-| Failure surfacing | Native client SDKs often swallow/log errors; js-core Promise can reject. | Server SDKs more commonly surface failure through rejection or by blocking until worker completion. |
+| Failure surfacing | Native client SDKs often swallow/log errors; js-core Promise can reject (React Native 5.0+ resolves). | Server SDKs more commonly surface failure through rejection or by blocking until worker completion. |
 
 ## Public signatures
 
@@ -34,7 +34,7 @@ flush(): void | Promise<void>
 
 ### Surface variants
 
-- **posthog-js core / react-native:** `flush(): Promise<void>`
+- **posthog-js core / react-native:** `flush(): Promise<void>`; on react-native 5.0+ it resolves when a send fails, and 4.x rejects
 - **Flutter:** `flush(): Future<void>`
 - **Node:** `flush(): Promise<void>`
 - **Ruby:** `flush(timeout: nil): Boolean` — accepts an optional timeout; returns `true` when
@@ -80,7 +80,7 @@ flush(): void | Promise<void>
 ## Error handling
 
 - Client/native SDKs often log and swallow flush failures.
-- js-core-based Promise APIs may reject on transport/HTTP failures.
+- js-core-based Promise APIs may reject on transport/HTTP failures. posthog-react-native 5.0 resolves instead: events kept for a later send stay queued, and dropped events (for example after a `400` or `401`) are reported on `posthog.on('error')`.
 - Python blocks on `queue.join()`; failure handling primarily happens in the consumer thread rather than by raising from `flush()` itself.
 - `flush()` should not crash application code under normal conditions.
 

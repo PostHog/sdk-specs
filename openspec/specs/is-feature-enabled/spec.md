@@ -60,7 +60,8 @@ isFeatureEnabled(
 
 ### Surface variants
 
-- **posthog-js core / browser / posthog-js-lite / react-native:** `isFeatureEnabled(key, { defaultValue })`
+- **posthog-js core / browser / posthog-js-lite:** `isFeatureEnabled(key, { defaultValue })`
+- **react-native:** `isFeatureEnabled(key, { defaultValue, sendFeatureFlagEvent }): boolean` (5.0+; `defaultValue` falls back to `false`; 4.x returns `boolean | undefined` and takes `sendEvent`)
 - **flutter:** `isFeatureEnabled(key, {sendFeatureFlagEvent, defaultValue}): Future<bool>`
 - **iOS:** `isFeatureEnabled(_ key: String)`, `isFeatureEnabled(_ key: String, sendFeatureFlagEvent: Bool)`, `isFeatureEnabled(_ key: String, defaultValue: Bool)`, and `isFeatureEnabled(_ key: String, defaultValue: Bool, sendFeatureFlagEvent: Bool)`
 - **Android:** `isFeatureEnabled(key, defaultValue = false, sendFeatureFlagEvent = null)`
@@ -80,7 +81,7 @@ isFeatureEnabled(
    - `true` stays `true`
    - `false` stays `false`
    - a non-empty variant string is treated as `true`
-   - if the flag is unavailable, the caller-supplied `defaultValue` is returned; with no default supplied, behavior follows the allowed variation named in the requirement (`false` by construction, or `undefined` for the three-state posthog-js family)
+   - if the flag is unavailable, the caller-supplied `defaultValue` is returned; with no default supplied, behavior follows the allowed variation named in the requirement (`false` by construction, or `undefined` for the three-state posthog-js family other than React Native 5.0+)
 3. **Optionally emit `$feature_flag_called`.** In audited client SDKs this is usually enabled by default and can be disabled per call in some implementations.
 4. **Do not fetch from the network directly.** The method uses the currently cached flags; callers wanting fresh values must reload flags separately.
 
@@ -138,7 +139,7 @@ The SDK SHALL implement the canonical `is-feature-enabled` behavior described by
 
 The SDK SHALL accept a caller-supplied boolean default (`defaultValue`; parameter placement per platform idiom — `{ defaultValue }` in the options object across the posthog-js family, a positional `defaultValue` on Android and Unity, a labeled `defaultValue:` on iOS, a named `defaultValue:` on Flutter, a positional `$defaultValue` on PHP's snapshot accessor) and SHALL return it whenever the flag has no value: flags not loaded yet, a failed flags request, or no flag with that key in the loaded flags. A flag that has a value — including `false` and variant strings — always wins over the caller-supplied default.
 
-Allowed variation for the no-default call: SDKs whose signature builds in a `false` default (Android, Unity) or hard-code `false` for missing values (iOS, Flutter) resolve missing flags to `false` by construction. SDKs whose boolean API is three-state (`boolean | undefined` — the posthog-js family) SHALL keep returning `undefined`/nullish when the caller supplies no default; collapsing that bare call to `false` is a breaking change reserved for their next major.
+Allowed variation for the no-default call: SDKs whose signature builds in a `false` default (Android, Unity) or hard-code `false` for missing values (iOS, Flutter, and posthog-react-native 5.0, whose `defaultValue` falls back to `false`) resolve missing flags to `false` by construction. SDKs whose boolean API is three-state (`boolean | undefined` — the rest of the posthog-js family, and posthog-react-native 4.x) SHALL keep returning `undefined`/nullish when the caller supplies no default; collapsing that bare call to `false` is a breaking change reserved for their next major, as posthog-react-native 5.0 did.
 
 #### Scenario: Enabled check maps flag values to booleans (@both)
 - **GIVEN** a fresh SDK acceptance test harness

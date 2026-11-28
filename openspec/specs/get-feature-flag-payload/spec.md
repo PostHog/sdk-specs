@@ -49,7 +49,8 @@ getFeatureFlagPayload(
 
 ### Surface variants
 
-- **posthog-js core / browser / react-native:** `getFeatureFlagPayload(key)`
+- **posthog-js core / browser:** `getFeatureFlagPayload(key)`
+- **react-native:** `getFeatureFlagPayload(key)` (4.x); 5.0 removes it, so payloads are read with `getFeatureFlagResult(key, { sendFeatureFlagEvent: false })?.payload`
 - **flutter:** `getFeatureFlagPayload(key): Future<Object?>` (5.x); 6.0 removes it, so payloads are read with `getFeatureFlagResult(key, sendFeatureFlagEvent: false)` and `.payload`
 - **iOS:** `getFeatureFlagPayload(_ key: String)` (3.x); 4.0 removes it, so payloads are read with `getFeatureFlagResult(_ key: String, sendFeatureFlagEvent: false)?.payload`
 - **Android:** `getFeatureFlagPayload(key, defaultValue = null)` (3.x); 4.0 removes it, so payloads are read with `getFeatureFlagResult(key, sendFeatureFlagEvent = false)?.payload`

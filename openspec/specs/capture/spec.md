@@ -403,7 +403,7 @@ On capture v1, `$lib` and `$lib_version` are the one exception: the SDK fills it
 
 A registered or caller value for a key the SDK sets itself changes that event only. It SHALL NOT change the SDK's own state: a later event without that key carries the SDK's value again, and a caller `process_person_profile` option (on legacy capture, the `$process_person_profile` property) does not turn person processing on or off for the SDK.
 
-A registered `$process_person_profile`, and a `process_person_profile` option a wrapper SDK registers, SHALL NOT be sent with the identity events `$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`, `$set` and `$set_once`. With person processing off, PostHog drops the first four and ignores the person update in `$set` and `$set_once`, so a registered `false` would stop `identify`, `alias`, `group` and `setPersonProperties` from working. A value passed on the call or set in `before_send` still applies. posthog-ios 4.0, posthog-android 4.0 and posthog-flutter 6.0 do this. posthog-js and posthog-react-native still send the registered value.
+A registered `$process_person_profile`, and a `process_person_profile` option a wrapper SDK registers, SHALL NOT be sent with the identity events `$identify`, `$create_alias`, `$merge_dangerously`, `$groupidentify`, `$set` and `$set_once`. With person processing off, PostHog drops the first four and ignores the person update in `$set` and `$set_once`, so a registered `false` would stop `identify`, `alias`, `group` and `setPersonProperties` from working. A value passed on the call or set in `before_send` still applies. posthog-ios 4.0, posthog-android 4.0, posthog-flutter 6.0 and posthog-react-native 5.0 do this. posthog-js and posthog-react-native 4.x still send the registered value.
 
 The project token is request routing, not an event property. Where an SDK carries it on the event (posthog-js stamps `token` on every event and takes the batch `api_key` from it), the SDK SHALL set the configured token on every event, and a registered or caller `token` SHALL NOT replace it.
 
@@ -1341,7 +1341,7 @@ Constructing an SDK client that delivers events through capture v1 SHALL never t
 
 When a client SDK stamps cached feature flags onto a captured event, a flag whose value is the empty string `""` SHALL NOT be listed in `$active_feature_flags`. Its `$feature/<key>` property SHALL still carry `""`.
 
-Known gap: posthog-js core and react-native list every cached flag key in `$active_feature_flags`, including one whose value is `""`. A follow-up should leave it out there.
+posthog-react-native 5.0 leaves it out. Known gap: posthog-js core (and posthog-react-native 4.x) list every cached flag key in `$active_feature_flags`, including one whose value is `""`. A follow-up should leave it out there.
 
 #### Scenario: Empty variant flag is left out of active feature flags (@client)
 - **GIVEN** a fresh SDK acceptance test harness

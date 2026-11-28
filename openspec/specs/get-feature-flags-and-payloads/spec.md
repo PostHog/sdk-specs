@@ -47,12 +47,13 @@ getFeatureFlagsAndPayloads(
 
 ### Surface variants
 
-- **posthog-js core / browser / react-native:** `getFeatureFlagsAndPayloads()` → `{ flags, payloads }`
+- **posthog-js core / browser:** `getFeatureFlagsAndPayloads()` → `{ flags, payloads }`
+- **react-native:** `getFeatureFlagsAndPayloads()` → `{ flags, payloads }` (4.x); 5.0 removes it, so flags and their payloads are read with `getAllFeatureFlags()`
 - **Node:** `getAllFlagsAndPayloads(distinctId, options?)` → `{ featureFlags, featureFlagPayloads }`
 - **Python:** `get_all_flags_and_payloads(distinct_id, *, ...)` → `{ featureFlags, featureFlagPayloads }`
 - **Ruby:** `get_all_flags_and_payloads(distinct_id, groups: {}, person_properties: {}, group_properties: {}, only_evaluate_locally: false)` → `{ featureFlags, featureFlagPayloads, ... }`
 
-Some SDKs do not expose this exact paired bulk API and instead return richer per-flag objects from `GetAllFeatureFlagsAsync(...)` or require separate flag/payload calls. posthog-ios 4.0, posthog-android 4.0 and posthog_flutter 6.0 return per-flag result objects that carry the payload from `getAllFeatureFlags()` (see `get-feature-flags`).
+Some SDKs do not expose this exact paired bulk API and instead return richer per-flag objects from `GetAllFeatureFlagsAsync(...)` or require separate flag/payload calls. posthog-ios 4.0, posthog-android 4.0, posthog_flutter 6.0 and posthog-react-native 5.0 return per-flag result objects that carry the payload from `getAllFeatureFlags()` (see `get-feature-flags`).
 
 ## Behavior
 

@@ -55,8 +55,9 @@ getAllFlags(
 
 ### Surface variants
 
-- **posthog-js core / browser / react-native:** `getFeatureFlags()`
-- **iOS (4.0+), Android (4.0+), flutter (6.0+):** `getAllFeatureFlags()` returns a list of flag result objects (key, enabled, variant, payload), or `null` when flags are unavailable, instead of a key-to-value map. Each entry matches `getFeatureFlagResult` for that key, so an empty variant reads as disabled. It never sends `$feature_flag_called`.
+- **posthog-js core / browser:** `getFeatureFlags()`
+- **react-native:** `getFeatureFlags()` (4.x); 5.0 removes it, along with `getFeatureFlagPayloads()` and `getFeatureFlagsAndPayloads()`, so flags are read with `getAllFeatureFlags()`
+- **iOS (4.0+), Android (4.0+), flutter (6.0+), react-native (5.0+):** `getAllFeatureFlags()` returns a list of flag result objects (key, enabled, variant, payload), or `null` (`undefined` on react-native) when flags are unavailable, instead of a key-to-value map. Each entry matches `getFeatureFlagResult` for that key, so an empty variant reads as disabled. It never sends `$feature_flag_called`.
 - **Node:** `getAllFlags(distinctId, options?)`
 - **Python:** `get_all_flags(distinct_id, *, ...)`
 - **Ruby:** `get_all_flags(distinct_id, groups: {}, person_properties: {}, group_properties: {}, only_evaluate_locally: false)`
@@ -164,7 +165,7 @@ The SDK SHALL implement the canonical `get-feature-flags` behavior described by 
 
 ### Requirement: Flag result list reads an empty variant as disabled
 
-On SDKs where `getAllFeatureFlags()` returns a list of flag result objects (iOS 4.0+, Android 4.0+, Flutter 6.0+, KMP), each entry SHALL match what `get-feature-flag-result` returns for that key. A flag whose value is the empty string `""` SHALL stay in the list with `enabled: false` and `variant: ""`. SDKs that return a key → value map keep reporting `""`, as `get-feature-flag` does.
+On SDKs where `getAllFeatureFlags()` returns a list of flag result objects (iOS 4.0+, Android 4.0+, Flutter 6.0+, React Native 5.0+, KMP), each entry SHALL match what `get-feature-flag-result` returns for that key. A flag whose value is the empty string `""` SHALL stay in the list with `enabled: false` and `variant: ""`. SDKs that return a key → value map keep reporting `""`, as `get-feature-flag` does.
 
 #### Scenario: Flag result list reads an empty variant as disabled (@client)
 - **GIVEN** a fresh SDK acceptance test harness

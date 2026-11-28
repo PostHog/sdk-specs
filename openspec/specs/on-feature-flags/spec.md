@@ -35,7 +35,8 @@ The exact callback shape varies by SDK:
 ### Surface variants
 
 - **browser:** `onFeatureFlags(callback): () => void`
-- **js-core / react-native:** `onFeatureFlags(callback): () => void` with a simpler callback that receives the latest `featureFlags` map/list
+- **js-core:** `onFeatureFlags(callback): () => void` with a simpler callback that receives the latest `featureFlags` map/list
+- **react-native:** `onFeatureFlags(callback): () => void` whose callback receives `{ flags, variants, errorsLoading }`: the enabled flag keys, their variants, and whether the latest load failed (5.0+; 4.x passes the latest `featureFlags` map, like js-core)
 - **iOS:** `onFeatureFlags(callback) -> Subscription` with `unsubscribe()`, whose callback receives the enabled flag keys, their variants, and `errorsLoading`; also available from Objective-C as `onFeatureFlags:`
 - **Android:** `onFeatureFlags(PostHogFeatureFlagsCallback): PostHogFeatureFlagsSubscription` on the
   instance and on the static `PostHog` facade (4.0+), whose handle exposes `unsubscribe()`, and can
@@ -56,15 +57,15 @@ The exact callback shape varies by SDK:
 3. **Invoke again on subsequent updates.**
    - The callback is not one-shot; it is intended to react to future flag changes as well.
 4. **Pass callback data according to SDK style.**
-   - Browser and iOS pass enabled flag keys, variants, and an error indication like `errorsLoading`.
+   - Browser, iOS, and React Native 5.0+ pass enabled flag keys, variants, and an error indication like `errorsLoading`.
      These are the **error-aware** listeners.
-   - js-core / React Native expose a simpler callback shape centered on the latest feature-flag values,
+   - js-core (and React Native 4.x) expose a simpler callback shape centered on the latest feature-flag values,
      with no error indication.
-   - Browser, iOS, Android 4.0+, Flutter 6.0+, and js-core / React Native are the **payload-carrying** listeners.
+   - Browser, iOS, Android 4.0+, Flutter 6.0+, React Native, and js-core are the **payload-carrying** listeners.
    - Unity primarily exposes a readiness signal with no direct payload; callers re-read flags through getter APIs when notified.
 5. **Support immediate invocation when state is already loaded in some SDKs.**
-   - Browser, iOS, Android 4.0+, and Flutter 6.0+ call the callback once with the current values if
-     flags were already loaded. Android's reload completion is not part of this group.
+   - Browser, iOS, Android 4.0+, Flutter 6.0+, and React Native 5.0+ call the callback once with the
+     current values if flags were already loaded. Android's reload completion is not part of this group.
    - Other SDKs may instead invoke only on the next load/update cycle.
 6. **Do not mutate flags by subscribing.** The callback only observes flag readiness/change notifications.
 7. **Handle missing/no-flag cases SDK-specifically.**
@@ -231,7 +232,7 @@ A flag load already in flight when `reset()` or `close()` ran SHALL NOT be deliv
 
 A payload-carrying listener SHALL treat a flag whose value is the empty string `""` as disabled and leave it out of the flag keys and variants it receives, like a flag whose value is `false`. Readiness-only listeners are not affected.
 
-Known gap: posthog-js core and react-native pass the raw flag map, which still contains the `""` entry. A follow-up should drop it there.
+posthog-react-native 5.0 leaves it out. Known gap: posthog-js core (and posthog-react-native 4.x) pass the raw flag map, which still contains the `""` entry. A follow-up should drop it there.
 
 #### Scenario: Listener does not receive an empty variant flag
 - **GIVEN** a fresh SDK acceptance test harness

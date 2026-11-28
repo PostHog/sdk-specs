@@ -38,7 +38,7 @@ Where `ClientSetupConfig` contains the project token plus runtime options such a
 - **Flutter:** `setup(config): Future<void>`
 - **Unity:** `PostHogSDK.Setup(config)` / `PostHog.Setup(config)`
 
-The configuration object names the project credential `projectToken` on iOS, Android, Flutter, KMP, and React Native (and `ProjectToken` in the .NET server SDK's options). React Native's `PostHogProvider` takes a `projectToken` prop and keeps `apiKey` as a deprecated alias that loses to `projectToken` when both are set. One client SDK has not adopted the name yet: Unity's `PostHogConfig` and `PostHogSettings` expose `ApiKey`. Browser `init(token, …)` and the React Native `new PostHog(projectToken, options?)` constructor take the token positionally, so their parameter name is not part of the contract.
+The configuration object names the project credential `projectToken` on iOS, Android, Flutter, KMP, and React Native (and `ProjectToken` in the .NET server SDK's options). React Native's `PostHogProvider` takes a `projectToken` prop; 4.x also accepts `apiKey` as a deprecated alias that loses to `projectToken` when both are set, and 5.0 removes it. One client SDK has not adopted the name yet: Unity's `PostHogConfig` and `PostHogSettings` expose `ApiKey`. Browser `init(token, …)` and the React Native `new PostHog(projectToken, options?)` constructor take the token positionally, so their parameter name is not part of the contract.
 
 `setup` is the canonical name here because it is the dominant public naming across the native/mobile SDKs, even though browser uses `init(...)` and React Native commonly uses a constructor/provider surface.
 

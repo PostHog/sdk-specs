@@ -64,7 +64,8 @@ getFeatureFlag(
 
 ### Surface variants
 
-- **posthog-js core / browser / react-native:** `getFeatureFlag(key)`
+- **posthog-js core / browser:** `getFeatureFlag(key)`
+- **react-native:** `getFeatureFlag(key, { sendFeatureFlagEvent })`, which returns `undefined` for a key that isn't in the loaded flags (5.0+; 4.x returns `false` for it once flags have loaded, and takes `sendEvent`)
 - **flutter:** `getFeatureFlag(key, {sendFeatureFlagEvent}): Future<Object?>` (6.0+; before 6.0 `getFeatureFlag(key)`)
 - **iOS:** `getFeatureFlag(_ key: String)` and `getFeatureFlag(_ key: String, sendFeatureFlagEvent: Bool)`
 - **Android:** `getFeatureFlag(key, sendFeatureFlagEvent = null)` (4.0 removes `defaultValue`; use `getFeatureFlag(key) ?: default`)

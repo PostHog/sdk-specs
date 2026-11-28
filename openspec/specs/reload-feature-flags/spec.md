@@ -24,7 +24,7 @@ reloadFeatureFlags(callback?: (flags?: Record<string, boolean | string>, error?:
 - **flutter:** `reloadFeatureFlags(): Future<PostHogFeatureFlagsLoaded>` (6.0+; before 6.0 it returned `Future<void>`)
 - **react-native:**
   - `reloadFeatureFlags(): void`
-  - `reloadFeatureFlagsAsync(): Promise<Record<string, boolean | string> | undefined>`
+  - `reloadFeatureFlagsAsync(): Promise<PostHogFeatureFlagsLoaded>`, which resolves with `{ flags, variants, errorsLoading }` as `onFeatureFlags` callbacks receive it, and after a failed reload with the last known values and `errorsLoading: true` (5.0+; 4.x resolves with `Record<string, boolean | string> | undefined`, `undefined` after a failed reload)
 - **iOS:**
   - `reloadFeatureFlags()`
   - `reloadFeatureFlags(_ callback: @escaping (PostHogFeatureFlagsLoaded) -> Void)` (4.0+; before 4.0 the callback took no arguments)
